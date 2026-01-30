@@ -1,4 +1,4 @@
-# 🏥 App Médico - Sistema Profissional
+# 🏥 Viva Saúde - Sistema Profissional
 
 Sistema completo para médicos com autenticação via CPF e CRM, dashboard personalizado e arquitetura segura.
 

@@ -1,0 +1,72 @@
+// Prisma Schema para App Médico
+// Banco de dados: PostgreSQL (externo ao Docker)
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Modelo de Médico
+model Medico {
+  id            String   @id @default(uuid())
+  cpf           String   @unique @db.VarChar(11) // CPF sem formatação (11 dígitos)
+  crm           String   @unique @db.VarChar(20) // Ex: "12345-SP"
+  nomeCompleto  String   @db.VarChar(255)
+  email         String?  @unique @db.VarChar(255)
+  senhaHash     String   @db.VarChar(255) // Hash bcrypt
+  especialidade String?  @db.VarChar(100)
+  telefone      String?  @db.VarChar(20)
+  ativo         Boolean  @default(true)
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  // Relações
+  sessoes       Sessao[]
+  auditoria     Auditoria[]
+
+  @@map("medicos")
+  @@index([cpf])
+  @@index([crm])
+  @@index([email])
+}
+
+// Modelo de Sessão (Tokens JWT)
+model Sessao {
+  id        String   @id @default(uuid())
+  medicoId  String   @map("medico_id")
+  tokenHash String   @db.VarChar(255) // Hash do refresh token
+  expiresAt DateTime @map("expires_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  ipAddress String?  @map("ip_address") @db.VarChar(45) // IPv4 ou IPv6
+  userAgent String?  @map("user_agent") @db.Text
+
+  // Relação
+  medico Medico @relation(fields: [medicoId], references: [id], onDelete: Cascade)
+
+  @@map("sessoes")
+  @@index([medicoId])
+  @@index([expiresAt])
+}
+
+// Modelo de Auditoria (Logs de ações)
+model Auditoria {
+  id        String   @id @default(uuid())
+  medicoId  String?  @map("medico_id") // Null se ação não autenticada
+  acao      String   @db.VarChar(100) // Ex: "LOGIN", "LOGOUT", "ACESSO_DASHBOARD"
+  ipAddress String?  @map("ip_address") @db.VarChar(45)
+  userAgent String?  @map("user_agent") @db.Text
+  detalhes  Json?    // Dados adicionais em JSON
+  createdAt DateTime @default(now()) @map("created_at")
+
+  // Relação
+  medico Medico? @relation(fields: [medicoId], references: [id], onDelete: SetNull)
+
+  @@map("auditoria")
+  @@index([medicoId])
+  @@index([acao])
+  @@index([createdAt])
+}

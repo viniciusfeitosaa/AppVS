@@ -1,8 +1,8 @@
-# 📋 Plano de Desenvolvimento - App Médico
+# 📋 Plano de Desenvolvimento - Viva Saúde
 
 ## 🎯 Visão Geral do Projeto
 
-Sistema profissional para médicos com autenticação via CPF e CRM, dashboard personalizado e arquitetura segura com Docker e banco de dados externo.
+Sistema profissional para médicos (Viva Saúde) com autenticação via CPF e CRM, dashboard personalizado e arquitetura segura com Docker e banco de dados externo.
 
 ---
 
