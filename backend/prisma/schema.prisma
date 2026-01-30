@@ -19,6 +19,7 @@ model Medico {
   email         String?  @unique @db.VarChar(255)
   senhaHash     String   @db.VarChar(255) // Hash bcrypt
   especialidade String?  @db.VarChar(100)
+  vinculo       String?  @db.VarChar(20)   // Ex: "PJ" ou vazio (Associado)
   telefone      String?  @db.VarChar(20)
   ativo         Boolean  @default(true)
   createdAt     DateTime @default(now()) @map("created_at")

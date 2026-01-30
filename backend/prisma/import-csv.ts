@@ -71,6 +71,8 @@ async function main() {
   for await (const record of parser) {
     try {
       const nome = cleanString(record[0]);
+      const vinculoRaw = record[4]; // Coluna Vínculo (PJ ou vazio)
+      const vinculo = vinculoRaw?.trim().toUpperCase() === 'PJ' ? 'PJ' : null;
       const crm = record[7]?.trim().toUpperCase();
       const especialidade = cleanString(record[8]);
       const email = record[9]?.toLowerCase().trim() || null;
@@ -91,6 +93,7 @@ async function main() {
           nomeCompleto: nome,
           crm: crm,
           especialidade: especialidade,
+          vinculo: vinculo ?? undefined,
           email: email || undefined,
           telefone: celular,
         },
@@ -99,6 +102,7 @@ async function main() {
           crm,
           nomeCompleto: nome,
           especialidade,
+          vinculo: vinculo ?? null,
           email: email || null,
           telefone: celular,
           senhaHash: DEFAULT_PASSWORD_HASH,

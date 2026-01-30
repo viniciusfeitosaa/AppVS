@@ -9,6 +9,7 @@ export const getPerfilService = async (medicoId: string) => {
       crm: true,
       email: true,
       especialidade: true,
+      vinculo: true,
       telefone: true,
       ativo: true,
       createdAt: true,

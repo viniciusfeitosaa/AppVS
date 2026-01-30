@@ -6,6 +6,7 @@ export interface MedicoPerfil {
   crm: string;
   email: string | null;
   especialidade: string | null;
+  vinculo: string | null;
   telefone: string | null;
   ativo: boolean;
   createdAt: string;

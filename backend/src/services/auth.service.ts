@@ -11,6 +11,7 @@ export interface LoginResult {
     crm: string;
     email: string | null;
     especialidade: string | null;
+    vinculo: string | null;
   };
   accessToken: string;
   refreshToken: string;
@@ -71,6 +72,7 @@ export const loginService = async (
       crm: medico.crm,
       email: medico.email,
       especialidade: medico.especialidade,
+      vinculo: medico.vinculo ?? null,
     },
     accessToken,
     refreshToken,

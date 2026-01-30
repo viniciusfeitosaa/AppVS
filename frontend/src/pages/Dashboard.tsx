@@ -78,6 +78,12 @@ const Dashboard = () => {
                   <p className="text-lg font-medium text-viva-900">{fixMojibake(displayUser.especialidade)}</p>
                 </div>
               )}
+              <div className="bg-viva-50 p-3 rounded-lg">
+                <p className="text-xs text-viva-600 font-bold uppercase tracking-wider">Tipo de vínculo</p>
+                <p className="text-lg font-medium text-viva-900">
+                  {displayUser?.vinculo?.toUpperCase() === 'PJ' ? 'PJ' : 'Associado'}
+                </p>
+              </div>
               {displayUser?.email && (
                 <div className="bg-viva-50 p-3 rounded-lg">
                   <p className="text-xs text-viva-600 font-bold uppercase tracking-wider">Email de Contato</p>

@@ -7,6 +7,7 @@ interface User {
   crm: string;
   email: string | null;
   especialidade: string | null;
+  vinculo?: string | null;
 }
 
 interface AuthContextType {

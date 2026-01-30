@@ -14,6 +14,7 @@ export interface LoginResponse {
       crm: string;
       email: string | null;
       especialidade: string | null;
+      vinculo?: string | null;
     };
     accessToken: string;
     refreshToken: string;
