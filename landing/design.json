@@ -1,0 +1,82 @@
+{
+    "site": {
+      "name": "Seja Viva Saúde",
+      "url": "https://www.sejavivasaude.com.br/",
+      "description": "Instituição sem fins lucrativos atuante na prestação de serviços em saúde, educação e assistência social.",
+      "contact": {
+        "email": "contato@sejavivasaude.com.br",
+        "phone": "(11) 5028-0780",
+        "address": "Rua Serra de Botucatu, 1195, Sala 103 - Vila Gomes Cardim, São Paulo - SP, Brasil"
+      },
+      "social": {
+        "instagram": "https://www.instagram.com/sejavivasaude"
+      }
+    },
+    "identity_visual": {
+      "logo": {
+        "src": "PRIME LOC (3).png",
+        "description": "Logomarca principal"
+      },
+      "images": [
+        {
+          "src": "PRIME LOC (4).png",
+          "description": "Imagem secundária do site"
+        },
+        {
+          "src": "PRIME LOC (5).png",
+          "description": "Imagem de rodapé / ícone"
+        }
+      ],
+      "colors": {
+        "primary": "#1A4011",
+        "secondary": "#2d6a1f",
+        "accent": "#52a33a",
+        "background": "#fafaf9",
+        "text": "#111827"
+      },
+      "typography": {
+        "headers": "Nome da fonte (se disponível em CSS)",
+        "body": "Nome da fonte (se disponível em CSS)"
+      }
+    },
+    "pages": {
+      "home": {
+        "hero_text": "A Viva Saúde é uma instituição de direito privado, sem fins lucrativos, de caráter social e inclusivo, reconhecida como de utilidade pública nacional, estadual e municipal.",
+        "sections": {
+          "about": "A Viva Saúde tem como missão a excelência nos serviços prestados, tanto em parceria com a administração pública, quanto no âmbito privado, buscando sempre alcançar uma atuação democrática, justa e humanizada.",
+          "services": [
+            {
+              "title": "Gestão de Mão de Obra",
+              "description": "Gestão completa de recursos humanos, incluindo médicos, prestadores de serviços e celetistas das diversas áreas relacionadas à saúde, educação e assistência social."
+            },
+            {
+              "title": "Gestão completa de Hospitais",
+              "description": "Gestão completa de hospitais de pequeno, médio e grande porte, especializados ou gerais."
+            },
+            {
+              "title": "Urgência e Emergência",
+              "description": "Gestão completa do pronto atendimento com eficiência e humanização."
+            },
+            {
+              "title": "Unidades Básicas e Secundárias",
+              "description": "Gestão integrada de UPA’s, PSF’s, Multicentros e Maternidades."
+            },
+            {
+              "title": "Centros de Atenção Psicossocial (CAPs)",
+              "description": "Atendimento intensivo e diário para portadores de transtornos mentais."
+            }
+          ]
+        },
+        "testimonials": [
+          "Depoimento de Beatriz Santos",
+          "Depoimento de Yuri Kiyoto",
+          "Depoimento de Amanda Ribeiro"
+        ],
+        "faq_intro": "Confira as perguntas mais comuns",
+        "footer": {
+          "privacy_policy": "Política de Privacidade",
+          "cookies_policy": "Política de Cookies"
+        }
+      }
+    }
+  }
