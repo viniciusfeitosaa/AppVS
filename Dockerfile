@@ -18,6 +18,9 @@ FROM base AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 
+# OpenSSL para o Prisma schema engine (Alpine usa OpenSSL 3)
+RUN apk add --no-cache openssl
+
 RUN addgroup --system --gid 1001 nodejs && \
     adduser --system --uid 1001 nodejs
 
