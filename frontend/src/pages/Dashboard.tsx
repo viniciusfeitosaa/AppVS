@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '../context/AuthContext';
 import { medicoService } from '../services/medico.service';
-import { formatCPF, formatCRM, fixMojibake } from '../utils/validation.util';
+import { formatCRM, fixMojibake } from '../utils/validation.util';
 
 const Dashboard = () => {
   const { user, logout } = useAuth();

@@ -1,9 +1,12 @@
 [build]
   # Diretório onde o Vite gera os arquivos buildados
   publish = "dist"
-  
-  # Comando para fazer o build
+
+  # Comando para fazer o build (VITE_API_URL deve estar nas env vars do site)
   command = "npm run build"
+
+  # Variável obrigatória em produção: URL do backend (ex.: https://viva-saude-backend.onrender.com/api)
+  # Configure em: Site settings → Environment variables → VITE_API_URL
 
 # Redireciona todas as rotas para o index.html (necessário para SPAs)
 [[redirects]]

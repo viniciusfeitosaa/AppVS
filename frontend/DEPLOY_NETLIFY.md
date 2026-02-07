@@ -50,9 +50,9 @@ O Netlify deve detectar automaticamente as configurações do `netlify.toml`, ma
 
 | Key | Value | Exemplo |
 |-----|-------|---------|
-| `VITE_API_URL` | URL do seu backend em produção | `https://seu-backend.herokuapp.com/api` |
+| `VITE_API_URL` | URL base da API do backend (com `/api` no final) | `https://viva-saude-backend.onrender.com/api` |
 
-> ⚠️ **Atenção:** Substitua `https://seu-backend.herokuapp.com/api` pela URL real do seu backend em produção.
+> ⚠️ **Atenção:** Use a URL real do seu backend (ex.: Render). O frontend chama `VITE_API_URL` + rotas como `/auth/login`. Ex.: `https://seu-backend.onrender.com/api`.
 
 ### 5️⃣ Deploy
 
