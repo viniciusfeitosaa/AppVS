@@ -179,11 +179,33 @@ O Docker usa cache de layers, tornando rebuilds muito mais rápidos:
 - Dependências isoladas
 - Health checks automáticos
 
+## 🗄️ Baseline do banco (primeira vez com banco já populado)
+
+Se o banco (ex.: Neon) **já existe** e já tem as tabelas (criadas com `prisma db push` ou manualmente), o primeiro deploy vai falhar com:
+
+```text
+No migration found in prisma/migrations
+Error: P3005 - The database schema is not empty. Read more about how to baseline...
+```
+
+**Faça uma única vez** na sua máquina, apontando para o **mesmo** `DATABASE_URL` do Render/Neon:
+
+```bash
+cd backend
+# Use a mesma URL do banco de produção (Neon)
+$env:DATABASE_URL = "postgresql://user:pass@ep-xxx.neon.tech/neondb?sslmode=require"
+npx prisma migrate resolve --applied "20250127000000_init"
+```
+
+Isso marca a migração inicial como “já aplicada”. Nos próximos deploys o `prisma migrate deploy` no container vai apenas conferir o histórico e aplicar migrações **novas** (se houver).
+
+---
+
 ## 🐛 Troubleshooting
 
 ### Build Falha com "Cannot find Dockerfile"
 
-✅ **Solução:** Verifique se o **Root Directory** está configurado como `backend`
+✅ **Solução:** Use o **Dockerfile na raiz** do repositório; Root Directory deixe em branco (raiz).
 
 ---
 
