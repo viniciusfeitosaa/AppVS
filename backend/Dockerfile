@@ -42,15 +42,19 @@ COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/package*.json ./
 COPY --from=builder /app/prisma ./prisma
 
+# Copiar script de entrypoint
+COPY docker-entrypoint.sh ./
+RUN chmod +x docker-entrypoint.sh
+
 # Mudar para usuário não-root
 USER nodejs
 
-# Expor porta
+# Expor porta (Render usa a variável PORT)
 EXPOSE 3001
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
   CMD node -e "require('http').get('http://localhost:3001/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"
 
-# Comando para iniciar a aplicação
-CMD ["node", "dist/server.js"]
+# Usar entrypoint para executar migrações antes de iniciar
+ENTRYPOINT ["./docker-entrypoint.sh"]

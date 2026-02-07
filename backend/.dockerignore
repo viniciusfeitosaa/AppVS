@@ -7,11 +7,25 @@ dist
 *.log
 .git
 .gitignore
-README.md
 .vscode
 .idea
-*.md
 coverage
 .nyc_output
 .DS_Store
 Thumbs.db
+
+# Arquivos de desenvolvimento
+*.test.ts
+*.spec.ts
+__tests__
+__mocks__
+
+# Documentação (mas mantém o entrypoint)
+README.md
+DEPLOY*.md
+!docker-entrypoint.sh
+
+# Docker
+Dockerfile.dev
+docker-compose*.yml
+.dockerignore

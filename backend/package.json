@@ -9,9 +9,11 @@
     "start": "node dist/server.js",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
+    "prisma:migrate:deploy": "prisma migrate deploy",
     "prisma:studio": "prisma studio",
     "prisma:seed": "ts-node prisma/seed.ts",
     "prisma:import": "ts-node prisma/import-csv.ts",
+    "deploy:build": "npm install && prisma generate && prisma migrate deploy && npm run build",
     "lint": "eslint src --ext .ts",
     "test": "jest"
   },
