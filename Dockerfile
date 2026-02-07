@@ -28,6 +28,9 @@ COPY --from=builder /app/prisma ./prisma
 COPY backend/docker-entrypoint.sh ./
 RUN chmod +x docker-entrypoint.sh
 
+# Donar /app ao nodejs para prisma migrate deploy poder escrever em node_modules
+RUN chown -R nodejs:nodejs /app
+
 USER nodejs
 EXPOSE 3001
 
