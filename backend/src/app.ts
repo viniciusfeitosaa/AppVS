@@ -47,7 +47,7 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // Garantir que respostas JSON sejam enviadas em UTF-8 (evita mojibake na exibição)
-app.use((req: Request, res: Response, next: NextFunction) => {
+app.use((_req: Request, res: Response, next: NextFunction) => {
   const originalJson = res.json.bind(res);
   res.json = function (this: Response, body: unknown) {
     this.setHeader('Content-Type', 'application/json; charset=utf-8');
@@ -57,7 +57,7 @@ app.use((req: Request, res: Response, next: NextFunction) => {
 });
 
 // Health check
-app.get('/health', (req: Request, res: Response) => {
+app.get('/health', (_req: Request, res: Response) => {
   res.status(200).json({
     status: 'ok',
     timestamp: new Date().toISOString(),
@@ -70,7 +70,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/medico', medicoRoutes);
 
 // Rota raiz
-app.get('/', (req: Request, res: Response) => {
+app.get('/', (_req: Request, res: Response) => {
   res.json({
     message: 'API App Médico',
     version: '1.0.0',
@@ -87,7 +87,7 @@ app.use((req: Request, res: Response) => {
 });
 
 // Middleware de tratamento de erros
-app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
+app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
   console.error('Erro:', err);
 
   res.status(500).json({

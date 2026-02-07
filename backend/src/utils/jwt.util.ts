@@ -16,17 +16,13 @@ export async function generateTokens(medicoId: string): Promise<{
   const accessToken = jwt.sign(
     { id: medicoId, type: 'access' },
     env.JWT_SECRET,
-    {
-      expiresIn: env.JWT_EXPIRES_IN,
-    }
+    { expiresIn: env.JWT_EXPIRES_IN } as jwt.SignOptions
   );
 
   const refreshToken = jwt.sign(
     { id: medicoId, type: 'refresh' },
     env.JWT_REFRESH_SECRET,
-    {
-      expiresIn: env.JWT_REFRESH_EXPIRES_IN,
-    }
+    { expiresIn: env.JWT_REFRESH_EXPIRES_IN } as jwt.SignOptions
   );
 
   return { accessToken, refreshToken };

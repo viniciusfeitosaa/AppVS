@@ -33,6 +33,6 @@ export const validateLogin = [
         errors: errors.array(),
       });
     }
-    next();
+    return next();
   },
 ];

@@ -33,7 +33,7 @@ export const authenticateToken = (
   try {
     const decoded = verifyAccessToken(token);
     req.user = { id: decoded.id };
-    next();
+    return next();
   } catch (error: any) {
     return res.status(403).json({
       success: false,

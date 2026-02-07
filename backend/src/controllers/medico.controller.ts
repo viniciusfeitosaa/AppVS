@@ -14,12 +14,12 @@ export const getPerfilController = async (req: Request, res: Response) => {
 
     const perfil = await getPerfilService(medicoId);
 
-    res.status(200).json({
+    return res.status(200).json({
       success: true,
       data: perfil,
     });
   } catch (error: any) {
-    res.status(error.statusCode || 500).json({
+    return res.status(error.statusCode || 500).json({
       success: false,
       error: error.message || 'Erro ao buscar perfil',
     });

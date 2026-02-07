@@ -1,6 +1,5 @@
 import { prisma } from '../config/database';
 import { validateCPF, validateCRM } from '../utils/validation.util';
-import { comparePassword, hashPassword } from '../utils/password.util';
 import { generateTokens } from '../utils/jwt.util';
 import { createAuditLog } from './auditoria.service';
 
