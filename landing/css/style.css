@@ -97,7 +97,7 @@ body {
 .header-inner {
   max-width: 100%;
   margin: 0 auto;
-  padding: 1rem 2rem;
+  padding: 1rem 2.5rem;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -130,6 +130,7 @@ body {
 
 .nav .btn-access {
   margin-left: 1rem;
+  margin-right: 0.25rem;
   position: relative;
   z-index: 1;
 }
@@ -140,7 +141,7 @@ body {
   font-weight: 500;
   font-size: 0.95rem;
   letter-spacing: 0.02em;
-  padding: 0.5rem 0;
+  padding: 0.5rem 0.5rem;
   position: relative;
   transition: color 0.3s ease;
 }
@@ -462,7 +463,7 @@ body {
 }
 
 .service-card h3 {
-  font-family: var(--font-heading);
+  font-family: var(--font-body);
   font-size: 1.35rem;
   color: var(--color-primary);
   margin: 0 0 0.75rem;
@@ -808,6 +809,13 @@ body {
 [data-animate="stagger"].is-visible > *:nth-child(3) { transition-delay: 0.3s; }
 [data-animate="stagger"].is-visible > *:nth-child(4) { transition-delay: 0.4s; }
 [data-animate="stagger"].is-visible > *:nth-child(5) { transition-delay: 0.5s; }
+
+/* Telas maiores: mais espaço lateral para o botão Área do Associado */
+@media (min-width: 969px) {
+  .header-inner {
+    padding: 1.15rem 3rem;
+  }
+}
 
 /* Responsive */
 @media (max-width: 968px) {
