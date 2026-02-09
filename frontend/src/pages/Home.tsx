@@ -1,44 +1,70 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
 const Home = () => {
   const navigate = useNavigate();
   const { setIntroPlayed } = useAuth();
-  const [isMediaLoaded, setIsMediaLoaded] = useState(false);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const [isVideoLoaded, setIsVideoLoaded] = useState(false);
 
   const handleComplete = () => {
     setIntroPlayed(true);
     navigate('/login');
   };
 
+  const tryPlay = () => {
+    const video = videoRef.current;
+    if (!video) return;
+    video.muted = true;
+    const p = video.play();
+    if (p?.catch) p.catch(() => {});
+  };
+
   useEffect(() => {
-    // Redireciona automaticamente após 10 segundos (GIF fica em loop)
     const timer = setTimeout(handleComplete, 10000);
     return () => clearTimeout(timer);
   }, [navigate, setIntroPlayed]);
 
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+    tryPlay();
+    const onCanPlay = () => {
+      tryPlay();
+      setIsVideoLoaded(true);
+    };
+    video.addEventListener('canplay', onCanPlay);
+    video.addEventListener('loadeddata', tryPlay);
+    return () => {
+      video.removeEventListener('canplay', onCanPlay);
+      video.removeEventListener('loadeddata', tryPlay);
+    };
+  }, []);
+
   return (
-    <div
-      className="min-h-screen bg-white flex flex-col items-center justify-center overflow-hidden cursor-pointer"
-      onClick={handleComplete}
-      onKeyDown={(e) => e.key === 'Enter' && handleComplete()}
-      role="button"
-      tabIndex={0}
-      aria-label="Toque para continuar"
-    >
-      {/* Animação de carregamento (GIF) - leve e compatível com qualquer dispositivo */}
-      <div 
+    <div className="min-h-screen bg-white flex flex-col items-center justify-center overflow-hidden">
+      <div
         className={`relative w-full max-w-xs px-6 flex justify-center transition-opacity duration-[1500ms] ease-in-out ${
-          isMediaLoaded ? 'opacity-100' : 'opacity-0'
+          isVideoLoaded ? 'opacity-100' : 'opacity-0'
         }`}
       >
-        <img
-          src="/assets/intro.gif"
-          alt="Viva Saúde"
-          className="w-full h-auto rounded-xl pointer-events-none"
-          onLoad={() => setIsMediaLoaded(true)}
-        />
+        <video
+          ref={videoRef}
+          autoPlay
+          muted
+          playsInline
+          onCanPlayThrough={() => {
+            tryPlay();
+            setIsVideoLoaded(true);
+          }}
+          onEnded={handleComplete}
+          className="w-full h-auto rounded-xl"
+          style={{ objectFit: 'contain' }}
+        >
+          <source src="/assets/intro.mp4" type="video/mp4" />
+          Seu navegador não suporta vídeos.
+        </video>
       </div>
     </div>
   );
