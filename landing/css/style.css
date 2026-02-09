@@ -238,11 +238,11 @@ body {
   transform: translateY(-10px) rotate(-45deg);
 }
 
-/* Hero sofisticado com gradiente da marca (igual ao footer) */
+/* Hero – fundo claro (troca com about) */
 .hero {
   position: relative;
-  background: linear-gradient(135deg, var(--color-primary) 0%, #06312e 100%);
-  color: #fff;
+  background: var(--color-surface);
+  color: var(--color-text);
   padding: 8rem 5vw 6rem;
   text-align: center;
   overflow: hidden;
@@ -259,16 +259,20 @@ body {
   right: -10%;
   width: 600px;
   height: 600px;
-  background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%);
+  background: radial-gradient(circle, rgba(26, 64, 17, 0.06) 0%, transparent 70%);
   border-radius: 50%;
   animation: float 20s infinite ease-in-out;
 }
 
 .hero-overlay {
   position: absolute;
-  inset: 0;
-  background: radial-gradient(circle at 30% 50%, rgba(255, 255, 255, 0.1) 0%, transparent 60%);
-  opacity: 0.6;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 50%;
+  height: 50%;
+  background: radial-gradient(circle at 50% 50%, rgba(82, 163, 58, 0.06) 0%, transparent 70%);
+  opacity: 0.9;
 }
 
 .hero-inner {
@@ -279,13 +283,14 @@ body {
 }
 
 .hero-title {
-  font-family: var(--font-display);
+  font-family: 'Cormorant Garamond', serif;
   font-size: clamp(3rem, 8vw, 6rem);
-  font-weight: 800;
-  letter-spacing: 0.02em;
+  font-weight: 600;
+  font-style: italic;
+  letter-spacing: 0.06em;
   margin: 0 0 1rem;
   text-transform: uppercase;
-  background: linear-gradient(90deg, #fff 0%, rgba(255,255,255,0.9) 100%);
+  background: linear-gradient(90deg, var(--color-primary) 0%, var(--color-secondary) 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -297,7 +302,7 @@ body {
   line-height: 1.8;
   margin: 0 0 2.5rem;
   font-weight: 300;
-  opacity: 0.95;
+  color: var(--color-text-muted);
   animation: fadeInUp 1s ease-out 0.2s backwards;
 }
 
@@ -330,10 +335,16 @@ body {
 }
 
 .btn-primary {
-  background: #fff;
-  color: var(--color-primary);
-  box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+  background: var(--color-primary);
+  color: #fff;
+  box-shadow: 0 8px 24px rgba(26, 64, 17, 0.25);
   animation: fadeInUp 1s ease-out 0.4s backwards;
+}
+
+.hero .btn-primary:hover {
+  background: var(--color-secondary);
+  color: #fff;
+  box-shadow: 0 8px 24px rgba(26, 64, 17, 0.35);
 }
 
 .btn-primary:hover {
@@ -377,9 +388,18 @@ body {
   border-radius: 2px;
 }
 
-/* About */
+/* About – fundo escuro (troca com hero) */
 .about {
-  background: var(--color-surface);
+  background: linear-gradient(135deg, var(--color-primary) 0%, #06312e 100%);
+  color: #fff;
+}
+
+.about .section-title {
+  color: #fff;
+}
+
+.about .section-title::after {
+  background: linear-gradient(90deg, rgba(255,255,255,0.5), rgba(255,255,255,0.9));
 }
 
 .about-text {
@@ -388,7 +408,7 @@ body {
   font-size: 1.15rem;
   text-align: center;
   line-height: 1.9;
-  color: var(--color-text-muted);
+  color: rgba(255, 255, 255, 0.9);
   font-weight: 300;
 }
 
@@ -501,11 +521,122 @@ body {
   background: var(--color-background-alt);
 }
 
+.faq .container {
+  max-width: 720px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
 .faq-intro {
   text-align: center;
-  margin: 0 0 2rem;
+  margin: 0 0 2.5rem;
   color: var(--color-text-muted);
   font-size: 1.1rem;
+  line-height: 1.6;
+}
+
+.faq-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.faq-item {
+  background: var(--color-surface);
+  border-radius: var(--radius);
+  border: 1px solid rgba(26, 64, 17, 0.12);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+  transition: var(--transition);
+}
+
+.faq-item:hover {
+  border-color: rgba(26, 64, 17, 0.2);
+  box-shadow: var(--shadow-md);
+}
+
+.faq-item[open] {
+  border-color: var(--color-accent);
+  box-shadow: 0 4px 20px rgba(82, 163, 58, 0.15);
+}
+
+.faq-question {
+  font-family: var(--font-body);
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--color-primary);
+  padding: 1rem 1.25rem 1rem 3.25rem;
+  cursor: pointer;
+  list-style: none;
+  position: relative;
+  transition: color 0.25s ease, background 0.25s ease;
+  line-height: 1.5;
+  min-height: 2.75rem;
+  display: flex;
+  align-items: center;
+}
+
+.faq-question::-webkit-details-marker,
+.faq-question::marker {
+  display: none;
+}
+
+.faq-question::before {
+  content: '';
+  position: absolute;
+  left: 1.25rem;
+  top: 1rem;
+  width: 22px;
+  height: 22px;
+  background: linear-gradient(135deg, var(--color-primary), var(--color-accent));
+  border-radius: 50%;
+  opacity: 0.95;
+}
+
+.faq-question::after {
+  content: '+';
+  position: absolute;
+  left: 1.25rem;
+  top: 1rem;
+  width: 22px;
+  height: 22px;
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: #fff;
+  line-height: 22px;
+  text-align: center;
+  font-family: var(--font-body);
+}
+
+.faq-item[open] .faq-question::after {
+  content: '−';
+  font-size: 1.35rem;
+  line-height: 20px;
+}
+
+.faq-item[open] .faq-question {
+  background: linear-gradient(135deg, rgba(26, 64, 17, 0.04) 0%, rgba(82, 163, 58, 0.06) 100%);
+  color: var(--color-primary);
+}
+
+.faq-question:hover {
+  color: var(--color-secondary);
+}
+
+.faq-answer {
+  padding: 0 1.25rem 1.25rem 3.25rem;
+}
+
+.faq-answer p {
+  margin: 0;
+  font-size: 0.9875rem;
+  font-family: var(--font-body);
+  color: var(--color-text);
+  line-height: 1.7;
+}
+
+.faq-answer p + p {
+  margin-top: 0.75rem;
 }
 
 /* Contact */
@@ -774,6 +905,29 @@ body {
   .services-grid,
   .testimonials-grid {
     grid-template-columns: 1fr;
+  }
+
+  .faq-question {
+    padding: 0.875rem 1rem 0.875rem 2.75rem;
+    font-size: 1rem;
+    min-height: auto;
+  }
+
+  .faq-question::before,
+  .faq-question::after {
+    left: 1rem;
+    top: 0.875rem;
+    width: 20px;
+    height: 20px;
+  }
+
+  .faq-question::after {
+    font-size: 1rem;
+    line-height: 20px;
+  }
+
+  .faq-answer {
+    padding: 0 1rem 1rem 2.75rem;
   }
   
   .logo-img {
