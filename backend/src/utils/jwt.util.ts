@@ -1,26 +1,33 @@
 import jwt from 'jsonwebtoken';
 import env from '../config/env';
+import { UserRole } from '@prisma/client';
 
-interface TokenPayload {
+export interface TokenPayload {
   id: string;
+  role: UserRole;
+  tenantId: string;
   type: 'access' | 'refresh';
 }
 
 /**
  * Gera access token e refresh token
  */
-export async function generateTokens(medicoId: string): Promise<{
+export async function generateTokens(
+  userId: string,
+  role: UserRole,
+  tenantId: string
+): Promise<{
   accessToken: string;
   refreshToken: string;
 }> {
   const accessToken = jwt.sign(
-    { id: medicoId, type: 'access' },
+    { id: userId, role, tenantId, type: 'access' },
     env.JWT_SECRET,
     { expiresIn: env.JWT_EXPIRES_IN } as jwt.SignOptions
   );
 
   const refreshToken = jwt.sign(
-    { id: medicoId, type: 'refresh' },
+    { id: userId, role, tenantId, type: 'refresh' },
     env.JWT_REFRESH_SECRET,
     { expiresIn: env.JWT_REFRESH_EXPIRES_IN } as jwt.SignOptions
   );

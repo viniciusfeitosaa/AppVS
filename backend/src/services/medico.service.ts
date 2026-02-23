@@ -1,10 +1,11 @@
 import { prisma } from '../config/database';
 
-export const getPerfilService = async (medicoId: string) => {
-  const medico = await prisma.medico.findUnique({
-    where: { id: medicoId },
+export const getPerfilService = async (medicoId: string, tenantId: string) => {
+  const medico = await prisma.medico.findFirst({
+    where: { id: medicoId, tenantId },
     select: {
       id: true,
+      tenantId: true,
       nomeCompleto: true,
       crm: true,
       email: true,

@@ -32,6 +32,12 @@ const envSchema = z.object({
   // CORS
   FRONTEND_URL: z.string().url().optional(),
   ALLOWED_ORIGINS: z.string().optional(),
+
+  // Multi-tenant / Master
+  TENANT_DEFAULT_SLUG: z.string().default('seja-viva-saude'),
+  MASTER_INITIAL_EMAIL: z.string().email().default('contato@sejavivasaude.com.br'),
+  MASTER_INITIAL_NAME: z.string().default('Administrador Master'),
+  MASTER_INITIAL_PASSWORD: z.string().min(8, 'MASTER_INITIAL_PASSWORD deve ter pelo menos 8 caracteres').optional(),
 });
 
 // Validar e exportar variáveis de ambiente

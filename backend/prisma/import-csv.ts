@@ -4,6 +4,7 @@ import path from 'path';
 import { parse } from 'csv-parse';
 import bcrypt from 'bcryptjs';
 import iconv from 'iconv-lite';
+import env from '../src/config/env';
 
 const prisma = new PrismaClient();
 
@@ -68,6 +69,18 @@ async function main() {
   let count = 0;
   let errors = 0;
 
+  const tenant = await prisma.tenant.findFirst({
+    where: {
+      slug: env.TENANT_DEFAULT_SLUG,
+      ativo: true,
+    },
+  });
+
+  if (!tenant) {
+    console.error(`❌ Tenant padrão não encontrado: ${env.TENANT_DEFAULT_SLUG}`);
+    return;
+  }
+
   for await (const record of parser) {
     try {
       const nome = cleanString(record[0]);
@@ -88,7 +101,12 @@ async function main() {
 
       // O upsert garante que se o CPF já existir, ele substitui os dados (update)
       await prisma.medico.upsert({
-        where: { cpf },
+        where: {
+          tenantId_cpf: {
+            tenantId: tenant.id,
+            cpf,
+          },
+        },
         update: {
           nomeCompleto: nome,
           crm: crm,
@@ -98,6 +116,7 @@ async function main() {
           telefone: celular,
         },
         create: {
+          tenantId: tenant.id,
           cpf,
           crm,
           nomeCompleto: nome,

@@ -1,11 +1,11 @@
 import { Request, Response } from 'express';
-import { loginService } from '../services/auth.service';
+import { loginMasterService, loginMedicoService } from '../services/auth.service';
 
-export const loginController = async (req: Request, res: Response) => {
+export const loginMedicoController = async (req: Request, res: Response) => {
   try {
     const { cpf, crm } = req.body;
 
-    const result = await loginService(cpf, crm);
+    const result = await loginMedicoService(cpf, crm);
 
     res.status(200).json({
       success: true,
@@ -18,3 +18,24 @@ export const loginController = async (req: Request, res: Response) => {
     });
   }
 };
+
+export const loginMasterController = async (req: Request, res: Response) => {
+  try {
+    const { email, password } = req.body;
+
+    const result = await loginMasterService(email, password);
+
+    return res.status(200).json({
+      success: true,
+      data: result,
+    });
+  } catch (error: any) {
+    return res.status(error.statusCode || 500).json({
+      success: false,
+      error: error.message || 'Erro ao fazer login master',
+    });
+  }
+};
+
+// Compatibilidade com endpoint legado /login
+export const loginController = loginMedicoController;

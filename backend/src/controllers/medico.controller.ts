@@ -3,16 +3,17 @@ import { getPerfilService } from '../services/medico.service';
 
 export const getPerfilController = async (req: Request, res: Response) => {
   try {
-    const medicoId = (req as any).user?.id;
+    const medicoId = req.user?.id;
+    const tenantId = req.user?.tenantId;
 
-    if (!medicoId) {
+    if (!medicoId || !tenantId) {
       return res.status(401).json({
         success: false,
         error: 'Não autenticado',
       });
     }
 
-    const perfil = await getPerfilService(medicoId);
+    const perfil = await getPerfilService(medicoId, tenantId);
 
     return res.status(200).json({
       success: true,

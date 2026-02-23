@@ -1,20 +1,29 @@
 import { prisma } from '../config/database';
 
-export const createAuditLog = async (
-  medicoId: string | null,
-  acao: string,
-  detalhes: any,
-  ipAddress?: string,
-  userAgent?: string
-) => {
+interface CreateAuditLogInput {
+  acao: string;
+  medicoId?: string | null;
+  masterId?: string | null;
+  tenantId?: string;
+  detalhes?: any;
+  ipAddress?: string;
+  userAgent?: string;
+}
+
+export const createAuditLog = async (input: CreateAuditLogInput) => {
   try {
     await prisma.auditoria.create({
       data: {
-        medicoId: medicoId || undefined,
-        acao,
-        detalhes: detalhes ? JSON.parse(JSON.stringify(detalhes)) : null,
-        ipAddress,
-        userAgent,
+        medicoId: input.medicoId || undefined,
+        masterId: input.masterId || undefined,
+        acao: input.acao,
+        detalhes: input.detalhes
+          ? JSON.parse(JSON.stringify({ ...input.detalhes, tenantId: input.tenantId }))
+          : input.tenantId
+          ? { tenantId: input.tenantId }
+          : null,
+        ipAddress: input.ipAddress,
+        userAgent: input.userAgent,
       },
     });
   } catch (error) {
