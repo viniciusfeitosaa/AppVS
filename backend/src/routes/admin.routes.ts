@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import {
   createMedicoController,
+  inviteMedicoController,
   listMedicosController,
   toggleMedicoAtivoController,
   updateMedicoController,
@@ -17,5 +18,6 @@ router.get('/medicos', listMedicosController);
 router.post('/medicos', createMedicoController);
 router.put('/medicos/:id', updateMedicoController);
 router.patch('/medicos/:id/ativo', toggleMedicoAtivoController);
+router.post('/medicos/:id/invite', inviteMedicoController);
 
 export default router;

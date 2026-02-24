@@ -28,7 +28,13 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401) {
+    const requestUrl = error.config?.url || '';
+    const isAuthRoute =
+      requestUrl.includes('/auth/login') ||
+      requestUrl.includes('/auth/login-medico') ||
+      requestUrl.includes('/auth/login-master');
+
+    if (error.response?.status === 401 && !isAuthRoute) {
       // Token expirado ou inválido
       localStorage.removeItem('accessToken');
       localStorage.removeItem('refreshToken');

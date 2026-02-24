@@ -6,14 +6,8 @@ import { z } from 'zod';
 import { useAuth } from '../context/AuthContext';
 
 const loginSchema = z.object({
-  cpf: z
-    .string()
-    .min(11, 'CPF deve ter 11 dígitos')
-    .max(14, 'CPF inválido'),
-  crm: z
-    .string()
-    .min(6, 'CRM inválido')
-    .max(20, 'CRM inválido'),
+  email: z.string().email('E-mail inválido'),
+  password: z.string().min(8, 'Senha deve ter no mínimo 8 caracteres'),
 });
 
 type LoginFormData = z.infer<typeof loginSchema>;
@@ -37,12 +31,9 @@ const Login = () => {
     setError(null);
 
     try {
-      // Remove formatação do CPF para enviar apenas números
-      const cpfClean = data.cpf.replace(/\D/g, '');
-      
       await login({
-        cpf: cpfClean,
-        crm: data.crm.toUpperCase().trim(),
+        email: data.email.trim().toLowerCase(),
+        password: data.password,
       });
 
       navigate('/dashboard');
@@ -74,36 +65,36 @@ const Login = () => {
 
           <div className="space-y-5">
             <div>
-              <label htmlFor="cpf" className="block text-sm font-semibold text-viva-800 mb-1">
-                CPF
+              <label htmlFor="email" className="block text-sm font-semibold text-viva-800 mb-1">
+                E-mail
               </label>
               <input
-                id="cpf"
-                type="text"
-                {...register('cpf')}
+                id="email"
+                type="email"
+                {...register('email')}
                 className="input"
-                placeholder="000.000.000-00"
-                maxLength={14}
+                placeholder="seuemail@dominio.com"
+                autoComplete="email"
               />
-              {errors.cpf && (
-                <p className="mt-1 text-sm text-red-600">{errors.cpf.message}</p>
+              {errors.email && (
+                <p className="mt-1 text-sm text-red-600">{errors.email.message}</p>
               )}
             </div>
 
             <div>
-              <label htmlFor="crm" className="block text-sm font-semibold text-viva-800 mb-1">
-                CRM
+              <label htmlFor="password" className="block text-sm font-semibold text-viva-800 mb-1">
+                Senha
               </label>
               <input
-                id="crm"
-                type="text"
-                {...register('crm')}
+                id="password"
+                type="password"
+                {...register('password')}
                 className="input"
-                placeholder="12345-CE"
-                style={{ textTransform: 'uppercase' }}
+                placeholder="Digite sua senha"
+                autoComplete="current-password"
               />
-              {errors.crm && (
-                <p className="mt-1 text-sm text-red-600">{errors.crm.message}</p>
+              {errors.password && (
+                <p className="mt-1 text-sm text-red-600">{errors.password.message}</p>
               )}
             </div>
           </div>

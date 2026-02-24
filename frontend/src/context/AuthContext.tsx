@@ -3,10 +3,12 @@ import { authService, LoginCredentials } from '../services/auth.service';
 
 interface User {
   id: string;
+  role: 'MASTER' | 'MEDICO';
+  tenantId: string;
   nomeCompleto: string;
-  crm: string;
+  crm?: string;
   email: string | null;
-  especialidade: string | null;
+  especialidade?: string | null;
   vinculo?: string | null;
 }
 
@@ -49,10 +51,15 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       const response = await authService.login(credentials);
       
       if (response.success && response.data) {
+        const userData = response.data.medico || response.data.user;
+        if (!userData) {
+          throw new Error('Resposta de login sem dados de usuário');
+        }
+
         localStorage.setItem('accessToken', response.data.accessToken);
         localStorage.setItem('refreshToken', response.data.refreshToken);
-        localStorage.setItem('user', JSON.stringify(response.data.medico));
-        setUser(response.data.medico);
+        localStorage.setItem('user', JSON.stringify(userData));
+        setUser(userData);
       }
     } catch (error) {
       throw error;

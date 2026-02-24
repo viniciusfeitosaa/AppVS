@@ -43,6 +43,18 @@ export function validateCPF(cpf: string): boolean {
  * @returns true se válido
  */
 export function validateCRM(crm: string): boolean {
+  return normalizeCRM(crm) !== null;
+}
+
+/**
+ * Normaliza CRM para o formato canônico "12345-UF"
+ * Aceita entradas como:
+ * - "12345-CE"
+ * - "12345/CE"
+ * - "12345CE"
+ * - "CRM : 12345CE"
+ */
+export function normalizeCRM(crm: string): string | null {
   // Estados válidos
   const estados = [
     'AC', 'AL', 'AP', 'AM', 'BA', 'CE', 'DF', 'ES', 'GO',
@@ -51,24 +63,28 @@ export function validateCRM(crm: string): boolean {
   ];
 
   // Remove espaços e converte para maiúsculo
-  const cleanCRM = crm.trim().toUpperCase();
+  const cleanCRM = crm
+    .trim()
+    .toUpperCase()
+    .replace(/\s+/g, '')
+    .replace(/^CRM:?/, '');
 
   // Padrões aceitos: "12345-SP" ou "12345/SP"
   const regex = /^(\d{4,6})[-/]?([A-Z]{2})$/;
   const match = cleanCRM.match(regex);
 
-  if (!match) return false;
+  if (!match) return null;
 
   const numero = match[1];
   const estado = match[2];
 
   // Verifica se o estado é válido
-  if (!estados.includes(estado)) return false;
+  if (!estados.includes(estado)) return null;
 
   // Verifica se o número tem entre 4 e 6 dígitos
-  if (numero.length < 4 || numero.length > 6) return false;
+  if (numero.length < 4 || numero.length > 6) return null;
 
-  return true;
+  return `${numero}-${estado}`;
 }
 
 /**
@@ -83,10 +99,6 @@ export function formatCPF(cpf: string): string {
  * Formata CRM para exibição
  */
 export function formatCRM(crm: string): string {
-  const clean = crm.trim().toUpperCase();
-  const match = clean.match(/^(\d{4,6})[-/]?([A-Z]{2})$/);
-  if (match) {
-    return `${match[1]}-${match[2]}`;
-  }
-  return clean;
+  const normalized = normalizeCRM(crm);
+  return normalized || crm.trim().toUpperCase();
 }

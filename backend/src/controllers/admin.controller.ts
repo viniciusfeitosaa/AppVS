@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import {
   createMedicoService,
+  inviteMedicoService,
   listMedicosService,
   toggleMedicoAtivoService,
   updateMedicoService,
@@ -114,6 +115,31 @@ export const toggleMedicoAtivoController = async (req: Request, res: Response) =
     return res.status(error.statusCode || 500).json({
       success: false,
       error: error.message || 'Erro ao alterar status do médico',
+    });
+  }
+};
+
+export const inviteMedicoController = async (req: Request, res: Response) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ success: false, error: 'Não autenticado' });
+    }
+
+    const result = await inviteMedicoService(
+      req.user.tenantId,
+      req.user.id,
+      req.params.id
+    );
+
+    return res.status(200).json({
+      success: true,
+      data: result,
+      message: 'Convite gerado com sucesso',
+    });
+  } catch (error: any) {
+    return res.status(error.statusCode || 500).json({
+      success: false,
+      error: error.message || 'Erro ao gerar convite',
     });
   }
 };

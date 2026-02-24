@@ -1,10 +1,11 @@
 import { prisma } from '../config/database';
 import env from '../config/env';
-import { validateCPF, validateCRM } from '../utils/validation.util';
-import { comparePassword } from '../utils/password.util';
+import { normalizeCRM, validateCPF, validateCRM } from '../utils/validation.util';
+import { comparePassword, hashPassword } from '../utils/password.util';
 import { generateTokens } from '../utils/jwt.util';
 import { createAuditLog } from './auditoria.service';
 import { UserRole } from '@prisma/client';
+import crypto from 'crypto';
 
 export interface LoginResult {
   user: {
@@ -39,11 +40,35 @@ const getDefaultTenant = async () => {
   return tenant;
 };
 
+const hashToken = (token: string) =>
+  crypto.createHash('sha256').update(token).digest('hex');
+
+const createMedicoSession = async (medicoId: string, refreshToken: string) => {
+  await prisma.sessao.create({
+    data: {
+      medicoId,
+      tokenHash: hashToken(refreshToken),
+      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+    },
+  });
+};
+
+const createMasterSession = async (masterId: string, refreshToken: string) => {
+  await prisma.sessaoMaster.create({
+    data: {
+      masterId,
+      tokenHash: hashToken(refreshToken),
+      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+    },
+  });
+};
+
 export const loginMedicoService = async (
   cpf: string,
   crm: string
 ): Promise<LoginResult> => {
   const tenant = await getDefaultTenant();
+  const normalizedCRM = normalizeCRM(crm);
 
   // Validar CPF
   if (!validateCPF(cpf)) {
@@ -60,7 +85,7 @@ export const loginMedicoService = async (
     where: {
       tenantId: tenant.id,
       cpf: cpf.replace(/\D/g, ''), // Remove formatação
-      crm: crm.toUpperCase(),
+      crm: normalizedCRM!,
       ativo: true,
     },
   });
@@ -72,7 +97,7 @@ export const loginMedicoService = async (
       tenantId: tenant.id,
       detalhes: {
         cpf: cpf.replace(/\D/g, ''),
-        crm: crm.toUpperCase(),
+        crm: normalizedCRM,
       },
     });
 
@@ -87,13 +112,7 @@ export const loginMedicoService = async (
   );
 
   // Salvar sessão (refresh token)
-  await prisma.sessao.create({
-    data: {
-      medicoId: medico.id,
-      tokenHash: refreshToken, // Em produção, fazer hash do token
-      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 dias
-    },
-  });
+  await createMedicoSession(medico.id, refreshToken);
 
   // Log de login bem-sucedido
   await createAuditLog({
@@ -160,13 +179,7 @@ export const loginMasterService = async (
     tenant.id
   );
 
-  await prisma.sessaoMaster.create({
-    data: {
-      masterId: master.id,
-      tokenHash: refreshToken,
-      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
-    },
-  });
+  await createMasterSession(master.id, refreshToken);
 
   await createAuditLog({
     acao: 'LOGIN_MASTER',
@@ -189,3 +202,149 @@ export const loginMasterService = async (
 
 // Compatibilidade com endpoint legado /login
 export const loginService = loginMedicoService;
+
+export const loginByEmailService = async (
+  email: string,
+  password: string
+): Promise<LoginResult> => {
+  const tenant = await getDefaultTenant();
+  const normalizedEmail = email.trim().toLowerCase();
+
+  // 1) Tenta master primeiro
+  const master = await prisma.usuarioMaster.findFirst({
+    where: {
+      tenantId: tenant.id,
+      email: normalizedEmail,
+      ativo: true,
+      role: UserRole.MASTER,
+    },
+  });
+
+  if (master) {
+    const ok = await comparePassword(password, master.senhaHash);
+    if (!ok) {
+      throw { statusCode: 401, message: 'E-mail ou senha inválidos' };
+    }
+
+    const { accessToken, refreshToken } = await generateTokens(
+      master.id,
+      UserRole.MASTER,
+      tenant.id
+    );
+    await createMasterSession(master.id, refreshToken);
+
+    return {
+      user: {
+        id: master.id,
+        role: UserRole.MASTER,
+        tenantId: tenant.id,
+        nomeCompleto: master.nome,
+        email: master.email,
+      },
+      accessToken,
+      refreshToken,
+    };
+  }
+
+  // 2) Senão, tenta médico por e-mail/senha
+  const medico = await prisma.medico.findFirst({
+    where: {
+      tenantId: tenant.id,
+      email: normalizedEmail,
+      ativo: true,
+    },
+  });
+
+  if (!medico) {
+    throw { statusCode: 401, message: 'E-mail ou senha inválidos' };
+  }
+
+  const ok = await comparePassword(password, medico.senhaHash);
+  if (!ok) {
+    throw { statusCode: 401, message: 'E-mail ou senha inválidos' };
+  }
+
+  const { accessToken, refreshToken } = await generateTokens(
+    medico.id,
+    UserRole.MEDICO,
+    tenant.id
+  );
+  await createMedicoSession(medico.id, refreshToken);
+
+  return {
+    user: {
+      id: medico.id,
+      role: UserRole.MEDICO,
+      tenantId: tenant.id,
+      nomeCompleto: medico.nomeCompleto,
+      crm: medico.crm,
+      email: medico.email,
+      especialidade: medico.especialidade,
+      vinculo: medico.vinculo ?? null,
+    },
+    accessToken,
+    refreshToken,
+  };
+};
+
+export const acceptInviteService = async (
+  token: string,
+  password: string
+): Promise<LoginResult> => {
+  const tenant = await getDefaultTenant();
+  const tokenHash = hashToken(token);
+
+  const medico = await prisma.medico.findFirst({
+    where: {
+      tenantId: tenant.id,
+      inviteTokenHash: tokenHash,
+      inviteExpiresAt: {
+        gte: new Date(),
+      },
+    },
+  });
+
+  if (!medico) {
+    throw { statusCode: 400, message: 'Convite inválido ou expirado' };
+  }
+
+  const senhaHash = await hashPassword(password);
+  const updated = await prisma.medico.update({
+    where: { id: medico.id },
+    data: {
+      senhaHash,
+      inviteTokenHash: null,
+      inviteExpiresAt: null,
+      inviteAcceptedAt: new Date(),
+      ativo: true,
+    },
+  });
+
+  const { accessToken, refreshToken } = await generateTokens(
+    updated.id,
+    UserRole.MEDICO,
+    tenant.id
+  );
+  await createMedicoSession(updated.id, refreshToken);
+
+  await createAuditLog({
+    acao: 'ACEITAR_CONVITE_MEDICO',
+    tenantId: tenant.id,
+    medicoId: updated.id,
+  });
+
+  return {
+    user: {
+      id: updated.id,
+      role: UserRole.MEDICO,
+      tenantId: tenant.id,
+      nomeCompleto: updated.nomeCompleto,
+      crm: updated.crm,
+      email: updated.email,
+      especialidade: updated.especialidade,
+      vinculo: updated.vinculo ?? null,
+    },
+    accessToken,
+    refreshToken,
+  };
+};

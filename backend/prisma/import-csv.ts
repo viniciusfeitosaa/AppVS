@@ -5,6 +5,7 @@ import { parse } from 'csv-parse';
 import bcrypt from 'bcryptjs';
 import iconv from 'iconv-lite';
 import env from '../src/config/env';
+import { normalizeCRM } from '../src/utils/validation.util';
 
 const prisma = new PrismaClient();
 
@@ -86,7 +87,7 @@ async function main() {
       const nome = cleanString(record[0]);
       const vinculoRaw = record[4]; // Coluna Vínculo (PJ ou vazio)
       const vinculo = vinculoRaw?.trim().toUpperCase() === 'PJ' ? 'PJ' : null;
-      const crm = record[7]?.trim().toUpperCase();
+      const crm = normalizeCRM(record[7] || '');
       const especialidade = cleanString(record[8]);
       const email = record[9]?.toLowerCase().trim() || null;
       const celular = record[10];
@@ -108,22 +109,22 @@ async function main() {
           },
         },
         update: {
-          nomeCompleto: nome,
+          nomeCompleto: nome.length > 255 ? nome.slice(0, 255) : nome,
           crm: crm,
-          especialidade: especialidade,
+          especialidade: especialidade && especialidade.length > 100 ? especialidade.slice(0, 100) : especialidade,
           vinculo: vinculo ?? undefined,
-          email: email || undefined,
-          telefone: celular,
+          email: email && email.length > 255 ? email.slice(0, 255) : email || undefined,
+          telefone: celular && celular.length > 20 ? celular.slice(0, 20) : celular,
         },
         create: {
           tenantId: tenant.id,
           cpf,
           crm,
-          nomeCompleto: nome,
-          especialidade,
+          nomeCompleto: nome.length > 255 ? nome.slice(0, 255) : nome,
+          especialidade: especialidade && especialidade.length > 100 ? especialidade.slice(0, 100) : especialidade,
           vinculo: vinculo ?? null,
-          email: email || null,
-          telefone: celular,
+          email: email && email.length > 255 ? email.slice(0, 255) : email || null,
+          telefone: celular && celular.length > 20 ? celular.slice(0, 20) : celular,
           senhaHash: DEFAULT_PASSWORD_HASH,
           ativo: true
         }

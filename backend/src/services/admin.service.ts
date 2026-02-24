@@ -1,7 +1,8 @@
 import { prisma } from '../config/database';
 import { hashPassword } from '../utils/password.util';
-import { validateCPF, validateCRM } from '../utils/validation.util';
+import { normalizeCRM, validateCPF, validateCRM } from '../utils/validation.util';
 import { createAuditLog } from './auditoria.service';
+import crypto from 'crypto';
 
 interface ListMedicosParams {
   tenantId: string;
@@ -94,14 +95,14 @@ export async function listMedicosService(params: ListMedicosParams) {
 
 export async function createMedicoService(input: CreateMedicoInput) {
   const cpf = input.cpf.replace(/\D/g, '');
-  const crm = input.crm.trim().toUpperCase();
+  const crm = normalizeCRM(input.crm);
   const email = input.email?.trim().toLowerCase() || null;
 
   if (!validateCPF(cpf)) {
     throw { statusCode: 400, message: 'CPF inválido' };
   }
 
-  if (!validateCRM(crm)) {
+  if (!crm || !validateCRM(crm)) {
     throw { statusCode: 400, message: 'CRM inválido' };
   }
 
@@ -164,7 +165,7 @@ export async function updateMedicoService(input: UpdateMedicoInput) {
   }
 
   const cpf = input.cpf ? input.cpf.replace(/\D/g, '') : undefined;
-  const crm = input.crm ? input.crm.trim().toUpperCase() : undefined;
+  const crm = input.crm ? normalizeCRM(input.crm) || undefined : undefined;
   const email = input.email === undefined ? undefined : input.email?.trim().toLowerCase() || null;
 
   if (cpf && !validateCPF(cpf)) {
@@ -223,6 +224,60 @@ export async function updateMedicoService(input: UpdateMedicoInput) {
   });
 
   return updated;
+}
+
+export async function inviteMedicoService(
+  tenantId: string,
+  masterId: string,
+  medicoId: string
+) {
+  const medico = await prisma.medico.findFirst({
+    where: { id: medicoId, tenantId },
+    select: { id: true, email: true, nomeCompleto: true },
+  });
+
+  if (!medico) {
+    throw { statusCode: 404, message: 'Médico não encontrado' };
+  }
+
+  if (!medico.email) {
+    throw { statusCode: 400, message: 'Médico sem e-mail cadastrado para envio de convite' };
+  }
+
+  const rawToken = crypto.randomBytes(32).toString('hex');
+  const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex');
+  const expiresAt = new Date(Date.now() + 72 * 60 * 60 * 1000); // 72h
+
+  await prisma.medico.update({
+    where: { id: medico.id },
+    data: {
+      inviteTokenHash: tokenHash,
+      inviteExpiresAt: expiresAt,
+      inviteAcceptedAt: null,
+    },
+  });
+
+  await createAuditLog({
+    acao: 'CONVIDAR_MEDICO',
+    tenantId,
+    masterId,
+    medicoId: medico.id,
+    detalhes: {
+      email: medico.email,
+      expiresAt: expiresAt.toISOString(),
+    },
+  });
+
+  const inviteUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/ativar-conta/${rawToken}`;
+
+  return {
+    medicoId: medico.id,
+    nomeCompleto: medico.nomeCompleto,
+    email: medico.email,
+    inviteUrl,
+    expiresAt,
+    token: rawToken,
+  };
 }
 
 export async function toggleMedicoAtivoService(

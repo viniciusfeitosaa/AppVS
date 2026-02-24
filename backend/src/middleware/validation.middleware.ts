@@ -44,6 +44,18 @@ export const validateMedicoLogin = [
 export const validateLogin = validateMedicoLogin;
 
 /**
+ * Validação de login por e-mail/senha (master e médico)
+ */
+export const validateEmailLogin = [
+  body('email').isEmail().withMessage('E-mail inválido'),
+  body('password')
+    .isString()
+    .isLength({ min: 8 })
+    .withMessage('Senha deve ter no mínimo 8 caracteres'),
+  handleValidationErrors,
+];
+
+/**
  * Validação de login master (email + senha)
  */
 export const validateMasterLogin = [
@@ -52,5 +64,21 @@ export const validateMasterLogin = [
     .isString()
     .isLength({ min: 8 })
     .withMessage('Senha deve ter no mínimo 8 caracteres'),
+  handleValidationErrors,
+];
+
+/**
+ * Aceite de convite (definição de senha)
+ */
+export const validateAcceptInvite = [
+  body('token').isString().isLength({ min: 20 }).withMessage('Token inválido'),
+  body('password')
+    .isString()
+    .isLength({ min: 8 })
+    .withMessage('Senha deve ter no mínimo 8 caracteres'),
+  body('confirmPassword')
+    .isString()
+    .custom((value, { req }) => value === req.body.password)
+    .withMessage('As senhas não coincidem'),
   handleValidationErrors,
 ];
