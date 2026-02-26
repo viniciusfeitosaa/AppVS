@@ -716,8 +716,9 @@ const Escalas = () => {
                         const aloc = n > 0 ? alocacoes[(gradeIndex * 7 + dayIndex) % n] : null;
                         return aloc?.medico ?? null;
                       })();
+                      const telefoneOuEmail = medico ? (('telefone' in medico && medico.telefone) || medico.email || '') : '';
                       const tooltip = medico
-                        ? `${medico.nomeCompleto}\n${medico.telefone || medico.email || ''}\n${grade.horario}`
+                        ? `${medico.nomeCompleto}\n${telefoneOuEmail}\n${grade.horario}`
                         : 'Sem alocação';
                       return (
                         <div
@@ -736,7 +737,7 @@ const Escalas = () => {
                               date: d,
                               gradeIndex,
                               dayIndex,
-                              medico: medico ? { id: medico.id, nomeCompleto: medico.nomeCompleto, crm: medico.crm, telefone: medico.telefone ?? null, email: medico.email ?? null } : null,
+                              medico: medico ? { id: medico.id, nomeCompleto: medico.nomeCompleto, crm: medico.crm ?? '', telefone: ('telefone' in medico ? medico.telefone : undefined) ?? null, email: medico.email ?? null } : null,
                               plantaoId: plantaoSlot?.plantaoId,
                             });
                           }}

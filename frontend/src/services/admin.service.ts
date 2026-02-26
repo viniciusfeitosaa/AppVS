@@ -125,7 +125,7 @@ export interface Subgrupo {
   ativo: boolean;
   createdAt: string;
   updatedAt: string;
-  _count?: { subgrupoMedicos: number; escalaSubgrupos: number };
+  _count?: { subgrupoMedicos: number; escalaSubgrupos: number; equipes?: number };
 }
 
 export interface Equipe {

@@ -27,7 +27,7 @@ const toDateInput = (value?: string | null) => (value ? value.slice(0, 10) : '')
 function ModalAssociarContrato({
   contrato,
   onClose,
-  onRefresh,
+  onRefresh: _onRefresh,
 }: {
   contrato: ContratoAtivo;
   onClose: () => void;

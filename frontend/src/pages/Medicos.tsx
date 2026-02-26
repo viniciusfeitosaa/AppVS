@@ -141,7 +141,7 @@ const Medicos = () => {
                       {fixMojibake(medico.nomeCompleto)}
                     </td>
                     <td className="py-2 pr-4 text-gray-700">{fixMojibake(medico.profissao ?? '-')}</td>
-                    <td className="py-2 pr-4 text-gray-700">{formatCRM(medico.crm)}</td>
+                    <td className="py-2 pr-4 text-gray-700">{formatCRM(medico.crm ?? '')}</td>
                     <td className="py-2 pr-4 text-gray-700">{medico.email || '-'}</td>
                     <td className="py-2 pr-4 text-gray-700">
                       {(medico.especialidades?.length ?? 0) > 0
