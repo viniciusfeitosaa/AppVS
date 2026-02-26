@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import multer from 'multer';
+import type { Request } from 'express';
 
 const uploadBaseDir = path.resolve(process.cwd(), 'uploads', 'medicos');
 if (!fs.existsSync(uploadBaseDir)) {
@@ -8,10 +9,10 @@ if (!fs.existsSync(uploadBaseDir)) {
 }
 
 const storage = multer.diskStorage({
-  destination: (_req, _file, cb) => {
+  destination: (_req: Request, _file: Express.Multer.File, cb: (error: Error | null, destination: string) => void) => {
     cb(null, uploadBaseDir);
   },
-  filename: (_req, file, cb) => {
+  filename: (_req: Request, file: Express.Multer.File, cb: (error: Error | null, filename: string) => void) => {
     const ext = path.extname(file.originalname || '').toLowerCase();
     const sanitizedBase = path
       .basename(file.originalname || 'arquivo', ext)

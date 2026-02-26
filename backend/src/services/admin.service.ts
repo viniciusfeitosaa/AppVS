@@ -176,10 +176,11 @@ export async function createMedicoService(input: CreateMedicoInput) {
 
   let crm: string | null = null;
   if (isMedico && input.crm) {
-    crm = normalizeCRM(input.crm);
-    if (!validateCRM(crm)) {
+    const crmNorm = normalizeCRM(input.crm);
+    if (crmNorm === null || !validateCRM(crmNorm)) {
       throw { statusCode: 400, message: 'CRM inválido' };
     }
+    crm = crmNorm;
   } else if (isMedico) {
     throw { statusCode: 400, message: 'CRM é obrigatório para médicos' };
   }
@@ -190,8 +191,8 @@ export async function createMedicoService(input: CreateMedicoInput) {
 
   const [existingByCpf, existingByCrm] = await Promise.all([
     prisma.medico.findFirst({ where: { tenantId: input.tenantId, cpf } }),
-    crm
-      ? prisma.medico.findFirst({ where: { tenantId: input.tenantId, crm } })
+    crm !== null
+      ? prisma.medico.findFirst({ where: { tenantId: input.tenantId, crm: crm as string } })
       : Promise.resolve(null),
   ]);
 
