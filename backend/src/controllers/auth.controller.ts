@@ -54,6 +54,7 @@ export const loginEmailController = async (req: Request, res: Response) => {
       data: result,
     });
   } catch (error: any) {
+    console.error('[auth/login]', error?.message ?? error);
     return res.status(error.statusCode || 500).json({
       success: false,
       error: error.message || 'Erro ao fazer login',

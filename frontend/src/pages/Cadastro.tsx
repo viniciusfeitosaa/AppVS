@@ -4,22 +4,30 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { authService } from '../services/auth.service';
+import { PROFISSOES_SAUDE, ESPECIALIDADES_MEDICAS } from '../constants/profissoesEspecialidades';
 
 const cadastroSchema = z
   .object({
     nomeCompleto: z.string().min(3, 'Informe seu nome completo'),
     email: z.string().email('E-mail inválido'),
     cpf: z.string().min(11, 'CPF inválido'),
-    crm: z.string().min(6, 'CRM inválido'),
-    especialidade: z.string().min(2, 'Especialidade é obrigatória'),
     telefone: z.string().min(8, 'Telefone é obrigatório'),
+    profissao: z.string().min(2, 'Selecione a profissão'),
+    crm: z.string().optional(),
     password: z.string().min(8, 'Senha deve ter no mínimo 8 caracteres'),
     confirmPassword: z.string().min(8, 'Confirme a senha'),
   })
   .refine((data) => data.password === data.confirmPassword, {
     message: 'As senhas não coincidem',
     path: ['confirmPassword'],
-  });
+  })
+  .refine(
+    (data) => {
+      if (data.profissao !== 'Médico') return true;
+      return (data.crm || '').trim().length >= 6;
+    },
+    { message: 'CRM inválido (mín. 6 caracteres)', path: ['crm'] }
+  );
 
 type CadastroFormData = z.infer<typeof cadastroSchema>;
 
@@ -28,14 +36,31 @@ const Cadastro = () => {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [especialidadesSelecionadas, setEspecialidadesSelecionadas] = useState<string[]>([]);
+  const [buscaEspecialidade, setBuscaEspecialidade] = useState('');
 
   const {
     register,
     handleSubmit,
+    watch,
     formState: { errors },
   } = useForm<CadastroFormData>({
     resolver: zodResolver(cadastroSchema),
+    defaultValues: { profissao: '' },
   });
+
+  const profissao = watch('profissao');
+  const isMedico = profissao === 'Médico';
+
+  const especialidadesFiltradas = ESPECIALIDADES_MEDICAS.filter((e) =>
+    e.toLowerCase().includes(buscaEspecialidade.toLowerCase())
+  );
+
+  const toggleEspecialidade = (nome: string) => {
+    setEspecialidadesSelecionadas((prev) =>
+      prev.includes(nome) ? prev.filter((x) => x !== nome) : [...prev, nome]
+    );
+  };
 
   const onSubmit = async (data: CadastroFormData) => {
     setIsLoading(true);
@@ -43,16 +68,22 @@ const Cadastro = () => {
     setSuccess(null);
 
     try {
-      const response = await authService.register({
+      const payload: Parameters<typeof authService.register>[0] = {
         nomeCompleto: data.nomeCompleto.trim(),
         email: data.email.trim().toLowerCase(),
         cpf: data.cpf,
-        crm: data.crm,
-        especialidade: data.especialidade.trim(),
+        profissao: data.profissao.trim(),
         telefone: data.telefone.trim(),
         password: data.password,
         confirmPassword: data.confirmPassword,
-      });
+      };
+      if (isMedico) {
+        payload.crm = (data.crm || '').trim();
+        payload.especialidades =
+          especialidadesSelecionadas.length > 0 ? [...especialidadesSelecionadas] : undefined;
+      }
+
+      const response = await authService.register(payload);
 
       setSuccess(response?.data?.message || 'Cadastro enviado com sucesso!');
       window.setTimeout(() => navigate('/login'), 1400);
@@ -113,23 +144,70 @@ const Cadastro = () => {
               {errors.cpf && <p className="mt-1 text-sm text-red-600">{errors.cpf.message}</p>}
             </div>
 
-            <div>
-              <label htmlFor="crm" className="block text-sm font-semibold text-viva-800 mb-1">
-                CRM
+            <div className="sm:col-span-2">
+              <label htmlFor="profissao" className="block text-sm font-semibold text-viva-800 mb-1">
+                Profissão
               </label>
-              <input id="crm" {...register('crm')} className="input" placeholder="12345-CE" required />
-              {errors.crm && <p className="mt-1 text-sm text-red-600">{errors.crm.message}</p>}
+              <select id="profissao" {...register('profissao')} className="input" required>
+                <option value="">Selecione sua profissão</option>
+                {PROFISSOES_SAUDE.map((p) => (
+                  <option key={p} value={p}>
+                    {p}
+                  </option>
+                ))}
+              </select>
+              {errors.profissao && <p className="mt-1 text-sm text-red-600">{errors.profissao.message}</p>}
             </div>
 
-            <div>
-              <label htmlFor="especialidade" className="block text-sm font-semibold text-viva-800 mb-1">
-                Especialidade
-              </label>
-              <input id="especialidade" {...register('especialidade')} className="input" required />
-              {errors.especialidade && <p className="mt-1 text-sm text-red-600">{errors.especialidade.message}</p>}
-            </div>
+            {isMedico && (
+              <>
+                <div>
+                  <label htmlFor="crm" className="block text-sm font-semibold text-viva-800 mb-1">
+                    CRM
+                  </label>
+                  <input
+                    id="crm"
+                    {...register('crm')}
+                    className="input"
+                    placeholder="12345-CE"
+                  />
+                  {errors.crm && <p className="mt-1 text-sm text-red-600">{errors.crm.message}</p>}
+                </div>
 
-            <div>
+                <div className="sm:col-span-2">
+                  <label className="block text-sm font-semibold text-viva-800 mb-1">
+                    Especialidades (pode marcar várias; se não marcar, será registrado como Clínica Médica)
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Buscar especialidade..."
+                    className="input mb-2"
+                    value={buscaEspecialidade}
+                    onChange={(e) => setBuscaEspecialidade(e.target.value)}
+                  />
+                  <div className="max-h-48 overflow-y-auto border border-gray-200 rounded-lg p-2 space-y-1">
+                    {especialidadesFiltradas.map((esp) => (
+                      <label key={esp} className="flex items-center gap-2 cursor-pointer hover:bg-viva-50 p-1 rounded">
+                        <input
+                          type="checkbox"
+                          checked={especialidadesSelecionadas.includes(esp)}
+                          onChange={() => toggleEspecialidade(esp)}
+                          className="rounded border-viva-600 text-viva-600"
+                        />
+                        <span className="text-sm text-viva-900">{esp}</span>
+                      </label>
+                    ))}
+                  </div>
+                  {especialidadesSelecionadas.length > 0 && (
+                    <p className="mt-1 text-xs text-gray-600">
+                      Selecionadas: {especialidadesSelecionadas.join(', ')}
+                    </p>
+                  )}
+                </div>
+              </>
+            )}
+
+            <div className="sm:col-span-2">
               <label htmlFor="password" className="block text-sm font-semibold text-viva-800 mb-1">
                 Senha
               </label>
@@ -137,7 +215,7 @@ const Cadastro = () => {
               {errors.password && <p className="mt-1 text-sm text-red-600">{errors.password.message}</p>}
             </div>
 
-            <div>
+            <div className="sm:col-span-2">
               <label htmlFor="confirmPassword" className="block text-sm font-semibold text-viva-800 mb-1">
                 Confirmar senha
               </label>

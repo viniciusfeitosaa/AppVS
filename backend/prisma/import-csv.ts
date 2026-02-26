@@ -111,7 +111,7 @@ async function main() {
         update: {
           nomeCompleto: nome.length > 255 ? nome.slice(0, 255) : nome,
           crm: crm,
-          especialidade: especialidade && especialidade.length > 100 ? especialidade.slice(0, 100) : especialidade,
+          especialidades: especialidade ? [especialidade.length > 100 ? especialidade.slice(0, 100) : especialidade] : ['Clínica Médica'],
           vinculo: vinculo ?? undefined,
           email: email && email.length > 255 ? email.slice(0, 255) : email || undefined,
           telefone: celular && celular.length > 20 ? celular.slice(0, 20) : celular,
@@ -119,9 +119,10 @@ async function main() {
         create: {
           tenantId: tenant.id,
           cpf,
+          profissao: 'Médico',
           crm,
           nomeCompleto: nome.length > 255 ? nome.slice(0, 255) : nome,
-          especialidade: especialidade && especialidade.length > 100 ? especialidade.slice(0, 100) : especialidade,
+          especialidades: especialidade ? [especialidade.length > 100 ? especialidade.slice(0, 100) : especialidade] : ['Clínica Médica'],
           vinculo: vinculo ?? null,
           email: email && email.length > 255 ? email.slice(0, 255) : email || null,
           telefone: celular && celular.length > 20 ? celular.slice(0, 20) : celular,

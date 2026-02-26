@@ -1,12 +1,16 @@
 import api from './api';
 
 interface CheckInPayload {
-  escalaId: string;
+  escalaId?: string;
   observacao?: string;
+  latitude?: number;
+  longitude?: number;
 }
 
 interface CheckOutPayload {
   observacao?: string;
+  latitude?: number;
+  longitude?: number;
 }
 
 export const pontoService = {

@@ -6,9 +6,10 @@ interface User {
   role: 'MASTER' | 'MEDICO';
   tenantId: string;
   nomeCompleto: string;
-  crm?: string;
+  profissao?: string;
+  crm?: string | null;
   email: string | null;
-  especialidade?: string | null;
+  especialidades?: string[];
   vinculo?: string | null;
 }
 
@@ -47,6 +48,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       if (storedUser) {
         const parsed = JSON.parse(storedUser);
         if (parsed && typeof parsed === 'object' && parsed.id) {
+          if (!Array.isArray(parsed.especialidades) && parsed.especialidade != null) {
+            parsed.especialidades = parsed.especialidade ? [parsed.especialidade] : [];
+          }
+          if (!Array.isArray(parsed.especialidades)) parsed.especialidades = [];
           setUser(parsed);
         }
       }
@@ -108,8 +113,7 @@ export const useAuth = () => {
   const context = useContext(AuthContext);
   if (context === undefined) {
     if (import.meta.env.DEV) {
-      // Em hot reload, evita quebrar toda a árvore por inconsistência temporária de contexto.
-      console.warn('AuthContext temporariamente indisponível durante hot reload.');
+      // Em hot reload o contexto pode ficar undefined por um instante; retorna fallback sem logar.
       return fallbackAuthContext;
     }
     throw new Error('useAuth deve ser usado dentro de um AuthProvider');

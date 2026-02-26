@@ -1,6 +1,8 @@
 import { Router } from 'express';
 import {
   alocarMedicoEscalaController,
+  addContratoEquipeController,
+  addContratoSubgrupoController,
   createContratoAtivoController,
   createEscalaController,
   createEscalaPlantaoController,
@@ -12,6 +14,8 @@ import {
   getValoresPlantaoOpcoesController,
   getValoresPlantaoController,
   inviteMedicoController,
+  listContratoEquipesController,
+  listContratoSubgruposController,
   listEscalaMedicosController,
   listEscalaPlantoesController,
   listEscalasController,
@@ -22,6 +26,8 @@ import {
   listMedicosController,
   removerEscalaPlantaoController,
   removerMedicoEscalaController,
+  removeContratoEquipeController,
+  removeContratoSubgrupoController,
   setConfigPontoController,
   setValorPlantaoController,
   toggleMedicoAtivoController,
@@ -69,6 +75,12 @@ router.get('/contratos-ativos', requireModuleAccess(ModuloSistema.CONTRATOS_ATIV
 router.post('/contratos-ativos', requireModuleAccess(ModuloSistema.CONTRATOS_ATIVOS), createContratoAtivoController);
 router.put('/contratos-ativos/:id', requireModuleAccess(ModuloSistema.CONTRATOS_ATIVOS), updateContratoAtivoController);
 router.delete('/contratos-ativos/:id', requireModuleAccess(ModuloSistema.CONTRATOS_ATIVOS), deleteContratoAtivoController);
+router.get('/contratos-ativos/:id/subgrupos', requireModuleAccess(ModuloSistema.CONTRATOS_ATIVOS), listContratoSubgruposController);
+router.post('/contratos-ativos/:id/subgrupos', requireModuleAccess(ModuloSistema.CONTRATOS_ATIVOS), addContratoSubgrupoController);
+router.delete('/contratos-ativos/:id/subgrupos/:subgrupoId', requireModuleAccess(ModuloSistema.CONTRATOS_ATIVOS), removeContratoSubgrupoController);
+router.get('/contratos-ativos/:id/equipes', requireModuleAccess(ModuloSistema.CONTRATOS_ATIVOS), listContratoEquipesController);
+router.post('/contratos-ativos/:id/equipes', requireModuleAccess(ModuloSistema.CONTRATOS_ATIVOS), addContratoEquipeController);
+router.delete('/contratos-ativos/:id/equipes/:equipeId', requireModuleAccess(ModuloSistema.CONTRATOS_ATIVOS), removeContratoEquipeController);
 
 router.get('/escalas', requireModuleAccess(ModuloSistema.ESCALAS), listEscalasController);
 router.post('/escalas', requireModuleAccess(ModuloSistema.ESCALAS), createEscalaController);

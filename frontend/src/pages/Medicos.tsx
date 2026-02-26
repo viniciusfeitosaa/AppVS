@@ -126,9 +126,10 @@ const Medicos = () => {
               <thead>
                 <tr className="text-left text-viva-700 border-b">
                   <th className="py-2 pr-4">Nome</th>
+                  <th className="py-2 pr-4">Profissão</th>
                   <th className="py-2 pr-4">CRM</th>
                   <th className="py-2 pr-4">Email</th>
-                  <th className="py-2 pr-4">Especialidade</th>
+                  <th className="py-2 pr-4">Especialidades</th>
                   <th className="py-2 pr-4">Vínculo</th>
                   <th className="py-2 pr-4">Status</th>
                 </tr>
@@ -139,10 +140,13 @@ const Medicos = () => {
                     <td className="py-2 pr-4 font-medium text-viva-900">
                       {fixMojibake(medico.nomeCompleto)}
                     </td>
+                    <td className="py-2 pr-4 text-gray-700">{fixMojibake(medico.profissao ?? '-')}</td>
                     <td className="py-2 pr-4 text-gray-700">{formatCRM(medico.crm)}</td>
                     <td className="py-2 pr-4 text-gray-700">{medico.email || '-'}</td>
                     <td className="py-2 pr-4 text-gray-700">
-                      {medico.especialidade ? fixMojibake(medico.especialidade) : '-'}
+                      {(medico.especialidades?.length ?? 0) > 0
+                        ? fixMojibake(medico.especialidades!.join(', '))
+                        : '-'}
                     </td>
                     <td className="py-2 pr-4 text-gray-700">
                       {medico.vinculo?.trim() ? fixMojibake(medico.vinculo) : 'Associado'}

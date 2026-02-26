@@ -12,12 +12,12 @@ export const checkInController = async (req: Request, res: Response) => {
       return res.status(401).json({ success: false, error: 'Não autenticado' });
     }
 
-    const { escalaId, observacao } = req.body;
-    if (!escalaId) {
-      return res.status(400).json({ success: false, error: 'escalaId é obrigatório' });
-    }
+    const { escalaId, observacao, latitude, longitude } = req.body;
+    const escalaIdOpt = escalaId != null && escalaId !== '' ? String(escalaId) : undefined;
+    const lat = latitude != null && latitude !== '' ? Number(latitude) : null;
+    const lon = longitude != null && longitude !== '' ? Number(longitude) : null;
 
-    const data = await checkInService(req.user.tenantId, req.user.id, String(escalaId), observacao);
+    const data = await checkInService(req.user.tenantId, req.user.id, escalaIdOpt, observacao, lat, lon);
     return res.status(201).json({ success: true, data, message: 'Check-in realizado com sucesso' });
   } catch (error: any) {
     return res.status(error.statusCode || 500).json({
@@ -33,8 +33,11 @@ export const checkOutController = async (req: Request, res: Response) => {
       return res.status(401).json({ success: false, error: 'Não autenticado' });
     }
 
-    const { observacao } = req.body;
-    const data = await checkOutService(req.user.tenantId, req.user.id, observacao);
+    const { observacao, latitude, longitude } = req.body;
+    const lat = latitude != null && latitude !== '' ? Number(latitude) : null;
+    const lon = longitude != null && longitude !== '' ? Number(longitude) : null;
+
+    const data = await checkOutService(req.user.tenantId, req.user.id, observacao, lat, lon);
     return res.status(200).json({ success: true, data, message: 'Checkout realizado com sucesso' });
   } catch (error: any) {
     return res.status(error.statusCode || 500).json({

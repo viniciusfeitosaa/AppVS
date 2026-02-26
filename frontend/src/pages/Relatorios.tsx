@@ -31,6 +31,9 @@ type AgrupamentoHoras = {
   escalaNome: string;
   totalMinutos: number;
   totalRegistros: number;
+  /** Valor (R$) apenas para contratos sem escala: totalHoras × valorHora */
+  valorHora?: number;
+  valorCalculado?: number;
 };
 
 const formatDuration = (minutes: number) => {
@@ -53,14 +56,18 @@ const escapeCsvCell = (value: string | number): string => {
   return s;
 };
 
+const formatValor = (valor: number) =>
+  new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(valor);
+
 const exportHorasCsv = (agrupado: AgrupamentoHoras[], dataInicio: string, dataFim: string) => {
-  const header = ['Médico', 'Escala', 'Registros', 'Total (min)', 'Total (horas)'];
+  const header = ['Médico', 'Escala', 'Registros', 'Total (min)', 'Total (horas)', 'Valor (R$)'];
   const rows = agrupado.map((item) => [
     escapeCsvCell(item.medicoNome),
     escapeCsvCell(item.escalaNome),
     escapeCsvCell(item.totalRegistros),
     escapeCsvCell(item.totalMinutos),
     escapeCsvCell(formatDuration(item.totalMinutos)),
+    escapeCsvCell(item.valorCalculado != null ? formatValor(item.valorCalculado) : ''),
   ]);
   const csv = [header.join(','), ...rows.map((r) => r.join(','))].join('\r\n');
   const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8' });
@@ -79,27 +86,43 @@ const Relatorios = () => {
   const now = new Date();
   const [dataInicio, setDataInicio] = useState(formatDateInput(new Date(now.getFullYear(), now.getMonth(), 1)));
   const [dataFim, setDataFim] = useState(formatDateInput(now));
-  const [medicoId, setMedicoId] = useState('');
-  const [escalaId, setEscalaId] = useState('');
+  const [contratoId, setContratoId] = useState('');
+  const [subgrupoId, setSubgrupoId] = useState('');
+  const [equipeId, setEquipeId] = useState('');
 
-  const { data: medicosResp } = useQuery({
-    queryKey: ['admin', 'medicos', 'relatorio-filtros'],
-    queryFn: () => adminService.listMedicos({ page: 1, limit: 200 }),
+  const { data: contratosResp } = useQuery({
+    queryKey: ['admin', 'contratos-ativos', 'relatorio-filtros'],
+    queryFn: () => adminService.listContratosAtivos({ page: 1, limit: 200 }),
     enabled: isMaster,
   });
 
-  const { data: escalasResp } = useQuery({
-    queryKey: ['admin', 'escalas', 'relatorio-filtros'],
-    queryFn: () => adminService.listEscalas({ page: 1, limit: 200 }),
-    enabled: isMaster,
+  const { data: subgruposResp } = useQuery({
+    queryKey: ['admin', 'contrato-subgrupos', contratoId],
+    queryFn: () => adminService.listContratoSubgrupos(contratoId),
+    enabled: isMaster && Boolean(contratoId),
   });
+
+  const { data: equipesResp } = useQuery({
+    queryKey: ['admin', 'contrato-equipes', contratoId],
+    queryFn: () => adminService.listContratoEquipes(contratoId),
+    enabled: isMaster && Boolean(contratoId),
+  });
+
+  const contratos = contratosResp?.data ?? [];
+  const subgruposList = subgruposResp?.data ?? [];
+  const equipesList = equipesResp?.data ?? [];
+  const equipesFiltradas =
+    subgrupoId && equipesList.length > 0
+      ? equipesList.filter((e: any) => e.equipe?.subgrupo?.id === subgrupoId)
+      : equipesList;
 
   const { data: registrosResp, isLoading } = useQuery({
-    queryKey: ['admin', 'registros-ponto', { medicoId, escalaId, dataInicio, dataFim }],
+    queryKey: ['admin', 'registros-ponto', { contratoId, subgrupoId, equipeId, dataInicio, dataFim }],
     queryFn: () =>
       adminService.listRegistrosPonto({
-        medicoId: medicoId || undefined,
-        escalaId: escalaId || undefined,
+        contratoAtivoId: contratoId || undefined,
+        subgrupoId: subgrupoId || undefined,
+        equipeId: equipeId || undefined,
         dataInicio: `${dataInicio}T00:00:00.000`,
         dataFim: `${dataFim}T23:59:59.999`,
       }),
@@ -115,9 +138,9 @@ const Relatorios = () => {
     );
   }
 
-  const medicos = medicosResp?.data || [];
-  const escalas = escalasResp?.data || [];
-  const registros: RegistroPontoAdmin[] = registrosResp?.data || [];
+  const raw = registrosResp?.data;
+  const registros: RegistroPontoAdmin[] = Array.isArray(raw) ? raw : raw?.data ?? [];
+  const valorHoraPorMedico: Record<string, number> = !Array.isArray(raw) && raw?.valorHoraPorMedico ? raw.valorHoraPorMedico : {};
 
   const { agrupado, totalMinutos, totalRegistros } = useMemo(() => {
     const map = new Map<string, AgrupamentoHoras>();
@@ -151,12 +174,23 @@ const Relatorios = () => {
     }
 
     const rows = Array.from(map.values()).sort((a, b) => b.totalMinutos - a.totalMinutos);
+
+    for (const row of rows) {
+      if (row.escalaId === 'sem-escala' && row.medicoId !== 'sem-medico') {
+        const vh = valorHoraPorMedico[row.medicoId];
+        if (vh != null && vh > 0) {
+          row.valorHora = vh;
+          row.valorCalculado = (row.totalMinutos / 60) * vh;
+        }
+      }
+    }
+
     return {
       agrupado: rows,
       totalMinutos: somaMinutos,
       totalRegistros: registros.length,
     };
-  }, [registros]);
+  }, [registros, valorHoraPorMedico]);
 
   return (
     <div className="space-y-6">
@@ -167,7 +201,7 @@ const Relatorios = () => {
 
       <div className="card">
         <h3 className="text-lg font-bold text-viva-900 mb-4">Filtros</h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-4">
           <div>
             <label htmlFor="dataInicio" className="block text-sm font-semibold text-viva-800 mb-1">
               Data início
@@ -195,38 +229,66 @@ const Relatorios = () => {
           </div>
 
           <div>
-            <label htmlFor="medicoId" className="block text-sm font-semibold text-viva-800 mb-1">
-              Médico
+            <label htmlFor="contratoId" className="block text-sm font-semibold text-viva-800 mb-1">
+              Contrato
             </label>
             <select
-              id="medicoId"
+              id="contratoId"
               className="input"
-              value={medicoId}
-              onChange={(e) => setMedicoId(e.target.value)}
+              value={contratoId}
+              onChange={(e) => {
+                setContratoId(e.target.value);
+                setSubgrupoId('');
+                setEquipeId('');
+              }}
             >
               <option value="">Todos</option>
-              {medicos.map((medico: any) => (
-                <option key={medico.id} value={medico.id}>
-                  {fixMojibake(medico.nomeCompleto)}
+              {contratos.map((c: any) => (
+                <option key={c.id} value={c.id}>
+                  {fixMojibake(c.nome ?? c.id)}
                 </option>
               ))}
             </select>
           </div>
 
           <div>
-            <label htmlFor="escalaId" className="block text-sm font-semibold text-viva-800 mb-1">
-              Escala
+            <label htmlFor="subgrupoId" className="block text-sm font-semibold text-viva-800 mb-1">
+              Subgrupo
             </label>
             <select
-              id="escalaId"
+              id="subgrupoId"
               className="input"
-              value={escalaId}
-              onChange={(e) => setEscalaId(e.target.value)}
+              value={subgrupoId}
+              onChange={(e) => {
+                setSubgrupoId(e.target.value);
+                setEquipeId('');
+              }}
+              disabled={!contratoId}
             >
-              <option value="">Todas</option>
-              {escalas.map((escala: any) => (
-                <option key={escala.id} value={escala.id}>
-                  {fixMojibake(escala.nome)}
+              <option value="">Todos</option>
+              {subgruposList.map((item: any) => (
+                <option key={item.subgrupo?.id} value={item.subgrupo?.id ?? ''}>
+                  {fixMojibake(item.subgrupo?.nome ?? '')}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label htmlFor="equipeId" className="block text-sm font-semibold text-viva-800 mb-1">
+              Equipe
+            </label>
+            <select
+              id="equipeId"
+              className="input"
+              value={equipeId}
+              onChange={(e) => setEquipeId(e.target.value)}
+              disabled={!contratoId}
+            >
+              <option value="">Todas as equipes</option>
+              {equipesFiltradas.map((item: any) => (
+                <option key={item.equipe?.id} value={item.equipe?.id ?? ''}>
+                  {fixMojibake(item.equipe?.nome ?? '')}
                 </option>
               ))}
             </select>
@@ -275,6 +337,7 @@ const Relatorios = () => {
                   <th className="py-2 pr-4">Escala</th>
                   <th className="py-2 pr-4">Registros</th>
                   <th className="py-2 pr-4">Total de horas</th>
+                  <th className="py-2 pr-4">Valor (R$)</th>
                 </tr>
               </thead>
               <tbody>
@@ -284,6 +347,9 @@ const Relatorios = () => {
                     <td className="py-2 pr-4 text-gray-700">{item.escalaNome}</td>
                     <td className="py-2 pr-4 text-gray-700">{item.totalRegistros}</td>
                     <td className="py-2 pr-4 font-semibold text-viva-900">{formatDuration(item.totalMinutos)}</td>
+                    <td className="py-2 pr-4 text-gray-700">
+                      {item.valorCalculado != null ? formatValor(item.valorCalculado) : '—'}
+                    </td>
                   </tr>
                 ))}
               </tbody>

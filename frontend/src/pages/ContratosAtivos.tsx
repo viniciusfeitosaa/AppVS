@@ -24,6 +24,247 @@ const emptyForm: FormState = {
 
 const toDateInput = (value?: string | null) => (value ? value.slice(0, 10) : '');
 
+function ModalAssociarContrato({
+  contrato,
+  onClose,
+  onRefresh,
+}: {
+  contrato: ContratoAtivo;
+  onClose: () => void;
+  onRefresh: () => Promise<void>;
+}) {
+  const queryClient = useQueryClient();
+  const [addSubgrupoId, setAddSubgrupoId] = useState('');
+  const [addEquipeId, setAddEquipeId] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<string | null>(null);
+
+  const { data: subgruposResp } = useQuery({
+    queryKey: ['admin', 'subgrupos'],
+    queryFn: () => adminService.listSubgrupos(),
+  });
+  const { data: equipesResp } = useQuery({
+    queryKey: ['admin', 'equipes'],
+    queryFn: () => adminService.listEquipes({}),
+  });
+  const { data: linkSubgruposResp, isLoading: loadSub } = useQuery({
+    queryKey: ['admin', 'contrato-subgrupos', contrato.id],
+    queryFn: () => adminService.listContratoSubgrupos(contrato.id),
+    enabled: !!contrato.id,
+  });
+  const { data: linkEquipesResp, isLoading: loadEqu } = useQuery({
+    queryKey: ['admin', 'contrato-equipes', contrato.id],
+    queryFn: () => adminService.listContratoEquipes(contrato.id),
+    enabled: !!contrato.id,
+  });
+
+  const subgrupos = subgruposResp?.data ?? [];
+  const equipes = equipesResp?.data ?? [];
+  const linkSubgrupos = linkSubgruposResp?.data ?? [];
+  const linkEquipes = linkEquipesResp?.data ?? [];
+  const linkedSubgrupoIds = useMemo(() => linkSubgrupos.map((l) => l.subgrupo.id), [linkSubgrupos]);
+  const linkedEquipeIds = useMemo(() => linkEquipes.map((l) => l.equipe.id), [linkEquipes]);
+  const subgruposDisponiveis = useMemo(
+    () => subgrupos.filter((s) => s.ativo !== false && !linkedSubgrupoIds.includes(s.id)),
+    [subgrupos, linkedSubgrupoIds]
+  );
+  const equipesDisponiveis = useMemo(
+    () => equipes.filter((e) => e.ativo !== false && !linkedEquipeIds.includes(e.id)),
+    [equipes, linkedEquipeIds]
+  );
+
+  const handleAddSubgrupo = async () => {
+    if (!addSubgrupoId) return;
+    setBusy(true);
+    setMsg(null);
+    try {
+      await adminService.addContratoSubgrupo(contrato.id, addSubgrupoId);
+      await queryClient.invalidateQueries({ queryKey: ['admin', 'contrato-subgrupos', contrato.id] });
+      setAddSubgrupoId('');
+    } catch (err: any) {
+      setMsg(err.response?.data?.error || err.message || 'Erro ao associar subgrupo');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleRemoveSubgrupo = async (subgrupoId: string) => {
+    setBusy(true);
+    setMsg(null);
+    try {
+      await adminService.removeContratoSubgrupo(contrato.id, subgrupoId);
+      await queryClient.invalidateQueries({ queryKey: ['admin', 'contrato-subgrupos', contrato.id] });
+    } catch (err: any) {
+      setMsg(err.response?.data?.error || err.message || 'Erro ao desassociar subgrupo');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleAddEquipe = async () => {
+    if (!addEquipeId) return;
+    setBusy(true);
+    setMsg(null);
+    try {
+      await adminService.addContratoEquipe(contrato.id, addEquipeId);
+      await queryClient.invalidateQueries({ queryKey: ['admin', 'contrato-equipes', contrato.id] });
+      setAddEquipeId('');
+    } catch (err: any) {
+      setMsg(err.response?.data?.error || err.message || 'Erro ao associar equipe');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleRemoveEquipe = async (equipeId: string) => {
+    setBusy(true);
+    setMsg(null);
+    try {
+      await adminService.removeContratoEquipe(contrato.id, equipeId);
+      await queryClient.invalidateQueries({ queryKey: ['admin', 'contrato-equipes', contrato.id] });
+    } catch (err: any) {
+      setMsg(err.response?.data?.error || err.message || 'Erro ao desassociar equipe');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
+      <div
+        className="bg-white rounded-2xl shadow-xl max-w-lg w-full max-h-[90vh] overflow-y-auto p-6"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-xl font-bold text-viva-900">
+            Associar subgrupos e equipes – {contrato.nome}
+          </h3>
+          <button type="button" className="text-gray-500 hover:text-viva-800" onClick={onClose}>
+            ✕
+          </button>
+        </div>
+        {msg && (
+          <div className="mb-4 p-3 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm">
+            {msg}
+          </div>
+        )}
+
+        <div className="space-y-6">
+          <div>
+            <h4 className="text-sm font-semibold text-viva-800 mb-2">Subgrupos deste contrato</h4>
+            {loadSub ? (
+              <p className="text-sm text-gray-600">Carregando...</p>
+            ) : (
+              <>
+                <ul className="list-disc list-inside text-sm text-viva-900 mb-2">
+                  {linkSubgrupos.length === 0 ? (
+                    <li className="text-gray-500">Nenhum subgrupo associado</li>
+                  ) : (
+                    linkSubgrupos.map((l) => (
+                      <li key={l.id} className="flex items-center gap-2">
+                        <span>{l.subgrupo.nome}</span>
+                        <button
+                          type="button"
+                          className="text-red-600 hover:underline text-xs disabled:opacity-50"
+                          disabled={busy}
+                          onClick={() => handleRemoveSubgrupo(l.subgrupo.id)}
+                        >
+                          Remover
+                        </button>
+                      </li>
+                    ))
+                  )}
+                </ul>
+                {subgruposDisponiveis.length > 0 && (
+                  <div className="flex gap-2">
+                    <select
+                      className="input flex-1 text-sm"
+                      value={addSubgrupoId}
+                      onChange={(e) => setAddSubgrupoId(e.target.value)}
+                      disabled={busy}
+                    >
+                      <option value="">Adicionar subgrupo...</option>
+                      {subgruposDisponiveis.map((s) => (
+                        <option key={s.id} value={s.id}>{s.nome}</option>
+                      ))}
+                    </select>
+                    <button
+                      type="button"
+                      className="btn btn-primary"
+                      disabled={busy || !addSubgrupoId}
+                      onClick={handleAddSubgrupo}
+                    >
+                      Adicionar
+                    </button>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+
+          <div>
+            <h4 className="text-sm font-semibold text-viva-800 mb-2">Equipes deste contrato</h4>
+            {loadEqu ? (
+              <p className="text-sm text-gray-600">Carregando...</p>
+            ) : (
+              <>
+                <ul className="list-disc list-inside text-sm text-viva-900 mb-2">
+                  {linkEquipes.length === 0 ? (
+                    <li className="text-gray-500">Nenhuma equipe associada</li>
+                  ) : (
+                    linkEquipes.map((l) => (
+                      <li key={l.id} className="flex items-center gap-2">
+                        <span>{l.equipe.nome}{l.equipe.subgrupo ? ` (${l.equipe.subgrupo.nome})` : ''}</span>
+                        <button
+                          type="button"
+                          className="text-red-600 hover:underline text-xs disabled:opacity-50"
+                          disabled={busy}
+                          onClick={() => handleRemoveEquipe(l.equipe.id)}
+                        >
+                          Remover
+                        </button>
+                      </li>
+                    ))
+                  )}
+                </ul>
+                {equipesDisponiveis.length > 0 && (
+                  <div className="flex gap-2">
+                    <select
+                      className="input flex-1 text-sm"
+                      value={addEquipeId}
+                      onChange={(e) => setAddEquipeId(e.target.value)}
+                      disabled={busy}
+                    >
+                      <option value="">Adicionar equipe...</option>
+                      {equipesDisponiveis.map((e) => (
+                        <option key={e.id} value={e.id}>{e.nome}{e.subgrupo ? ` (${e.subgrupo.nome})` : ''}</option>
+                      ))}
+                    </select>
+                    <button
+                      type="button"
+                      className="btn btn-primary"
+                      disabled={busy || !addEquipeId}
+                      onClick={handleAddEquipe}
+                    >
+                      Adicionar
+                    </button>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        </div>
+
+        <div className="mt-6 flex justify-end">
+          <button type="button" className="btn btn-secondary" onClick={onClose}>
+            Fechar
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 const ContratosAtivos = () => {
   const queryClient = useQueryClient();
   const [search, setSearch] = useState('');
@@ -31,6 +272,7 @@ const ContratosAtivos = () => {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [contratoAssociar, setContratoAssociar] = useState<ContratoAtivo | null>(null);
 
   const { data, isLoading } = useQuery({
     queryKey: ['admin', 'contratos-ativos', search],
@@ -258,7 +500,10 @@ const ContratosAtivos = () => {
                       </span>
                     </td>
                     <td className="py-2 pr-4">
-                      <div className="flex gap-2">
+                      <div className="flex flex-wrap gap-2">
+                        <button className="btn btn-secondary" onClick={() => setContratoAssociar(contrato)}>
+                          Associar
+                        </button>
                         <button className="btn btn-secondary" onClick={() => handleEdit(contrato)}>
                           Editar
                         </button>
@@ -274,6 +519,14 @@ const ContratosAtivos = () => {
           </div>
         )}
       </div>
+
+      {contratoAssociar && (
+        <ModalAssociarContrato
+          contrato={contratoAssociar}
+          onClose={() => setContratoAssociar(null)}
+          onRefresh={refresh}
+        />
+      )}
     </div>
   );
 };

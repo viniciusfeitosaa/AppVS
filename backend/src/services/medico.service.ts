@@ -3,7 +3,7 @@ import env from '../config/env';
 import { DOCUMENTO_TIPO_BY_FIELD, DOCUMENTOS_PERFIL_FIELDS } from '../constants/documentos.const';
 
 interface UpdatePerfilInput {
-  especialidade?: string;
+  especialidades?: string[];
   telefone?: string;
   estadoCivil?: string;
   enderecoResidencial?: string;
@@ -28,9 +28,10 @@ export const getPerfilService = async (medicoId: string, tenantId: string) => {
       id: true,
       tenantId: true,
       nomeCompleto: true,
+      profissao: true,
       crm: true,
       email: true,
-      especialidade: true,
+      especialidades: true,
       vinculo: true,
       telefone: true,
       estadoCivil: true,
@@ -88,7 +89,9 @@ export const updatePerfilService = async (
   await prisma.medico.update({
     where: { id: medico.id },
     data: {
-      especialidade: input.especialidade?.trim() || undefined,
+      especialidades: input.especialidades?.length
+        ? input.especialidades.map((e) => (e || '').trim()).filter(Boolean)
+        : undefined,
       telefone: input.telefone?.trim() || undefined,
       estadoCivil: input.estadoCivil?.trim() || undefined,
       enderecoResidencial: input.enderecoResidencial?.trim() || undefined,

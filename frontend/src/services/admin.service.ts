@@ -5,9 +5,10 @@ export interface AdminMedico {
   id: string;
   nomeCompleto: string;
   cpf: string;
-  crm: string;
+  profissao: string;
+  crm: string | null;
   email: string | null;
-  especialidade: string | null;
+  especialidades: string[];
   vinculo: string | null;
   telefone: string | null;
   ativo: boolean;
@@ -62,9 +63,9 @@ export interface EscalaMedicoAlocacao {
   medico: {
     id: string;
     nomeCompleto: string;
-    crm: string;
+    crm: string | null;
     email: string | null;
-    especialidade: string | null;
+    especialidades: string[];
     vinculo: string | null;
     ativo: boolean;
   };
@@ -86,8 +87,16 @@ export interface ConfigPontoEletronico {
   tenantId: string;
   contratoAtivoId: string;
   subgrupoId: string;
+  equipeId: string | null;
   horasPrevistasMes: number | null;
   valorHora: string | null;
+  horarioEntrada: string | null;
+  horarioSaida: string | null;
+  toleranciaMinutos: number | null;
+  latitude: string | null;
+  longitude: string | null;
+  raioMetros: number | null;
+  enderecoPonto: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -224,6 +233,41 @@ export const adminService = {
     return response.data;
   },
 
+  listContratoSubgrupos: async (contratoId: string) => {
+    const response = await api.get<{ success: boolean; data: { id: string; subgrupo: { id: string; nome: string; ativo: boolean } }[] }>(
+      `/admin/contratos-ativos/${contratoId}/subgrupos`
+    );
+    return response.data;
+  },
+
+  addContratoSubgrupo: async (contratoId: string, subgrupoId: string) => {
+    const response = await api.post(`/admin/contratos-ativos/${contratoId}/subgrupos`, { subgrupoId });
+    return response.data;
+  },
+
+  removeContratoSubgrupo: async (contratoId: string, subgrupoId: string) => {
+    const response = await api.delete(`/admin/contratos-ativos/${contratoId}/subgrupos/${subgrupoId}`);
+    return response.data;
+  },
+
+  listContratoEquipes: async (contratoId: string) => {
+    const response = await api.get<{
+      success: boolean;
+      data: { id: string; equipe: { id: string; nome: string; ativo: boolean; subgrupo?: { id: string; nome: string } } }[];
+    }>(`/admin/contratos-ativos/${contratoId}/equipes`);
+    return response.data;
+  },
+
+  addContratoEquipe: async (contratoId: string, equipeId: string) => {
+    const response = await api.post(`/admin/contratos-ativos/${contratoId}/equipes`, { equipeId });
+    return response.data;
+  },
+
+  removeContratoEquipe: async (contratoId: string, equipeId: string) => {
+    const response = await api.delete(`/admin/contratos-ativos/${contratoId}/equipes/${equipeId}`);
+    return response.data;
+  },
+
   listEscalas: async (params?: { page?: number; limit?: number; search?: string }) => {
     const response = await api.get<ListEscalasResponse>('/admin/escalas', { params });
     return response.data;
@@ -323,6 +367,7 @@ export const adminService = {
     data: {
       contratos: { id: string; nome: string }[];
       subgrupos: { id: string; nome: string; ativo: boolean }[];
+      equipes: { id: string; nome: string; ativo: boolean; subgrupoId: string | null }[];
     };
   }> => {
     const response = await api.get('/admin/config-ponto/opcoes');
@@ -331,10 +376,11 @@ export const adminService = {
 
   getConfigPonto: async (
     contratoId: string,
-    subgrupoId: string
+    subgrupoId: string,
+    equipeId: string | null
   ): Promise<{ success: boolean; data: ConfigPontoEletronico | null }> => {
     const response = await api.get('/admin/config-ponto', {
-      params: { contratoId, subgrupoId },
+      params: { contratoId, subgrupoId, ...(equipeId ? { equipeId } : {}) },
     });
     return response.data;
   },
@@ -342,14 +388,24 @@ export const adminService = {
   setConfigPonto: async (
     contratoId: string,
     subgrupoId: string,
-    horasPrevistasMes: number | null,
-    valorHora: number | null
+    equipeId: string | null,
+    payload: {
+      horasPrevistasMes: number | null;
+      valorHora: number | null;
+      horarioEntrada?: string | null;
+      horarioSaida?: string | null;
+      toleranciaMinutos?: number | null;
+      latitude?: string | number | null;
+      longitude?: string | number | null;
+      raioMetros?: number | null;
+      enderecoPonto?: string | null;
+    }
   ) => {
     const response = await api.put('/admin/config-ponto', {
       contratoId,
       subgrupoId,
-      horasPrevistasMes,
-      valorHora,
+      ...(equipeId ? { equipeId } : {}),
+      ...payload,
     });
     return response.data;
   },
@@ -357,6 +413,9 @@ export const adminService = {
   listRegistrosPonto: async (params?: {
     escalaId?: string;
     medicoId?: string;
+    contratoAtivoId?: string;
+    subgrupoId?: string;
+    equipeId?: string;
     dataInicio?: string;
     dataFim?: string;
   }) => {

@@ -1,8 +1,76 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useRef, useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { adminService } from '../services/admin.service';
+
+function SearchableSelect({
+  options,
+  value,
+  onChange,
+  placeholder,
+  disabled,
+  className = 'input',
+}: {
+  options: { value: string; label: string }[];
+  value: string;
+  onChange: (value: string) => void;
+  placeholder: string;
+  disabled?: boolean;
+  className?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState('');
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  const selectedLabel = useMemo(() => options.find((o) => o.value === value)?.label ?? '', [options, value]);
+  const filtered = useMemo(() => {
+    if (!search.trim()) return options;
+    const s = search.trim().toLowerCase();
+    return options.filter((o) => o.label.toLowerCase().includes(s));
+  }, [options, search]);
+
+  useEffect(() => {
+    const onOutside = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', onOutside);
+    return () => document.removeEventListener('mousedown', onOutside);
+  }, []);
+
+  return (
+    <div ref={containerRef} className="relative flex-1 min-w-0">
+      <input
+        type="text"
+        className={className}
+        placeholder={placeholder}
+        value={open ? search : selectedLabel || ''}
+        onChange={(e) => { setSearch(e.target.value); if (!open) setOpen(true); }}
+        onFocus={() => setOpen(true)}
+        disabled={disabled}
+        autoComplete="off"
+      />
+      {open && (
+        <ul className="absolute z-50 left-0 right-0 mt-1 max-h-60 overflow-auto bg-white border border-viva-200 rounded-lg shadow-lg py-1">
+          {filtered.length === 0 ? (
+            <li className="px-3 py-2 text-sm text-gray-500">Nenhum resultado</li>
+          ) : (
+            filtered.map((o) => (
+              <li
+                key={o.value}
+                role="option"
+                className={`px-3 py-2 text-sm cursor-pointer hover:bg-viva-100 ${o.value === value ? 'bg-viva-50 text-viva-900 font-medium' : 'text-viva-800'}`}
+                onClick={() => { onChange(o.value); setSearch(''); setOpen(false); }}
+              >
+                {o.label}
+              </li>
+            ))
+          )}
+        </ul>
+      )}
+    </div>
+  );
+}
 
 const SubgruposEquipes = () => {
   const { user } = useAuth();
@@ -26,7 +94,7 @@ const SubgruposEquipes = () => {
   });
   const { data: medicosResp } = useQuery({
     queryKey: ['admin', 'medicos', 'for-subgrupos'],
-    queryFn: () => adminService.listMedicos({ page: 1, limit: 300 }),
+    queryFn: () => adminService.listMedicos({ page: 1, limit: 2000 }),
     enabled: isMaster,
   });
   const { data: subgruposResp } = useQuery({
@@ -227,15 +295,16 @@ const SubgruposEquipes = () => {
             ))}
           </div>
           {selectedSubgrupoId && (
-            <div className="mt-4 space-y-2">
-              <div className="flex gap-2">
-                <select className="input" value={medicoIdToSubgrupo} onChange={(e) => setMedicoIdToSubgrupo(e.target.value)}>
-                  <option value="">Adicionar médico ao subgrupo</option>
-                  {medicos.map((m) => (
-                    <option key={m.id} value={m.id}>{m.nomeCompleto} ({m.crm})</option>
-                  ))}
-                </select>
-                <button className="btn btn-secondary" onClick={adicionarMedicoSubgrupo}>Adicionar</button>
+            <div className="mt-4 space-y-2 hidden">
+              <div className="flex gap-2 items-start">
+                <SearchableSelect
+                  options={medicos.map((m) => ({ value: m.id, label: `${m.nomeCompleto} (${m.crm})` }))}
+                  value={medicoIdToSubgrupo}
+                  onChange={setMedicoIdToSubgrupo}
+                  placeholder="Pesquisar e adicionar médico ao subgrupo"
+                  disabled={loadingAction}
+                />
+                <button className="btn btn-secondary shrink-0" onClick={adicionarMedicoSubgrupo}>Adicionar</button>
               </div>
               <div className="space-y-1">
                 {subgrupoMedicos.map((a: { id: string; medicoId: string; medico?: { nomeCompleto: string } }) => (
@@ -279,14 +348,15 @@ const SubgruposEquipes = () => {
           </div>
           {selectedEquipeId && (
             <div className="mt-4 space-y-2">
-              <div className="flex gap-2">
-                <select className="input" value={medicoIdToEquipe} onChange={(e) => setMedicoIdToEquipe(e.target.value)}>
-                  <option value="">Adicionar médico à equipe</option>
-                  {medicos.map((m) => (
-                    <option key={m.id} value={m.id}>{m.nomeCompleto} ({m.crm})</option>
-                  ))}
-                </select>
-                <button className="btn btn-secondary" onClick={adicionarMedicoEquipe}>Adicionar</button>
+              <div className="flex gap-2 items-start">
+                <SearchableSelect
+                  options={medicos.map((m) => ({ value: m.id, label: `${m.nomeCompleto} (${m.crm})` }))}
+                  value={medicoIdToEquipe}
+                  onChange={setMedicoIdToEquipe}
+                  placeholder="Pesquisar e adicionar médico à equipe"
+                  disabled={loadingAction}
+                />
+                <button className="btn btn-secondary shrink-0" onClick={adicionarMedicoEquipe}>Adicionar</button>
               </div>
               <div className="space-y-1">
                 {equipeMedicos.map((a: { id: string; medicoId: string; medico?: { nomeCompleto: string } }) => (

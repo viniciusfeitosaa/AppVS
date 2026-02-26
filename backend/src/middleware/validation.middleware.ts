@@ -112,21 +112,35 @@ export const validateRegisterMedico = [
       }
       return true;
     }),
-  body('crm')
-    .isString()
-    .custom((value) => {
-      if (!validateCRM(value)) {
-        throw new Error('CRM inválido');
-      }
-      return true;
-    }),
-  body('especialidade')
+  body('profissao')
     .isString()
     .trim()
     .notEmpty()
-    .withMessage('Especialidade é obrigatória')
+    .withMessage('Profissão é obrigatória')
+    .isLength({ max: 80 })
+    .withMessage('Profissão inválida'),
+  body('crm')
+    .optional({ values: 'null', checkFalsy: true })
+    .isString()
+    .custom((value, { req }) => {
+      const profissao = (req.body?.profissao || '').trim();
+      if (profissao === 'Médico') {
+        if (!value || !validateCRM(value)) {
+          throw new Error('CRM inválido');
+        }
+      }
+      return true;
+    }),
+  body('especialidades')
+    .optional({ values: 'null', checkFalsy: true })
+    .isArray()
+    .withMessage('Especialidades deve ser uma lista'),
+  body('especialidades.*')
+    .optional()
+    .isString()
+    .trim()
     .isLength({ max: 100 })
-    .withMessage('Especialidade inválida'),
+    .withMessage('Cada especialidade deve ter no máximo 100 caracteres'),
   body('telefone')
     .isString()
     .trim()
@@ -168,11 +182,15 @@ export const validateUpdatePerfil = [
     .trim()
     .isLength({ max: 20 })
     .withMessage('Telefone inválido'),
-  body('especialidade')
+  body('especialidades')
     .optional({ values: 'falsy' })
+    .isArray()
+    .withMessage('Especialidades deve ser uma lista'),
+  body('especialidades.*')
+    .optional()
     .isString()
     .trim()
     .isLength({ max: 100 })
-    .withMessage('Especialidade inválida'),
+    .withMessage('Cada especialidade deve ter no máximo 100 caracteres'),
   handleValidationErrors,
 ];

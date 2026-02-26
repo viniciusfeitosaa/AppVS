@@ -14,9 +14,10 @@ export interface LoginResponse {
       role: 'MASTER' | 'MEDICO';
       tenantId: string;
       nomeCompleto: string;
-      crm?: string;
+      profissao?: string;
+      crm?: string | null;
       email: string | null;
-      especialidade?: string | null;
+      especialidades?: string[];
       vinculo?: string | null;
     };
     user?: {
@@ -24,9 +25,10 @@ export interface LoginResponse {
       role: 'MASTER' | 'MEDICO';
       tenantId: string;
       nomeCompleto: string;
-      crm?: string;
+      profissao?: string;
+      crm?: string | null;
       email: string | null;
-      especialidade?: string | null;
+      especialidades?: string[];
       vinculo?: string | null;
     };
     accessToken: string;
@@ -44,8 +46,9 @@ export interface RegisterPayload {
   nomeCompleto: string;
   email: string;
   cpf: string;
-  crm: string;
-  especialidade: string;
+  profissao: string;
+  crm?: string;
+  especialidades?: string[];
   telefone: string;
   password: string;
   confirmPassword: string;

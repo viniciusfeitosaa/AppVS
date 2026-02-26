@@ -13,9 +13,10 @@ export interface LoginResult {
     role: UserRole;
     tenantId: string;
     nomeCompleto: string;
-    crm?: string;
+    profissao?: string;
+    crm?: string | null;
     email?: string | null;
-    especialidade?: string | null;
+    especialidades: string[];
     vinculo?: string | null;
   };
   accessToken: string;
@@ -27,8 +28,9 @@ interface RegisterPublicMedicoInput {
   email: string;
   password: string;
   cpf: string;
-  crm: string;
-  especialidade: string;
+  profissao: string;
+  crm?: string;
+  especialidades?: string[];
   telefone: string;
 }
 
@@ -43,7 +45,8 @@ const getDefaultTenant = async () => {
   if (!tenant) {
     throw {
       statusCode: 500,
-      message: `Tenant padrão não encontrado (slug: ${env.TENANT_DEFAULT_SLUG})`,
+      message:
+        'Banco não configurado. No terminal, na pasta backend, rode: npx prisma db push e depois npm run prisma:seed',
     };
   }
 
@@ -137,9 +140,10 @@ export const loginMedicoService = async (
       role: UserRole.MEDICO,
       tenantId: tenant.id,
       nomeCompleto: medico.nomeCompleto,
+      profissao: medico.profissao ?? 'Médico',
       crm: medico.crm,
       email: medico.email,
-      especialidade: medico.especialidade,
+      especialidades: medico.especialidades ?? [],
       vinculo: medico.vinculo ?? null,
     },
     accessToken,
@@ -287,9 +291,10 @@ export const loginByEmailService = async (
       role: UserRole.MEDICO,
       tenantId: tenant.id,
       nomeCompleto: medico.nomeCompleto,
+      profissao: medico.profissao ?? 'Médico',
       crm: medico.crm,
       email: medico.email,
-      especialidade: medico.especialidade,
+      especialidades: medico.especialidades ?? [],
       vinculo: medico.vinculo ?? null,
     },
     accessToken,
@@ -349,9 +354,10 @@ export const acceptInviteService = async (
       role: UserRole.MEDICO,
       tenantId: tenant.id,
       nomeCompleto: updated.nomeCompleto,
+      profissao: updated.profissao ?? 'Médico',
       crm: updated.crm,
       email: updated.email,
-      especialidade: updated.especialidade,
+      especialidades: updated.especialidades ?? [],
       vinculo: updated.vinculo ?? null,
     },
     accessToken,
@@ -359,25 +365,45 @@ export const acceptInviteService = async (
   };
 };
 
+const PROFISSAO_MEDICO = 'Médico';
+
 export const registerPublicMedicoService = async (
   input: RegisterPublicMedicoInput
 ) => {
   const tenant = await getDefaultTenant();
   const cpf = input.cpf.replace(/\D/g, '');
-  const crm = normalizeCRM(input.crm);
   const email = input.email.trim().toLowerCase();
+  const profissao = (input.profissao || '').trim();
+  const isMedico = profissao === PROFISSAO_MEDICO;
 
   if (!validateCPF(cpf)) {
     throw { statusCode: 400, message: 'CPF inválido' };
   }
 
-  if (!crm || !validateCRM(crm)) {
-    throw { statusCode: 400, message: 'CRM inválido' };
+  if (!profissao) {
+    throw { statusCode: 400, message: 'Profissão é obrigatória' };
   }
+
+  let crm: string | null = null;
+  if (isMedico) {
+    const crmNorm = input.crm ? normalizeCRM(input.crm) : '';
+    if (!crmNorm || !validateCRM(crmNorm)) {
+      throw { statusCode: 400, message: 'CRM inválido' };
+    }
+    crm = crmNorm;
+  }
+
+  // Médico sem especialidades = [Clínica Médica]; senão usa as enviadas (várias permitidas)
+  const especialidades = (input.especialidades || []).filter((e) => (e || '').trim()).map((e) => (e || '').trim());
+  const especialidadesFinal = isMedico
+    ? (especialidades.length > 0 ? especialidades : ['Clínica Médica'])
+    : especialidades;
 
   const [existingByCpf, existingByCrm, existingByEmail] = await Promise.all([
     prisma.medico.findFirst({ where: { tenantId: tenant.id, cpf } }),
-    prisma.medico.findFirst({ where: { tenantId: tenant.id, crm } }),
+    crm
+      ? prisma.medico.findFirst({ where: { tenantId: tenant.id, crm } })
+      : Promise.resolve(null),
     prisma.medico.findFirst({ where: { tenantId: tenant.id, email } }),
   ]);
 
@@ -401,9 +427,10 @@ export const registerPublicMedicoService = async (
       nomeCompleto: input.nomeCompleto.trim(),
       email,
       cpf,
+      profissao,
       crm,
       senhaHash,
-      especialidade: input.especialidade.trim(),
+      especialidades: especialidadesFinal,
       vinculo: 'Associado',
       telefone: input.telefone.trim(),
       ativo: true,

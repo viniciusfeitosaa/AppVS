@@ -11,6 +11,7 @@ import {
   DocumentoPerfilField,
 } from '../constants/documentosPerfil';
 import { MODULO_LABEL, ModuloSistema } from '../constants/modulos';
+import { ESPECIALIDADES_MEDICAS } from '../constants/profissoesEspecialidades';
 
 type TabPerfil = 'pessoais' | 'bancarios' | 'documentos';
 
@@ -27,14 +28,22 @@ const Perfil = () => {
   >({});
   const [savingAcessos, setSavingAcessos] = useState(false);
   const [acessosDraft, setAcessosDraft] = useState<AcessoModuloItem[]>([]);
-  const [form, setForm] = useState({
-    especialidade: '',
+  const [form, setForm] = useState<{
+    especialidades: string[];
+    telefone: string;
+    estadoCivil: string;
+    enderecoResidencial: string;
+    dadosBancarios: string;
+    chavePix: string;
+  }>({
+    especialidades: [],
     telefone: '',
     estadoCivil: '',
     enderecoResidencial: '',
     dadosBancarios: '',
     chavePix: '',
   });
+  const [buscaEspecialidade, setBuscaEspecialidade] = useState('');
 
   const { data: perfilMedico, isLoading } = useQuery({
     queryKey: ['medico', 'perfil', 'pagina-perfil', user?.id],
@@ -56,12 +65,34 @@ const Perfil = () => {
     setAcessosDraft([...(acessosResp.data.master || []), ...(acessosResp.data.medico || [])]);
   }, [acessosResp]);
 
+  useEffect(() => {
+    if (!perfilMedico) return;
+    setForm((prev) => ({
+      ...prev,
+      especialidades: perfilMedico.especialidades ?? [],
+      telefone: perfilMedico.telefone ?? '',
+      estadoCivil: perfilMedico.estadoCivil ?? '',
+      enderecoResidencial: perfilMedico.enderecoResidencial ?? '',
+      dadosBancarios: perfilMedico.dadosBancarios ?? '',
+      chavePix: perfilMedico.chavePix ?? '',
+    }));
+  }, [perfilMedico]);
+
   const perfil = isMaster ? user : perfilMedico || user;
   const perfilMedicoAtual = !isMaster ? perfilMedico : null;
   const telefone = !isMaster && perfil && 'telefone' in perfil ? perfil.telefone : null;
 
-  const handleChange = (field: keyof typeof form, value: string) => {
+  const handleChange = (field: keyof typeof form, value: string | string[]) => {
     setForm((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const toggleEspecialidade = (nome: string) => {
+    setForm((prev) => ({
+      ...prev,
+      especialidades: prev.especialidades.includes(nome)
+        ? prev.especialidades.filter((x) => x !== nome)
+        : [...prev.especialidades, nome],
+    }));
   };
 
   const handleSalvar = async () => {
@@ -71,7 +102,10 @@ const Perfil = () => {
     setSuccess(null);
     try {
       await medicoService.updatePerfil({
-        especialidade: form.especialidade || perfilMedico.especialidade || '',
+        especialidades:
+          form.especialidades.length > 0
+            ? form.especialidades
+            : (perfilMedico.especialidades ?? []),
         telefone: form.telefone || perfilMedico.telefone || '',
         estadoCivil: form.estadoCivil || perfilMedico.estadoCivil || '',
         enderecoResidencial: form.enderecoResidencial || perfilMedico.enderecoResidencial || '',
@@ -196,6 +230,23 @@ const Perfil = () => {
                 </p>
               </div>
               {!isMaster && (
+                <div className="bg-viva-50 rounded-lg p-3 md:col-span-2 border-2 border-viva-200">
+                  <p className="text-xs text-viva-600 font-bold uppercase tracking-wider">
+                    Identificação profissional
+                  </p>
+                  <p className="text-sm text-viva-800 mt-1">
+                    <span className="font-semibold">Profissão:</span>{' '}
+                    {perfil && 'profissao' in perfil ? fixMojibake(perfil.profissao) : 'Médico'}
+                  </p>
+                  {(perfil && 'especialidades' in perfil && (perfil.especialidades?.length ?? 0) > 0) && (
+                    <p className="text-sm text-viva-800 mt-0.5">
+                      <span className="font-semibold">Especialidades:</span>{' '}
+                      {fixMojibake((perfil.especialidades ?? []).join(', '))}
+                    </p>
+                  )}
+                </div>
+              )}
+              {!isMaster && (
                 <div className="bg-viva-50 rounded-lg p-3">
                   <p className="text-xs text-viva-600 font-bold uppercase tracking-wider">CRM</p>
                   <p className="text-base font-semibold text-viva-900 mt-1">
@@ -204,13 +255,40 @@ const Perfil = () => {
                 </div>
               )}
               {!isMaster && (
-                <div className="bg-viva-50 rounded-lg p-3">
-                  <p className="text-xs text-viva-600 font-bold uppercase tracking-wider">Especialidade</p>
+                <div className="bg-viva-50 rounded-lg p-3 md:col-span-2">
+                  <p className="text-xs text-viva-600 font-bold uppercase tracking-wider">
+                    Atualizar especialidades (várias permitidas)
+                  </p>
                   <input
+                    type="text"
+                    placeholder="Buscar especialidade..."
                     className="input mt-2"
-                    value={form.especialidade || perfil?.especialidade || ''}
-                    onChange={(e) => handleChange('especialidade', e.target.value)}
+                    value={buscaEspecialidade}
+                    onChange={(e) => setBuscaEspecialidade(e.target.value)}
                   />
+                  <div className="max-h-40 overflow-y-auto border border-gray-200 rounded-lg p-2 mt-2 space-y-1">
+                    {ESPECIALIDADES_MEDICAS.filter((e) =>
+                      e.toLowerCase().includes(buscaEspecialidade.toLowerCase())
+                    ).map((esp) => (
+                      <label
+                        key={esp}
+                        className="flex items-center gap-2 cursor-pointer hover:bg-viva-50 p-1 rounded"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={form.especialidades.includes(esp)}
+                          onChange={() => toggleEspecialidade(esp)}
+                          className="rounded border-viva-600 text-viva-600"
+                        />
+                        <span className="text-sm text-viva-900">{esp}</span>
+                      </label>
+                    ))}
+                  </div>
+                  {form.especialidades.length > 0 && (
+                    <p className="mt-1 text-xs text-gray-600">
+                      Selecionadas: {form.especialidades.join(', ')}
+                    </p>
+                  )}
                 </div>
               )}
               {!isMaster && (

@@ -1,5 +1,7 @@
 import { Request, Response } from 'express';
 import {
+  addContratoEquipeService,
+  addContratoSubgrupoService,
   alocarMedicoEscalaService,
   createEscalaService,
   createContratoAtivoService,
@@ -10,6 +12,8 @@ import {
   getConfigPontoService,
   getValoresPlantaoService,
   inviteMedicoService,
+  listContratoEquipesService,
+  listContratoSubgruposService,
   listEscalaMedicosService,
   listEscalaPlantoesService,
   listEscalasService,
@@ -18,6 +22,8 @@ import {
   listMedicosService,
   removerEscalaPlantaoService,
   removerMedicoEscalaService,
+  removeContratoEquipeService,
+  removeContratoSubgrupoService,
   setConfigPontoService,
   setValorPlantaoService,
   toggleMedicoAtivoService,
@@ -29,7 +35,7 @@ import {
   getMatrizAcessosModulosService,
   salvarMatrizAcessosModulosService,
 } from '../services/acesso-modulo.service';
-import { listSubgruposService } from '../services/grupo-equipe.service';
+import { listEquipesService, listSubgruposService } from '../services/grupo-equipe.service';
 import { ModuloSistema, UserRole } from '@prisma/client';
 
 export const listMedicosController = async (req: Request, res: Response) => {
@@ -268,6 +274,114 @@ export const deleteContratoAtivoController = async (req: Request, res: Response)
     return res.status(error.statusCode || 500).json({
       success: false,
       error: error.message || 'Erro ao excluir contrato ativo',
+    });
+  }
+};
+
+export const listContratoSubgruposController = async (req: Request, res: Response) => {
+  try {
+    if (!req.user) return res.status(401).json({ success: false, error: 'Não autenticado' });
+    const data = await listContratoSubgruposService(req.user.tenantId, req.params.id);
+    return res.status(200).json({ success: true, data });
+  } catch (error: any) {
+    console.error('[listContratoSubgrupos]', error?.message ?? error);
+    return res.status(error.statusCode || 500).json({
+      success: false,
+      error: error.message || 'Erro ao listar subgrupos do contrato',
+    });
+  }
+};
+
+export const addContratoSubgrupoController = async (req: Request, res: Response) => {
+  try {
+    if (!req.user) return res.status(401).json({ success: false, error: 'Não autenticado' });
+    const { subgrupoId } = req.body;
+    if (!subgrupoId || typeof subgrupoId !== 'string') {
+      return res.status(400).json({ success: false, error: 'subgrupoId é obrigatório' });
+    }
+    const data = await addContratoSubgrupoService(
+      req.user.tenantId,
+      req.user.id,
+      req.params.id,
+      subgrupoId.trim()
+    );
+    return res.status(201).json({ success: true, data, message: 'Subgrupo associado ao contrato' });
+  } catch (error: any) {
+    return res.status(error.statusCode || 500).json({
+      success: false,
+      error: error.message || 'Erro ao associar subgrupo',
+    });
+  }
+};
+
+export const removeContratoSubgrupoController = async (req: Request, res: Response) => {
+  try {
+    if (!req.user) return res.status(401).json({ success: false, error: 'Não autenticado' });
+    await removeContratoSubgrupoService(
+      req.user.tenantId,
+      req.user.id,
+      req.params.id,
+      req.params.subgrupoId
+    );
+    return res.status(200).json({ success: true, message: 'Subgrupo desassociado do contrato' });
+  } catch (error: any) {
+    return res.status(error.statusCode || 500).json({
+      success: false,
+      error: error.message || 'Erro ao desassociar subgrupo',
+    });
+  }
+};
+
+export const listContratoEquipesController = async (req: Request, res: Response) => {
+  try {
+    if (!req.user) return res.status(401).json({ success: false, error: 'Não autenticado' });
+    const data = await listContratoEquipesService(req.user.tenantId, req.params.id);
+    return res.status(200).json({ success: true, data });
+  } catch (error: any) {
+    console.error('[listContratoEquipes]', error?.message ?? error);
+    return res.status(error.statusCode || 500).json({
+      success: false,
+      error: error.message || 'Erro ao listar equipes do contrato',
+    });
+  }
+};
+
+export const addContratoEquipeController = async (req: Request, res: Response) => {
+  try {
+    if (!req.user) return res.status(401).json({ success: false, error: 'Não autenticado' });
+    const { equipeId } = req.body;
+    if (!equipeId || typeof equipeId !== 'string') {
+      return res.status(400).json({ success: false, error: 'equipeId é obrigatório' });
+    }
+    const data = await addContratoEquipeService(
+      req.user.tenantId,
+      req.user.id,
+      req.params.id,
+      equipeId.trim()
+    );
+    return res.status(201).json({ success: true, data, message: 'Equipe associada ao contrato' });
+  } catch (error: any) {
+    return res.status(error.statusCode || 500).json({
+      success: false,
+      error: error.message || 'Erro ao associar equipe',
+    });
+  }
+};
+
+export const removeContratoEquipeController = async (req: Request, res: Response) => {
+  try {
+    if (!req.user) return res.status(401).json({ success: false, error: 'Não autenticado' });
+    await removeContratoEquipeService(
+      req.user.tenantId,
+      req.user.id,
+      req.params.id,
+      req.params.equipeId
+    );
+    return res.status(200).json({ success: true, message: 'Equipe desassociada do contrato' });
+  } catch (error: any) {
+    return res.status(error.statusCode || 500).json({
+      success: false,
+      error: error.message || 'Erro ao desassociar equipe',
     });
   }
 };
@@ -541,15 +655,22 @@ export const getConfigPontoOpcoesController = async (req: Request, res: Response
       return res.status(401).json({ success: false, error: 'Não autenticado' });
     }
     const tenantId = req.user.tenantId;
-    const [contratosResult, subgrupos] = await Promise.all([
+    const [contratosResult, subgrupos, equipes] = await Promise.all([
       listContratosAtivosService({ tenantId, page: 1, limit: 500 }),
       listSubgruposService(tenantId),
+      listEquipesService(tenantId, null),
     ]);
     return res.status(200).json({
       success: true,
       data: {
         contratos: contratosResult.items,
         subgrupos: subgrupos.map((s) => ({ id: s.id, nome: s.nome, ativo: s.ativo })),
+        equipes: equipes.map((e) => ({
+          id: e.id,
+          nome: e.nome,
+          ativo: e.ativo,
+          subgrupoId: e.subgrupoId ?? null,
+        })),
       },
     });
   } catch (error: any) {
@@ -567,13 +688,14 @@ export const getConfigPontoController = async (req: Request, res: Response) => {
     }
     const contratoId = (req.query.contratoId as string)?.trim();
     const subgrupoId = (req.query.subgrupoId as string)?.trim();
+    const equipeId = (req.query.equipeId as string)?.trim() || null;
     if (!contratoId || !subgrupoId) {
       return res.status(400).json({
         success: false,
         error: 'contratoId e subgrupoId são obrigatórios na query',
       });
     }
-    const data = await getConfigPontoService(req.user.tenantId, contratoId, subgrupoId);
+    const data = await getConfigPontoService(req.user.tenantId, contratoId, subgrupoId, equipeId);
     return res.status(200).json({ success: true, data: data ?? null });
   } catch (error: any) {
     return res.status(error.statusCode || 500).json({
@@ -588,20 +710,29 @@ export const setConfigPontoController = async (req: Request, res: Response) => {
     if (!req.user) {
       return res.status(401).json({ success: false, error: 'Não autenticado' });
     }
-    const { contratoId, subgrupoId, horasPrevistasMes, valorHora } = req.body;
+    const { contratoId, subgrupoId, equipeId, horasPrevistasMes, valorHora, horarioEntrada, horarioSaida, toleranciaMinutos, latitude, longitude, raioMetros, enderecoPonto } = req.body;
     if (!contratoId || typeof contratoId !== 'string') {
       return res.status(400).json({ success: false, error: 'contratoId é obrigatório' });
     }
     if (!subgrupoId || typeof subgrupoId !== 'string') {
       return res.status(400).json({ success: false, error: 'subgrupoId é obrigatório' });
     }
+    const equipeIdTrimmed = equipeId != null && typeof equipeId === 'string' ? equipeId.trim() || null : null;
     const data = await setConfigPontoService({
       tenantId: req.user.tenantId,
       masterId: req.user.id,
       contratoAtivoId: contratoId.trim(),
       subgrupoId: subgrupoId.trim(),
+      equipeId: equipeIdTrimmed,
       horasPrevistasMes: horasPrevistasMes != null ? Number(horasPrevistasMes) : null,
       valorHora: valorHora != null ? Number(valorHora) : null,
+      horarioEntrada: horarioEntrada != null && typeof horarioEntrada === 'string' ? horarioEntrada.trim() || null : null,
+      horarioSaida: horarioSaida != null && typeof horarioSaida === 'string' ? horarioSaida.trim() || null : null,
+      toleranciaMinutos: toleranciaMinutos != null ? Number(toleranciaMinutos) : null,
+      latitude: latitude != null && latitude !== '' ? latitude : null,
+      longitude: longitude != null && longitude !== '' ? longitude : null,
+      raioMetros: raioMetros != null && raioMetros !== '' ? Number(raioMetros) : null,
+      enderecoPonto: enderecoPonto != null && typeof enderecoPonto === 'string' ? enderecoPonto.trim() || null : null,
     });
     return res.status(200).json({ success: true, data, message: 'Configuração salva' });
   } catch (error: any) {
@@ -653,6 +784,9 @@ export const listRegistrosPontoAdminController = async (req: Request, res: Respo
     const data = await listRegistrosPontoAdminService(req.user.tenantId, {
       escalaId: req.query.escalaId ? String(req.query.escalaId) : undefined,
       medicoId: req.query.medicoId ? String(req.query.medicoId) : undefined,
+      contratoAtivoId: req.query.contratoAtivoId ? String(req.query.contratoAtivoId) : undefined,
+      subgrupoId: req.query.subgrupoId ? String(req.query.subgrupoId) : undefined,
+      equipeId: req.query.equipeId ? String(req.query.equipeId) : undefined,
       dataInicio: req.query.dataInicio ? String(req.query.dataInicio) : undefined,
       dataFim: req.query.dataFim ? String(req.query.dataFim) : undefined,
     });

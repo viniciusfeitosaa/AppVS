@@ -5,9 +5,10 @@ export interface MedicoPerfil {
   id: string;
   tenantId: string;
   nomeCompleto: string;
-  crm: string;
+  profissao: string;
+  crm: string | null;
   email: string | null;
-  especialidade: string | null;
+  especialidades: string[];
   vinculo: string | null;
   telefone: string | null;
   estadoCivil: string | null;
@@ -41,7 +42,7 @@ export const medicoService = {
   },
 
   updatePerfil: async (payload: {
-    especialidade?: string;
+    especialidades?: string[];
     telefone?: string;
     estadoCivil?: string;
     enderecoResidencial?: string;
@@ -50,7 +51,8 @@ export const medicoService = {
     documentos?: Partial<Record<DocumentoPerfilField, File>>;
   }): Promise<PerfilResponse> => {
     const formData = new FormData();
-    if (payload.especialidade) formData.append('especialidade', payload.especialidade);
+    if (payload.especialidades?.length)
+      formData.append('especialidades', JSON.stringify(payload.especialidades));
     if (payload.telefone) formData.append('telefone', payload.telefone);
     if (payload.estadoCivil) formData.append('estadoCivil', payload.estadoCivil);
     if (payload.enderecoResidencial) formData.append('enderecoResidencial', payload.enderecoResidencial);

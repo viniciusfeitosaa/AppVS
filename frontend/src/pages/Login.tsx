@@ -39,9 +39,12 @@ const Login = () => {
 
       navigate('/dashboard');
     } catch (err: any) {
-      setError(
-        err.response?.data?.error || 'Erro ao fazer login. Verifique suas credenciais.'
-      );
+      const msg =
+        err.response?.data?.error ||
+        err.response?.data?.message ||
+        err.message ||
+        'Erro ao fazer login. Verifique suas credenciais.';
+      setError(msg);
     } finally {
       setIsLoading(false);
     }

@@ -49,16 +49,25 @@ const Dashboard = () => {
           Informações Pessoais
         </h3>
         <div className="space-y-4">
-          {!isMaster && (
-            <div className="bg-viva-50 p-3 rounded-lg">
-              <p className="text-xs text-viva-600 font-bold uppercase tracking-wider">CRM</p>
-              <p className="text-lg font-medium text-viva-900">{formatCRM(displayUser?.crm || '')}</p>
+          {!isMaster && (displayUser?.profissao || (displayUser?.especialidades?.length ?? 0) > 0) && (
+            <div className="bg-viva-100 border border-viva-200 p-3 rounded-lg">
+              <p className="text-xs text-viva-600 font-bold uppercase tracking-wider">Identificação profissional</p>
+              {displayUser?.profissao && (
+                <p className="text-lg font-medium text-viva-900 mt-1">
+                  <span className="text-viva-700">Profissão:</span> {fixMojibake(displayUser.profissao)}
+                </p>
+              )}
+              {(displayUser?.especialidades?.length ?? 0) > 0 && (
+                <p className="text-base font-medium text-viva-900 mt-0.5">
+                  <span className="text-viva-700">Especialidades:</span> {fixMojibake(displayUser!.especialidades!.join(', '))}
+                </p>
+              )}
             </div>
           )}
-          {displayUser?.especialidade && (
+          {!isMaster && displayUser?.crm && (
             <div className="bg-viva-50 p-3 rounded-lg">
-              <p className="text-xs text-viva-600 font-bold uppercase tracking-wider">Especialidade</p>
-              <p className="text-lg font-medium text-viva-900">{fixMojibake(displayUser.especialidade)}</p>
+              <p className="text-xs text-viva-600 font-bold uppercase tracking-wider">CRM</p>
+              <p className="text-lg font-medium text-viva-900">{formatCRM(displayUser.crm)}</p>
             </div>
           )}
           {!isMaster && (
