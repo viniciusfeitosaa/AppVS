@@ -1,0 +1,281 @@
+import { useMemo, useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { adminService, ContratoAtivo } from '../services/admin.service';
+
+interface FormState {
+  nome: string;
+  descricao: string;
+  dataInicio: string;
+  dataFim: string;
+  ativo: boolean;
+  usaEscala: boolean;
+  usaPonto: boolean;
+}
+
+const emptyForm: FormState = {
+  nome: '',
+  descricao: '',
+  dataInicio: '',
+  dataFim: '',
+  ativo: true,
+  usaEscala: true,
+  usaPonto: true,
+};
+
+const toDateInput = (value?: string | null) => (value ? value.slice(0, 10) : '');
+
+const ContratosAtivos = () => {
+  const queryClient = useQueryClient();
+  const [search, setSearch] = useState('');
+  const [form, setForm] = useState<FormState>(emptyForm);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const { data, isLoading } = useQuery({
+    queryKey: ['admin', 'contratos-ativos', search],
+    queryFn: () => adminService.listContratosAtivos({ page: 1, limit: 100, search: search || undefined }),
+  });
+
+  const contratos = useMemo(() => data?.data || [], [data]);
+
+  const resetForm = () => {
+    setForm(emptyForm);
+    setEditingId(null);
+    setError(null);
+  };
+
+  const handleEdit = (contrato: ContratoAtivo) => {
+    setEditingId(contrato.id);
+    setForm({
+      nome: contrato.nome,
+      descricao: contrato.descricao || '',
+      dataInicio: toDateInput(contrato.dataInicio),
+      dataFim: toDateInput(contrato.dataFim),
+      ativo: contrato.ativo,
+      usaEscala: contrato.usaEscala !== false,
+      usaPonto: contrato.usaPonto !== false,
+    });
+    setError(null);
+  };
+
+  const refresh = async () => {
+    await queryClient.invalidateQueries({ queryKey: ['admin', 'contratos-ativos'] });
+  };
+
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setSaving(true);
+    setError(null);
+
+    try {
+      const payload = {
+        nome: form.nome.trim(),
+        descricao: form.descricao.trim() || null,
+        dataInicio: form.dataInicio,
+        dataFim: form.dataFim || null,
+        ativo: form.ativo,
+        usaEscala: form.usaEscala,
+        usaPonto: form.usaPonto,
+      };
+
+      if (!payload.nome || !payload.dataInicio) {
+        throw new Error('Preencha nome e data de início.');
+      }
+      if (!payload.usaEscala && !payload.usaPonto) {
+        throw new Error('Selecione ao menos uma opção: usar escalas ou usar ponto eletrônico.');
+      }
+
+      if (editingId) {
+        await adminService.updateContratoAtivo(editingId, payload);
+      } else {
+        await adminService.createContratoAtivo(payload);
+      }
+
+      resetForm();
+      await refresh();
+    } catch (err: any) {
+      setError(err.response?.data?.error || err.message || 'Não foi possível salvar o contrato.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDelete = async (contrato: ContratoAtivo) => {
+    const ok = window.confirm(`Excluir o contrato "${contrato.nome}"?`);
+    if (!ok) return;
+
+    try {
+      await adminService.deleteContratoAtivo(contrato.id);
+      if (editingId === contrato.id) {
+        resetForm();
+      }
+      await refresh();
+    } catch (err: any) {
+      setError(err.response?.data?.error || 'Não foi possível excluir o contrato.');
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="card border-l-4 border-viva-500">
+        <h2 className="text-2xl font-bold text-viva-900 mb-1">Contratos Ativos</h2>
+        <p className="text-gray-600">Adicione, edite e exclua contratos vinculados ao seu tenant.</p>
+      </div>
+
+      <div className="card">
+        <h3 className="text-lg font-bold text-viva-900 mb-4">
+          {editingId ? 'Editar contrato' : 'Novo contrato'}
+        </h3>
+        <form className="grid grid-cols-1 md:grid-cols-2 gap-4" onSubmit={handleSubmit}>
+          <input
+            className="input"
+            placeholder="Nome do contrato"
+            value={form.nome}
+            onChange={(e) => setForm((prev) => ({ ...prev, nome: e.target.value }))}
+          />
+          <input
+            className="input"
+            type="date"
+            value={form.dataInicio}
+            onChange={(e) => setForm((prev) => ({ ...prev, dataInicio: e.target.value }))}
+          />
+          <input
+            className="input"
+            type="date"
+            value={form.dataFim}
+            onChange={(e) => setForm((prev) => ({ ...prev, dataFim: e.target.value }))}
+          />
+          <div className="md:col-span-2 space-y-2">
+            <p className="text-sm font-semibold text-viva-800">Estilo de produção</p>
+            <p className="text-xs text-gray-600">
+              Escalas: controle de plantões por dia/turno. Ponto: registro de entrada e saída. Você pode usar os dois, só escalas ou só ponto.
+            </p>
+            <div className="flex flex-wrap gap-6">
+              <label className="flex items-center gap-2 text-sm text-viva-900">
+                <input
+                  type="checkbox"
+                  checked={form.usaEscala}
+                  onChange={(e) => setForm((prev) => ({ ...prev, usaEscala: e.target.checked }))}
+                />
+                Usar escalas (plantões)
+              </label>
+              <label className="flex items-center gap-2 text-sm text-viva-900">
+                <input
+                  type="checkbox"
+                  checked={form.usaPonto}
+                  onChange={(e) => setForm((prev) => ({ ...prev, usaPonto: e.target.checked }))}
+                />
+                Usar ponto eletrônico
+              </label>
+            </div>
+          </div>
+          <label className="flex items-center gap-2 text-sm text-viva-900">
+            <input
+              type="checkbox"
+              checked={form.ativo}
+              onChange={(e) => setForm((prev) => ({ ...prev, ativo: e.target.checked }))}
+            />
+            Contrato ativo
+          </label>
+          <textarea
+            className="input md:col-span-2 min-h-[90px]"
+            placeholder="Descrição (opcional)"
+            value={form.descricao}
+            onChange={(e) => setForm((prev) => ({ ...prev, descricao: e.target.value }))}
+          />
+
+          {error && <p className="md:col-span-2 text-sm text-red-600">{error}</p>}
+
+          <div className="md:col-span-2 flex gap-2">
+            <button type="submit" disabled={saving} className="btn btn-primary">
+              {saving ? 'Salvando...' : editingId ? 'Salvar alterações' : 'Adicionar contrato'}
+            </button>
+            {editingId && (
+              <button type="button" className="btn btn-secondary" onClick={resetForm}>
+                Cancelar edição
+              </button>
+            )}
+          </div>
+        </form>
+      </div>
+
+      <div className="card">
+        <div className="flex items-center justify-between gap-3 mb-4">
+          <h3 className="text-lg font-bold text-viva-900">Lista de contratos</h3>
+          <input
+            className="input max-w-xs"
+            placeholder="Buscar por nome"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </div>
+
+        {isLoading ? (
+          <p className="text-sm text-gray-600">Carregando contratos...</p>
+        ) : contratos.length === 0 ? (
+          <p className="text-sm text-gray-600">Nenhum contrato encontrado.</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="min-w-full text-sm">
+              <thead>
+                <tr className="text-left text-viva-700 border-b">
+                  <th className="py-2 pr-4">Nome</th>
+                  <th className="py-2 pr-4">Início</th>
+                  <th className="py-2 pr-4">Fim</th>
+                  <th className="py-2 pr-4">Estilo</th>
+                  <th className="py-2 pr-4">Status</th>
+                  <th className="py-2 pr-4">Ações</th>
+                </tr>
+              </thead>
+              <tbody>
+                {contratos.map((contrato) => (
+                  <tr key={contrato.id} className="border-b last:border-b-0">
+                    <td className="py-2 pr-4">
+                      <p className="font-semibold text-viva-900">{contrato.nome}</p>
+                      {contrato.descricao && <p className="text-xs text-gray-600">{contrato.descricao}</p>}
+                    </td>
+                    <td className="py-2 pr-4 text-gray-700">{toDateInput(contrato.dataInicio)}</td>
+                    <td className="py-2 pr-4 text-gray-700">{toDateInput(contrato.dataFim) || '-'}</td>
+                    <td className="py-2 pr-4">
+                      <span className="text-xs text-viva-700">
+                        {contrato.usaEscala !== false && contrato.usaPonto !== false
+                          ? 'Escala + Ponto'
+                          : contrato.usaEscala !== false
+                            ? 'Apenas escala'
+                            : 'Apenas ponto'}
+                      </span>
+                    </td>
+                    <td className="py-2 pr-4">
+                      <span
+                        className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold ${
+                          contrato.ativo
+                            ? 'bg-green-100 text-green-800 border border-green-200'
+                            : 'bg-red-100 text-red-700 border border-red-200'
+                        }`}
+                      >
+                        {contrato.ativo ? 'Ativo' : 'Inativo'}
+                      </span>
+                    </td>
+                    <td className="py-2 pr-4">
+                      <div className="flex gap-2">
+                        <button className="btn btn-secondary" onClick={() => handleEdit(contrato)}>
+                          Editar
+                        </button>
+                        <button className="btn btn-secondary" onClick={() => handleDelete(contrato)}>
+                          Excluir
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+export default ContratosAtivos;

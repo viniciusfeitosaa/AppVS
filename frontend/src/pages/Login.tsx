@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -109,6 +110,12 @@ const Login = () => {
             </button>
           </div>
         </form>
+        <p className="text-sm text-center text-gray-600">
+          Ainda não possui cadastro?{' '}
+          <Link to="/cadastro" className="font-semibold text-viva-800 hover:text-viva-600">
+            Criar conta
+          </Link>
+        </p>
       </div>
     </div>
   );

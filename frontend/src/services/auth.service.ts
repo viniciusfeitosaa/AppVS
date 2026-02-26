@@ -1,4 +1,5 @@
 import api from './api';
+import { ModuloSistema } from '../constants/modulos';
 
 export interface LoginCredentials {
   email: string;
@@ -39,6 +40,17 @@ export interface AcceptInvitePayload {
   confirmPassword: string;
 }
 
+export interface RegisterPayload {
+  nomeCompleto: string;
+  email: string;
+  cpf: string;
+  crm: string;
+  especialidade: string;
+  telefone: string;
+  password: string;
+  confirmPassword: string;
+}
+
 export const authService = {
   login: async (credentials: LoginCredentials): Promise<LoginResponse> => {
     const response = await api.post<LoginResponse>('/auth/login', credentials);
@@ -47,6 +59,23 @@ export const authService = {
 
   acceptInvite: async (payload: AcceptInvitePayload): Promise<LoginResponse> => {
     const response = await api.post<LoginResponse>('/auth/accept-invite', payload);
+    return response.data;
+  },
+
+  register: async (payload: RegisterPayload) => {
+    const response = await api.post('/auth/register', payload);
+    return response.data;
+  },
+
+  getModulosAcesso: async (): Promise<{
+    success: boolean;
+    data: {
+      perfil: 'MASTER' | 'MEDICO';
+      items: Array<{ perfil: 'MASTER' | 'MEDICO'; modulo: ModuloSistema; permitido: boolean }>;
+      map: Record<ModuloSistema, boolean>;
+    };
+  }> => {
+    const response = await api.get('/auth/modulos-acesso');
     return response.data;
   },
 

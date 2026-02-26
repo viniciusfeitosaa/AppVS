@@ -27,7 +27,7 @@ const envSchema = z.object({
   // Segurança
   BCRYPT_ROUNDS: z.string().default('12'),
   RATE_LIMIT_WINDOW_MS: z.string().default('900000'), // 15 minutos
-  RATE_LIMIT_MAX_REQUESTS: z.string().default('100'),
+  RATE_LIMIT_MAX_REQUESTS: z.string().default('500'), // requisições por janela (dashboard faz várias em paralelo)
 
   // CORS
   FRONTEND_URL: z.string().url().optional(),

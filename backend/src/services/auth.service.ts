@@ -22,6 +22,16 @@ export interface LoginResult {
   refreshToken: string;
 }
 
+interface RegisterPublicMedicoInput {
+  nomeCompleto: string;
+  email: string;
+  password: string;
+  cpf: string;
+  crm: string;
+  especialidade: string;
+  telefone: string;
+}
+
 const getDefaultTenant = async () => {
   const tenant = await prisma.tenant.findFirst({
     where: {
@@ -346,5 +356,83 @@ export const acceptInviteService = async (
     },
     accessToken,
     refreshToken,
+  };
+};
+
+export const registerPublicMedicoService = async (
+  input: RegisterPublicMedicoInput
+) => {
+  const tenant = await getDefaultTenant();
+  const cpf = input.cpf.replace(/\D/g, '');
+  const crm = normalizeCRM(input.crm);
+  const email = input.email.trim().toLowerCase();
+
+  if (!validateCPF(cpf)) {
+    throw { statusCode: 400, message: 'CPF inválido' };
+  }
+
+  if (!crm || !validateCRM(crm)) {
+    throw { statusCode: 400, message: 'CRM inválido' };
+  }
+
+  const [existingByCpf, existingByCrm, existingByEmail] = await Promise.all([
+    prisma.medico.findFirst({ where: { tenantId: tenant.id, cpf } }),
+    prisma.medico.findFirst({ where: { tenantId: tenant.id, crm } }),
+    prisma.medico.findFirst({ where: { tenantId: tenant.id, email } }),
+  ]);
+
+  if (existingByCpf) {
+    throw { statusCode: 409, message: 'Já existe cadastro com este CPF' };
+  }
+
+  if (existingByCrm) {
+    throw { statusCode: 409, message: 'Já existe cadastro com este CRM' };
+  }
+
+  if (existingByEmail) {
+    throw { statusCode: 409, message: 'Já existe cadastro com este e-mail' };
+  }
+
+  const senhaHash = await hashPassword(input.password);
+
+  const medico = await prisma.medico.create({
+    data: {
+      tenantId: tenant.id,
+      nomeCompleto: input.nomeCompleto.trim(),
+      email,
+      cpf,
+      crm,
+      senhaHash,
+      especialidade: input.especialidade.trim(),
+      vinculo: 'Associado',
+      telefone: input.telefone.trim(),
+      ativo: true,
+      inviteTokenHash: null,
+      inviteExpiresAt: null,
+      inviteAcceptedAt: new Date(),
+    },
+    select: {
+      id: true,
+      nomeCompleto: true,
+      email: true,
+      crm: true,
+      vinculo: true,
+    },
+  });
+
+  await createAuditLog({
+    acao: 'CADASTRO_PUBLICO_MEDICO',
+    tenantId: tenant.id,
+    medicoId: medico.id,
+    detalhes: {
+      email: medico.email,
+      crm: medico.crm,
+      vinculo: medico.vinculo ?? null,
+    },
+  });
+
+  return {
+    medico,
+    message: 'Cadastro realizado com sucesso. Você já pode fazer login.',
   };
 };

@@ -4,10 +4,20 @@ import ProtectedRoute from './components/Layout/ProtectedRoute';
 import AppShell from './components/Layout/AppShell';
 import Home from './pages/Home';
 import Login from './pages/Login';
+import Cadastro from './pages/Cadastro';
 import Dashboard from './pages/Dashboard';
 import AcceptInvite from './pages/AcceptInvite';
 import Medicos from './pages/Medicos';
 import FeaturePlaceholder from './pages/FeaturePlaceholder';
+import ContratosAtivos from './pages/ContratosAtivos';
+import Escalas from './pages/Escalas';
+import SubgruposEquipes from './pages/SubgruposEquipes';
+import ValoresPlantao from './pages/ValoresPlantao';
+import ValoresPonto from './pages/ValoresPonto';
+import PontoEletronico from './pages/PontoEletronico';
+import Relatorios from './pages/Relatorios';
+import Perfil from './pages/Perfil';
+import AcessoNegado from './pages/AcessoNegado';
 
 // Componente para garantir que a intro seja vista antes do login
 const LoginGuard = ({ children }: { children: React.ReactNode }) => {
@@ -49,6 +59,14 @@ function AppRoutes() {
           </LoginGuard>
         } 
       />
+      <Route
+        path="/cadastro"
+        element={
+          <LoginGuard>
+            <Cadastro />
+          </LoginGuard>
+        }
+      />
       <Route path="/ativar-conta/:token" element={<AcceptInvite />} />
       <Route
         element={
@@ -58,7 +76,10 @@ function AppRoutes() {
         }
       >
         <Route path="/dashboard" element={<Dashboard />} />
+        <Route path="/acesso-negado" element={<AcessoNegado />} />
         <Route path="/medicos" element={<Medicos />} />
+        <Route path="/escalas" element={<Escalas />} />
+        <Route path="/subgrupos-equipes" element={<SubgruposEquipes />} />
         <Route
           path="/convites"
           element={
@@ -69,13 +90,8 @@ function AppRoutes() {
           }
         />
         <Route
-          path="/agenda"
-          element={
-            <FeaturePlaceholder
-              title="Agenda"
-              description="Visualize seus horários e compromissos clínicos."
-            />
-          }
+          path="/ponto-eletronico"
+          element={<PontoEletronico />}
         />
         <Route
           path="/atendimentos"
@@ -88,12 +104,7 @@ function AppRoutes() {
         />
         <Route
           path="/relatorios"
-          element={
-            <FeaturePlaceholder
-              title="Relatórios"
-              description="Acompanhe indicadores e resultados da operação em tempo real."
-            />
-          }
+          element={<Relatorios />}
         />
         <Route
           path="/configuracoes"
@@ -105,13 +116,20 @@ function AppRoutes() {
           }
         />
         <Route
+          path="/contratos-ativos"
+          element={<ContratosAtivos />}
+        />
+        <Route
+          path="/valores-plantao"
+          element={<ValoresPlantao />}
+        />
+        <Route
+          path="/valores-ponto"
+          element={<ValoresPonto />}
+        />
+        <Route
           path="/perfil"
-          element={
-            <FeaturePlaceholder
-              title="Minha Conta"
-              description="Gerencie seus dados cadastrais e informações de acesso."
-            />
-          }
+          element={<Perfil />}
         />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />

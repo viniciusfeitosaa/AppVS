@@ -35,10 +35,14 @@ api.interceptors.response.use(
       requestUrl.includes('/auth/login-master');
 
     if (error.response?.status === 401 && !isAuthRoute) {
-      // Token expirado ou inválido
+      // Token expirado ou inválido: limpar user também para evitar loop login → dashboard → 401
       localStorage.removeItem('accessToken');
       localStorage.removeItem('refreshToken');
+      localStorage.removeItem('user');
       window.location.href = '/login';
+    }
+    if (error.response?.status === 403 && !requestUrl.includes('/acesso-negado')) {
+      window.location.href = '/acesso-negado';
     }
     return Promise.reject(error);
   }

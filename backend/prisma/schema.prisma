@@ -16,6 +16,37 @@ enum UserRole {
   MEDICO
 }
 
+enum OrigemRegistroPonto {
+  APP_MEDICO
+}
+
+enum DocumentoPerfilTipo {
+  CEDULA_IDENTIDADE_CRM
+  CERTIDAO_REGULARIDADE_FISCAL_CRM
+  COMPROVANTE_ENDERECO
+  DADOS_BANCARIOS_PF_PIX
+  DECLARACAO_REGULARIDADE_CONTRIBUINTE_INDIVIDUAL
+  DIPLOMA
+  DOCUMENTO_ASSINATURA_DIGITAL
+  RQE
+  RG_CPF_OU_CNH
+  TITULO_ESPECIALISTA
+}
+
+enum ModuloSistema {
+  DASHBOARD
+  MEDICOS
+  CONTRATOS_ATIVOS
+  ESCALAS
+  VALORES_PLANTAO
+  CONVITES
+  RELATORIOS
+  PONTO_ELETRONICO
+  ATENDIMENTOS
+  CONFIGURACOES
+  PERFIL
+}
+
 model Tenant {
   id        String   @id @default(uuid())
   nome      String   @db.VarChar(120)
@@ -24,11 +55,50 @@ model Tenant {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  medicos        Medico[]
-  usuariosMaster UsuarioMaster[]
+  medicos         Medico[]
+  usuariosMaster  UsuarioMaster[]
+  contratosAtivos ContratoAtivo[]
+  escalas         Escala[]
+  escalaMedicos   EscalaMedico[]
+  escalaPlantoes EscalaPlantao[]
+  registrosPonto  RegistroPonto[]
+  medicoDocumentos MedicoDocumento[]
+  acessosModulosPerfil AcessoModuloPerfil[]
+  subgrupos       Subgrupo[]
+  equipes         Equipe[]
+  subgrupoMedicos SubgrupoMedico[]
+  equipeMedicos   EquipeMedico[]
+  escalaSubgrupos EscalaSubgrupo[]
+  escalaEquipes           EscalaEquipe[]
+  valoresPlantao          ValorPlantao[]
+  configPontoEletronico   ConfigPontoEletronico[]
 
   @@map("tenants")
   @@index([slug])
+}
+
+model ContratoAtivo {
+  id          String   @id @default(uuid())
+  tenantId    String   @map("tenant_id")
+  nome        String   @db.VarChar(180)
+  descricao   String?  @db.Text
+  dataInicio  DateTime @map("data_inicio")
+  dataFim     DateTime? @map("data_fim")
+  ativo       Boolean  @default(true)
+  usaEscala   Boolean  @default(true) @map("usa_escala")
+  usaPonto    Boolean  @default(true) @map("usa_ponto")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  tenant               Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  escalas              Escala[]
+  valoresPlantao       ValorPlantao[]
+  configPontoEletronico ConfigPontoEletronico[]
+
+  @@map("contratos_ativos")
+  @@index([tenantId])
+  @@index([ativo])
+  @@index([dataInicio])
 }
 
 model UsuarioMaster {
@@ -64,6 +134,10 @@ model Medico {
   especialidade String?  @db.VarChar(100)
   vinculo       String?  @db.VarChar(20)   // Ex: "PJ" ou vazio (Associado)
   telefone      String?  @db.VarChar(20)
+  estadoCivil   String?  @map("estado_civil") @db.VarChar(60)
+  enderecoResidencial String? @map("endereco_residencial") @db.Text
+  dadosBancarios String? @map("dados_bancarios") @db.Text
+  chavePix      String?  @map("chave_pix") @db.VarChar(120)
   inviteTokenHash String?  @map("invite_token_hash") @db.VarChar(255)
   inviteExpiresAt DateTime? @map("invite_expires_at")
   inviteAcceptedAt DateTime? @map("invite_accepted_at")
@@ -72,9 +146,15 @@ model Medico {
   updatedAt     DateTime @updatedAt @map("updated_at")
 
   // Relações
-  tenant        Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  sessoes       Sessao[]
-  auditoria     Auditoria[]
+  tenant         Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  sessoes        Sessao[]
+  auditoria      Auditoria[]
+  escalaMedicos  EscalaMedico[]
+  escalaPlantoes EscalaPlantao[]
+  registrosPonto RegistroPonto[]
+  documentos     MedicoDocumento[]
+  subgrupoMedicos SubgrupoMedico[]
+  equipeMedicos   EquipeMedico[]
 
   @@map("medicos")
   @@unique([tenantId, cpf])
@@ -83,6 +163,298 @@ model Medico {
   @@index([tenantId, cpf])
   @@index([tenantId, crm])
   @@index([tenantId, email])
+}
+
+model MedicoDocumento {
+  id            String             @id @default(uuid())
+  tenantId      String             @map("tenant_id")
+  medicoId      String             @map("medico_id")
+  tipo          DocumentoPerfilTipo
+  nomeArquivo   String             @map("nome_arquivo") @db.VarChar(255)
+  caminhoArquivo String            @map("caminho_arquivo") @db.Text
+  mimeType      String             @map("mime_type") @db.VarChar(120)
+  tamanhoBytes  Int                @map("tamanho_bytes")
+  createdAt     DateTime           @default(now()) @map("created_at")
+  updatedAt     DateTime           @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  medico Medico @relation(fields: [medicoId], references: [id], onDelete: Cascade)
+
+  @@map("medico_documentos")
+  @@unique([tenantId, medicoId, tipo])
+  @@index([tenantId])
+  @@index([medicoId])
+  @@index([tipo])
+}
+
+model AcessoModuloPerfil {
+  id        String       @id @default(uuid())
+  tenantId  String       @map("tenant_id")
+  perfil    UserRole
+  modulo    ModuloSistema
+  permitido Boolean      @default(true)
+  createdAt DateTime     @default(now()) @map("created_at")
+  updatedAt DateTime     @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("acessos_modulos_perfil")
+  @@unique([tenantId, perfil, modulo])
+  @@index([tenantId])
+  @@index([perfil])
+  @@index([modulo])
+}
+
+model Escala {
+  id              String   @id @default(uuid())
+  tenantId        String   @map("tenant_id")
+  contratoAtivoId String   @map("contrato_ativo_id")
+  nome            String   @db.VarChar(180)
+  descricao       String?  @db.Text
+  dataInicio      DateTime @map("data_inicio")
+  dataFim         DateTime @map("data_fim")
+  ativo           Boolean  @default(true)
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  tenant         Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  contratoAtivo  ContratoAtivo  @relation(fields: [contratoAtivoId], references: [id], onDelete: Cascade)
+  alocacoes      EscalaMedico[]
+  plantoes       EscalaPlantao[]
+  registrosPonto RegistroPonto[]
+  escalaSubgrupos EscalaSubgrupo[]
+  escalaEquipes   EscalaEquipe[]
+
+  @@map("escalas")
+  @@index([tenantId])
+  @@index([contratoAtivoId])
+  @@index([ativo])
+  @@index([dataInicio])
+}
+
+model Subgrupo {
+  id        String   @id @default(uuid())
+  tenantId  String   @map("tenant_id")
+  nome      String   @db.VarChar(180)
+  descricao String?  @db.Text
+  ativo     Boolean  @default(true)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  tenant                 Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  subgrupoMedicos        SubgrupoMedico[]
+  escalaSubgrupos        EscalaSubgrupo[]
+  equipes                Equipe[]
+  valoresPlantao         ValorPlantao[]
+  configPontoEletronico  ConfigPontoEletronico[]
+
+  @@map("subgrupos")
+  @@unique([tenantId, nome])
+  @@index([tenantId])
+}
+
+model Equipe {
+  id         String   @id @default(uuid())
+  tenantId   String   @map("tenant_id")
+  subgrupoId String?  @map("subgrupo_id")
+  nome       String   @db.VarChar(180)
+  descricao  String?  @db.Text
+  ativo      Boolean  @default(true)
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  tenant        Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  subgrupo      Subgrupo?     @relation(fields: [subgrupoId], references: [id], onDelete: SetNull)
+  equipeMedicos EquipeMedico[]
+  escalaEquipes EscalaEquipe[]
+
+  @@map("equipes")
+  @@unique([tenantId, subgrupoId, nome])
+  @@index([tenantId])
+  @@index([subgrupoId])
+}
+
+model SubgrupoMedico {
+  id         String   @id @default(uuid())
+  tenantId   String   @map("tenant_id")
+  subgrupoId String   @map("subgrupo_id")
+  medicoId   String   @map("medico_id")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  tenant   Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  subgrupo Subgrupo @relation(fields: [subgrupoId], references: [id], onDelete: Cascade)
+  medico   Medico   @relation(fields: [medicoId], references: [id], onDelete: Cascade)
+
+  @@map("subgrupo_medicos")
+  @@unique([tenantId, subgrupoId, medicoId])
+  @@index([tenantId])
+  @@index([subgrupoId])
+  @@index([medicoId])
+}
+
+model EquipeMedico {
+  id        String   @id @default(uuid())
+  tenantId  String   @map("tenant_id")
+  equipeId  String   @map("equipe_id")
+  medicoId  String   @map("medico_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  equipe Equipe @relation(fields: [equipeId], references: [id], onDelete: Cascade)
+  medico Medico @relation(fields: [medicoId], references: [id], onDelete: Cascade)
+
+  @@map("equipe_medicos")
+  @@unique([tenantId, equipeId, medicoId])
+  @@index([tenantId])
+  @@index([equipeId])
+  @@index([medicoId])
+}
+
+model EscalaSubgrupo {
+  id         String   @id @default(uuid())
+  tenantId   String   @map("tenant_id")
+  escalaId   String   @map("escala_id")
+  subgrupoId String   @map("subgrupo_id")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  tenant   Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  escala   Escala   @relation(fields: [escalaId], references: [id], onDelete: Cascade)
+  subgrupo Subgrupo @relation(fields: [subgrupoId], references: [id], onDelete: Cascade)
+
+  @@map("escala_subgrupos")
+  @@unique([tenantId, escalaId, subgrupoId])
+  @@index([tenantId])
+  @@index([escalaId])
+  @@index([subgrupoId])
+}
+
+model EscalaEquipe {
+  id        String   @id @default(uuid())
+  tenantId  String   @map("tenant_id")
+  escalaId  String   @map("escala_id")
+  equipeId  String   @map("equipe_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  escala Escala @relation(fields: [escalaId], references: [id], onDelete: Cascade)
+  equipe Equipe @relation(fields: [equipeId], references: [id], onDelete: Cascade)
+
+  @@map("escala_equipes")
+  @@unique([tenantId, escalaId, equipeId])
+  @@index([tenantId])
+  @@index([escalaId])
+  @@index([equipeId])
+}
+
+model EscalaMedico {
+  id        String   @id @default(uuid())
+  tenantId  String   @map("tenant_id")
+  escalaId  String   @map("escala_id")
+  medicoId  String   @map("medico_id")
+  cargo     String?  @db.VarChar(100)
+  valorHora Decimal? @map("valor_hora") @db.Decimal(10, 2)
+  ativo     Boolean  @default(true)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  escala Escala @relation(fields: [escalaId], references: [id], onDelete: Cascade)
+  medico Medico @relation(fields: [medicoId], references: [id], onDelete: Cascade)
+
+  @@map("escala_medicos")
+  @@unique([tenantId, escalaId, medicoId])
+  @@index([tenantId])
+  @@index([escalaId])
+  @@index([medicoId])
+}
+
+model EscalaPlantao {
+  id         String   @id @default(uuid())
+  tenantId   String   @map("tenant_id")
+  escalaId   String   @map("escala_id")
+  data       DateTime @db.Date
+  gradeId    String   @map("grade_id") @db.VarChar(20)
+  medicoId   String   @map("medico_id")
+  valorHora  Decimal? @map("valor_hora") @db.Decimal(10, 2)
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  escala Escala @relation(fields: [escalaId], references: [id], onDelete: Cascade)
+  medico Medico @relation(fields: [medicoId], references: [id], onDelete: Cascade)
+
+  @@map("escala_plantoes")
+  @@unique([escalaId, data, gradeId])
+  @@index([tenantId])
+  @@index([escalaId])
+  @@index([medicoId])
+  @@index([data])
+}
+
+model ValorPlantao {
+  id               String   @id @default(uuid())
+  tenantId         String   @map("tenant_id")
+  contratoAtivoId  String   @map("contrato_ativo_id")
+  subgrupoId       String   @map("subgrupo_id")
+  gradeId          String   @map("grade_id") @db.VarChar(20)
+  valorHora        Decimal? @map("valor_hora") @db.Decimal(10, 2)
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  tenant        Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  contratoAtivo ContratoAtivo @relation(fields: [contratoAtivoId], references: [id], onDelete: Cascade)
+  subgrupo      Subgrupo      @relation(fields: [subgrupoId], references: [id], onDelete: Cascade)
+
+  @@map("valores_plantao")
+  @@unique([tenantId, contratoAtivoId, subgrupoId, gradeId])
+  @@index([tenantId])
+  @@index([contratoAtivoId])
+  @@index([subgrupoId])
+}
+
+model ConfigPontoEletronico {
+  id               String   @id @default(uuid())
+  tenantId         String   @map("tenant_id")
+  contratoAtivoId  String   @map("contrato_ativo_id")
+  subgrupoId       String   @map("subgrupo_id")
+  horasPrevistasMes Int?    @map("horas_previstas_mes")
+  valorHora        Decimal? @map("valor_hora") @db.Decimal(10, 2)
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  tenant        Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  contratoAtivo ContratoAtivo @relation(fields: [contratoAtivoId], references: [id], onDelete: Cascade)
+  subgrupo      Subgrupo      @relation(fields: [subgrupoId], references: [id], onDelete: Cascade)
+
+  @@map("config_ponto_eletronico")
+  @@unique([tenantId, contratoAtivoId, subgrupoId])
+  @@index([tenantId])
+  @@index([contratoAtivoId])
+  @@index([subgrupoId])
+}
+
+model RegistroPonto {
+  id             String              @id @default(uuid())
+  tenantId       String              @map("tenant_id")
+  escalaId       String              @map("escala_id")
+  medicoId       String              @map("medico_id")
+  checkInAt      DateTime            @map("checkin_at")
+  checkOutAt     DateTime?           @map("checkout_at")
+  origem         OrigemRegistroPonto @default(APP_MEDICO)
+  observacao     String?             @db.Text
+  duracaoMinutos Int?                @map("duracao_minutos")
+  createdAt      DateTime            @default(now()) @map("created_at")
+  updatedAt      DateTime            @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  escala Escala @relation(fields: [escalaId], references: [id], onDelete: Cascade)
+  medico Medico @relation(fields: [medicoId], references: [id], onDelete: Cascade)
+
+  @@map("registros_ponto")
+  @@index([tenantId])
+  @@index([escalaId])
+  @@index([medicoId])
+  @@index([checkInAt])
 }
 
 // Modelo de Sessão (Tokens JWT)

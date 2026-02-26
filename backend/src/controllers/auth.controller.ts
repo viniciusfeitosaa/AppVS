@@ -4,7 +4,9 @@ import {
   loginByEmailService,
   loginMasterService,
   loginMedicoService,
+  registerPublicMedicoService,
 } from '../services/auth.service';
+import { getMinhaPermissaoModulosService } from '../services/acesso-modulo.service';
 
 export const loginMedicoController = async (req: Request, res: Response) => {
   try {
@@ -73,6 +75,36 @@ export const acceptInviteController = async (req: Request, res: Response) => {
     return res.status(error.statusCode || 500).json({
       success: false,
       error: error.message || 'Erro ao aceitar convite',
+    });
+  }
+};
+
+export const registerPublicController = async (req: Request, res: Response) => {
+  try {
+    const result = await registerPublicMedicoService(req.body);
+    return res.status(201).json({
+      success: true,
+      data: result,
+    });
+  } catch (error: any) {
+    return res.status(error.statusCode || 500).json({
+      success: false,
+      error: error.message || 'Erro ao cadastrar usuário',
+    });
+  }
+};
+
+export const getMeModulosAcessoController = async (req: Request, res: Response) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ success: false, error: 'Não autenticado' });
+    }
+    const data = await getMinhaPermissaoModulosService(req.user.tenantId, req.user.role);
+    return res.status(200).json({ success: true, data });
+  } catch (error: any) {
+    return res.status(error.statusCode || 500).json({
+      success: false,
+      error: error.message || 'Erro ao consultar módulos de acesso',
     });
   }
 };

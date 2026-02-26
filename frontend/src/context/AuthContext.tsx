@@ -22,6 +22,18 @@ interface AuthContextType {
   logout: () => void;
 }
 
+const fallbackAuthContext: AuthContextType = {
+  user: null,
+  isAuthenticated: false,
+  isLoading: true,
+  introPlayed: false,
+  setIntroPlayed: () => undefined,
+  login: async () => {
+    throw new Error('AuthProvider indisponível no momento');
+  },
+  logout: () => undefined,
+};
+
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
@@ -95,6 +107,11 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (context === undefined) {
+    if (import.meta.env.DEV) {
+      // Em hot reload, evita quebrar toda a árvore por inconsistência temporária de contexto.
+      console.warn('AuthContext temporariamente indisponível durante hot reload.');
+      return fallbackAuthContext;
+    }
     throw new Error('useAuth deve ser usado dentro de um AuthProvider');
   }
   return context;

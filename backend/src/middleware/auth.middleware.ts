@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { verifyAccessToken } from '../utils/jwt.util';
-import { UserRole } from '@prisma/client';
+import { ModuloSistema, UserRole } from '@prisma/client';
+import { possuiAcessoModuloService } from '../services/acesso-modulo.service';
 
 // Estender tipo Request para incluir user
 declare global {
@@ -38,7 +39,7 @@ export const authenticateToken = (
     req.user = { id: decoded.id, role: decoded.role, tenantId: decoded.tenantId };
     return next();
   } catch (error: any) {
-    return res.status(403).json({
+    return res.status(401).json({
       success: false,
       error: error.message || 'Token inválido ou expirado',
     });
@@ -62,5 +63,46 @@ export const requireRole = (allowedRoles: UserRole[]) => {
     }
 
     return next();
+  };
+};
+
+export const requireModuleAccess = (modulo: ModuloSistema) => {
+  return async (req: Request, res: Response, next: NextFunction) => {
+    if (!req.user) {
+      return res.status(401).json({
+        success: false,
+        error: 'Não autenticado',
+      });
+    }
+
+    const allowed = await possuiAcessoModuloService(req.user.tenantId, req.user.role, modulo);
+    if (!allowed) {
+      return res.status(403).json({
+        success: false,
+        error: 'Sem acesso ao módulo solicitado',
+      });
+    }
+
+    return next();
+  };
+};
+
+export const requireAnyModuleAccess = (modulos: ModuloSistema[]) => {
+  return async (req: Request, res: Response, next: NextFunction) => {
+    if (!req.user) {
+      return res.status(401).json({
+        success: false,
+        error: 'Não autenticado',
+      });
+    }
+
+    for (const modulo of modulos) {
+      const allowed = await possuiAcessoModuloService(req.user.tenantId, req.user.role, modulo);
+      if (allowed) return next();
+    }
+    return res.status(403).json({
+      success: false,
+      error: 'Sem acesso ao módulo solicitado',
+    });
   };
 };
