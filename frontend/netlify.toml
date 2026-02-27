@@ -8,10 +8,14 @@
   # Variável obrigatória em produção: URL do backend (ex.: https://viva-saude-backend.onrender.com/api)
   # Configure em: Site settings → Environment variables → VITE_API_URL
 
-# Redireciona todas as rotas para o index.html (necessário para SPAs)
+# Raiz (/) serve a landing estática (dist/index.html). Só o app React precisa de rewrite:
 [[redirects]]
-  from = "/*"
-  to = "/index.html"
+  from = "/app"
+  to = "/app/index.html"
+  status = 200
+[[redirects]]
+  from = "/app/*"
+  to = "/app/index.html"
   status = 200
 
 # Configurações de headers para segurança e performance
@@ -25,5 +29,10 @@
 
 [[headers]]
   for = "/assets/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+[[headers]]
+  for = "/app/assets/*"
   [headers.values]
     Cache-Control = "public, max-age=31536000, immutable"
