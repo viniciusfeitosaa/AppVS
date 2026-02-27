@@ -13,6 +13,7 @@
     "prisma:studio": "prisma studio",
     "prisma:seed": "ts-node prisma/seed.ts",
     "prisma:import": "ts-node prisma/import-csv.ts",
+    "prisma:migrate-neon": "ts-node prisma/migrate-neon-to-supabase.ts",
     "deploy:build": "npm install && prisma generate && prisma migrate deploy && npm run build",
     "lint": "eslint src --ext .ts",
     "test": "jest"
@@ -38,6 +39,7 @@
     "iconv-lite": "^0.6.3",
     "jsonwebtoken": "^9.0.2",
     "multer": "^2.0.2",
+    "pg": "^8.19.0",
     "ts-node": "^10.9.2",
     "zod": "^3.22.4"
   },
@@ -48,6 +50,7 @@
     "@types/jsonwebtoken": "^9.0.5",
     "@types/multer": "^2.0.0",
     "@types/node": "^20.10.5",
+    "@types/pg": "^8.16.0",
     "@typescript-eslint/eslint-plugin": "^6.15.0",
     "@typescript-eslint/parser": "^6.15.0",
     "eslint": "^8.56.0",
@@ -58,5 +61,8 @@
   "engines": {
     "node": ">=18.0.0",
     "npm": ">=9.0.0"
+  },
+  "prisma": {
+    "seed": "ts-node prisma/seed.ts"
   }
 }

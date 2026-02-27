@@ -141,6 +141,25 @@ export interface Equipe {
   subgrupo?: { id: string; nome: string } | null;
 }
 
+export interface DocumentoEnviado {
+  id: string;
+  tenantId: string;
+  medicoId: string;
+  titulo: string | null;
+  nomeArquivo: string;
+  caminhoArquivo: string;
+  mimeType: string;
+  tamanhoBytes: number;
+  enviadoPorId: string | null;
+  createdAt: string;
+  medico?: {
+    id: string;
+    nomeCompleto: string;
+    crm: string | null;
+    email: string | null;
+  };
+}
+
 interface ListMedicosResponse {
   success: boolean;
   data: AdminMedico[];
@@ -519,6 +538,29 @@ export const adminService = {
   },
   removeEquipeFromEscala: async (escalaId: string, equipeId: string) => {
     const response = await api.delete(`/admin/escalas/${escalaId}/equipes/${equipeId}`);
+    return response.data;
+  },
+
+  listDocumentosEnviados: async (medicoId?: string) => {
+    const response = await api.get<{ success: boolean; data: DocumentoEnviado[] }>('/admin/documentos-enviados', {
+      params: medicoId ? { medicoId } : undefined,
+    });
+    return response.data;
+  },
+  uploadDocumentoEnviado: async (arquivo: File, medicoId: string, titulo?: string) => {
+    const formData = new FormData();
+    formData.append('arquivo', arquivo);
+    formData.append('medicoId', medicoId);
+    if (titulo != null && titulo.trim()) formData.append('titulo', titulo.trim());
+    const response = await api.post<{ success: boolean; data: DocumentoEnviado; message?: string }>(
+      '/admin/documentos-enviados',
+      formData,
+      { headers: { 'Content-Type': 'multipart/form-data' } }
+    );
+    return response.data;
+  },
+  deleteDocumentoEnviado: async (id: string) => {
+    const response = await api.delete(`/admin/documentos-enviados/${id}`);
     return response.data;
   },
 };

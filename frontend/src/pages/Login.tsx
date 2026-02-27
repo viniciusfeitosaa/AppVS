@@ -100,6 +100,11 @@ const Login = () => {
               {errors.password && (
                 <p className="mt-1 text-sm text-red-600">{errors.password.message}</p>
               )}
+              <p className="mt-2 text-sm">
+                <Link to="/esqueci-senha" className="text-viva-700 hover:text-viva-900 font-medium">
+                  Esqueci minha senha
+                </Link>
+              </p>
             </div>
           </div>
 

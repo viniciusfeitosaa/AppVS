@@ -16,6 +16,13 @@ const Dashboard = () => {
     enabled: !!user && !isMaster,
   });
 
+  const { data: docsResp } = useQuery({
+    queryKey: ['medico', 'documentos-enviados', user?.id],
+    queryFn: () => medicoService.listDocumentosEnviados(),
+    enabled: !!user && !isMaster,
+  });
+
+  const documentosDisponiveis = docsResp?.data ?? [];
   const displayUser = isMaster ? user : perfil || user;
 
   if (isLoading) {
@@ -106,6 +113,40 @@ const Dashboard = () => {
           </div>
         </div>
       </div>
+
+      {/* Documentos disponíveis (profissional) */}
+      {!isMaster && documentosDisponiveis.length > 0 && (
+        <div className="card col-span-full hover:shadow-lg transition-shadow border-l-4 border-viva-500">
+          <h3 className="text-lg font-bold mb-4 text-viva-800 flex items-center gap-2">
+            <span className="w-2 h-2 bg-viva-500 rounded-full"></span>
+            Documentos disponíveis
+          </h3>
+          <p className="text-sm text-viva-600 mb-3">
+            Documentos enviados para você. Clique para visualizar.
+          </p>
+          <ul className="space-y-2">
+            {documentosDisponiveis.map((doc) => (
+              <li key={doc.id} className="flex items-center justify-between gap-3 p-3 bg-viva-50 rounded-lg border border-viva-100">
+                <div className="min-w-0">
+                  <p className="font-medium text-viva-900 truncate">
+                    {doc.titulo || doc.nomeArquivo}
+                  </p>
+                  {doc.titulo && (
+                    <p className="text-xs text-viva-600 truncate">{doc.nomeArquivo}</p>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  className="btn btn-primary shrink-0"
+                  onClick={() => medicoService.openDocumentoEnviado(doc.id)}
+                >
+                  Visualizar
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
     </div>
   );
 };

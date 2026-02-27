@@ -36,6 +36,11 @@ import {
   salvarMatrizAcessosModulosService,
 } from '../services/acesso-modulo.service';
 import { listEquipesService, listSubgruposService } from '../services/grupo-equipe.service';
+import {
+  listDocumentosEnviadosAdmin,
+  uploadAndSendDocumento,
+  deleteDocumentoEnviado,
+} from '../services/documentosenviados.service';
 import { ModuloSistema, UserRole } from '@prisma/client';
 
 export const listMedicosController = async (req: Request, res: Response) => {
@@ -845,6 +850,71 @@ export const salvarMatrizAcessosModulosController = async (req: Request, res: Re
     return res.status(error.statusCode || 500).json({
       success: false,
       error: error.message || 'Erro ao salvar matriz de acesso',
+    });
+  }
+};
+
+export const listDocumentosEnviadosController = async (req: Request, res: Response) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ success: false, error: 'Não autenticado' });
+    }
+    const medicoId = req.query.medicoId ? String(req.query.medicoId) : undefined;
+    const data = await listDocumentosEnviadosAdmin(req.user.tenantId, medicoId);
+    return res.status(200).json({ success: true, data });
+  } catch (error: any) {
+    return res.status(error.statusCode || 500).json({
+      success: false,
+      error: error.message || 'Erro ao listar documentos enviados',
+    });
+  }
+};
+
+export const uploadDocumentoEnviadoController = async (req: Request, res: Response) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ success: false, error: 'Não autenticado' });
+    }
+    const file = req.file;
+    if (!file) {
+      return res.status(400).json({ success: false, error: 'Nenhum arquivo enviado' });
+    }
+    const medicoId = req.body?.medicoId ? String(req.body.medicoId).trim() : undefined;
+    if (!medicoId) {
+      return res.status(400).json({ success: false, error: 'Profissional (medicoId) é obrigatório' });
+    }
+    const titulo = req.body?.titulo != null ? String(req.body.titulo).trim() || null : null;
+    const doc = await uploadAndSendDocumento(
+      req.user.tenantId,
+      req.user.id,
+      medicoId,
+      file,
+      titulo
+    );
+    return res.status(201).json({ success: true, data: doc, message: 'Documento enviado com sucesso' });
+  } catch (error: any) {
+    return res.status(error.statusCode || 500).json({
+      success: false,
+      error: error.message || 'Erro ao enviar documento',
+    });
+  }
+};
+
+export const deleteDocumentoEnviadoController = async (req: Request, res: Response) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ success: false, error: 'Não autenticado' });
+    }
+    const id = req.params.id;
+    if (!id) {
+      return res.status(400).json({ success: false, error: 'ID do documento é obrigatório' });
+    }
+    await deleteDocumentoEnviado(req.user.tenantId, id);
+    return res.status(200).json({ success: true, message: 'Documento removido' });
+  } catch (error: any) {
+    return res.status(error.statusCode || 500).json({
+      success: false,
+      error: error.message || 'Erro ao remover documento',
     });
   }
 };

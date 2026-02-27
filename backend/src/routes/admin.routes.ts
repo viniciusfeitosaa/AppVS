@@ -24,6 +24,9 @@ import {
   salvarMatrizAcessosModulosController,
   listContratosAtivosController,
   listMedicosController,
+  listDocumentosEnviadosController,
+  uploadDocumentoEnviadoController,
+  deleteDocumentoEnviadoController,
   removerEscalaPlantaoController,
   removerMedicoEscalaController,
   removeContratoEquipeController,
@@ -58,6 +61,7 @@ import {
   updateSubgrupoController,
 } from '../controllers/grupo-equipe.controller';
 import { authenticateToken, requireAnyModuleAccess, requireModuleAccess, requireRole } from '../middleware/auth.middleware';
+import { uploadDocumentoEnviado } from '../middleware/upload.middleware';
 import { ModuloSistema, UserRole } from '@prisma/client';
 
 const router = Router();
@@ -102,6 +106,9 @@ router.get('/config-ponto', requireModuleAccess(ModuloSistema.PONTO_ELETRONICO),
 router.put('/config-ponto', requireModuleAccess(ModuloSistema.PONTO_ELETRONICO), setConfigPontoController);
 
 router.get('/registros-ponto', requireModuleAccess(ModuloSistema.RELATORIOS), listRegistrosPontoAdminController);
+router.get('/documentos-enviados', requireModuleAccess(ModuloSistema.ENVIO_DOCUMENTOS), listDocumentosEnviadosController);
+router.post('/documentos-enviados', requireModuleAccess(ModuloSistema.ENVIO_DOCUMENTOS), uploadDocumentoEnviado.single('arquivo'), uploadDocumentoEnviadoController);
+router.delete('/documentos-enviados/:id', requireModuleAccess(ModuloSistema.ENVIO_DOCUMENTOS), deleteDocumentoEnviadoController);
 router.get('/acessos-modulos', requireModuleAccess(ModuloSistema.CONFIGURACOES), getMatrizAcessosModulosController);
 router.put('/acessos-modulos', requireModuleAccess(ModuloSistema.CONFIGURACOES), salvarMatrizAcessosModulosController);
 router.get('/subgrupos', requireModuleAccess(ModuloSistema.MEDICOS), listSubgruposController);

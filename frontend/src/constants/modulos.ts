@@ -9,6 +9,7 @@ export type ModuloSistema =
   | 'PONTO_ELETRONICO'
   | 'ATENDIMENTOS'
   | 'CONFIGURACOES'
+  | 'ENVIO_DOCUMENTOS'
   | 'PERFIL';
 
 export const MODULO_LABEL: Record<ModuloSistema, string> = {
@@ -22,5 +23,6 @@ export const MODULO_LABEL: Record<ModuloSistema, string> = {
   PONTO_ELETRONICO: 'Ponto Eletrônico',
   ATENDIMENTOS: 'Atendimentos',
   CONFIGURACOES: 'Configurações',
+  ENVIO_DOCUMENTOS: 'Envio de Documentos',
   PERFIL: 'Minha Conta',
 };

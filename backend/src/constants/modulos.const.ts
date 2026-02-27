@@ -11,6 +11,7 @@ export const MODULOS_SISTEMA: ModuloSistema[] = [
   ModuloSistema.PONTO_ELETRONICO,
   ModuloSistema.ATENDIMENTOS,
   ModuloSistema.CONFIGURACOES,
+  ModuloSistema.ENVIO_DOCUMENTOS,
   ModuloSistema.PERFIL,
 ];
 
@@ -36,6 +37,7 @@ export const MODULOS_DEFAULT_POR_PERFIL: Record<UserRole, Record<ModuloSistema, 
     [ModuloSistema.PONTO_ELETRONICO]: true,
     [ModuloSistema.ATENDIMENTOS]: true,
     [ModuloSistema.CONFIGURACOES]: false,
+    [ModuloSistema.ENVIO_DOCUMENTOS]: false,
     [ModuloSistema.PERFIL]: true,
   },
 };

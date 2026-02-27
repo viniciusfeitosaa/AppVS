@@ -1,9 +1,11 @@
 import { Request, Response } from 'express';
 import {
   acceptInviteService,
+  esqueciSenhaService,
   loginByEmailService,
   loginMasterService,
   loginMedicoService,
+  redefinirSenhaService,
   registerPublicMedicoService,
 } from '../services/auth.service';
 import { getMinhaPermissaoModulosService } from '../services/acesso-modulo.service';
@@ -112,3 +114,36 @@ export const getMeModulosAcessoController = async (req: Request, res: Response) 
 
 // /login agora é o login único por e-mail/senha
 export const loginController = loginEmailController;
+
+export const esqueciSenhaController = async (req: Request, res: Response) => {
+  try {
+    const { email } = req.body;
+    const result = await esqueciSenhaService(email);
+    return res.status(200).json({
+      success: true,
+      message: result.message,
+      ...(result.resetLink && { resetLink: result.resetLink }),
+    });
+  } catch (error: any) {
+    return res.status(error.statusCode || 500).json({
+      success: false,
+      error: error.message || 'Erro ao solicitar redefinição de senha',
+    });
+  }
+};
+
+export const redefinirSenhaController = async (req: Request, res: Response) => {
+  try {
+    const { token, novaSenha } = req.body;
+    const result = await redefinirSenhaService(token, novaSenha);
+    return res.status(200).json({
+      success: true,
+      message: result.message,
+    });
+  } catch (error: any) {
+    return res.status(error.statusCode || 500).json({
+      success: false,
+      error: error.message || 'Erro ao redefinir senha',
+    });
+  }
+};

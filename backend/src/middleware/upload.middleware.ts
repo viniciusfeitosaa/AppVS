@@ -30,3 +30,28 @@ export const uploadPerfilDocumentos = multer({
     files: 12,
   },
 });
+
+const uploadDocEnviadoDir = path.resolve(process.cwd(), 'uploads', 'documentos-enviados');
+if (!fs.existsSync(uploadDocEnviadoDir)) {
+  fs.mkdirSync(uploadDocEnviadoDir, { recursive: true });
+}
+
+const storageDocEnviado = multer.diskStorage({
+  destination: (_req: Request, _file: Express.Multer.File, cb: (error: Error | null, destination: string) => void) => {
+    cb(null, uploadDocEnviadoDir);
+  },
+  filename: (_req: Request, file: Express.Multer.File, cb: (error: Error | null, filename: string) => void) => {
+    const ext = path.extname(file.originalname || '').toLowerCase();
+    const sanitizedBase = path
+      .basename(file.originalname || 'documento', ext)
+      .replace(/[^a-zA-Z0-9_-]/g, '_')
+      .slice(0, 80);
+    const unique = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
+    cb(null, `${sanitizedBase || 'documento'}-${unique}${ext}`);
+  },
+});
+
+export const uploadDocumentoEnviado = multer({
+  storage: storageDocEnviado,
+  limits: { fileSize: 15 * 1024 * 1024, files: 1 },
+});

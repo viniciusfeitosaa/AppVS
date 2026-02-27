@@ -2,7 +2,10 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import ProtectedRoute from './components/Layout/ProtectedRoute';
 import AppShell from './components/Layout/AppShell';
-import Home from './pages/Home';
+import LandingLayout from './components/Layout/LandingLayout';
+import Landing from './pages/Landing';
+import Sobre from './pages/Sobre';
+import Contato from './pages/Contato';
 import Login from './pages/Login';
 import Cadastro from './pages/Cadastro';
 import Dashboard from './pages/Dashboard';
@@ -17,20 +20,22 @@ import ValoresPonto from './pages/ValoresPonto';
 import PontoEletronico from './pages/PontoEletronico';
 import Relatorios from './pages/Relatorios';
 import Perfil from './pages/Perfil';
+import EnvioDocumentos from './pages/EnvioDocumentos';
+import EsqueciSenha from './pages/EsqueciSenha';
+import RedefinirSenha from './pages/RedefinirSenha';
 import AcessoNegado from './pages/AcessoNegado';
 
-// Componente para garantir que a intro seja vista antes do login
+// Redireciona para o dashboard se já estiver autenticado (evita ver login/cadastro)
 const LoginGuard = ({ children }: { children: React.ReactNode }) => {
-  const { introPlayed, isAuthenticated } = useAuth();
-  
-  if (isAuthenticated) {
-    return <Navigate to="/dashboard" replace />;
-  }
+  const { isAuthenticated } = useAuth();
+  if (isAuthenticated) return <Navigate to="/dashboard" replace />;
+  return <>{children}</>;
+};
 
-  if (!introPlayed) {
-    return <Navigate to="/" replace />;
-  }
-
+// Só redireciona se estiver autenticado (ex.: redefinir-senha vindo do e-mail)
+const AuthOnlyRedirect = ({ children }: { children: React.ReactNode }) => {
+  const { isAuthenticated } = useAuth();
+  if (isAuthenticated) return <Navigate to="/dashboard" replace />;
   return <>{children}</>;
 };
 
@@ -50,7 +55,11 @@ function AppRoutes() {
 
   return (
     <Routes>
-      <Route path="/" element={<Home />} />
+      <Route element={<LandingLayout />}>
+        <Route path="/" element={<Landing />} />
+        <Route path="/sobre" element={<Sobre />} />
+        <Route path="/contato" element={<Contato />} />
+      </Route>
       <Route 
         path="/login" 
         element={
@@ -68,6 +77,8 @@ function AppRoutes() {
         }
       />
       <Route path="/ativar-conta/:token" element={<AcceptInvite />} />
+      <Route path="/esqueci-senha" element={<LoginGuard><EsqueciSenha /></LoginGuard>} />
+      <Route path="/redefinir-senha" element={<AuthOnlyRedirect><RedefinirSenha /></AuthOnlyRedirect>} />
       <Route
         element={
           <ProtectedRoute>
@@ -126,6 +137,10 @@ function AppRoutes() {
         <Route
           path="/valores-ponto"
           element={<ValoresPonto />}
+        />
+        <Route
+          path="/envio-documentos"
+          element={<EnvioDocumentos />}
         />
         <Route
           path="/perfil"

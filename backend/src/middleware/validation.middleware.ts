@@ -84,6 +84,30 @@ export const validateAcceptInvite = [
 ];
 
 /**
+ * Esqueci minha senha - solicitar link
+ */
+export const validateEsqueciSenha = [
+  body('email').isEmail().withMessage('E-mail inválido').normalizeEmail(),
+  handleValidationErrors,
+];
+
+/**
+ * Redefinir senha com token
+ */
+export const validateRedefinirSenha = [
+  body('token').isString().isLength({ min: 32 }).withMessage('Token inválido'),
+  body('novaSenha')
+    .isString()
+    .isLength({ min: 8 })
+    .withMessage('Nova senha deve ter no mínimo 8 caracteres'),
+  body('confirmarSenha')
+    .isString()
+    .custom((value, { req }) => value === req.body.novaSenha)
+    .withMessage('As senhas não coincidem'),
+  handleValidationErrors,
+];
+
+/**
  * Cadastro público de médico/associado
  */
 export const validateRegisterMedico = [

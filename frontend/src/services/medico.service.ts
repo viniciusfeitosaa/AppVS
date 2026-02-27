@@ -70,4 +70,28 @@ export const medicoService = {
     });
     return response.data;
   },
+
+  listDocumentosEnviados: async (): Promise<{ success: boolean; data: DocumentoEnviadoItem[] }> => {
+    const response = await api.get<{ success: boolean; data: DocumentoEnviadoItem[] }>('/medico/documentos-enviados');
+    return response.data;
+  },
+
+  openDocumentoEnviado: async (id: string): Promise<void> => {
+    const response = await api.get(`/medico/documentos-enviados/${id}/download`, {
+      responseType: 'blob',
+    });
+    const blob = response.data as Blob;
+    const url = URL.createObjectURL(blob);
+    window.open(url, '_blank', 'noopener,noreferrer');
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
+  },
 };
+
+export interface DocumentoEnviadoItem {
+  id: string;
+  titulo: string | null;
+  nomeArquivo: string;
+  mimeType: string;
+  tamanhoBytes: number;
+  createdAt: string;
+}

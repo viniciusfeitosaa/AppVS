@@ -82,6 +82,23 @@ export const authService = {
     return response.data;
   },
 
+  esqueciSenha: async (email: string): Promise<{ success: boolean; message: string; resetLink?: string }> => {
+    const response = await api.post<{ success: boolean; message: string; resetLink?: string }>(
+      '/auth/esqueci-senha',
+      { email: email.trim().toLowerCase() }
+    );
+    return response.data;
+  },
+
+  redefinirSenha: async (token: string, novaSenha: string): Promise<{ success: boolean; message: string }> => {
+    const response = await api.post<{ success: boolean; message: string }>('/auth/redefinir-senha', {
+      token,
+      novaSenha,
+      confirmarSenha: novaSenha,
+    });
+    return response.data;
+  },
+
   logout: () => {
     localStorage.removeItem('accessToken');
     localStorage.removeItem('refreshToken');

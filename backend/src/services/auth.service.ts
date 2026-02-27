@@ -465,3 +465,94 @@ export const registerPublicMedicoService = async (
     message: 'Cadastro realizado com sucesso. Você já pode fazer login.',
   };
 };
+
+const RESET_TOKEN_EXPIRY_MS = 60 * 60 * 1000; // 1 hora
+
+export async function esqueciSenhaService(email: string): Promise<{
+  ok: boolean;
+  message: string;
+  resetLink?: string;
+}> {
+  const tenant = await getDefaultTenant();
+  const normalizedEmail = email.trim().toLowerCase();
+  if (!normalizedEmail) {
+    return { ok: true, message: 'Se existir uma conta com este e-mail, você receberá um link para redefinir a senha.' };
+  }
+
+  // Buscar Master primeiro, depois Médico
+  const master = await prisma.usuarioMaster.findFirst({
+    where: { tenantId: tenant.id, email: normalizedEmail, ativo: true },
+    select: { id: true },
+  });
+  const medico = !master
+    ? await prisma.medico.findFirst({
+        where: { tenantId: tenant.id, email: normalizedEmail, ativo: true },
+        select: { id: true },
+      })
+    : null;
+
+  if (!master && !medico) {
+    return { ok: true, message: 'Se existir uma conta com este e-mail, você receberá um link para redefinir a senha.' };
+  }
+
+  const tipo = master ? 'MASTER' : 'MEDICO';
+  const token = crypto.randomBytes(32).toString('hex');
+  const tokenHash = hashToken(token);
+  const expiresAt = new Date(Date.now() + RESET_TOKEN_EXPIRY_MS);
+
+  await prisma.resetSenhaToken.create({
+    data: {
+      tenantId: tenant.id,
+      email: normalizedEmail,
+      tokenHash,
+      tipo,
+      expiresAt,
+    },
+  });
+
+  const frontendUrl = (process.env.FRONTEND_URL || 'http://localhost:3000').replace(/\/$/, '');
+  const resetLink = `${frontendUrl}/redefinir-senha?token=${token}`;
+
+  // TODO: enviar e-mail com resetLink (nodemailer + SMTP). Por ora em dev retornamos o link.
+  if (process.env.NODE_ENV === 'development') {
+    console.log('[esqueci-senha] Link de redefinição (dev):', resetLink);
+    return { ok: true, message: 'Se existir uma conta com este e-mail, você receberá um link para redefinir a senha.', resetLink };
+  }
+
+  return { ok: true, message: 'Se existir uma conta com este e-mail, você receberá um link para redefinir a senha.' };
+}
+
+export async function redefinirSenhaService(token: string, novaSenha: string): Promise<{ ok: boolean; message: string }> {
+  const tokenHash = hashToken(token);
+  const tenant = await getDefaultTenant();
+
+  const record = await prisma.resetSenhaToken.findFirst({
+    where: { tokenHash, tenantId: tenant.id },
+  });
+
+  if (!record) {
+    throw { statusCode: 400, message: 'Link inválido ou expirado. Solicite uma nova redefinição de senha.' };
+  }
+  if (new Date() > record.expiresAt) {
+    await prisma.resetSenhaToken.deleteMany({ where: { id: record.id } });
+    throw { statusCode: 400, message: 'Link expirado. Solicite uma nova redefinição de senha.' };
+  }
+
+  const hashed = await hashPassword(novaSenha);
+
+  if (record.tipo === 'MASTER') {
+    await prisma.usuarioMaster.updateMany({
+      where: { tenantId: tenant.id, email: record.email },
+      data: { senhaHash: hashed },
+    });
+  } else {
+    await prisma.medico.updateMany({
+      where: { tenantId: tenant.id, email: record.email },
+      data: { senhaHash: hashed },
+    });
+  }
+
+  await prisma.resetSenhaToken.deleteMany({ where: { id: record.id } });
+
+  return { ok: true, message: 'Senha alterada com sucesso. Faça login com a nova senha.' };
+}
