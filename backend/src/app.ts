@@ -4,7 +4,6 @@ import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import env from './config/env';
-import { connectDatabase } from './config/database';
 
 // Importar rotas
 import authRoutes from './routes/auth.routes';
