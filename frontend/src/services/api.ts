@@ -2,6 +2,13 @@ import axios from 'axios';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
 
+// Em produção, a URL deve vir de VITE_API_URL (configurar no Netlify e redeployar)
+if (import.meta.env.PROD && (API_URL.includes('localhost') || !import.meta.env.VITE_API_URL)) {
+  console.error(
+    '[API] Em produção a URL da API está incorreta. No Netlify: Site configuration → Environment variables → adicione VITE_API_URL = https://SEU-BACKEND.onrender.com/api e faça um novo deploy.'
+  );
+}
+
 const api = axios.create({
   baseURL: API_URL,
   headers: {
