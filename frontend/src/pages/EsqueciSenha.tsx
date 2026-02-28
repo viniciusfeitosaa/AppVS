@@ -43,7 +43,7 @@ const EsqueciSenha = () => {
     <div className="min-h-screen flex items-center justify-center bg-viva-950 py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md w-full space-y-8 bg-white p-10 rounded-2xl shadow-2xl">
         <div className="flex flex-col items-center">
-          <img src="/assets/logo.avif" alt="Logo Viva Saúde" className="h-24 w-auto mb-6" />
+          <img src={`${import.meta.env.BASE_URL}assets/logo.avif`} alt="Logo Viva Saúde" className="h-24 w-auto mb-6" />
           <h1 className="text-xl font-bold text-viva-900">Esqueci minha senha</h1>
           <p className="text-sm text-gray-600 mt-1 text-center">
             Informe o e-mail da sua conta para receber o link de redefinição.

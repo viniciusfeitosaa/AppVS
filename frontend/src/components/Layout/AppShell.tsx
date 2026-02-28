@@ -150,7 +150,7 @@ const AppShell = () => {
         <div className="max-w-screen-2xl mx-auto px-4 md:px-6 lg:px-8">
           <div className="h-16 flex items-center justify-between gap-3">
             <div className="flex items-center gap-3">
-              <img src="/assets/logo-horizontal.png" alt="Logo Viva Saúde" className="h-8 w-auto" />
+              <img src={`${import.meta.env.BASE_URL}assets/logo-horizontal.png`} alt="Logo Viva Saúde" className="h-8 w-auto" />
               <span className="hidden md:inline text-sm font-semibold text-viva-900">
                 {isMaster ? 'Painel Master' : 'Painel Profissional'}
               </span>

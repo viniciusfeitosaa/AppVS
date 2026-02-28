@@ -57,7 +57,7 @@ const RedefinirSenha = () => {
     return (
       <div className="min-h-screen flex items-center justify-center bg-viva-950 py-12 px-4">
         <div className="max-w-md w-full bg-white p-10 rounded-2xl shadow-2xl text-center">
-          <img src="/assets/logo.avif" alt="Logo" className="h-20 w-auto mx-auto mb-4" />
+          <img src={`${import.meta.env.BASE_URL}assets/logo.avif`} alt="Logo" className="h-20 w-auto mx-auto mb-4" />
           <p className="text-red-600 mb-4">{error}</p>
           <Link to="/esqueci-senha" className="font-semibold text-viva-800 hover:text-viva-600">
             Solicitar novo link
@@ -72,7 +72,7 @@ const RedefinirSenha = () => {
       <div className="max-w-md w-full space-y-8 bg-white p-10 rounded-2xl shadow-2xl">
         <div className="flex flex-col items-center">
           <img
-            src="/assets/logo.avif"
+            src={`${import.meta.env.BASE_URL}assets/logo.avif`}
             alt="Logo Viva Saúde"
             className="h-24 w-auto mb-6"
           />

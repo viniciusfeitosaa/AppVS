@@ -62,7 +62,7 @@ const Home = () => {
           className="w-full h-auto rounded-xl"
           style={{ objectFit: 'contain' }}
         >
-          <source src="/assets/intro.mp4" type="video/mp4" />
+          <source src={`${import.meta.env.BASE_URL}assets/intro.mp4`} type="video/mp4" />
           Seu navegador não suporta vídeos.
         </video>
       </div>

@@ -6,7 +6,7 @@ export default function LandingLayout() {
       <header className="sticky top-0 z-50 border-b border-viva-100 bg-white/95 backdrop-blur">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 flex items-center justify-between h-16">
           <Link to="/" className="flex items-center gap-2">
-            <img src="/assets/logo.avif" alt="Logo" className="h-10 w-auto" />
+            <img src={`${import.meta.env.BASE_URL}assets/logo.avif`} alt="Logo" className="h-10 w-auto" />
           </Link>
           <nav className="flex items-center gap-6">
             <Link

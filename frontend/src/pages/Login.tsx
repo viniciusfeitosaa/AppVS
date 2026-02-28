@@ -55,7 +55,7 @@ const Login = () => {
       <div className="max-w-md w-full space-y-8 bg-white p-10 rounded-2xl shadow-2xl">
         <div className="flex flex-col items-center">
           <img 
-            src="/assets/logo.avif" 
+            src={`${import.meta.env.BASE_URL}assets/logo.avif`} 
             alt="Logo Viva Saúde" 
             className="h-24 w-auto mb-6"
           />
