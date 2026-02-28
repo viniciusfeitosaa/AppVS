@@ -56,6 +56,8 @@ export const getMeuDiaPontoController = async (req: Request, res: Response) => {
     const data = await getMeuDiaPontoService(req.user.tenantId, req.user.id);
     return res.status(200).json({ success: true, data });
   } catch (error: any) {
+    console.error('[ponto/meu-dia] Erro:', error?.message ?? error);
+    if (error?.stack) console.error(error.stack);
     return res.status(error.statusCode || 500).json({
       success: false,
       error: error.message || 'Erro ao obter ponto do dia',
