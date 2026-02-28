@@ -1,19 +1,29 @@
 import 'dotenv/config';
 import { createApp } from './app';
 import env from './config/env';
-import { disconnectDatabase } from './config/database';
+import { connectDatabase, disconnectDatabase } from './config/database';
 
 const PORT = parseInt(env.PORT) || 3001;
 
+// Conecta ao banco em background (não bloqueia o listen; Render precisa da porta aberta logo)
+function connectDatabaseInBackground() {
+  connectDatabase().catch((err) => {
+    console.error('❌ Conexão ao banco em background falhou:', err?.message ?? err);
+    console.log('⏳ O servidor está no ar; novas tentativas a cada 30s...');
+    setTimeout(connectDatabaseInBackground, 30000);
+  });
+}
+
 // Inicializar servidor
-async function startServer() {
+function startServer() {
   try {
-    const app = await createApp();
+    const app = createApp();
 
     const server = app.listen(PORT, '0.0.0.0', () => {
       console.log(`🚀 Servidor rodando na porta ${PORT}`);
       console.log(`📝 Ambiente: ${env.NODE_ENV}`);
       console.log(`🌐 Escutando em 0.0.0.0 (necessário para Render)`);
+      connectDatabaseInBackground();
     });
 
     // Graceful shutdown

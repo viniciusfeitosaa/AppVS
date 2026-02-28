@@ -113,11 +113,8 @@ app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
   });
 });
 
-// Função para inicializar a aplicação
-export async function createApp(): Promise<Express> {
-  // Conectar ao banco de dados
-  await connectDatabase();
-
+// Função para inicializar a aplicação (não espera o banco – conexão em background no server.ts)
+export function createApp(): Express {
   return app;
 }
 

@@ -1,8 +1,19 @@
 import { PrismaClient } from '@prisma/client';
 
+/** URL com connection_limit=1 e pool_timeout maior (Supabase + Render). */
+function getDatabaseUrl(): string {
+  const url = process.env.DATABASE_URL || '';
+  if (!url) return url;
+  let u = url;
+  if (!u.includes('connection_limit=')) u += (u.includes('?') ? '&' : '?') + 'connection_limit=1';
+  if (!u.includes('pool_timeout=')) u += (u.includes('?') ? '&' : '?') + 'pool_timeout=30';
+  return u;
+}
+
 // Singleton do Prisma Client
 const prismaClientSingleton = () => {
   return new PrismaClient({
+    datasources: { db: { url: getDatabaseUrl() } },
     log: process.env.NODE_ENV === 'development' ? ['query', 'error', 'warn'] : ['error'],
   });
 };
