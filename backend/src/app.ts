@@ -18,16 +18,25 @@ const app: Express = express();
 // Middleware de segurança
 app.use(helmet());
 
-// CORS
-const allowedOrigins = env.ALLOWED_ORIGINS
-  ? env.ALLOWED_ORIGINS.split(',')
-  : env.FRONTEND_URL
-  ? [env.FRONTEND_URL]
-  : ['http://localhost:3000'];
+// CORS – origem de produção sempre permitida; demais vêm do env (trim para evitar espaços)
+const originsFromEnv = [
+  ...(env.ALLOWED_ORIGINS ? env.ALLOWED_ORIGINS.split(',').map((o) => o.trim()).filter(Boolean) : []),
+  ...(env.FRONTEND_URL ? [env.FRONTEND_URL.trim()] : []),
+];
+const allowedOriginsSet = new Set([
+  'https://sejavivasaude.com.br',
+  'http://localhost:3000',
+  'http://localhost:5173',
+  ...originsFromEnv,
+]);
 
 app.use(
   cors({
-    origin: allowedOrigins,
+    origin: (origin, cb) => {
+      if (!origin) return cb(null, true);
+      if (allowedOriginsSet.has(origin)) return cb(null, true);
+      cb(null, false);
+    },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
