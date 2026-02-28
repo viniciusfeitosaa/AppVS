@@ -1,12 +1,9 @@
 [build]
-  # Diretório onde o Vite gera os arquivos buildados
   publish = "dist"
-
-  # Comando para fazer o build (VITE_API_URL deve estar nas env vars do site)
   command = "npm run build"
-
-  # Variável obrigatória em produção: URL do backend (ex.: https://viva-saude-backend.onrender.com/api)
-  # Configure em: Site settings → Environment variables → VITE_API_URL
+  # Garante que o build use a API do Render (a UI do Netlify às vezes não injeta env no build)
+  [build.environment]
+    VITE_API_URL = "https://appvs.onrender.com/api"
 
 # Raiz (/) serve a landing estática (dist/index.html). Só o app React precisa de rewrite:
 [[redirects]]
