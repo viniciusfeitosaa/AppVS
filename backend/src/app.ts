@@ -14,6 +14,9 @@ import pontoRoutes from './routes/ponto.routes';
 // Criar aplicação Express
 const app: Express = express();
 
+// Necessário atrás do proxy do Render (evita erro do express-rate-limit com X-Forwarded-For)
+app.set('trust proxy', 1);
+
 // Middleware de segurança
 app.use(helmet());
 

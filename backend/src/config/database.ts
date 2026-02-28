@@ -1,11 +1,11 @@
 import { PrismaClient } from '@prisma/client';
 
-/** URL com connection_limit=1 e pool_timeout maior (Supabase + Render). */
+/** URL com connection_limit e pool_timeout (Supabase + Render). Limit 3 evita timeout quando várias requisições chegam. */
 function getDatabaseUrl(): string {
   const url = process.env.DATABASE_URL || '';
   if (!url) return url;
   let u = url;
-  if (!u.includes('connection_limit=')) u += (u.includes('?') ? '&' : '?') + 'connection_limit=1';
+  if (!u.includes('connection_limit=')) u += (u.includes('?') ? '&' : '?') + 'connection_limit=3';
   if (!u.includes('pool_timeout=')) u += (u.includes('?') ? '&' : '?') + 'pool_timeout=30';
   return u;
 }
