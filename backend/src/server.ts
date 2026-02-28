@@ -10,10 +10,10 @@ async function startServer() {
   try {
     const app = await createApp();
 
-    const server = app.listen(PORT, () => {
+    const server = app.listen(PORT, '0.0.0.0', () => {
       console.log(`🚀 Servidor rodando na porta ${PORT}`);
       console.log(`📝 Ambiente: ${env.NODE_ENV}`);
-      console.log(`🌐 Health check: http://localhost:${PORT}/health`);
+      console.log(`🌐 Escutando em 0.0.0.0 (necessário para Render)`);
     });
 
     // Graceful shutdown

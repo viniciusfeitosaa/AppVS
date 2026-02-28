@@ -17,14 +17,22 @@ if (process.env.NODE_ENV !== 'production') {
   globalThis.prismaGlobal = prisma;
 }
 
-// Função para conectar ao banco
-export async function connectDatabase() {
-  try {
-    await prisma.$connect();
-    console.log('✅ Conectado ao banco de dados PostgreSQL');
-  } catch (error) {
-    console.error('❌ Erro ao conectar ao banco de dados:', error);
-    throw error;
+const MAX_RETRIES = 5;
+const RETRY_DELAY_MS = 5000;
+
+/** Conecta ao banco com retry (útil para Render + Supabase: cold start / rede). */
+export async function connectDatabase(): Promise<void> {
+  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      await prisma.$connect();
+      console.log('✅ Conectado ao banco de dados PostgreSQL');
+      return;
+    } catch (error) {
+      console.error(`❌ Tentativa ${attempt}/${MAX_RETRIES} de conexão ao banco:`, (error as Error)?.message ?? error);
+      if (attempt === MAX_RETRIES) throw error;
+      console.log(`⏳ Nova tentativa em ${RETRY_DELAY_MS / 1000}s...`);
+      await new Promise((r) => setTimeout(r, RETRY_DELAY_MS));
+    }
   }
 }
 
