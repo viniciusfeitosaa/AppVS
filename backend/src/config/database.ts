@@ -1,13 +1,19 @@
 import { PrismaClient } from '@prisma/client';
 
-/** Garante connection_limit=3 e pool_timeout=30 (Supabase + Render). Sobrescreve se a URL já tiver esses params. */
+/** connection_limit por instância: 10 em produção (vários usuários), 3 em dev. Override via DATABASE_POOL_SIZE. */
+const CONNECTION_LIMIT = Math.min(
+  Math.max(1, parseInt(process.env.DATABASE_POOL_SIZE || '', 10) || (process.env.NODE_ENV === 'production' ? 10 : 3)),
+  20
+);
+
+/** Garante connection_limit e pool_timeout na URL (Supabase + Render). Sobrescreve se a URL já tiver. */
 function getDatabaseUrl(): string {
   const url = process.env.DATABASE_URL || '';
   if (!url) return url;
   let u = url
-    .replace(/connection_limit=\d+/g, 'connection_limit=3')
+    .replace(/connection_limit=\d+/g, `connection_limit=${CONNECTION_LIMIT}`)
     .replace(/pool_timeout=\d+/g, 'pool_timeout=30');
-  if (!u.includes('connection_limit=')) u += (u.includes('?') ? '&' : '?') + 'connection_limit=3';
+  if (!u.includes('connection_limit=')) u += (u.includes('?') ? '&' : '?') + `connection_limit=${CONNECTION_LIMIT}`;
   if (!u.includes('pool_timeout=')) u += (u.includes('?') ? '&' : '?') + 'pool_timeout=30';
   return u;
 }
