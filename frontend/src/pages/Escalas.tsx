@@ -550,7 +550,7 @@ const Escalas = () => {
       </div>
 
       {selectedEscalaId && (
-        <div className="card">
+        <div className="card hidden">
           <h3 className="text-lg font-bold text-viva-900 mb-4">Alocação de médicos na escala</h3>
           <div className="flex gap-2 mb-4 flex-wrap items-start">
             <div ref={medicoAllocateRef} className="relative flex-1 min-w-[240px] max-w-md">

@@ -113,7 +113,12 @@ const PontoEletronico = () => {
       setObservacao('');
       await refresh();
     } catch (err: any) {
-      setError(err.response?.data?.error || 'Não foi possível registrar check-in.');
+      const status = err.response?.status;
+      if (status === 403) {
+        setError('Você não tem permissão para registrar ponto. Verifique o acesso ao módulo Ponto Eletrônico com o administrador.');
+      } else {
+        setError(err.response?.data?.error || 'Não foi possível registrar check-in.');
+      }
     } finally {
       setLoadingAction(false);
     }
@@ -138,7 +143,15 @@ const PontoEletronico = () => {
       setObservacao('');
       await refresh();
     } catch (err: any) {
-      setError(err.response?.data?.error || 'Não foi possível registrar checkout.');
+      const status = err.response?.status;
+      const msg = err.response?.data?.error;
+      if (status === 403) {
+        setError('Você não tem permissão para registrar ponto. Verifique o acesso ao módulo Ponto Eletrônico com o administrador.');
+      } else if (status === 404 || msg?.toLowerCase().includes('check-in em aberto')) {
+        setError('Seu ponto foi fechado.');
+      } else {
+        setError(msg || 'Não foi possível registrar checkout.');
+      }
     } finally {
       setLoadingAction(false);
     }
@@ -213,16 +226,22 @@ const PontoEletronico = () => {
               <p className="text-sm text-gray-600">Sem registros hoje.</p>
             ) : (
               <div className="space-y-2">
-                {registrosHoje.map((r: any) => (
+                {registrosHoje.map((r: any) => {
+                  const nomeEscala =
+                    r.escala?.nome ??
+                    (r.escalaId && listaEscalas.find((e: { id?: string; nome?: string }) => e.id === r.escalaId)?.nome) ??
+                    (listaEscalas.length > 0 ? (listaEscalas[0] as { nome?: string }).nome ?? 'Sem escala' : 'Sem escala');
+                  return (
                   <div key={r.id} className="border border-viva-200 rounded-lg px-3 py-2">
-                    <p className="font-medium text-viva-900">{r.escala?.nome ?? 'Sem escala'}</p>
+                    <p className="font-medium text-viva-900">{nomeEscala}</p>
                     <p className="text-xs text-gray-600">
                       Início: {new Date(r.checkInAt).toLocaleTimeString()} | Fim:{' '}
                       {r.checkOutAt ? new Date(r.checkOutAt).toLocaleTimeString() : 'Em aberto'} | Duração:{' '}
                       {r.duracaoMinutos ? formatDuration(r.duracaoMinutos) : '-'}
                     </p>
                   </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </>

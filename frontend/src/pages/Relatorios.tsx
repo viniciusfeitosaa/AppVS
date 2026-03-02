@@ -1,5 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 import { useAuth } from '../context/AuthContext';
 import { adminService } from '../services/admin.service';
 import { fixMojibake } from '../utils/validation.util';
@@ -79,6 +81,28 @@ const exportHorasCsv = (agrupado: AgrupamentoHoras[], dataInicio: string, dataFi
   URL.revokeObjectURL(url);
 };
 
+const exportHorasPdf = (agrupado: AgrupamentoHoras[], dataInicio: string, dataFim: string) => {
+  const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+  doc.setFontSize(14);
+  doc.text('Relatório de Horas por médico e escala', 14, 12);
+  doc.setFontSize(10);
+  doc.text(`Período: ${dataInicio} a ${dataFim}`, 14, 18);
+  autoTable(doc, {
+    startY: 24,
+    head: [['Médico', 'Escala', 'Registros', 'Total (horas)', 'Valor (R$)']],
+    body: agrupado.map((item) => [
+      item.medicoNome,
+      item.escalaNome,
+      String(item.totalRegistros),
+      formatDuration(item.totalMinutos),
+      item.valorCalculado != null ? formatValor(item.valorCalculado) : '—',
+    ]),
+    styles: { fontSize: 9 },
+    headStyles: { fillColor: [22, 163, 74] },
+  });
+  doc.save(`relatorio-horas_${dataInicio}_${dataFim}.pdf`);
+};
+
 const Relatorios = () => {
   const { user } = useAuth();
   const isMaster = user?.role === 'MASTER';
@@ -108,13 +132,22 @@ const Relatorios = () => {
     enabled: isMaster && Boolean(contratoId),
   });
 
+  const { data: equipesPorSubgrupoResp } = useQuery({
+    queryKey: ['admin', 'equipes', subgrupoId],
+    queryFn: () => adminService.listEquipes(subgrupoId ? { subgrupoId } : undefined),
+    enabled: isMaster && Boolean(subgrupoId),
+  });
+
   const contratos = contratosResp?.data ?? [];
   const subgruposList = subgruposResp?.data ?? [];
   const equipesList = equipesResp?.data ?? [];
+  const equipesDoSubgrupo = equipesPorSubgrupoResp?.data ?? [];
   const equipesFiltradas =
-    subgrupoId && equipesList.length > 0
-      ? equipesList.filter((e: any) => e.equipe?.subgrupo?.id === subgrupoId)
-      : equipesList;
+    subgrupoId && equipesDoSubgrupo.length > 0
+      ? equipesDoSubgrupo
+      : subgrupoId && equipesList.length > 0
+        ? equipesList.filter((e: any) => e.equipe?.subgrupo?.id === subgrupoId || e.equipe?.subgrupoId === subgrupoId)
+        : equipesList;
 
   const { data: registrosResp, isLoading } = useQuery({
     queryKey: ['admin', 'registros-ponto', { contratoId, subgrupoId, equipeId, dataInicio, dataFim }],
@@ -141,6 +174,7 @@ const Relatorios = () => {
   const raw = registrosResp?.data;
   const registros: RegistroPontoAdmin[] = Array.isArray(raw) ? raw : raw?.data ?? [];
   const valorHoraPorMedico: Record<string, number> = !Array.isArray(raw) && raw?.valorHoraPorMedico ? raw.valorHoraPorMedico : {};
+  const valorHoraPorMedicoEscala: Record<string, number> = !Array.isArray(raw) && raw?.valorHoraPorMedicoEscala ? raw.valorHoraPorMedicoEscala : {};
 
   const { agrupado, totalMinutos, totalRegistros } = useMemo(() => {
     const map = new Map<string, AgrupamentoHoras>();
@@ -149,7 +183,7 @@ const Relatorios = () => {
     for (const item of registros) {
       const minutos = item.duracaoMinutos || 0;
       const medId = item.medico?.id || 'sem-medico';
-      const escId = item.escala?.id || 'sem-escala';
+      const escId = item.escala?.id ?? (item as any).escalaId ?? 'sem-escala';
       const medNome = fixMojibake(item.medico?.nomeCompleto || 'Médico não identificado');
       const escNome = fixMojibake(item.escala?.nome || 'Escala não identificada');
       const key = `${medId}::${escId}`;
@@ -158,6 +192,9 @@ const Relatorios = () => {
       if (prev) {
         prev.totalMinutos += minutos;
         prev.totalRegistros += 1;
+        if (escNome && escNome !== 'Escala não identificada' && prev.escalaNome === 'Escala não identificada') {
+          prev.escalaNome = escNome;
+        }
       } else {
         map.set(key, {
           key,
@@ -176,7 +213,14 @@ const Relatorios = () => {
     const rows = Array.from(map.values()).sort((a, b) => b.totalMinutos - a.totalMinutos);
 
     for (const row of rows) {
-      if (row.escalaId === 'sem-escala' && row.medicoId !== 'sem-medico') {
+      const keyMedEsc = `${row.medicoId}::${row.escalaId}`;
+      if (row.escalaId !== 'sem-escala') {
+        const vh = valorHoraPorMedicoEscala[keyMedEsc];
+        if (vh != null && vh > 0) {
+          row.valorHora = vh;
+          row.valorCalculado = (row.totalMinutos / 60) * vh;
+        }
+      } else if (row.medicoId !== 'sem-medico') {
         const vh = valorHoraPorMedico[row.medicoId];
         if (vh != null && vh > 0) {
           row.valorHora = vh;
@@ -190,7 +234,7 @@ const Relatorios = () => {
       totalMinutos: somaMinutos,
       totalRegistros: registros.length,
     };
-  }, [registros, valorHoraPorMedico]);
+  }, [registros, valorHoraPorMedico, valorHoraPorMedicoEscala]);
 
   return (
     <div className="space-y-6">
@@ -283,14 +327,18 @@ const Relatorios = () => {
               className="input"
               value={equipeId}
               onChange={(e) => setEquipeId(e.target.value)}
-              disabled={!contratoId}
+              disabled={!subgrupoId}
             >
               <option value="">Todas as equipes</option>
-              {equipesFiltradas.map((item: any) => (
-                <option key={item.equipe?.id} value={item.equipe?.id ?? ''}>
-                  {fixMojibake(item.equipe?.nome ?? '')}
-                </option>
-              ))}
+              {equipesFiltradas.map((item: any) => {
+                const id = item.equipe?.id ?? item.id ?? '';
+                const nome = item.equipe?.nome ?? item.nome ?? '';
+                return (
+                  <option key={id} value={id}>
+                    {fixMojibake(nome)}
+                  </option>
+                );
+              })}
             </select>
           </div>
         </div>
@@ -322,6 +370,15 @@ const Relatorios = () => {
           >
             <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clipRule="evenodd" /></svg>
             Exportar CSV
+          </button>
+          <button
+            type="button"
+            className="btn btn-secondary inline-flex items-center gap-2"
+            disabled={isLoading || agrupado.length === 0}
+            onClick={() => exportHorasPdf(agrupado, dataInicio, dataFim)}
+          >
+            <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z" clipRule="evenodd" /></svg>
+            Exportar PDF
           </button>
         </div>
         {isLoading ? (

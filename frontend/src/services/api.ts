@@ -48,7 +48,11 @@ api.interceptors.response.use(
       localStorage.removeItem('user');
       window.location.href = '/login';
     }
-    if (error.response?.status === 403 && !requestUrl.includes('/acesso-negado')) {
+    // Não redirecionar para acesso negado em erros de ponto (ex.: check-in duplo, ponto já fechado)
+    const isPontoRoute = requestUrl.includes('/ponto/');
+    const status = error.response?.status;
+    const isPontoError = isPontoRoute && (status === 403 || status === 404 || status === 409);
+    if (status === 403 && !requestUrl.includes('/acesso-negado') && !isPontoError) {
       window.location.href = '/acesso-negado';
     }
     return Promise.reject(error);

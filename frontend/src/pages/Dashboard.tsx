@@ -1,11 +1,46 @@
+import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '../context/AuthContext';
 import { medicoService } from '../services/medico.service';
+import { pontoService } from '../services/ponto.service';
 import { formatCRM, fixMojibake } from '../utils/validation.util';
+
+/** Extrai a hora no formato "HHh" de "HH:mm" ou "HH:mm:ss". */
+const toHoraLabel = (horario: string | null | undefined): string | null => {
+  if (!horario) return null;
+  const part = String(horario).trim().slice(0, 5);
+  if (part.length < 5) return null;
+  const [h] = part.split(':');
+  return `${h}h`;
+};
+
+/** MT = 07h às 19h, SN = 19h às 07h. Apenas horas, sem label MT/SN. Vários turnos unidos com " e ". */
+const HORARIOS_POR_GRADE: Record<string, string> = {
+  mt: '07h às 19h',
+  sn: '19h às 07h',
+};
+
+const formatFaixaEscala = (
+  gradeIds: string[] | undefined,
+  horarioEntrada: string | null | undefined,
+  horarioSaida: string | null | undefined
+): string => {
+  if (gradeIds && gradeIds.length > 0) {
+    const faixas = gradeIds
+      .map((g) => HORARIOS_POR_GRADE[g.toLowerCase()])
+      .filter(Boolean);
+    if (faixas.length > 0) return faixas.join(' e ');
+  }
+  const entrada = toHoraLabel(horarioEntrada);
+  const saida = toHoraLabel(horarioSaida);
+  if (entrada && saida) return `${entrada} às ${saida}`;
+  return '07h às 19h ou 19h às 07h';
+};
 
 const Dashboard = () => {
   const { user } = useAuth();
   const isMaster = user?.role === 'MASTER';
+  const isMedico = user?.role === 'MEDICO';
 
   const { data: perfil, isLoading } = useQuery({
     queryKey: ['medico', 'perfil', user?.id],
@@ -16,6 +51,18 @@ const Dashboard = () => {
     enabled: !!user && !isMaster,
   });
 
+  const { data: meuDiaResp } = useQuery({
+    queryKey: ['ponto', 'meu-dia'],
+    queryFn: () => pontoService.getMeuDia(),
+    enabled: !!user && isMedico,
+  });
+
+  const { data: escalasResp } = useQuery({
+    queryKey: ['ponto', 'minhas-escalas'],
+    queryFn: () => pontoService.listMinhasEscalas(),
+    enabled: !!user && isMedico,
+  });
+
   const { data: docsResp } = useQuery({
     queryKey: ['medico', 'documentos-enviados', user?.id],
     queryFn: () => medicoService.listDocumentosEnviados(),
@@ -24,6 +71,33 @@ const Dashboard = () => {
 
   const documentosDisponiveis = docsResp?.data ?? [];
   const displayUser = isMaster ? user : perfil || user;
+  const rawEscalas = escalasResp?.data ?? escalasResp;
+  const listaEscalas = Array.isArray(rawEscalas) ? rawEscalas : [];
+  type EscalaItem = { id?: string; nome?: string; ativo?: boolean; dataInicio?: string; dataFim?: string; gradeIds?: string[] };
+  const escalasEmVigor = listaEscalas.filter((e: EscalaItem) => {
+    if (e?.ativo === false) return false;
+    const inicio = e?.dataInicio ? new Date(e.dataInicio) : null;
+    const fim = e?.dataFim ? new Date(e.dataFim) : null;
+    const hoje = new Date();
+    hoje.setHours(0, 0, 0, 0);
+    if (inicio && inicio > hoje) return false;
+    if (fim) {
+      const fimDia = new Date(fim);
+      fimDia.setHours(23, 59, 59, 999);
+      if (fimDia < hoje) return false;
+    }
+    return true;
+  });
+  const escalaAtiva = escalasEmVigor.length > 0 ? (escalasEmVigor[0] as EscalaItem) : (listaEscalas[0] as EscalaItem) ?? null;
+  const escalaNome = escalaAtiva?.nome ?? null;
+  const configHorario = meuDiaResp?.data?.configHorario as { horarioEntrada?: string | null; horarioSaida?: string | null } | undefined;
+  const faixaHorario = formatFaixaEscala(
+    escalaAtiva?.gradeIds,
+    configHorario?.horarioEntrada ?? null,
+    configHorario?.horarioSaida ?? null
+  );
+  const horaEntrada = configHorario?.horarioEntrada ? String(configHorario.horarioEntrada).trim().slice(0, 5) : '--:--';
+  const temEscalaAtivaParaPonto = isMedico && escalasEmVigor.length > 0;
 
   if (isLoading) {
     return (
@@ -48,6 +122,18 @@ const Dashboard = () => {
             : 'Sistema de gestão Viva Saúde | Acesso Profissional'}
         </p>
       </div>
+
+      {temEscalaAtivaParaPonto && (
+        <div className="card col-span-full border-l-4 border-viva-500 flex flex-wrap items-center justify-between gap-4">
+          <p className="text-viva-900 font-medium">
+            Você tem uma escala para <span className="font-bold">{fixMojibake(escalaNome || 'hoje')}</span> às{' '}
+            <span className="font-bold">{horaEntrada}</span>.
+          </p>
+          <Link to="/ponto-eletronico" className="btn btn-primary shrink-0">
+            Bater ponto
+          </Link>
+        </div>
+      )}
 
       {/* Card de Informações */}
       <div className="card hover:shadow-lg transition-shadow">
@@ -91,6 +177,27 @@ const Dashboard = () => {
               <p className="text-lg font-medium text-viva-900">{fixMojibake(displayUser.email)}</p>
             </div>
           )}
+          {!isMaster && listaEscalas.length > 0 && (
+            <div className="bg-viva-50 p-3 rounded-lg">
+              <p className="text-xs text-viva-600 font-bold uppercase tracking-wider">Escala(s)</p>
+              <p className="text-lg font-medium text-viva-900 mt-1">
+                <span className="font-semibold">{fixMojibake(escalaNome ?? '—')}</span>
+                <span className="text-viva-700"> · </span>
+                <span className="font-semibold">{new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long' })}</span>
+                <span className="text-viva-700"> · </span>
+                <span className="font-semibold">{faixaHorario}</span>
+              </p>
+              <div className="mt-2 text-center">
+                <Link
+                  to="/ponto-eletronico"
+                  className="inline-flex items-center gap-1 text-sm font-semibold text-viva-700 hover:text-viva-900 hover:underline"
+                >
+                  Bater ponto
+                  <span aria-hidden>→</span>
+                </Link>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
@@ -115,15 +222,19 @@ const Dashboard = () => {
       </div>
 
       {/* Documentos disponíveis (profissional) */}
-      {!isMaster && documentosDisponiveis.length > 0 && (
+      {!isMaster && (
         <div className="card col-span-full hover:shadow-lg transition-shadow border-l-4 border-viva-500">
           <h3 className="text-lg font-bold mb-4 text-viva-800 flex items-center gap-2">
             <span className="w-2 h-2 bg-viva-500 rounded-full"></span>
-            Documentos disponíveis
+            Documentos
           </h3>
           <p className="text-sm text-viva-600 mb-3">
-            Documentos enviados para você. Clique para visualizar.
+            Documentos enviados para você. Acesse a área de Documentos para ver todos e visualizar.
           </p>
+          <Link to="/documentos" className="btn btn-primary mb-3">
+            Ver todos os documentos
+          </Link>
+          {documentosDisponiveis.length > 0 && (
           <ul className="space-y-2">
             {documentosDisponiveis.map((doc) => (
               <li key={doc.id} className="flex items-center justify-between gap-3 p-3 bg-viva-50 rounded-lg border border-viva-100">
@@ -145,6 +256,7 @@ const Dashboard = () => {
               </li>
             ))}
           </ul>
+          )}
         </div>
       )}
     </div>

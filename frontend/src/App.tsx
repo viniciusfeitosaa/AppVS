@@ -1,4 +1,5 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import ProtectedRoute from './components/Layout/ProtectedRoute';
 import AppShell from './components/Layout/AppShell';
@@ -21,9 +22,36 @@ import PontoEletronico from './pages/PontoEletronico';
 import Relatorios from './pages/Relatorios';
 import Perfil from './pages/Perfil';
 import EnvioDocumentos from './pages/EnvioDocumentos';
+import MeusDocumentos from './pages/MeusDocumentos';
 import EsqueciSenha from './pages/EsqueciSenha';
 import RedefinirSenha from './pages/RedefinirSenha';
 import AcessoNegado from './pages/AcessoNegado';
+
+/** Animação de carregamento. variant white = fundo branco + vídeo (tela de login). */
+const PageLoadingScreen = ({ variant = 'default' }: { variant?: 'default' | 'white' }) => {
+  const isWhite = variant === 'white';
+  return (
+    <div className={`min-h-screen flex items-center justify-center ${isWhite ? 'bg-white' : 'bg-viva-50'}`}>
+      {isWhite ? (
+        <video
+          autoPlay
+          loop
+          muted
+          playsInline
+          className="w-full h-auto max-w-[200px] object-contain"
+          style={{ objectFit: 'contain' }}
+        >
+          <source src={`${import.meta.env.BASE_URL}assets/loading.mp4`} type="video/mp4" />
+        </video>
+      ) : (
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-viva-600 mx-auto" />
+          <p className="mt-4 text-viva-800">Carregando...</p>
+        </div>
+      )}
+    </div>
+  );
+};
 
 // Redireciona para o dashboard se já estiver autenticado (evita ver login/cadastro)
 const LoginGuard = ({ children }: { children: React.ReactNode }) => {
@@ -39,18 +67,32 @@ const AuthOnlyRedirect = ({ children }: { children: React.ReactNode }) => {
   return <>{children}</>;
 };
 
-function AppRoutes() {
-  const { isLoading } = useAuth();
+/** Retorna se o path atual é a rota de login (considera basename). */
+function isLoginPath(pathname: string) {
+  return pathname === '/login' || pathname.endsWith('/login');
+}
 
-  if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-viva-50">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-viva-600 mx-auto" />
-          <p className="mt-4 text-viva-800">Carregando...</p>
-        </div>
-      </div>
-    );
+function AppRoutes() {
+  const location = useLocation();
+  const { isLoading } = useAuth();
+  const [loginTransitionDone, setLoginTransitionDone] = useState(false);
+
+  // Ao entrar em /login: mostra animação por um tempo, depois libera a rota
+  useEffect(() => {
+    if (!isLoginPath(location.pathname)) {
+      setLoginTransitionDone(true);
+      return;
+    }
+    setLoginTransitionDone(false);
+    const t = setTimeout(() => setLoginTransitionDone(true), 3000);
+    return () => clearTimeout(t);
+  }, [location.pathname]);
+
+  if (isLoading) return <PageLoadingScreen />;
+
+  // Na rota de login, exibir animação (fundo branco) antes de montar o conteúdo
+  if (isLoginPath(location.pathname) && !loginTransitionDone) {
+    return <PageLoadingScreen variant="white" />;
   }
 
   return (
@@ -141,6 +183,10 @@ function AppRoutes() {
         <Route
           path="/envio-documentos"
           element={<EnvioDocumentos />}
+        />
+        <Route
+          path="/documentos"
+          element={<MeusDocumentos />}
         />
         <Route
           path="/perfil"

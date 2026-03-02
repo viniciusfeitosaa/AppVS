@@ -1005,9 +1005,41 @@ export async function listRegistrosPontoAdminService(
     orderBy: { checkInAt: 'desc' },
   });
 
+  const escalaIdsParaBuscar = [
+    ...new Set(
+      registros
+        .filter((r) => r.escalaId != null && (!r.escala || !r.escala.nome))
+        .map((r) => r.escalaId!)
+    ),
+  ];
+  let escalaNomePorId: Record<string, string> = {};
+  if (escalaIdsParaBuscar.length > 0) {
+    const escalas = await prisma.escala.findMany({
+      where: { id: { in: escalaIdsParaBuscar }, tenantId },
+      select: { id: true, nome: true },
+    });
+    escalaNomePorId = Object.fromEntries(escalas.map((e) => [e.id, e.nome]));
+  }
+  const registrosComEscalaNome = registros.map((r) => {
+    if (!r.escalaId) return r;
+    const nomeExistente = r.escala?.nome?.trim();
+    if (nomeExistente) return r;
+    const nome = escalaNomePorId[r.escalaId];
+    if (!nome) return r;
+    return {
+      ...r,
+      escala: {
+        id: r.escalaId,
+        nome,
+        dataInicio: (r.escala as any)?.dataInicio ?? null,
+        dataFim: (r.escala as any)?.dataFim ?? null,
+      },
+    };
+  });
+
   const medicoIdsSemEscala = [
     ...new Set(
-      registros.filter((r) => r.escalaId == null).map((r) => r.medicoId)
+      registrosComEscalaNome.filter((r) => r.escalaId == null).map((r) => r.medicoId)
     )
   ];
   const valorHoraPorMedico: Record<string, number> = {};
@@ -1037,7 +1069,27 @@ export async function listRegistrosPontoAdminService(
     }
   }
 
-  return { data: registros, valorHoraPorMedico };
+  const paresMedicoEscala = [...new Set(
+    registrosComEscalaNome
+      .filter((r) => r.escalaId != null && r.medicoId != null)
+      .map((r) => `${r.medicoId}::${r.escalaId}`)
+  )];
+  const valorHoraPorMedicoEscala: Record<string, number> = {};
+  if (paresMedicoEscala.length > 0) {
+    const medicoIds = [...new Set(paresMedicoEscala.map((k) => k.split('::')[0]))];
+    const escalaIds = [...new Set(paresMedicoEscala.map((k) => k.split('::')[1]))];
+    const alocacoes = await prisma.escalaMedico.findMany({
+      where: { tenantId, medicoId: { in: medicoIds }, escalaId: { in: escalaIds } },
+      select: { medicoId: true, escalaId: true, valorHora: true },
+    });
+    for (const aloc of alocacoes) {
+      if (aloc.valorHora != null) {
+        valorHoraPorMedicoEscala[`${aloc.medicoId}::${aloc.escalaId}`] = Number(aloc.valorHora);
+      }
+    }
+  }
+
+  return { data: registrosComEscalaNome, valorHoraPorMedico, valorHoraPorMedicoEscala };
 }
 
 export async function listEscalaPlantoesService(
@@ -1097,6 +1149,24 @@ export async function createEscalaPlantaoService(input: {
   if (!medico) {
     throw { statusCode: 404, message: 'Médico não encontrado ou inativo' };
   }
+
+  // Garantir que o médico esteja associado à escala (para "minhas escalas" / dashboard do médico)
+  await prisma.escalaMedico.upsert({
+    where: {
+      tenantId_escalaId_medicoId: {
+        tenantId: input.tenantId,
+        escalaId: input.escalaId,
+        medicoId: input.medicoId,
+      },
+    },
+    update: { ativo: true },
+    create: {
+      tenantId: input.tenantId,
+      escalaId: input.escalaId,
+      medicoId: input.medicoId,
+      ativo: true,
+    },
+  });
 
   const valorHora = input.valorHora != null ? Number(input.valorHora) : null;
 

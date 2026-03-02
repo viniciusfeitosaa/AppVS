@@ -45,7 +45,7 @@ const EnvioDocumentos = () => {
 
   const { data: medicosResp } = useQuery({
     queryKey: ['admin', 'medicos', 'all'],
-    queryFn: () => adminService.listMedicos({ page: 1, limit: 500, ativo: true }),
+    queryFn: () => adminService.listMedicos({ page: 1, limit: 5000, ativo: true }),
     enabled: !!user && isMaster,
   });
 

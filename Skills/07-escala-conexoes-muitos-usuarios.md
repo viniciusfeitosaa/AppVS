@@ -4,6 +4,17 @@ Quando a base cresce (ex.: 500+ usuários) e várias pessoas usam o sistema ao m
 
 ---
 
+## Capacidade aproximada (plano grátis Supabase + Render)
+
+| Configuração | Usuários simultâneos (uso médio) |
+|--------------|-----------------------------------|
+| 1 instância, pool = 10 (default) | ~15–30 |
+| 1 instância, DATABASE_POOL_SIZE = 15–20 | ~25–40 |
+
+Ou seja: **dá para dizer que o plano grátis do Supabase + Render aguenta na faixa de até ~40 acessos simultâneos**, desde que o pool esteja aumentado (ex.: 15–20 conexões). Acima disso ou em picos muito fortes (muitos abrindo dashboard ao mesmo tempo), pode aparecer fila, timeout ou cold start no Render (free tier “dorme” após inatividade).
+
+---
+
 ## 1. Pool de conexões (Prisma + Supabase)
 
 ### O que é
@@ -59,7 +70,29 @@ Quando a base cresce (ex.: 500+ usuários) e várias pessoas usam o sistema ao m
 
 ---
 
-## 5. Resumo prático
+## 5. Logout automático por inatividade (sessão)
+
+- **Impacto em capacidade:** com **JWT** (token no frontend), um usuário **ocioso** não ocupa conexão com o banco — a conexão só é usada no momento da requisição. Então **logout automático por tempo sem uso não aumenta capacidade** de conexões; ele não “libera” conexões.
+- **Por que fazer mesmo assim:**
+  - **Segurança:** usuário esqueceu o PC aberto → após X minutos sem ação, fazer logout evita uso por terceiros.
+  - **UX:** sessão “viva” só enquanto a pessoa está usando; depois de 30–60 min sem clicar/navegar, faz sentido pedir login de novo.
+- **Implementação típica:** no frontend, um timer que:
+  - reinicia a cada ação do usuário (clique, tecla, mudança de rota);
+  - ao atingir o tempo limite (ex.: 30 min), chama `logout()` e redireciona para `/app/login`.
+- Conclusão: **logout por inatividade é uma boa prática de segurança e UX**, mas não é tática para aumentar “quantos profissionais ativos ao mesmo tempo” — para isso continuam valendo pool maior, múltiplas instâncias, cache e otimização de queries.
+
+## 6. Outras táticas que realmente aumentam capacidade
+
+| Tática | O que faz |
+|--------|-----------|
+| **Pool maior** | Já feito: `DATABASE_POOL_SIZE` 10–20. Mais conexões = mais requisições simultâneas. |
+| **Várias instâncias (Render)** | Cada instância tem seu pool; dobra/triplica a capacidade (respeitando limite do Supabase). |
+| **Cache** | Dados pouco alterados (ex.: lista de módulos) em cache → menos idas ao banco. |
+| **Otimizar queries** | Menos N+1, menos round-trips → cada conexão é liberada mais rápido. |
+| **Limitar sessões por usuário** | Ex.: 1 dispositivo por vez. Não aumenta total, mas evita um usuário com 5 abas abertas consumir 5× as requisições. |
+| **Logout por inatividade** | Segurança/UX; **não** aumenta capacidade (usuário ocioso já não usa conexão). |
+
+## 7. Resumo prático
 
 | Objetivo | Ação |
 |----------|------|
@@ -67,3 +100,4 @@ Quando a base cresce (ex.: 500+ usuários) e várias pessoas usam o sistema ao m
 | Confirmar limite do banco | Ver no Supabase (Database / Connection pool) o limite de conexões do seu plano. |
 | Várias instâncias | Manter `connection_limit × instâncias` ≤ limite Supabase. |
 | Muitos usuários legítimos | Aumentar `RATE_LIMIT_MAX_REQUESTS` se começar a receber 429 em uso normal. |
+| Segurança / sessão “limpa” | Implementar logout automático por inatividade no frontend (ex.: 30 min sem ação). |

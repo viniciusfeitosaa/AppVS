@@ -4,7 +4,9 @@ Plugin do Cursor para documentar e usar Skills com o agente.
 
 ## Instalação
 
-No Cursor, use o comando de instalação do plugin:
+**Importante:** o comando abaixo é do **Cursor** (chat do agente), **não** do terminal (PowerShell, bash, etc.). Não rode no terminal; use no **campo de chat do Cursor** onde você fala com o assistente.
+
+No **chat do Cursor**, digite:
 
 ```
 /plugin install document-skills@anthropic-agent-skills
@@ -13,7 +15,7 @@ No Cursor, use o comando de instalação do plugin:
 - **document-skills** – nome do plugin.
 - **anthropic-agent-skills** – pacote/origem do plugin.
 
-Após a instalação, o plugin fica disponível para documentar e referenciar skills no projeto.
+Se o Cursor não reconhecer `/plugin`, a instalação de extensões/plugins pode ser feita pelo **Cursor Settings** ou pela paleta de comandos (Ctrl+Shift+P) procurando por "Extensions" ou "Install Extension", e então buscar por "document-skills" ou "anthropic agent skills" no marketplace.
 
 ## Relação com esta pasta
 

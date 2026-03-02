@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '../../context/AuthContext';
 import { authService } from '../../services/auth.service';
 import { ModuloSistema } from '../../constants/modulos';
+import { useInactivityLogout } from '../../hooks/useInactivityLogout';
 
 type MenuItem = { to: string; label: string };
 type MenuGroup = { title: string; items: MenuItem[] };
@@ -53,6 +54,13 @@ const getMobileIcon = (label: string) => {
           <path d="M12 9v4l3 2M9 3h6" />
         </svg>
       );
+    case 'Documentos':
+      return (
+        <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+          <path d="M14 2v6h6M16 13H8M16 17H8M10 9H8" />
+        </svg>
+      );
     default:
       return (
         <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
@@ -62,8 +70,12 @@ const getMobileIcon = (label: string) => {
   }
 };
 
+/** Tempo sem atividade (em ms) antes do logout automático. 40 min. */
+const INACTIVITY_LOGOUT_MS = 40 * 60 * 1000;
+
 const AppShell = () => {
   const { user, logout } = useAuth();
+  useInactivityLogout(INACTIVITY_LOGOUT_MS);
   const isMaster = user?.role === 'MASTER';
   const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
   const [openDesktopGroup, setOpenDesktopGroup] = useState<string | null>(null);
@@ -100,6 +112,7 @@ const AppShell = () => {
         {
           title: 'Relatórios',
           items: [
+            { to: '/documentos', label: 'Documentos' },
             { to: '/relatorios', label: 'Relatórios' },
             { to: '/perfil', label: 'Minha Conta' },
           ],
@@ -119,6 +132,7 @@ const AppShell = () => {
     '/envio-documentos': 'ENVIO_DOCUMENTOS',
     '/configuracoes': 'CONFIGURACOES',
     '/perfil': 'PERFIL',
+    '/documentos': 'PERFIL',
     '/ponto-eletronico': 'PONTO_ELETRONICO',
     '/atendimentos': 'ATENDIMENTOS',
   };
@@ -140,6 +154,7 @@ const AppShell = () => {
     : [
         dashboardItem,
         { to: '/ponto-eletronico', label: 'Ponto' },
+        { to: '/documentos', label: 'Documentos' },
         { to: '/relatorios', label: 'Relatórios' },
       ];
   const mobileTabs = mobileTabsBase.filter((item) => hasAccess(moduloByRoute[item.to]));

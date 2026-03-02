@@ -340,19 +340,41 @@ export async function listMinhasEscalasService(tenantId: string, medicoId: strin
     }
   }
 
+  // Incluir escalas em que o médico tem plantão mas não tem EscalaMedico (ex.: foi alocado só na grade)
+  const plantoesDoMedico = await prisma.escalaPlantao.findMany({
+    where: { tenantId, medicoId },
+    select: { escalaId: true, escala: { select: { id: true, nome: true, dataInicio: true, dataFim: true, ativo: true } } },
+    distinct: ['escalaId'],
+  });
+  for (const p of plantoesDoMedico) {
+    if (p.escala?.ativo && !uniqueByEscala.has(p.escala.id)) {
+      uniqueByEscala.set(p.escala.id, { ...p.escala, equipes: [] as string[] });
+    }
+  }
+
   const escalaIds = Array.from(uniqueByEscala.keys());
   for (const escalaId of escalaIds) {
-    const equipesNaEscala = await prisma.escalaEquipe.findMany({
-      where: { tenantId, escalaId },
-      select: { equipeId: true },
-    });
+    const [equipesNaEscala, gradeIdsDoMedico] = await Promise.all([
+      prisma.escalaEquipe.findMany({
+        where: { tenantId, escalaId },
+        select: { equipeId: true },
+      }),
+      prisma.escalaPlantao.findMany({
+        where: { tenantId, escalaId, medicoId },
+        select: { gradeId: true },
+        distinct: ['gradeId'],
+      }),
+    ]);
     const equipeIds = new Set(equipesNaEscala.map((e) => e.equipeId));
     const minhasEquipes = await prisma.equipeMedico.findMany({
       where: { tenantId, medicoId, equipeId: { in: Array.from(equipeIds) } },
       select: { equipe: { select: { nome: true } } },
     });
     const entry = uniqueByEscala.get(escalaId);
-    if (entry) entry.equipes = minhasEquipes.map((em) => em.equipe.nome);
+    if (entry) {
+      entry.equipes = minhasEquipes.map((em) => em.equipe.nome);
+      entry.gradeIds = gradeIdsDoMedico.map((p) => p.gradeId?.toLowerCase()).filter(Boolean);
+    }
   }
 
   return Array.from(uniqueByEscala.values());
