@@ -54,8 +54,8 @@ const PontoEletronico = () => {
   if (!isMedico) {
     return (
       <div className="card border-l-4 border-red-400">
-        <h2 className="text-xl font-bold text-viva-900 mb-2">Acesso restrito</h2>
-        <p className="text-gray-600">Somente médicos podem registrar ponto eletrônico.</p>
+        <h2 className="text-xl font-bold text-viva-900 mb-2 font-display">Acesso restrito</h2>
+        <p className="text-viva-700 font-serif">Somente médicos podem registrar ponto eletrônico.</p>
       </div>
     );
   }
@@ -159,36 +159,54 @@ const PontoEletronico = () => {
 
   return (
     <div className="space-y-6">
-      <div className="card border-l-4 border-viva-500">
-        <h2 className="text-2xl font-bold text-viva-900 mb-1">Ponto Eletrônico</h2>
-        <p className="text-gray-600">Registre seu check-in e checkout atual.</p>
+      {/* Hero */}
+      <div className="card dashboard-hero col-span-full stagger-1 py-8 md:py-10">
+        <p className="text-sm font-semibold uppercase tracking-widest text-viva-600 mb-2 font-display">
+          Controle de jornada
+        </p>
+        <h1 className="text-2xl md:text-3xl font-bold text-viva-900 font-display leading-tight mb-2">
+          Ponto Eletrônico
+        </h1>
+        <p className="text-viva-700 font-serif text-lg">
+          Registre seu check-in e checkout atual.
+        </p>
       </div>
 
-      <div className="card">
-        <div className="flex items-center justify-center gap-4 mb-6 py-4 bg-viva-50 rounded-xl">
-          <span className="text-4xl font-mono font-bold text-viva-900 tabular-nums" aria-live="polite">
+      {/* Relógio + Ação */}
+      <div className="card stagger-2">
+        <div className="flex items-center justify-center mb-6 py-6 rounded-2xl bg-gradient-to-br from-viva-50/80 to-viva-100/40 border border-viva-200/50">
+          <span
+            className="text-4xl md:text-5xl font-mono font-bold text-viva-900 tabular-nums tracking-tight"
+            aria-live="polite"
+          >
             {formatClock(agora)}
           </span>
         </div>
 
-        <h3 className="text-lg font-bold text-viva-900 mb-4">Registrar ponto</h3>
-        <div className="flex flex-col items-center gap-4 text-center">
-          <p className="text-viva-800 font-medium">
-            Equipe {equipeExibida.length > 0 ? equipeExibida.join(', ') : '—'}
+        <h3 className="text-sm font-semibold uppercase tracking-wider text-viva-600 mb-4 font-display">
+          Registrar ponto
+        </h3>
+        <div className="flex flex-col items-center gap-3 text-center mb-6">
+          <p className="text-viva-800 font-medium font-serif">
+            {equipeExibida.length > 0 ? equipeExibida.join(', ') : '—'}
           </p>
           {(configHorario.horarioEntrada || configHorario.horarioSaida) && (
-            <p className="text-sm text-viva-700">
-              Entrada: {configHorario.horarioEntrada ?? '—'} | Saída: {configHorario.horarioSaida ?? '—'}
+            <p className="text-sm text-viva-600">
+              Entrada: {configHorario.horarioEntrada ?? '—'} · Saída: {configHorario.horarioSaida ?? '—'}
             </p>
           )}
         </div>
 
-        {error && <p className="mt-3 text-sm text-red-600 text-center">{error}</p>}
+        {error && (
+          <p className="mb-4 p-3 rounded-xl bg-red-50 border border-red-200 text-sm text-red-700 text-center">
+            {error}
+          </p>
+        )}
 
-        <div className="mt-4 flex justify-center">
+        <div className="flex justify-center">
           {!registroAberto ? (
             <button
-              className="btn btn-primary text-lg px-8 py-3"
+              className="btn btn-primary px-8 py-3"
               onClick={handleCheckIn}
               disabled={loadingAction}
             >
@@ -196,7 +214,7 @@ const PontoEletronico = () => {
             </button>
           ) : (
             <button
-              className="btn btn-primary text-lg px-8 py-3"
+              className="btn btn-primary px-8 py-3"
               onClick={handleCheckOut}
               disabled={loadingAction}
             >
@@ -206,24 +224,32 @@ const PontoEletronico = () => {
         </div>
       </div>
 
-      <div className="card">
-        <h3 className="text-lg font-bold text-viva-900 mb-2">Status de hoje</h3>
+      {/* Status de hoje */}
+      <div className="card stagger-3">
+        <h3 className="text-sm font-semibold uppercase tracking-wider text-viva-600 mb-4 font-display">
+          Status de hoje
+        </h3>
         {isLoading ? (
-          <p className="text-sm text-gray-600">Carregando status...</p>
+          <p className="text-sm text-viva-600 font-serif">Carregando status...</p>
         ) : (
           <>
-            <p className="text-sm text-gray-700 mb-2">
-              Ponto atual:{' '}
-              <span className="font-semibold text-viva-900">
-                {registroAberto ? `Em aberto desde ${new Date(registroAberto.checkInAt).toLocaleTimeString()}` : 'Fechado'}
-              </span>
-            </p>
-            <p className="text-sm text-gray-700 mb-4">
-              Total de horas hoje: <span className="font-semibold text-viva-900">{formatDuration(totalMinutosHoje)}</span>
-            </p>
+            <div className="space-y-3 mb-4">
+              <div className="flex items-center justify-between p-4 rounded-xl bg-viva-50/60 border border-viva-200/50">
+                <p className="text-sm font-medium text-viva-700">Ponto atual</p>
+                <span className="text-sm font-bold text-viva-900">
+                  {registroAberto
+                    ? `Em aberto desde ${new Date(registroAberto.checkInAt).toLocaleTimeString()}`
+                    : 'Fechado'}
+                </span>
+              </div>
+              <div className="flex items-center justify-between p-4 rounded-xl bg-viva-50/60 border border-viva-200/50">
+                <p className="text-sm font-medium text-viva-700">Total de horas hoje</p>
+                <span className="text-sm font-bold text-viva-900">{formatDuration(totalMinutosHoje)}</span>
+              </div>
+            </div>
 
             {registrosHoje.length === 0 ? (
-              <p className="text-sm text-gray-600">Sem registros hoje.</p>
+              <p className="text-sm text-viva-600 font-serif">Sem registros hoje.</p>
             ) : (
               <div className="space-y-2">
                 {registrosHoje.map((r: any) => {
@@ -232,14 +258,17 @@ const PontoEletronico = () => {
                     (r.escalaId && listaEscalas.find((e: { id?: string; nome?: string }) => e.id === r.escalaId)?.nome) ??
                     (listaEscalas.length > 0 ? (listaEscalas[0] as { nome?: string }).nome ?? 'Sem escala' : 'Sem escala');
                   return (
-                  <div key={r.id} className="border border-viva-200 rounded-lg px-3 py-2">
-                    <p className="font-medium text-viva-900">{nomeEscala}</p>
-                    <p className="text-xs text-gray-600">
-                      Início: {new Date(r.checkInAt).toLocaleTimeString()} | Fim:{' '}
-                      {r.checkOutAt ? new Date(r.checkOutAt).toLocaleTimeString() : 'Em aberto'} | Duração:{' '}
-                      {r.duracaoMinutos ? formatDuration(r.duracaoMinutos) : '-'}
-                    </p>
-                  </div>
+                    <div
+                      key={r.id}
+                      className="rounded-xl bg-viva-50/50 border border-viva-200/50 px-4 py-3 hover:bg-viva-50/70 transition"
+                    >
+                      <p className="font-semibold text-viva-900 font-display text-sm">{nomeEscala}</p>
+                      <p className="text-xs text-viva-600 mt-1">
+                        Início: {new Date(r.checkInAt).toLocaleTimeString()} · Fim:{' '}
+                        {r.checkOutAt ? new Date(r.checkOutAt).toLocaleTimeString() : 'Em aberto'} · Duração:{' '}
+                        {r.duracaoMinutos ? formatDuration(r.duracaoMinutos) : '-'}
+                      </p>
+                    </div>
                   );
                 })}
               </div>

@@ -167,42 +167,51 @@ const Perfil = () => {
 
   if (isLoading) {
     return (
-      <div className="card">
-        <p className="text-sm text-gray-600">Carregando perfil...</p>
+      <div className="flex items-center justify-center py-16">
+        <div className="flex items-center gap-3">
+          <div className="animate-spin rounded-full h-10 w-10 border-2 border-viva-200 border-t-viva-600" />
+          <p className="text-viva-700 font-medium">Carregando perfil...</p>
+        </div>
       </div>
     );
   }
 
   return (
     <div className="space-y-6">
-      <div className="card border-l-4 border-viva-500">
-        <h2 className="text-2xl font-bold text-viva-900 mb-1">Minha Conta</h2>
-        <p className="text-gray-600">
+      {/* Hero */}
+      <div className="card dashboard-hero col-span-full stagger-1 py-8 md:py-10">
+        <p className="text-sm font-semibold uppercase tracking-widest text-viva-600 mb-2 font-display">
+          Configurações
+        </p>
+        <h1 className="text-2xl md:text-3xl font-bold text-viva-900 font-display leading-tight mb-2">
+          Minha Conta
+        </h1>
+        <p className="text-viva-700 font-serif text-lg">
           Informações do seu perfil de acesso na plataforma.
         </p>
       </div>
 
       {!!error && (
-        <div className="card border-l-4 border-red-400">
-          <p className="text-sm text-red-700">{error}</p>
+        <div className="card stagger-2 border-l-4 border-red-400 bg-red-50/50 p-4">
+          <p className="text-sm text-red-700 font-medium">{error}</p>
         </div>
       )}
       {!!success && (
-        <div className="card border-l-4 border-green-400">
-          <p className="text-sm text-green-700">{success}</p>
+        <div className="card stagger-2 border-l-4 border-emerald-500 bg-emerald-50/50 p-4">
+          <p className="text-sm text-emerald-800 font-medium">{success}</p>
         </div>
       )}
 
-      <div className="flex gap-1 border-b border-viva-200">
+      <div className="flex gap-1 p-1 rounded-xl bg-viva-100/50 border border-viva-200/60 w-fit">
         {(['pessoais', 'bancarios', 'documentos'] as const).map((tab) => (
           <button
             key={tab}
             type="button"
             onClick={() => setActiveTab(tab)}
-            className={`px-4 py-2.5 text-sm font-medium rounded-t-lg transition ${
+            className={`px-4 py-2.5 text-sm font-semibold rounded-lg transition ${
               activeTab === tab
-                ? 'bg-viva-100 text-viva-900 border border-viva-200 border-b-0 -mb-px'
-                : 'text-viva-600 hover:bg-viva-50 hover:text-viva-800'
+                ? 'bg-white text-viva-900 shadow-sm border border-viva-200/60'
+                : 'text-viva-600 hover:bg-viva-50/80 hover:text-viva-800'
             }`}
           >
             {tab === 'pessoais' && 'Dados Pessoais'}
@@ -214,32 +223,32 @@ const Perfil = () => {
 
       {activeTab === 'pessoais' && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="card lg:col-span-2">
-            <h3 className="text-lg font-bold text-viva-900 mb-4">Dados Pessoais</h3>
+          <div className="card stagger-2 lg:col-span-2">
+            <h3 className="text-sm font-semibold uppercase tracking-wider text-viva-600 mb-4 font-display">Dados Pessoais</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="bg-viva-50 rounded-lg p-3">
-                <p className="text-xs text-viva-600 font-bold uppercase tracking-wider">Nome completo</p>
-                <p className="text-base font-semibold text-viva-900 mt-1">
+              <div className="rounded-xl bg-viva-50/80 border border-viva-200/50 p-4">
+                <p className="text-[11px] font-semibold uppercase tracking-wider text-viva-600">Nome completo</p>
+                <p className="text-base font-semibold text-viva-900 mt-1 font-display">
                   {fixMojibake(perfil?.nomeCompleto || '-')}
                 </p>
               </div>
-              <div className="bg-viva-50 rounded-lg p-3">
-                <p className="text-xs text-viva-600 font-bold uppercase tracking-wider">E-mail</p>
-                <p className="text-base font-semibold text-viva-900 mt-1">
+              <div className="rounded-xl bg-viva-50/80 border border-viva-200/50 p-4">
+                <p className="text-[11px] font-semibold uppercase tracking-wider text-viva-600">E-mail</p>
+                <p className="text-base font-semibold text-viva-900 mt-1 font-display">
                   {perfil?.email ? fixMojibake(perfil.email) : '-'}
                 </p>
               </div>
               {!isMaster && (
-                <div className="bg-viva-50 rounded-lg p-3 md:col-span-2 border-2 border-viva-200">
-                  <p className="text-xs text-viva-600 font-bold uppercase tracking-wider">
+                <div className="rounded-xl bg-viva-100/80 border border-viva-200/60 p-4 md:col-span-2">
+                  <p className="text-[11px] font-semibold uppercase tracking-wider text-viva-600">
                     Identificação profissional
                   </p>
-                  <p className="text-sm text-viva-800 mt-1">
+                  <p className="text-sm text-viva-800 mt-1 font-serif">
                     <span className="font-semibold">Profissão:</span>{' '}
                     {perfil && 'profissao' in perfil ? fixMojibake(perfil.profissao) : 'Médico'}
                   </p>
                   {(perfil && 'especialidades' in perfil && (perfil.especialidades?.length ?? 0) > 0) && (
-                    <p className="text-sm text-viva-800 mt-0.5">
+                    <p className="text-sm text-viva-800 mt-0.5 font-serif">
                       <span className="font-semibold">Especialidades:</span>{' '}
                       {fixMojibake((perfil.especialidades ?? []).join(', '))}
                     </p>
@@ -247,16 +256,16 @@ const Perfil = () => {
                 </div>
               )}
               {!isMaster && (
-                <div className="bg-viva-50 rounded-lg p-3">
-                  <p className="text-xs text-viva-600 font-bold uppercase tracking-wider">CRM</p>
-                  <p className="text-base font-semibold text-viva-900 mt-1">
+                <div className="rounded-xl bg-viva-50/80 border border-viva-200/50 p-4">
+                  <p className="text-[11px] font-semibold uppercase tracking-wider text-viva-600">CRM</p>
+                  <p className="text-base font-semibold text-viva-900 mt-1 font-display">
                     {formatCRM(perfil?.crm || '') || '-'}
                   </p>
                 </div>
               )}
               {!isMaster && (
-                <div className="bg-viva-50 rounded-lg p-3 md:col-span-2">
-                  <p className="text-xs text-viva-600 font-bold uppercase tracking-wider">
+                <div className="rounded-xl bg-viva-50/80 border border-viva-200/50 p-4 md:col-span-2">
+                  <p className="text-[11px] font-semibold uppercase tracking-wider text-viva-600">
                     Atualizar especialidades (várias permitidas)
                   </p>
                   <input
@@ -266,13 +275,13 @@ const Perfil = () => {
                     value={buscaEspecialidade}
                     onChange={(e) => setBuscaEspecialidade(e.target.value)}
                   />
-                  <div className="max-h-40 overflow-y-auto border border-gray-200 rounded-lg p-2 mt-2 space-y-1">
+                  <div className="max-h-40 overflow-y-auto rounded-xl border border-viva-200/60 p-2 mt-2 space-y-1 bg-white/50">
                     {ESPECIALIDADES_MEDICAS.filter((e) =>
                       e.toLowerCase().includes(buscaEspecialidade.toLowerCase())
                     ).map((esp) => (
                       <label
                         key={esp}
-                        className="flex items-center gap-2 cursor-pointer hover:bg-viva-50 p-1 rounded"
+                        className="flex items-center gap-2 cursor-pointer hover:bg-viva-50/80 p-2 rounded-lg transition"
                       >
                         <input
                           type="checkbox"
@@ -280,20 +289,20 @@ const Perfil = () => {
                           onChange={() => toggleEspecialidade(esp)}
                           className="rounded border-viva-600 text-viva-600"
                         />
-                        <span className="text-sm text-viva-900">{esp}</span>
+                        <span className="text-sm text-viva-900 font-serif">{esp}</span>
                       </label>
                     ))}
                   </div>
                   {form.especialidades.length > 0 && (
-                    <p className="mt-1 text-xs text-gray-600">
+                    <p className="mt-2 text-xs text-viva-600 font-serif">
                       Selecionadas: {form.especialidades.join(', ')}
                     </p>
                   )}
                 </div>
               )}
               {!isMaster && (
-                <div className="bg-viva-50 rounded-lg p-3">
-                  <p className="text-xs text-viva-600 font-bold uppercase tracking-wider">Telefone</p>
+                <div className="rounded-xl bg-viva-50/80 border border-viva-200/50 p-4">
+                  <p className="text-[11px] font-semibold uppercase tracking-wider text-viva-600">Telefone</p>
                   <input
                     className="input mt-2"
                     value={form.telefone || telefone || ''}
@@ -302,16 +311,16 @@ const Perfil = () => {
                 </div>
               )}
               {!isMaster && (
-                <div className="bg-viva-50 rounded-lg p-3">
-                  <p className="text-xs text-viva-600 font-bold uppercase tracking-wider">Vínculo</p>
+                <div className="rounded-xl bg-viva-50/80 border border-viva-200/50 p-4">
+                  <p className="text-[11px] font-semibold uppercase tracking-wider text-viva-600">Vínculo</p>
                   <p className="text-base font-semibold text-viva-900 mt-1">
                     {perfil?.vinculo ? fixMojibake(perfil.vinculo) : 'Associado'}
                   </p>
                 </div>
               )}
               {!isMaster && (
-                <div className="bg-viva-50 rounded-lg p-3">
-                  <p className="text-xs text-viva-600 font-bold uppercase tracking-wider">Estado civil</p>
+                <div className="rounded-xl bg-viva-50/80 border border-viva-200/50 p-4">
+                  <p className="text-[11px] font-semibold uppercase tracking-wider text-viva-600">Estado civil</p>
                   <input
                     className="input mt-2"
                     value={form.estadoCivil || perfilMedicoAtual?.estadoCivil || ''}
@@ -320,8 +329,8 @@ const Perfil = () => {
                 </div>
               )}
               {!isMaster && (
-                <div className="bg-viva-50 rounded-lg p-3 md:col-span-2">
-                  <p className="text-xs text-viva-600 font-bold uppercase tracking-wider">Endereço residencial</p>
+                <div className="rounded-xl bg-viva-50/80 border border-viva-200/50 p-4 md:col-span-2">
+                  <p className="text-[11px] font-semibold uppercase tracking-wider text-viva-600">Endereço residencial</p>
                   <textarea
                     className="input mt-2 min-h-[84px]"
                     value={form.enderecoResidencial || perfilMedicoAtual?.enderecoResidencial || ''}
@@ -331,24 +340,24 @@ const Perfil = () => {
               )}
             </div>
           </div>
-          <div className="card">
-            <h3 className="text-lg font-bold text-viva-900 mb-4">Acesso</h3>
+          <div className="card stagger-3">
+            <h3 className="text-sm font-semibold uppercase tracking-wider text-viva-600 mb-4 font-display">Acesso</h3>
             <div className="space-y-3">
-              <div className="flex items-center justify-between rounded-lg border border-viva-200 px-3 py-2">
-                <span className="text-sm text-gray-600">Perfil</span>
-                <span className="text-sm font-semibold text-viva-900">
+              <div className="flex items-center justify-between rounded-xl bg-viva-50/60 border border-viva-200/50 px-4 py-3">
+                <span className="text-sm font-medium text-viva-700">Perfil</span>
+                <span className="text-sm font-semibold text-viva-900 font-display">
                   {isMaster ? 'Master' : 'Profissional'}
                 </span>
               </div>
-              <div className="flex items-center justify-between rounded-lg border border-viva-200 px-3 py-2">
-                <span className="text-sm text-gray-600">Status</span>
-                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-green-100 text-green-800 border border-green-200">
+              <div className="flex items-center justify-between rounded-xl bg-viva-50/60 border border-viva-200/50 px-4 py-3">
+                <span className="text-sm font-medium text-viva-700">Status</span>
+                <span className="inline-flex items-center px-3 py-1 rounded-lg text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-200/80">
                   Ativo
                 </span>
               </div>
             </div>
-            <div className="mt-4 rounded-lg bg-viva-50 p-3">
-              <p className="text-xs text-viva-700">
+            <div className="mt-4 rounded-xl bg-viva-50/80 border border-viva-200/50 p-4">
+              <p className="text-sm text-viva-700 font-serif">
                 {isMaster
                   ? 'Como usuário Master, você pode gerenciar médicos, contratos, escalas e relatórios.'
                   : 'Se precisar atualizar dados cadastrais, solicite ao administrador Master.'}
@@ -359,22 +368,22 @@ const Perfil = () => {
       )}
 
       {activeTab === 'bancarios' && (
-        <div className="card">
-          <h3 className="text-lg font-bold text-viva-900 mb-4">Dados Bancários</h3>
+        <div className="card stagger-2">
+          <h3 className="text-sm font-semibold uppercase tracking-wider text-viva-600 mb-4 font-display">Dados Bancários</h3>
           {isMaster ? (
-            <p className="text-sm text-gray-600">Disponível apenas para perfil profissional.</p>
+            <p className="text-sm text-viva-600 font-serif">Disponível apenas para perfil profissional.</p>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-2xl">
-              <div className="bg-viva-50 rounded-lg p-3 md:col-span-2">
-                <p className="text-xs text-viva-600 font-bold uppercase tracking-wider">Dados bancários</p>
+              <div className="rounded-xl bg-viva-50/80 border border-viva-200/50 p-4 md:col-span-2">
+                <p className="text-[11px] font-semibold uppercase tracking-wider text-viva-600">Dados bancários</p>
                 <textarea
                   className="input mt-2 min-h-[84px]"
                   value={form.dadosBancarios || perfilMedicoAtual?.dadosBancarios || ''}
                   onChange={(e) => handleChange('dadosBancarios', e.target.value)}
                 />
               </div>
-              <div className="bg-viva-50 rounded-lg p-3 md:col-span-2">
-                <p className="text-xs text-viva-600 font-bold uppercase tracking-wider">Chave PIX</p>
+              <div className="rounded-xl bg-viva-50/80 border border-viva-200/50 p-4 md:col-span-2">
+                <p className="text-[11px] font-semibold uppercase tracking-wider text-viva-600">Chave PIX</p>
                 <input
                   className="input mt-2"
                   value={form.chavePix || perfilMedicoAtual?.chavePix || ''}
@@ -387,20 +396,20 @@ const Perfil = () => {
       )}
 
       {activeTab === 'documentos' && (
-        <div className="card">
-          <h3 className="text-lg font-bold text-viva-900 mb-4">Documentos</h3>
+        <div className="card stagger-2">
+          <h3 className="text-sm font-semibold uppercase tracking-wider text-viva-600 mb-4 font-display">Documentos</h3>
           {isMaster ? (
-            <p className="text-sm text-gray-600">Disponível apenas para perfil profissional.</p>
+            <p className="text-sm text-viva-600 font-serif">Disponível apenas para perfil profissional.</p>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {DOCUMENTOS_PERFIL_FIELDS.map((field) => {
                 const existing = perfilMedicoAtual?.documentos?.find((doc) => {
                   return doc.tipo === DOCUMENTO_TIPO_BY_FIELD[field];
                 });
                 return (
-                  <div key={field} className="rounded-lg border border-viva-200 p-3">
-                    <p className="text-sm font-semibold text-viva-900">{DOCUMENTO_LABEL_BY_FIELD[field]}</p>
-                    <p className="text-xs text-gray-600 mt-1 mb-2">
+                  <div key={field} className="rounded-xl bg-viva-50/50 border border-viva-200/50 p-4 hover:bg-viva-50/70 transition">
+                    <p className="text-sm font-semibold text-viva-900 font-display">{DOCUMENTO_LABEL_BY_FIELD[field]}</p>
+                    <p className="text-xs text-viva-600 mt-1 mb-2 font-serif">
                       {existing?.nomeArquivo ? `Atual: ${existing.nomeArquivo}` : 'Ainda não anexado'}
                     </p>
                     {existing?.url && (
@@ -409,24 +418,22 @@ const Perfil = () => {
                           href={existing.url}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="btn btn-secondary text-sm inline-flex items-center gap-1.5"
+                          className="btn-sm btn-secondary inline-flex items-center gap-1.5"
                         >
-                          <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z" clipRule="evenodd" /></svg>
                           Abrir
                         </a>
                         <a
                           href={existing.url}
                           download={existing.nomeArquivo || undefined}
-                          className="btn btn-secondary text-sm inline-flex items-center gap-1.5"
+                          className="btn-sm btn-secondary inline-flex items-center gap-1.5"
                         >
-                          <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clipRule="evenodd" /></svg>
                           Baixar
                         </a>
                       </div>
                     )}
                     <input
                       type="file"
-                      className="input"
+                      className="input text-sm"
                       onChange={(e) => {
                         const file = e.target.files?.[0];
                         setDocumentosSelecionados((prev) => ({ ...prev, [field]: file }));
@@ -454,22 +461,25 @@ const Perfil = () => {
       )}
 
       {isMaster && (
-        <div className="card">
-          <h3 className="text-lg font-bold text-viva-900 mb-2">Administração de Acesso por Módulo</h3>
-          <p className="text-sm text-gray-600 mb-4">
+        <div className="card stagger-2 border-l-4 border-l-viva-500">
+          <h3 className="text-sm font-semibold uppercase tracking-wider text-viva-600 mb-2 font-display">Administração de Acesso por Módulo</h3>
+          <p className="text-sm text-viva-700 mb-4 font-serif">
             Defina quais perfis têm acesso a cada módulo do sistema.
           </p>
 
           {loadingAcessos ? (
-            <p className="text-sm text-gray-600">Carregando permissões...</p>
+            <div className="flex items-center gap-3 py-6">
+              <div className="animate-spin rounded-full h-8 w-8 border-2 border-viva-200 border-t-viva-600" />
+              <p className="text-sm text-viva-600">Carregando permissões...</p>
+            </div>
           ) : (
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto rounded-xl border border-viva-200/60 overflow-hidden">
               <table className="min-w-full text-sm">
                 <thead>
-                  <tr className="text-left text-viva-700 border-b">
-                    <th className="py-2 pr-4">Módulo</th>
-                    <th className="py-2 pr-4">Master</th>
-                    <th className="py-2 pr-4">Médico</th>
+                  <tr className="text-left text-viva-700 bg-viva-50/80 border-b border-viva-200/60">
+                    <th className="py-3 px-4 font-semibold">Módulo</th>
+                    <th className="py-3 px-4 font-semibold">Master</th>
+                    <th className="py-3 px-4 font-semibold">Médico</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -480,21 +490,23 @@ const Perfil = () => {
                     const masterLocked =
                       modulo === 'DASHBOARD' || modulo === 'CONFIGURACOES' || modulo === 'PERFIL';
                     return (
-                      <tr key={modulo} className="border-b last:border-b-0">
-                        <td className="py-2 pr-4 font-medium text-viva-900">{MODULO_LABEL[modulo]}</td>
-                        <td className="py-2 pr-4">
+                      <tr key={modulo} className="border-b border-viva-200/40 last:border-b-0 hover:bg-viva-50/40 transition">
+                        <td className="py-3 px-4 font-medium text-viva-900 font-serif">{MODULO_LABEL[modulo]}</td>
+                        <td className="py-3 px-4">
                           <input
                             type="checkbox"
                             checked={masterChecked}
                             disabled={masterLocked}
                             onChange={(e) => updateAcessoItem('MASTER', modulo, e.target.checked)}
+                            className="rounded border-viva-600 text-viva-600"
                           />
                         </td>
-                        <td className="py-2 pr-4">
+                        <td className="py-3 px-4">
                           <input
                             type="checkbox"
                             checked={medicoChecked}
                             onChange={(e) => updateAcessoItem('MEDICO', modulo, e.target.checked)}
+                            className="rounded border-viva-600 text-viva-600"
                           />
                         </td>
                       </tr>

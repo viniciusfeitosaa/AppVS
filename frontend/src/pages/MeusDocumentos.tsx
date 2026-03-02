@@ -38,62 +38,81 @@ const MeusDocumentos = () => {
   if (isMaster) {
     return (
       <div className="card border-l-4 border-red-400">
-        <h2 className="text-xl font-bold text-viva-900 mb-2">Acesso restrito</h2>
-        <p className="text-gray-600">Documentos enviados para você estão na área do profissional. Use o perfil Master apenas para envio em Envio de Documentos.</p>
+        <h2 className="text-xl font-bold text-viva-900 mb-2 font-display">Acesso restrito</h2>
+        <p className="text-viva-700 font-serif">Documentos enviados para você estão na área do profissional. Use o perfil Master apenas para envio em Envio de Documentos.</p>
       </div>
     );
   }
 
   return (
     <div className="space-y-6">
-      <div className="card border-l-4 border-viva-500">
-        <h2 className="text-2xl font-bold text-viva-900 mb-1">Meus Documentos</h2>
-        <p className="text-gray-600 mb-6">
-          Documentos enviados para você. Clique em &quot;Visualizar&quot; para abrir ou baixar.
+      {/* Hero */}
+      <div className="card dashboard-hero col-span-full stagger-1 py-8 md:py-10">
+        <p className="text-sm font-semibold uppercase tracking-widest text-viva-600 mb-2 font-display">
+          Área do profissional
         </p>
+        <h1 className="text-2xl md:text-3xl font-bold text-viva-900 font-display leading-tight mb-2">
+          Meus Documentos
+        </h1>
+        <p className="text-viva-700 font-serif text-lg">
+          Documentos enviados para você. Clique em Visualizar para abrir ou baixar.
+        </p>
+      </div>
 
+      {/* Lista de documentos */}
+      <div className="card stagger-2 border-l-4 border-l-viva-500 bg-gradient-to-br from-white to-viva-50/30">
         {isLoading ? (
-          <p className="text-viva-600">Carregando...</p>
-        ) : documentos.length === 0 ? (
-          <p className="text-gray-500">Nenhum documento enviado para você ainda.</p>
-        ) : (
-          <div className="border border-viva-200 rounded-lg overflow-hidden">
-            <table className="w-full text-sm">
-              <thead className="bg-viva-100 text-viva-800">
-                <tr>
-                  <th className="text-left px-3 py-2">Documento</th>
-                  <th className="text-left px-3 py-2 hidden sm:table-cell">Tamanho</th>
-                  <th className="text-left px-3 py-2 hidden md:table-cell">Data</th>
-                  <th className="w-28 px-3 py-2"></th>
-                </tr>
-              </thead>
-              <tbody>
-                {documentos.map((doc) => (
-                  <tr key={doc.id} className="border-t border-viva-100">
-                    <td className="px-3 py-2">
-                      <span className="font-medium text-viva-900">
-                        {doc.titulo ? fixMojibake(doc.titulo) : fixMojibake(doc.nomeArquivo)}
-                      </span>
-                      {doc.titulo && (
-                        <span className="block text-xs text-gray-500">{fixMojibake(doc.nomeArquivo)}</span>
-                      )}
-                    </td>
-                    <td className="px-3 py-2 text-viva-800 hidden sm:table-cell">{formatBytes(doc.tamanhoBytes)}</td>
-                    <td className="px-3 py-2 text-gray-600 hidden md:table-cell">{formatDate(doc.createdAt)}</td>
-                    <td className="px-3 py-2">
-                      <button
-                        type="button"
-                        className="btn btn-primary"
-                        onClick={() => medicoService.openDocumentoEnviado(doc.id)}
-                      >
-                        Visualizar
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div className="flex items-center gap-3 py-8">
+            <div className="animate-spin rounded-full h-8 w-8 border-2 border-viva-200 border-t-viva-600" />
+            <p className="text-viva-700 font-medium">Carregando...</p>
           </div>
+        ) : documentos.length === 0 ? (
+          <div className="py-12 text-center">
+            <span className="inline-flex w-14 h-14 rounded-2xl bg-viva-100/80 items-center justify-center text-viva-500 mb-4">
+              <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+            </span>
+            <p className="text-viva-600 font-serif">Nenhum documento enviado para você ainda.</p>
+          </div>
+        ) : (
+          <ul className="space-y-2">
+            {documentos.map((doc) => (
+              <li
+                key={doc.id}
+                className="flex items-center gap-3 p-4 rounded-xl bg-viva-50/50 hover:bg-viva-100/50 border border-viva-200/40 transition"
+              >
+                <span className="flex-shrink-0 w-10 h-10 rounded-xl bg-viva-200/50 flex items-center justify-center text-viva-700">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="font-semibold text-viva-900 truncate font-display">
+                    {doc.titulo ? fixMojibake(doc.titulo) : fixMojibake(doc.nomeArquivo)}
+                  </p>
+                  {doc.titulo && (
+                    <p className="text-xs text-viva-600 truncate mt-0.5">{fixMojibake(doc.nomeArquivo)}</p>
+                  )}
+                  <div className="flex gap-4 mt-1 text-xs text-viva-600 sm:hidden">
+                    <span>{formatBytes(doc.tamanhoBytes)}</span>
+                    <span>{formatDate(doc.createdAt)}</span>
+                  </div>
+                </div>
+                <div className="hidden sm:flex items-center gap-4 shrink-0">
+                  <span className="text-sm text-viva-700 w-14 text-right">{formatBytes(doc.tamanhoBytes)}</span>
+                  <span className="text-sm text-viva-600 w-24 text-right hidden md:block">{formatDate(doc.createdAt)}</span>
+                </div>
+                <button
+                  type="button"
+                  className="btn-sm btn-primary shrink-0"
+                  onClick={() => medicoService.openDocumentoEnviado(doc.id)}
+                >
+                  Visualizar
+                </button>
+              </li>
+            ))}
+          </ul>
         )}
       </div>
     </div>

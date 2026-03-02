@@ -101,10 +101,10 @@ const Dashboard = () => {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-[60vh] flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-viva-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Carregando...</p>
+          <div className="animate-spin rounded-full h-12 w-12 border-2 border-viva-200 border-t-viva-600 mx-auto" />
+          <p className="mt-4 text-viva-700 font-medium">Carregando...</p>
         </div>
       </div>
     );
@@ -112,22 +112,24 @@ const Dashboard = () => {
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-      <div className="card col-span-full border-l-4 border-viva-500">
-        <h2 className="text-2xl font-bold text-viva-900 mb-1">
+      {/* Hero */}
+      <div className="card dashboard-hero col-span-full stagger-1 py-8 md:py-10">
+        <p className="text-sm font-semibold uppercase tracking-widest text-viva-600 mb-2 font-display">
+          {isMaster ? 'Acesso Master' : 'Acesso Profissional'}
+        </p>
+        <h1 className="text-2xl md:text-3xl font-bold text-viva-900 font-display leading-tight mb-2">
           Bem-vindo, {fixMojibake(displayUser?.nomeCompleto)}!
-        </h2>
-        <p className="text-gray-600">
-          {isMaster
-            ? 'Sistema de gestão Viva Saúde | Acesso Master'
-            : 'Sistema de gestão Viva Saúde | Acesso Profissional'}
+        </h1>
+        <p className="text-viva-700 font-serif text-lg">
+          Sistema de gestão Viva Saúde
         </p>
       </div>
 
       {temEscalaAtivaParaPonto && (
-        <div className="card col-span-full border-l-4 border-viva-500 flex flex-wrap items-center justify-between gap-4">
+        <div className="card col-span-full stagger-2 flex flex-wrap items-center justify-between gap-4 border-l-4 border-l-viva-500 bg-gradient-to-r from-viva-50/60 to-transparent">
           <p className="text-viva-900 font-medium">
-            Você tem uma escala para <span className="font-bold">{fixMojibake(escalaNome || 'hoje')}</span> às{' '}
-            <span className="font-bold">{horaEntrada}</span>.
+            Você tem uma escala para <span className="font-bold text-viva-800">{fixMojibake(escalaNome || 'hoje')}</span> às{' '}
+            <span className="font-bold text-viva-800">{horaEntrada}</span>.
           </p>
           <Link to="/ponto-eletronico" className="btn btn-primary shrink-0">
             Bater ponto
@@ -136,64 +138,63 @@ const Dashboard = () => {
       )}
 
       {/* Card de Informações */}
-      <div className="card hover:shadow-lg transition-shadow">
-        <h3 className="text-lg font-bold mb-4 text-viva-800 flex items-center gap-2">
-          <span className="w-2 h-2 bg-viva-500 rounded-full"></span>
+      <div className="card stagger-3">
+        <h3 className="text-sm font-semibold uppercase tracking-wider text-viva-600 mb-4 font-display">
           Informações Pessoais
         </h3>
-        <div className="space-y-4">
+        <div className="space-y-3">
           {!isMaster && (displayUser?.profissao || (displayUser?.especialidades?.length ?? 0) > 0) && (
-            <div className="bg-viva-100 border border-viva-200 p-3 rounded-lg">
-              <p className="text-xs text-viva-600 font-bold uppercase tracking-wider">Identificação profissional</p>
+            <div className="rounded-xl bg-viva-100/80 border border-viva-200/60 p-4">
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-viva-600">Identificação profissional</p>
               {displayUser?.profissao && (
-                <p className="text-lg font-medium text-viva-900 mt-1">
-                  <span className="text-viva-700">Profissão:</span> {fixMojibake(displayUser.profissao)}
+                <p className="text-base font-semibold text-viva-900 mt-1 font-display">
+                  {fixMojibake(displayUser.profissao)}
                 </p>
               )}
               {(displayUser?.especialidades?.length ?? 0) > 0 && (
-                <p className="text-base font-medium text-viva-900 mt-0.5">
-                  <span className="text-viva-700">Especialidades:</span> {fixMojibake(displayUser!.especialidades!.join(', '))}
+                <p className="text-sm text-viva-800 mt-0.5 font-serif">
+                  {fixMojibake(displayUser!.especialidades!.join(', '))}
                 </p>
               )}
             </div>
           )}
           {!isMaster && displayUser?.crm && (
-            <div className="bg-viva-50 p-3 rounded-lg">
-              <p className="text-xs text-viva-600 font-bold uppercase tracking-wider">CRM</p>
-              <p className="text-lg font-medium text-viva-900">{formatCRM(displayUser.crm)}</p>
+            <div className="rounded-xl bg-viva-50/80 border border-viva-200/50 p-4">
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-viva-600">CRM</p>
+              <p className="text-lg font-semibold text-viva-900 mt-0.5 font-display">{formatCRM(displayUser.crm)}</p>
             </div>
           )}
           {!isMaster && (
-            <div className="bg-viva-50 p-3 rounded-lg">
-              <p className="text-xs text-viva-600 font-bold uppercase tracking-wider">Tipo de vínculo</p>
-              <p className="text-lg font-medium text-viva-900">
+            <div className="rounded-xl bg-viva-50/80 border border-viva-200/50 p-4">
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-viva-600">Tipo de vínculo</p>
+              <p className="text-base font-semibold text-viva-900 mt-0.5">
                 {displayUser?.vinculo?.toUpperCase() === 'PJ' ? 'PJ' : 'Associado'}
               </p>
             </div>
           )}
           {displayUser?.email && (
-            <div className="bg-viva-50 p-3 rounded-lg">
-              <p className="text-xs text-viva-600 font-bold uppercase tracking-wider">Email de Contato</p>
-              <p className="text-lg font-medium text-viva-900">{fixMojibake(displayUser.email)}</p>
+            <div className="hidden rounded-xl bg-viva-50/80 border border-viva-200/50 p-4">
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-viva-600">Email de Contato</p>
+              <p className="text-sm font-medium text-viva-900 mt-0.5 break-all">{fixMojibake(displayUser.email)}</p>
             </div>
           )}
           {!isMaster && listaEscalas.length > 0 && (
-            <div className="bg-viva-50 p-3 rounded-lg">
-              <p className="text-xs text-viva-600 font-bold uppercase tracking-wider">Escala(s)</p>
-              <p className="text-lg font-medium text-viva-900 mt-1">
+            <div className="rounded-xl bg-viva-50/80 border border-viva-200/50 p-4">
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-viva-600">Escala(s)</p>
+              <p className="text-sm font-medium text-viva-900 mt-1 leading-snug">
                 <span className="font-semibold">{fixMojibake(escalaNome ?? '—')}</span>
-                <span className="text-viva-700"> · </span>
-                <span className="font-semibold">{new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long' })}</span>
-                <span className="text-viva-700"> · </span>
-                <span className="font-semibold">{faixaHorario}</span>
+                <span className="text-viva-600"> · </span>
+                <span className="font-medium">{new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long' })}</span>
+                <span className="text-viva-600"> · </span>
+                <span className="font-medium">{faixaHorario}</span>
               </p>
-              <div className="mt-2 text-center">
+              <div className="mt-3">
                 <Link
                   to="/ponto-eletronico"
-                  className="inline-flex items-center gap-1 text-sm font-semibold text-viva-700 hover:text-viva-900 hover:underline"
+                  className="inline-flex items-center gap-1.5 text-sm font-semibold text-viva-700 hover:text-viva-900 transition"
                 >
                   Bater ponto
-                  <span aria-hidden>→</span>
+                  <span aria-hidden className="text-viva-500">→</span>
                 </Link>
               </div>
             </div>
@@ -202,60 +203,76 @@ const Dashboard = () => {
       </div>
 
       {/* Card de Status */}
-      <div className="card hover:shadow-lg transition-shadow">
-        <h3 className="text-lg font-bold mb-4 text-viva-800 flex items-center gap-2">
-          <span className="w-2 h-2 bg-viva-500 rounded-full"></span>
+      <div className="card stagger-4">
+        <h3 className="text-sm font-semibold uppercase tracking-wider text-viva-600 mb-4 font-display">
           Status do Sistema
         </h3>
-        <div className="space-y-4">
-          <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-            <p className="text-sm font-medium text-gray-600">Status da Conta</p>
-            <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-green-100 text-green-800 border border-green-200 uppercase">
+        <div className="space-y-3">
+          <div className="flex items-center justify-between p-4 rounded-xl bg-viva-50/60 border border-viva-200/50">
+            <p className="text-sm font-medium text-viva-700">Status da Conta</p>
+            <span className="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-200/80">
               Ativo
             </span>
           </div>
-          <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-            <p className="text-sm font-medium text-gray-600">Último Acesso</p>
-            <p className="text-sm text-viva-700 font-bold">Hoje</p>
+          <div className="flex items-center justify-between p-4 rounded-xl bg-viva-50/60 border border-viva-200/50">
+            <p className="text-sm font-medium text-viva-700">Último Acesso</p>
+            <p className="text-sm font-bold text-viva-900">Hoje</p>
           </div>
         </div>
       </div>
 
       {/* Documentos disponíveis (profissional) */}
       {!isMaster && (
-        <div className="card col-span-full hover:shadow-lg transition-shadow border-l-4 border-viva-500">
-          <h3 className="text-lg font-bold mb-4 text-viva-800 flex items-center gap-2">
-            <span className="w-2 h-2 bg-viva-500 rounded-full"></span>
-            Documentos
-          </h3>
-          <p className="text-sm text-viva-600 mb-3">
-            Documentos enviados para você. Acesse a área de Documentos para ver todos e visualizar.
-          </p>
-          <Link to="/documentos" className="btn btn-primary mb-3">
-            Ver todos os documentos
-          </Link>
+        <div className="card col-span-full stagger-5 border-l-4 border-l-viva-500 bg-gradient-to-br from-white to-viva-50/30">
+          <div className="flex flex-wrap items-start justify-between gap-3 mb-4">
+            <div>
+              <h3 className="text-base font-semibold text-viva-800 font-display">
+                Documentos enviados para você
+              </h3>
+              <p className="text-sm text-viva-600 mt-1 font-serif max-w-xl">
+                Acesse a área de Documentos para ver todos e visualizar.
+              </p>
+            </div>
+            <Link
+              to="/documentos"
+              className="btn-sm btn-primary shrink-0 inline-flex items-center gap-1.5"
+            >
+              Ver todos
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
+            </Link>
+          </div>
           {documentosDisponiveis.length > 0 && (
-          <ul className="space-y-2">
-            {documentosDisponiveis.map((doc) => (
-              <li key={doc.id} className="flex items-center justify-between gap-3 p-3 bg-viva-50 rounded-lg border border-viva-100">
-                <div className="min-w-0">
-                  <p className="font-medium text-viva-900 truncate">
-                    {doc.titulo || doc.nomeArquivo}
-                  </p>
-                  {doc.titulo && (
-                    <p className="text-xs text-viva-600 truncate">{doc.nomeArquivo}</p>
-                  )}
-                </div>
-                <button
-                  type="button"
-                  className="btn btn-primary shrink-0"
-                  onClick={() => medicoService.openDocumentoEnviado(doc.id)}
+            <ul className="space-y-1 rounded-xl overflow-hidden">
+              {documentosDisponiveis.map((doc) => (
+                <li
+                  key={doc.id}
+                  className="flex items-center gap-3 p-3 rounded-xl bg-viva-50/50 hover:bg-viva-100/50 border border-viva-200/40 transition"
                 >
-                  Visualizar
-                </button>
-              </li>
-            ))}
-          </ul>
+                  <span className="flex-shrink-0 w-9 h-9 rounded-lg bg-viva-200/50 flex items-center justify-center text-viva-700">
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="font-semibold text-viva-900 truncate text-sm font-display">
+                      {doc.titulo || doc.nomeArquivo}
+                    </p>
+                    {doc.titulo && (
+                      <p className="text-xs text-viva-600 truncate mt-0.5">{doc.nomeArquivo}</p>
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    className="btn-sm btn-primary shrink-0"
+                    onClick={() => medicoService.openDocumentoEnviado(doc.id)}
+                  >
+                    Visualizar
+                  </button>
+                </li>
+              ))}
+            </ul>
           )}
         </div>
       )}

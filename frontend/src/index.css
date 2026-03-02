@@ -2,33 +2,103 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  --app-bg: linear-gradient(165deg, rgba(255,255,255,0.98) 0%, rgba(255,255,255,0.95) 50%, rgba(250,252,254,0.97) 100%);
+  --app-surface: rgba(255, 255, 255, 0.85);
+  --app-border: rgba(22, 101, 52, 0.12);
+  --app-accent: #166534;
+  --app-accent-hover: #14532d;
+  --card-shadow: 0 1px 3px rgba(8, 50, 20, 0.06);
+  --card-shadow-hover: 0 12px 28px rgba(8, 50, 20, 0.1);
+}
+
 @layer base {
   body {
-    background-color: #f9fafb; /* bg-gray-50 */
-    color: #111827; /* text-gray-900 */
+    background-color: #ffffff;
+    background-image: var(--app-bg);
+    background-attachment: fixed;
+    color: #1a1a1a;
+    font-feature-settings: "ss01", "ss02";
   }
 }
 
 @layer components {
   .btn {
-    @apply px-4 py-2 rounded-lg font-medium transition-colors duration-200;
+    @apply px-4 py-2.5 rounded-xl font-semibold text-sm transition-all duration-200;
   }
 
   .btn-primary {
-    background-color: #16a34a; /* vival-600 */
+    background-color: var(--app-accent);
     color: white;
-    @apply hover:bg-viva-700 active:bg-viva-800;
+    @apply shadow-sm;
+  }
+  .btn-primary:hover {
+    background-color: var(--app-accent-hover);
+    @apply shadow-md;
+  }
+  .btn-primary:active {
+    @apply scale-[0.98];
+  }
+
+  .btn-sm {
+    @apply px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-200;
+  }
+  .btn-sm.btn-primary {
+    background-color: var(--app-accent);
+    color: white;
+  }
+  .btn-sm.btn-primary:hover {
+    background-color: var(--app-accent-hover);
   }
 
   .btn-secondary {
-    @apply bg-gray-200 text-gray-800 hover:bg-gray-300 active:bg-gray-400;
+    @apply bg-white/80 text-viva-900 border border-viva-200 hover:bg-viva-50 hover:border-viva-300;
   }
 
   .input {
-    @apply w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-viva-500 focus:border-transparent;
+    @apply w-full px-4 py-2.5 border border-viva-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-viva-500/40 focus:border-viva-400 bg-white/90;
   }
 
   .card {
-    @apply bg-white rounded-lg shadow-md p-6;
+    @apply bg-white/90 backdrop-blur-sm rounded-2xl p-6 border border-[var(--app-border)];
+    box-shadow: var(--card-shadow);
+    transition: box-shadow 0.25s ease, transform 0.2s ease;
   }
+  .card:hover {
+    box-shadow: var(--card-shadow-hover);
+  }
+
+  .dashboard-hero {
+    background: linear-gradient(135deg, rgba(22, 101, 52, 0.06) 0%, rgba(22, 101, 52, 0.02) 100%);
+    @apply border border-viva-200/60;
+  }
+
+  .stagger-1 { animation: fadeInUp 0.5s ease-out 0.05s forwards; opacity: 0; }
+  .stagger-2 { animation: fadeInUp 0.5s ease-out 0.12s forwards; opacity: 0; }
+  .stagger-3 { animation: fadeInUp 0.5s ease-out 0.19s forwards; opacity: 0; }
+  .stagger-4 { animation: fadeInUp 0.5s ease-out 0.26s forwards; opacity: 0; }
+  .stagger-5 { animation: fadeInUp 0.5s ease-out 0.33s forwards; opacity: 0; }
+  .stagger-6 { animation: fadeInUp 0.5s ease-out 0.4s forwards; opacity: 0; }
+
+  .app-shell {
+    min-height: 100vh;
+    background-color: #ffffff;
+    background-image: var(--app-bg);
+    background-attachment: fixed;
+  }
+
+  .nav-pill {
+    @apply px-3 py-2 rounded-xl text-sm font-semibold transition-all duration-200;
+  }
+  .nav-pill-active {
+    @apply bg-viva-900 text-white shadow-sm;
+  }
+  .nav-pill-inactive {
+    @apply text-viva-800 hover:bg-viva-100/80;
+  }
+}
+
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(14px); }
+  to { opacity: 1; transform: translateY(0); }
 }
