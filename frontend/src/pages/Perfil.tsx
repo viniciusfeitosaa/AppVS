@@ -170,7 +170,7 @@ const Perfil = () => {
       <div className="flex items-center justify-center py-16">
         <div className="flex items-center gap-3">
           <div className="animate-spin rounded-full h-10 w-10 border-2 border-viva-200 border-t-viva-600" />
-          <p className="text-viva-700 font-medium">Carregando perfil...</p>
+          <p className="text-sm text-viva-700 font-medium">Carregando perfil...</p>
         </div>
       </div>
     );
@@ -180,25 +180,25 @@ const Perfil = () => {
     <div className="space-y-6">
       {/* Hero */}
       <div className="card dashboard-hero col-span-full stagger-1 py-8 md:py-10">
-        <p className="text-sm font-semibold uppercase tracking-widest text-viva-600 mb-2 font-display">
+        <p className="text-xs font-semibold uppercase tracking-widest text-viva-600 mb-2 font-display">
           Configurações
         </p>
-        <h1 className="text-2xl md:text-3xl font-bold text-viva-900 font-display leading-tight mb-2">
+        <h1 className="text-xl md:text-2xl font-bold text-viva-900 font-display leading-tight mb-2">
           Minha Conta
         </h1>
-        <p className="text-viva-700 font-serif text-lg">
+        <p className="text-viva-700 font-serif text-base">
           Informações do seu perfil de acesso na plataforma.
         </p>
       </div>
 
       {!!error && (
         <div className="card stagger-2 border-l-4 border-red-400 bg-red-50/50 p-4">
-          <p className="text-sm text-red-700 font-medium">{error}</p>
+          <p className="text-xs text-red-700 font-medium">{error}</p>
         </div>
       )}
       {!!success && (
         <div className="card stagger-2 border-l-4 border-emerald-500 bg-emerald-50/50 p-4">
-          <p className="text-sm text-emerald-800 font-medium">{success}</p>
+          <p className="text-xs text-emerald-800 font-medium">{success}</p>
         </div>
       )}
 
@@ -224,26 +224,26 @@ const Perfil = () => {
       {activeTab === 'pessoais' && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="card stagger-2 lg:col-span-2">
-            <h3 className="text-sm font-semibold uppercase tracking-wider text-viva-600 mb-4 font-display">Dados Pessoais</h3>
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-viva-600 mb-4 font-display">Dados Pessoais</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="rounded-xl bg-viva-50/80 border border-viva-200/50 p-4">
-                <p className="text-[11px] font-semibold uppercase tracking-wider text-viva-600">Nome completo</p>
-                <p className="text-base font-semibold text-viva-900 mt-1 font-display">
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-viva-600">Nome completo</p>
+                <p className="text-sm font-semibold text-viva-900 mt-1 font-display">
                   {fixMojibake(perfil?.nomeCompleto || '-')}
                 </p>
               </div>
               <div className="rounded-xl bg-viva-50/80 border border-viva-200/50 p-4">
-                <p className="text-[11px] font-semibold uppercase tracking-wider text-viva-600">E-mail</p>
-                <p className="text-base font-semibold text-viva-900 mt-1 font-display">
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-viva-600">E-mail</p>
+                <p className="text-sm font-semibold text-viva-900 mt-1 font-display">
                   {perfil?.email ? fixMojibake(perfil.email) : '-'}
                 </p>
               </div>
               {!isMaster && (
                 <div className="rounded-xl bg-viva-100/80 border border-viva-200/60 p-4 md:col-span-2">
-                  <p className="text-[11px] font-semibold uppercase tracking-wider text-viva-600">
+                  <p className="text-[10px] font-semibold uppercase tracking-wider text-viva-600">
                     Identificação profissional
                   </p>
-                  <p className="text-sm text-viva-800 mt-1 font-serif">
+                  <p className="text-xs text-viva-800 mt-1 font-serif">
                     <span className="font-semibold">Profissão:</span>{' '}
                     {perfil && 'profissao' in perfil ? fixMojibake(perfil.profissao) : 'Médico'}
                   </p>
@@ -257,15 +257,15 @@ const Perfil = () => {
               )}
               {!isMaster && (
                 <div className="rounded-xl bg-viva-50/80 border border-viva-200/50 p-4">
-                  <p className="text-[11px] font-semibold uppercase tracking-wider text-viva-600">CRM</p>
-                  <p className="text-base font-semibold text-viva-900 mt-1 font-display">
+                  <p className="text-[10px] font-semibold uppercase tracking-wider text-viva-600">CRM</p>
+                  <p className="text-sm font-semibold text-viva-900 mt-1 font-display">
                     {formatCRM(perfil?.crm || '') || '-'}
                   </p>
                 </div>
               )}
               {!isMaster && (
                 <div className="rounded-xl bg-viva-50/80 border border-viva-200/50 p-4 md:col-span-2">
-                  <p className="text-[11px] font-semibold uppercase tracking-wider text-viva-600">
+                  <p className="text-[10px] font-semibold uppercase tracking-wider text-viva-600">
                     Atualizar especialidades (várias permitidas)
                   </p>
                   <input
@@ -289,12 +289,12 @@ const Perfil = () => {
                           onChange={() => toggleEspecialidade(esp)}
                           className="rounded border-viva-600 text-viva-600"
                         />
-                        <span className="text-sm text-viva-900 font-serif">{esp}</span>
+                        <span className="text-xs text-viva-900 font-serif">{esp}</span>
                       </label>
                     ))}
                   </div>
                   {form.especialidades.length > 0 && (
-                    <p className="mt-2 text-xs text-viva-600 font-serif">
+                    <p className="mt-2 text-[10px] text-viva-600 font-serif">
                       Selecionadas: {form.especialidades.join(', ')}
                     </p>
                   )}
@@ -302,7 +302,7 @@ const Perfil = () => {
               )}
               {!isMaster && (
                 <div className="rounded-xl bg-viva-50/80 border border-viva-200/50 p-4">
-                  <p className="text-[11px] font-semibold uppercase tracking-wider text-viva-600">Telefone</p>
+                  <p className="text-[10px] font-semibold uppercase tracking-wider text-viva-600">Telefone</p>
                   <input
                     className="input mt-2"
                     value={form.telefone || telefone || ''}
@@ -312,15 +312,15 @@ const Perfil = () => {
               )}
               {!isMaster && (
                 <div className="rounded-xl bg-viva-50/80 border border-viva-200/50 p-4">
-                  <p className="text-[11px] font-semibold uppercase tracking-wider text-viva-600">Vínculo</p>
-                  <p className="text-base font-semibold text-viva-900 mt-1">
+                  <p className="text-[10px] font-semibold uppercase tracking-wider text-viva-600">Vínculo</p>
+                  <p className="text-sm font-semibold text-viva-900 mt-1">
                     {perfil?.vinculo ? fixMojibake(perfil.vinculo) : 'Associado'}
                   </p>
                 </div>
               )}
               {!isMaster && (
                 <div className="rounded-xl bg-viva-50/80 border border-viva-200/50 p-4">
-                  <p className="text-[11px] font-semibold uppercase tracking-wider text-viva-600">Estado civil</p>
+                  <p className="text-[10px] font-semibold uppercase tracking-wider text-viva-600">Estado civil</p>
                   <input
                     className="input mt-2"
                     value={form.estadoCivil || perfilMedicoAtual?.estadoCivil || ''}
@@ -330,7 +330,7 @@ const Perfil = () => {
               )}
               {!isMaster && (
                 <div className="rounded-xl bg-viva-50/80 border border-viva-200/50 p-4 md:col-span-2">
-                  <p className="text-[11px] font-semibold uppercase tracking-wider text-viva-600">Endereço residencial</p>
+                  <p className="text-[10px] font-semibold uppercase tracking-wider text-viva-600">Endereço residencial</p>
                   <textarea
                     className="input mt-2 min-h-[84px]"
                     value={form.enderecoResidencial || perfilMedicoAtual?.enderecoResidencial || ''}
@@ -341,23 +341,23 @@ const Perfil = () => {
             </div>
           </div>
           <div className="card stagger-3">
-            <h3 className="text-sm font-semibold uppercase tracking-wider text-viva-600 mb-4 font-display">Acesso</h3>
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-viva-600 mb-4 font-display">Acesso</h3>
             <div className="space-y-3">
               <div className="flex items-center justify-between rounded-xl bg-viva-50/60 border border-viva-200/50 px-4 py-3">
-                <span className="text-sm font-medium text-viva-700">Perfil</span>
-                <span className="text-sm font-semibold text-viva-900 font-display">
+                <span className="text-xs font-medium text-viva-700">Perfil</span>
+                <span className="text-xs font-semibold text-viva-900 font-display">
                   {isMaster ? 'Master' : 'Profissional'}
                 </span>
               </div>
               <div className="flex items-center justify-between rounded-xl bg-viva-50/60 border border-viva-200/50 px-4 py-3">
-                <span className="text-sm font-medium text-viva-700">Status</span>
+                <span className="text-xs font-medium text-viva-700">Status</span>
                 <span className="inline-flex items-center px-3 py-1 rounded-lg text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-200/80">
                   Ativo
                 </span>
               </div>
             </div>
             <div className="mt-4 rounded-xl bg-viva-50/80 border border-viva-200/50 p-4">
-              <p className="text-sm text-viva-700 font-serif">
+              <p className="text-xs text-viva-700 font-serif">
                 {isMaster
                   ? 'Como usuário Master, você pode gerenciar médicos, contratos, escalas e relatórios.'
                   : 'Se precisar atualizar dados cadastrais, solicite ao administrador Master.'}
@@ -369,13 +369,13 @@ const Perfil = () => {
 
       {activeTab === 'bancarios' && (
         <div className="card stagger-2">
-          <h3 className="text-sm font-semibold uppercase tracking-wider text-viva-600 mb-4 font-display">Dados Bancários</h3>
+          <h3 className="text-xs font-semibold uppercase tracking-wider text-viva-600 mb-4 font-display">Dados Bancários</h3>
           {isMaster ? (
-            <p className="text-sm text-viva-600 font-serif">Disponível apenas para perfil profissional.</p>
+            <p className="text-xs text-viva-600 font-serif">Disponível apenas para perfil profissional.</p>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-2xl">
               <div className="rounded-xl bg-viva-50/80 border border-viva-200/50 p-4 md:col-span-2">
-                <p className="text-[11px] font-semibold uppercase tracking-wider text-viva-600">Dados bancários</p>
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-viva-600">Dados bancários</p>
                 <textarea
                   className="input mt-2 min-h-[84px]"
                   value={form.dadosBancarios || perfilMedicoAtual?.dadosBancarios || ''}
@@ -383,7 +383,7 @@ const Perfil = () => {
                 />
               </div>
               <div className="rounded-xl bg-viva-50/80 border border-viva-200/50 p-4 md:col-span-2">
-                <p className="text-[11px] font-semibold uppercase tracking-wider text-viva-600">Chave PIX</p>
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-viva-600">Chave PIX</p>
                 <input
                   className="input mt-2"
                   value={form.chavePix || perfilMedicoAtual?.chavePix || ''}
@@ -397,9 +397,9 @@ const Perfil = () => {
 
       {activeTab === 'documentos' && (
         <div className="card stagger-2">
-          <h3 className="text-sm font-semibold uppercase tracking-wider text-viva-600 mb-4 font-display">Documentos</h3>
+          <h3 className="text-xs font-semibold uppercase tracking-wider text-viva-600 mb-4 font-display">Documentos</h3>
           {isMaster ? (
-            <p className="text-sm text-viva-600 font-serif">Disponível apenas para perfil profissional.</p>
+            <p className="text-xs text-viva-600 font-serif">Disponível apenas para perfil profissional.</p>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {DOCUMENTOS_PERFIL_FIELDS.map((field) => {
@@ -408,8 +408,8 @@ const Perfil = () => {
                 });
                 return (
                   <div key={field} className="rounded-xl bg-viva-50/50 border border-viva-200/50 p-4 hover:bg-viva-50/70 transition">
-                    <p className="text-sm font-semibold text-viva-900 font-display">{DOCUMENTO_LABEL_BY_FIELD[field]}</p>
-                    <p className="text-xs text-viva-600 mt-1 mb-2 font-serif">
+                    <p className="text-xs font-semibold text-viva-900 font-display">{DOCUMENTO_LABEL_BY_FIELD[field]}</p>
+                    <p className="text-[10px] text-viva-600 mt-1 mb-2 font-serif">
                       {existing?.nomeArquivo ? `Atual: ${existing.nomeArquivo}` : 'Ainda não anexado'}
                     </p>
                     {existing?.url && (
@@ -470,16 +470,16 @@ const Perfil = () => {
           {loadingAcessos ? (
             <div className="flex items-center gap-3 py-6">
               <div className="animate-spin rounded-full h-8 w-8 border-2 border-viva-200 border-t-viva-600" />
-              <p className="text-sm text-viva-600">Carregando permissões...</p>
+              <p className="text-xs text-viva-600">Carregando permissões...</p>
             </div>
           ) : (
             <div className="overflow-x-auto rounded-xl border border-viva-200/60 overflow-hidden">
-              <table className="min-w-full text-sm">
+              <table className="min-w-full text-xs">
                 <thead>
                   <tr className="text-left text-viva-700 bg-viva-50/80 border-b border-viva-200/60">
-                    <th className="py-3 px-4 font-semibold">Módulo</th>
-                    <th className="py-3 px-4 font-semibold">Master</th>
-                    <th className="py-3 px-4 font-semibold">Médico</th>
+                    <th className="py-2.5 px-4 font-semibold text-xs">Módulo</th>
+                    <th className="py-2.5 px-4 font-semibold text-xs">Master</th>
+                    <th className="py-2.5 px-4 font-semibold text-xs">Médico</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -491,8 +491,8 @@ const Perfil = () => {
                       modulo === 'DASHBOARD' || modulo === 'CONFIGURACOES' || modulo === 'PERFIL';
                     return (
                       <tr key={modulo} className="border-b border-viva-200/40 last:border-b-0 hover:bg-viva-50/40 transition">
-                        <td className="py-3 px-4 font-medium text-viva-900 font-serif">{MODULO_LABEL[modulo]}</td>
-                        <td className="py-3 px-4">
+                        <td className="py-2.5 px-4 font-medium text-viva-900 font-serif text-xs">{MODULO_LABEL[modulo]}</td>
+                        <td className="py-2.5 px-4">
                           <input
                             type="checkbox"
                             checked={masterChecked}
@@ -501,7 +501,7 @@ const Perfil = () => {
                             className="rounded border-viva-600 text-viva-600"
                           />
                         </td>
-                        <td className="py-3 px-4">
+                        <td className="py-2.5 px-4">
                           <input
                             type="checkbox"
                             checked={medicoChecked}

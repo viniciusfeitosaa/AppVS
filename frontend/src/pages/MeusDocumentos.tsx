@@ -38,8 +38,8 @@ const MeusDocumentos = () => {
   if (isMaster) {
     return (
       <div className="card border-l-4 border-red-400">
-        <h2 className="text-xl font-bold text-viva-900 mb-2 font-display">Acesso restrito</h2>
-        <p className="text-viva-700 font-serif">Documentos enviados para você estão na área do profissional. Use o perfil Master apenas para envio em Envio de Documentos.</p>
+        <h2 className="text-base font-bold text-viva-900 mb-2 font-display">Acesso restrito</h2>
+        <p className="text-sm text-viva-700 font-serif">Documentos enviados para você estão na área do profissional. Use o perfil Master apenas para envio em Envio de Documentos.</p>
       </div>
     );
   }
@@ -48,13 +48,13 @@ const MeusDocumentos = () => {
     <div className="space-y-6">
       {/* Hero */}
       <div className="card dashboard-hero col-span-full stagger-1 py-8 md:py-10">
-        <p className="text-sm font-semibold uppercase tracking-widest text-viva-600 mb-2 font-display">
+        <p className="text-xs font-semibold uppercase tracking-widest text-viva-600 mb-2 font-display">
           Área do profissional
         </p>
-        <h1 className="text-2xl md:text-3xl font-bold text-viva-900 font-display leading-tight mb-2">
+        <h1 className="text-xl md:text-2xl font-bold text-viva-900 font-display leading-tight mb-2">
           Meus Documentos
         </h1>
-        <p className="text-viva-700 font-serif text-lg">
+        <p className="text-viva-700 font-serif text-base">
           Documentos enviados para você. Clique em Visualizar para abrir ou baixar.
         </p>
       </div>
@@ -64,7 +64,7 @@ const MeusDocumentos = () => {
         {isLoading ? (
           <div className="flex items-center gap-3 py-8">
             <div className="animate-spin rounded-full h-8 w-8 border-2 border-viva-200 border-t-viva-600" />
-            <p className="text-viva-700 font-medium">Carregando...</p>
+            <p className="text-sm text-viva-700 font-medium">Carregando...</p>
           </div>
         ) : documentos.length === 0 ? (
           <div className="py-12 text-center">
@@ -73,7 +73,7 @@ const MeusDocumentos = () => {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
               </svg>
             </span>
-            <p className="text-viva-600 font-serif">Nenhum documento enviado para você ainda.</p>
+            <p className="text-sm text-viva-600 font-serif">Nenhum documento enviado para você ainda.</p>
           </div>
         ) : (
           <ul className="space-y-2">
@@ -88,20 +88,20 @@ const MeusDocumentos = () => {
                   </svg>
                 </span>
                 <div className="min-w-0 flex-1">
-                  <p className="font-semibold text-viva-900 truncate font-display">
+                  <p className="font-semibold text-viva-900 truncate font-display text-sm">
                     {doc.titulo ? fixMojibake(doc.titulo) : fixMojibake(doc.nomeArquivo)}
                   </p>
                   {doc.titulo && (
-                    <p className="text-xs text-viva-600 truncate mt-0.5">{fixMojibake(doc.nomeArquivo)}</p>
+                    <p className="text-[10px] text-viva-600 truncate mt-0.5">{fixMojibake(doc.nomeArquivo)}</p>
                   )}
-                  <div className="flex gap-4 mt-1 text-xs text-viva-600 sm:hidden">
+                  <div className="flex gap-4 mt-1 text-[10px] text-viva-600 sm:hidden">
                     <span>{formatBytes(doc.tamanhoBytes)}</span>
                     <span>{formatDate(doc.createdAt)}</span>
                   </div>
                 </div>
                 <div className="hidden sm:flex items-center gap-4 shrink-0">
-                  <span className="text-sm text-viva-700 w-14 text-right">{formatBytes(doc.tamanhoBytes)}</span>
-                  <span className="text-sm text-viva-600 w-24 text-right hidden md:block">{formatDate(doc.createdAt)}</span>
+                  <span className="text-xs text-viva-700 w-14 text-right">{formatBytes(doc.tamanhoBytes)}</span>
+                  <span className="text-xs text-viva-600 w-24 text-right hidden md:block">{formatDate(doc.createdAt)}</span>
                 </div>
                 <button
                   type="button"

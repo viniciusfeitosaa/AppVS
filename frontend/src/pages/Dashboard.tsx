@@ -20,6 +20,14 @@ const HORARIOS_POR_GRADE: Record<string, string> = {
   sn: '19h às 07h',
 };
 
+/** Retorna primeiro e segundo nome. */
+const primeiroSegundoNome = (nome?: string | null): string => {
+  const n = (nome ?? '').trim().split(/\s+/).filter(Boolean);
+  if (n.length === 0) return nome ?? '';
+  if (n.length === 1) return n[0];
+  return `${n[0]} ${n[1]}`;
+};
+
 const formatFaixaEscala = (
   gradeIds: string[] | undefined,
   horarioEntrada: string | null | undefined,
@@ -114,20 +122,20 @@ const Dashboard = () => {
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
       {/* Hero */}
       <div className="card dashboard-hero col-span-full stagger-1 py-8 md:py-10">
-        <p className="text-sm font-semibold uppercase tracking-widest text-viva-600 mb-2 font-display">
+        <p className="text-xs font-semibold uppercase tracking-widest text-viva-600 mb-2 font-display">
           {isMaster ? 'Acesso Master' : 'Acesso Profissional'}
         </p>
-        <h1 className="text-2xl md:text-3xl font-bold text-viva-900 font-display leading-tight mb-2">
-          Bem-vindo, {fixMojibake(displayUser?.nomeCompleto)}!
+        <h1 className="text-xl md:text-2xl font-bold text-viva-900 font-display leading-tight mb-2">
+          Bem-vindo, {fixMojibake(primeiroSegundoNome(displayUser?.nomeCompleto))}!
         </h1>
-        <p className="text-viva-700 font-serif text-lg">
+        <p className="text-viva-700 font-serif text-base">
           Sistema de gestão Viva Saúde
         </p>
       </div>
 
       {temEscalaAtivaParaPonto && (
         <div className="card col-span-full stagger-2 flex flex-wrap items-center justify-between gap-4 border-l-4 border-l-viva-500 bg-gradient-to-r from-viva-50/60 to-transparent">
-          <p className="text-viva-900 font-medium">
+          <p className="text-viva-900 font-medium text-sm">
             Você tem uma escala para <span className="font-bold text-viva-800">{fixMojibake(escalaNome || 'hoje')}</span> às{' '}
             <span className="font-bold text-viva-800">{horaEntrada}</span>.
           </p>
@@ -139,20 +147,20 @@ const Dashboard = () => {
 
       {/* Card de Informações */}
       <div className="card stagger-3">
-        <h3 className="text-sm font-semibold uppercase tracking-wider text-viva-600 mb-4 font-display">
+        <h3 className="text-xs font-semibold uppercase tracking-wider text-viva-600 mb-4 font-display">
           Informações Pessoais
         </h3>
         <div className="space-y-3">
           {!isMaster && (displayUser?.profissao || (displayUser?.especialidades?.length ?? 0) > 0) && (
             <div className="rounded-xl bg-viva-100/80 border border-viva-200/60 p-4">
-              <p className="text-[11px] font-semibold uppercase tracking-wider text-viva-600">Identificação profissional</p>
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-viva-600">Identificação profissional</p>
               {displayUser?.profissao && (
-                <p className="text-base font-semibold text-viva-900 mt-1 font-display">
+                <p className="text-sm font-semibold text-viva-900 mt-1 font-display">
                   {fixMojibake(displayUser.profissao)}
                 </p>
               )}
               {(displayUser?.especialidades?.length ?? 0) > 0 && (
-                <p className="text-sm text-viva-800 mt-0.5 font-serif">
+                <p className="text-xs text-viva-800 mt-0.5 font-serif">
                   {fixMojibake(displayUser!.especialidades!.join(', '))}
                 </p>
               )}
@@ -160,14 +168,14 @@ const Dashboard = () => {
           )}
           {!isMaster && displayUser?.crm && (
             <div className="rounded-xl bg-viva-50/80 border border-viva-200/50 p-4">
-              <p className="text-[11px] font-semibold uppercase tracking-wider text-viva-600">CRM</p>
-              <p className="text-lg font-semibold text-viva-900 mt-0.5 font-display">{formatCRM(displayUser.crm)}</p>
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-viva-600">CRM</p>
+              <p className="text-sm font-semibold text-viva-900 mt-0.5 font-display">{formatCRM(displayUser.crm)}</p>
             </div>
           )}
           {!isMaster && (
             <div className="rounded-xl bg-viva-50/80 border border-viva-200/50 p-4">
-              <p className="text-[11px] font-semibold uppercase tracking-wider text-viva-600">Tipo de vínculo</p>
-              <p className="text-base font-semibold text-viva-900 mt-0.5">
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-viva-600">Tipo de vínculo</p>
+              <p className="text-sm font-semibold text-viva-900 mt-0.5">
                 {displayUser?.vinculo?.toUpperCase() === 'PJ' ? 'PJ' : 'Associado'}
               </p>
             </div>
@@ -180,8 +188,8 @@ const Dashboard = () => {
           )}
           {!isMaster && listaEscalas.length > 0 && (
             <div className="rounded-xl bg-viva-50/80 border border-viva-200/50 p-4">
-              <p className="text-[11px] font-semibold uppercase tracking-wider text-viva-600">Escala(s)</p>
-              <p className="text-sm font-medium text-viva-900 mt-1 leading-snug">
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-viva-600">Escala(s)</p>
+              <p className="text-xs font-medium text-viva-900 mt-1 leading-snug">
                 <span className="font-semibold">{fixMojibake(escalaNome ?? '—')}</span>
                 <span className="text-viva-600"> · </span>
                 <span className="font-medium">{new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long' })}</span>
@@ -191,7 +199,7 @@ const Dashboard = () => {
               <div className="mt-3">
                 <Link
                   to="/ponto-eletronico"
-                  className="inline-flex items-center gap-1.5 text-sm font-semibold text-viva-700 hover:text-viva-900 transition"
+                  className="inline-flex items-center gap-1.5 text-xs font-semibold text-viva-700 hover:text-viva-900 transition"
                 >
                   Bater ponto
                   <span aria-hidden className="text-viva-500">→</span>
@@ -204,19 +212,19 @@ const Dashboard = () => {
 
       {/* Card de Status */}
       <div className="card stagger-4">
-        <h3 className="text-sm font-semibold uppercase tracking-wider text-viva-600 mb-4 font-display">
+        <h3 className="text-xs font-semibold uppercase tracking-wider text-viva-600 mb-4 font-display">
           Status do Sistema
         </h3>
         <div className="space-y-3">
           <div className="flex items-center justify-between p-4 rounded-xl bg-viva-50/60 border border-viva-200/50">
-            <p className="text-sm font-medium text-viva-700">Status da Conta</p>
+            <p className="text-xs font-medium text-viva-700">Status da Conta</p>
             <span className="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-200/80">
               Ativo
             </span>
           </div>
           <div className="flex items-center justify-between p-4 rounded-xl bg-viva-50/60 border border-viva-200/50">
-            <p className="text-sm font-medium text-viva-700">Último Acesso</p>
-            <p className="text-sm font-bold text-viva-900">Hoje</p>
+            <p className="text-xs font-medium text-viva-700">Último Acesso</p>
+            <p className="text-xs font-bold text-viva-900">Hoje</p>
           </div>
         </div>
       </div>
@@ -226,10 +234,10 @@ const Dashboard = () => {
         <div className="card col-span-full stagger-5 border-l-4 border-l-viva-500 bg-gradient-to-br from-white to-viva-50/30">
           <div className="flex flex-wrap items-start justify-between gap-3 mb-4">
             <div>
-              <h3 className="text-base font-semibold text-viva-800 font-display">
+              <h3 className="text-sm font-semibold text-viva-800 font-display">
                 Documentos enviados para você
               </h3>
-              <p className="text-sm text-viva-600 mt-1 font-serif max-w-xl">
+              <p className="text-xs text-viva-600 mt-1 font-serif max-w-xl">
                 Acesse a área de Documentos para ver todos e visualizar.
               </p>
             </div>
@@ -256,11 +264,11 @@ const Dashboard = () => {
                     </svg>
                   </span>
                   <div className="min-w-0 flex-1">
-                    <p className="font-semibold text-viva-900 truncate text-sm font-display">
+                    <p className="font-semibold text-viva-900 truncate text-xs font-display">
                       {doc.titulo || doc.nomeArquivo}
                     </p>
                     {doc.titulo && (
-                      <p className="text-xs text-viva-600 truncate mt-0.5">{doc.nomeArquivo}</p>
+                      <p className="text-[10px] text-viva-600 truncate mt-0.5">{doc.nomeArquivo}</p>
                     )}
                   </div>
                   <button
