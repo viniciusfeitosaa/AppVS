@@ -39,3 +39,44 @@ Interpret creatively and make unexpected choices that feel genuinely designed fo
 **IMPORTANT**: Match implementation complexity to the aesthetic vision. Maximalist designs need elaborate code with extensive animations and effects. Minimalist or refined designs need restraint, precision, and careful attention to spacing, typography, and subtle details. Elegance comes from executing the vision well.
 
 Remember: Claude is capable of extraordinary creative work. Don't hold back, show what can truly be created when thinking outside the box and committing fully to a distinctive vision.
+
+---
+
+## Project Conventions (Viva Saúde / AppVS)
+
+Padrões estabelecidos para manter consistência visual em todo o app. Usar ao criar ou alterar páginas, componentes e layouts.
+
+### Tipografia
+- **Display / Sans**: Outfit (400, 500, 600, 700) — títulos, labels, nav, botões. Classes: `font-display` ou `font-sans`.
+- **Serif**: IBM Plex Serif (400, 500, 600, itálico 400) — descrições, textos corridos. Classe: `font-serif`.
+- **Tamanhos**: `text-xl` / `text-2xl` para h1; `text-xs` para labels; `text-[10px]` para metadados e auxiliares. Evitar `text-lg` em títulos de card; preferir `text-xs uppercase` para seções.
+
+### Cores e variáveis CSS
+- Paleta **viva** (verde): `viva-50` a `viva-950`. Cor principal `viva-600` / `viva-900`.
+- Variáveis em `:root`: `--app-bg`, `--app-border`, `--app-accent`, `--app-accent-hover`, `--card-shadow`, `--card-shadow-hover`.
+- Textos: `text-viva-900` (títulos), `text-viva-700` (corpo), `text-viva-600` (labels). Evitar `text-gray-600` em favor de `text-viva-700`.
+
+### Componentes (index.css + Tailwind)
+- **Hero**: `.card.dashboard-hero` — gradiente sutil, `border border-viva-200/60`. Estrutura: label uppercase (`text-xs tracking-widest`), título (`text-xl md:text-2xl font-bold`), descrição (`font-serif text-base`).
+- **Card**: `.card` — `rounded-2xl`, `border`, `backdrop-blur-sm`, sombra. Hover aumenta sombra.
+- **CTA / Destaque**: `border-l-4 border-l-viva-500` + `bg-gradient-to-r from-viva-50/60 to-transparent` ou `bg-gradient-to-br from-white to-viva-50/30`.
+- **Botões**: `.btn`, `.btn-primary`, `.btn-secondary`, `.btn-sm`. Rounded-xl.
+- **Input**: `.input` — bordas `viva-200`, `focus:ring-viva-500/40`.
+- **Labels de seção**: `text-xs font-semibold uppercase tracking-wider text-viva-600 font-display mb-4`.
+
+### Animações (stagger)
+- Classes `.stagger-1` a `.stagger-6` com `fadeInUp` e delays progressivos (0.05s, 0.12s, …).
+- Aplicar em cards na ordem de leitura (hero=1, primeiros cards=2–3, etc.).
+
+### Layout
+- **Grid dashboard**: `grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6`. Hero com `col-span-full`.
+- **Espaçamento**: `space-y-6` ou `gap-6` entre blocos. Cards com `p-6`.
+- **Itens em lista**: `rounded-xl`, `bg-viva-50/30` ou `bg-viva-50/50`, `border border-viva-200/40`. Item ativo: `border-l-4 border-l-viva-500`.
+
+### AppShell
+- Header: `sticky top-0`, `bg-white/80 backdrop-blur-md`, `border-b border-[var(--app-border)]`.
+- Bottom nav (mobile): `fixed bottom-0`, 3 colunas (Dashboard, Ponto ou Escalas, Mais), ícones + labels `text-[11px]`.
+- Drawer (menu lateral): slide da direita, `animate-slide-in-right`, itens com ícones por tipo.
+
+### Restrições técnicas
+- **Não usar** `font-display` (classe Tailwind) dentro de `@apply` no `index.css` — causa erro PostCSS. Aplicar `font-display` diretamente nas classes dos componentes.

@@ -125,9 +125,12 @@ export const esqueciSenhaController = async (req: Request, res: Response) => {
       ...(result.resetLink && { resetLink: result.resetLink }),
     });
   } catch (error: any) {
-    return res.status(error.statusCode || 500).json({
+    const status = error.statusCode || 500;
+    const message = error.message || 'Erro ao solicitar redefinição de senha';
+    console.error('[esqueci-senha]', status, message, error?.stack || '');
+    return res.status(status).json({
       success: false,
-      error: error.message || 'Erro ao solicitar redefinição de senha',
+      error: status === 500 ? 'Erro ao solicitar redefinição. Tente novamente mais tarde.' : message,
     });
   }
 };

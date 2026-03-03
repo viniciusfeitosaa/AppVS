@@ -120,10 +120,9 @@ const AppShell = () => {
         { title: 'Ponto', items: [{ to: '/ponto-eletronico', label: 'Ponto Eletrônico' }] },
         { title: 'Produtividade', items: [{ to: '/atendimentos', label: 'Atendimentos' }] },
         {
-          title: 'Relatórios',
+          title: 'Conta',
           items: [
             { to: '/documentos', label: 'Documentos' },
-            { to: '/relatorios', label: 'Relatórios' },
             { to: '/perfil', label: 'Minha Conta' },
           ],
         },
@@ -154,19 +153,10 @@ const AppShell = () => {
     }))
     .filter((group) => group.items.length > 0);
 
+  /** No mobile: só Dashboard, Ponto (ou Escalas no master) e o menu "Mais" com o resto. */
   const mobileTabsBase: MenuItem[] = isMaster
-    ? [
-        dashboardItem,
-        { to: '/escalas', label: 'Escalas' },
-        { to: '/medicos', label: 'Médicos' },
-        { to: '/relatorios', label: 'Relatórios' },
-      ]
-    : [
-        dashboardItem,
-        { to: '/ponto-eletronico', label: 'Ponto' },
-        { to: '/documentos', label: 'Documentos' },
-        { to: '/relatorios', label: 'Relatórios' },
-      ];
+    ? [dashboardItem, { to: '/escalas', label: 'Escalas' }]
+    : [dashboardItem, { to: '/ponto-eletronico', label: 'Ponto' }];
   const mobileTabs = mobileTabsBase.filter((item) => hasAccess(moduloByRoute[item.to]));
 
   return (
@@ -186,7 +176,7 @@ const AppShell = () => {
                 to={dashboardItem.to}
                 onClick={() => setOpenDesktopGroup(null)}
                 className={({ isActive }) =>
-                  `nav-pill ${isActive ? 'nav-pill-active' : 'nav-pill-inactive'}`
+                  `nav-pill font-display ${isActive ? 'nav-pill-active' : 'nav-pill-inactive'}`
                 }
               >
                 {dashboardItem.label}
@@ -199,7 +189,7 @@ const AppShell = () => {
                     onClick={() =>
                       setOpenDesktopGroup((current) => (current === group.title ? null : group.title))
                     }
-                    className="nav-pill nav-pill-inactive flex items-center gap-1.5"
+                    className="nav-pill nav-pill-inactive font-display flex items-center gap-1.5"
                   >
                     {group.title}
                     <svg className="w-3.5 h-3.5 text-viva-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -215,7 +205,7 @@ const AppShell = () => {
                           to={item.to}
                           onClick={() => setOpenDesktopGroup(null)}
                           className={({ isActive }) =>
-                            `block px-3 py-2.5 rounded-xl text-sm font-medium transition ${
+                            `block px-3 py-2.5 rounded-xl text-sm font-medium transition font-display ${
                               isActive
                                 ? 'bg-viva-900 text-white'
                                 : 'text-viva-800 hover:bg-viva-50'
@@ -233,19 +223,19 @@ const AppShell = () => {
 
             <div className="flex items-center gap-2">
               <div className="hidden md:flex items-center rounded-xl border border-viva-200/80 bg-viva-50/80 px-3 py-2">
-                <span className="text-sm font-medium text-viva-900 max-w-[140px] truncate">
-                  {user?.nomeCompleto || 'Usuário'}
+                <span className="text-sm font-medium text-viva-900 max-w-[140px] truncate font-display">
+                  {isMaster ? 'Administrador Master' : (user?.nomeCompleto || 'Usuário')}
                 </span>
               </div>
               <button
                 onClick={logout}
-                className="hidden md:inline-flex px-4 py-2 rounded-xl text-sm font-semibold text-white bg-viva-900 hover:bg-viva-800 transition shadow-sm"
+                className="hidden md:inline-flex px-4 py-2 rounded-xl text-sm font-semibold text-white bg-viva-900 hover:bg-viva-800 transition shadow-sm font-display"
               >
                 Sair
               </button>
               <button
                 onClick={() => setIsMoreMenuOpen(true)}
-                className="lg:hidden px-4 py-2 rounded-xl text-sm font-semibold text-white bg-viva-900 hover:bg-viva-800 transition"
+                className="lg:hidden px-4 py-2 rounded-xl text-sm font-semibold text-white bg-viva-900 hover:bg-viva-800 transition font-display"
               >
                 Menu
               </button>
@@ -268,7 +258,7 @@ const AppShell = () => {
               key={tab.to}
               to={tab.to}
               className={({ isActive }) =>
-                `min-h-[52px] px-1 py-1 text-[11px] font-semibold text-center transition flex flex-col items-center justify-center gap-1 rounded-xl ${
+                `min-h-[52px] px-1 py-1 text-[11px] font-semibold text-center transition flex flex-col items-center justify-center gap-1 rounded-xl font-display ${
                   isActive
                     ? 'text-viva-900 bg-viva-100/90'
                     : 'text-viva-700 hover:bg-viva-50/60'
@@ -281,7 +271,7 @@ const AppShell = () => {
           ))}
           <button
             onClick={() => setIsMoreMenuOpen(true)}
-            className="min-h-[52px] px-1 py-1 text-[11px] font-semibold text-viva-700 hover:bg-viva-50/60 transition flex flex-col items-center justify-center gap-1 rounded-xl"
+            className="min-h-[52px] px-1 py-1 text-[11px] font-semibold text-viva-700 hover:bg-viva-50/60 transition flex flex-col items-center justify-center gap-1 rounded-xl font-display"
           >
             <span className="text-lg leading-none">⋯</span>
             <span>Mais</span>

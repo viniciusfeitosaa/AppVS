@@ -38,6 +38,14 @@ const envSchema = z.object({
   MASTER_INITIAL_EMAIL: z.string().email().default('contato@sejavivasaude.com.br'),
   MASTER_INITIAL_NAME: z.string().default('Administrador Master'),
   MASTER_INITIAL_PASSWORD: z.string().min(8, 'MASTER_INITIAL_PASSWORD deve ter pelo menos 8 caracteres').optional(),
+
+  // E-mail (opcional – para esqueci senha)
+  SMTP_HOST: z.string().optional(),
+  SMTP_PORT: z.string().optional(),
+  SMTP_SECURE: z.string().optional(), // 'true' | 'false'
+  SMTP_USER: z.string().optional(),
+  SMTP_PASS: z.string().optional(),
+  SMTP_FROM: z.string().email().optional(), // remetente ex: noreply@sejavivasaude.com.br
 });
 
 // Validar e exportar variáveis de ambiente

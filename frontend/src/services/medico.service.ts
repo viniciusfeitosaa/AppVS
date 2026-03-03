@@ -76,13 +76,21 @@ export const medicoService = {
     return response.data;
   },
 
-  openDocumentoEnviado: async (id: string): Promise<void> => {
+  openDocumentoEnviado: async (id: string, nomeArquivo?: string): Promise<void> => {
     const response = await api.get(`/medico/documentos-enviados/${id}/download`, {
       responseType: 'blob',
     });
     const blob = response.data as Blob;
     const url = URL.createObjectURL(blob);
-    window.open(url, '_blank', 'noopener,noreferrer');
+    const opened = window.open(url, '_blank', 'noopener,noreferrer');
+    if (!opened) {
+      const a = document.createElement('a');
+      a.href = url;
+      a.target = '_blank';
+      a.rel = 'noopener noreferrer';
+      if (nomeArquivo) a.download = nomeArquivo;
+      a.click();
+    }
     setTimeout(() => URL.revokeObjectURL(url), 60000);
   },
 };

@@ -15,6 +15,22 @@
   to = "/app/index.html"
   status = 200
 
+# URLs sem /app: redirecionar para o app (evita 404 ao acessar /login ou ao receber redirect 401)
+[[redirects]]
+  from = "/login"
+  to = "/app/login"
+  status = 302
+[[redirects]]
+  from = "/login/*"
+  to = "/app/login"
+  status = 302
+
+# Favicon na raiz: servir o ícone do app (evita 404 em /favicon.ico)
+[[redirects]]
+  from = "/favicon.ico"
+  to = "/app/vite.svg"
+  status = 302
+
 # Configurações de headers para segurança e performance
 [[headers]]
   for = "/*"

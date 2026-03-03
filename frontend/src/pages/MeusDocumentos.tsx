@@ -78,37 +78,34 @@ const MeusDocumentos = () => {
         ) : (
           <ul className="space-y-2">
             {documentos.map((doc) => (
-              <li
-                key={doc.id}
-                className="flex items-center gap-3 p-4 rounded-xl bg-viva-50/50 hover:bg-viva-100/50 border border-viva-200/40 transition"
-              >
-                <span className="flex-shrink-0 w-10 h-10 rounded-xl bg-viva-200/50 flex items-center justify-center text-viva-700">
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                  </svg>
-                </span>
-                <div className="min-w-0 flex-1">
-                  <p className="font-semibold text-viva-900 truncate font-display text-sm">
-                    {doc.titulo ? fixMojibake(doc.titulo) : fixMojibake(doc.nomeArquivo)}
-                  </p>
-                  {doc.titulo && (
-                    <p className="text-[10px] text-viva-600 truncate mt-0.5">{fixMojibake(doc.nomeArquivo)}</p>
-                  )}
-                  <div className="flex gap-4 mt-1 text-[10px] text-viva-600 sm:hidden">
-                    <span>{formatBytes(doc.tamanhoBytes)}</span>
-                    <span>{formatDate(doc.createdAt)}</span>
-                  </div>
-                </div>
-                <div className="hidden sm:flex items-center gap-4 shrink-0">
-                  <span className="text-xs text-viva-700 w-14 text-right">{formatBytes(doc.tamanhoBytes)}</span>
-                  <span className="text-xs text-viva-600 w-24 text-right hidden md:block">{formatDate(doc.createdAt)}</span>
-                </div>
+              <li key={doc.id}>
                 <button
                   type="button"
-                  className="btn-sm btn-primary shrink-0"
-                  onClick={() => medicoService.openDocumentoEnviado(doc.id)}
+                  className="w-full flex items-center gap-3 p-4 rounded-xl bg-viva-50/50 hover:bg-viva-100/50 active:bg-viva-100/80 border border-viva-200/40 transition text-left cursor-pointer"
+                  onClick={() => medicoService.openDocumentoEnviado(doc.id, doc.nomeArquivo)}
                 >
-                  Visualizar
+                  <span className="flex-shrink-0 w-10 h-10 rounded-xl bg-viva-200/50 flex items-center justify-center text-viva-700">
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="font-semibold text-viva-900 truncate font-display text-sm">
+                      {doc.titulo ? fixMojibake(doc.titulo) : fixMojibake(doc.nomeArquivo)}
+                    </p>
+                    {doc.titulo && (
+                      <p className="text-[10px] text-viva-600 truncate mt-0.5">{fixMojibake(doc.nomeArquivo)}</p>
+                    )}
+                    <div className="flex gap-4 mt-1 text-[10px] text-viva-600 sm:hidden">
+                      <span>{formatBytes(doc.tamanhoBytes)}</span>
+                      <span>{formatDate(doc.createdAt)}</span>
+                    </div>
+                  </div>
+                  <div className="hidden sm:flex items-center gap-4 shrink-0">
+                    <span className="text-xs text-viva-700 w-14 text-right">{formatBytes(doc.tamanhoBytes)}</span>
+                    <span className="text-xs text-viva-600 w-24 text-right hidden md:block">{formatDate(doc.createdAt)}</span>
+                  </div>
+                  <span className="btn-sm btn-primary shrink-0 pointer-events-none">Visualizar</span>
                 </button>
               </li>
             ))}

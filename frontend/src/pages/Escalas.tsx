@@ -237,9 +237,9 @@ const Escalas = () => {
 
   if (!isMaster) {
     return (
-      <div className="card border-l-4 border-red-400">
-        <h2 className="text-xl font-bold text-viva-900 mb-2">Acesso restrito</h2>
-        <p className="text-gray-600">Somente o perfil Master pode gerenciar escalas.</p>
+      <div className="card border-l-4 border-red-400 stagger-1">
+        <h2 className="text-lg font-bold text-viva-900 mb-2 font-display">Acesso restrito</h2>
+        <p className="text-sm text-viva-700 font-serif">Somente o perfil Master pode gerenciar escalas.</p>
       </div>
     );
   }
@@ -434,19 +434,31 @@ const Escalas = () => {
 
   return (
     <div className="space-y-6">
-      <div className="card border-l-4 border-viva-500 flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <h2 className="text-2xl font-bold text-viva-900 mb-1">Escalas</h2>
-          <p className="text-gray-600">Cadastre escalas, associe contratos ativos e aloque médicos.</p>
-        </div>
+      {/* Hero */}
+      <div className="card dashboard-hero col-span-full stagger-1 py-8 md:py-10">
+        <p className="text-xs font-semibold uppercase tracking-widest text-viva-600 mb-2 font-display">
+          Área Master
+        </p>
+        <h1 className="text-xl md:text-2xl font-bold text-viva-900 font-display leading-tight mb-2">
+          Escalas
+        </h1>
+        <p className="text-viva-700 font-serif text-base">
+          Cadastre escalas, associe contratos ativos e aloque médicos na grade semanal.
+        </p>
+      </div>
+
+      <div className="card border-l-4 border-l-viva-500 stagger-2 flex flex-wrap items-center justify-between gap-4 bg-gradient-to-r from-viva-50/60 to-transparent">
+        <p className="text-viva-900 font-medium text-sm font-display">
+          Subgrupos e equipes definem a estrutura dos plantões e valores.
+        </p>
         <Link to="/subgrupos-equipes" className="btn btn-secondary inline-flex items-center gap-2">
           <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20"><path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zM18 8a2 2 0 11-4 0 2 2 0 014 0zM14 15a4 4 0 00-8 0v3h8v-3zM6 8a2 2 0 11-4 0 2 2 0 014 0zM16 18v-3a5.972 5.972 0 00-.75-2.906A3.005 3.005 0 0119 15v3h-3zM4.75 12.094A5.973 5.973 0 004 15v3H1v-3a3 3 0 013.75-2.906z" /></svg>
           Gerenciar Subgrupos e Equipes
         </Link>
       </div>
 
-      <div className="card">
-        <h3 className="text-lg font-bold text-viva-900 mb-4">{editingEscalaId ? 'Editar escala' : 'Nova escala'}</h3>
+      <div className="card stagger-3">
+        <h3 className="text-xs font-semibold uppercase tracking-wider text-viva-600 mb-4 font-display">{editingEscalaId ? 'Editar escala' : 'Nova escala'}</h3>
         <form className="grid grid-cols-1 md:grid-cols-2 gap-4" onSubmit={submitEscala}>
           <select
             className="input"
@@ -484,7 +496,7 @@ const Escalas = () => {
             value={form.descricao}
             onChange={(e) => setForm((prev) => ({ ...prev, descricao: e.target.value }))}
           />
-          <label className="flex items-center gap-2 text-sm text-viva-900">
+          <label className="flex items-center gap-2 text-xs font-medium text-viva-900 font-display">
             <input
               type="checkbox"
               checked={form.ativo}
@@ -493,7 +505,7 @@ const Escalas = () => {
             Escala ativa
           </label>
 
-          {error && <p className="md:col-span-2 text-sm text-red-600">{error}</p>}
+          {error && <p className="md:col-span-2 text-sm text-red-600 font-medium">{error}</p>}
 
           <div className="md:col-span-2 flex gap-2">
             <button className="btn btn-primary" type="submit" disabled={loadingAction}>
@@ -508,39 +520,34 @@ const Escalas = () => {
         </form>
       </div>
 
-      <div className="card">
-        <h3 className="text-lg font-bold text-viva-900 mb-4">Escalas cadastradas</h3>
+      <div className="card stagger-4">
+        <h3 className="text-xs font-semibold uppercase tracking-wider text-viva-600 mb-4 font-display">Escalas cadastradas</h3>
         {loadingEscalas ? (
-          <p className="text-sm text-gray-600">Carregando escalas...</p>
+          <p className="text-sm text-viva-700 font-serif">Carregando escalas...</p>
         ) : escalas.length === 0 ? (
-          <p className="text-sm text-gray-600">Nenhuma escala cadastrada.</p>
+          <p className="text-sm text-viva-700 font-serif">Nenhuma escala cadastrada.</p>
         ) : (
           <div className="space-y-2">
             {escalas.map((escala) => (
               <div
                 key={escala.id}
-                className={`border rounded-xl p-3 ${
-                  selectedEscalaId === escala.id ? 'border-viva-900 bg-viva-50' : 'border-viva-200 bg-white'
+                className={`border rounded-xl p-4 transition ${
+                  selectedEscalaId === escala.id ? 'border-viva-700 bg-viva-50/80 border-l-4 border-l-viva-500' : 'border-viva-200/80 bg-viva-50/30 hover:bg-viva-50/50'
                 }`}
               >
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <button
-                    className="text-left"
+                    className="text-left min-w-0 flex-1"
                     onClick={() => setSelectedEscalaId((prev) => (prev === escala.id ? '' : escala.id))}
                   >
-                    <p className="font-semibold text-viva-900">{escala.nome}</p>
-                    <p className="text-xs text-gray-600">
-                      Contrato: {escala.contratoAtivo?.nome || '-'} | {toDateInput(escala.dataInicio)} até{' '}
-                      {toDateInput(escala.dataFim)} | Alocados: {escala._count?.alocacoes || 0}
+                    <p className="font-semibold text-viva-900 text-sm font-display">{escala.nome}</p>
+                    <p className="text-[10px] text-viva-600 mt-0.5 font-serif">
+                      Contrato: {escala.contratoAtivo?.nome || '-'} · {toDateInput(escala.dataInicio)} até {toDateInput(escala.dataFim)} · Alocados: {escala._count?.alocacoes || 0}
                     </p>
                   </button>
-                  <div className="flex gap-2">
-                    <button className="btn btn-secondary" onClick={() => startEdit(escala)}>
-                      Editar
-                    </button>
-                    <button className="btn btn-secondary" onClick={() => deleteEscala(escala)}>
-                      Excluir
-                    </button>
+                  <div className="flex gap-2 shrink-0">
+                    <button className="btn-sm btn-secondary" onClick={() => startEdit(escala)}>Editar</button>
+                    <button className="btn-sm btn-secondary" onClick={() => deleteEscala(escala)}>Excluir</button>
                   </div>
                 </div>
               </div>
@@ -549,9 +556,9 @@ const Escalas = () => {
         )}
       </div>
 
-      {selectedEscalaId && (
-        <div className="card hidden">
-          <h3 className="text-lg font-bold text-viva-900 mb-4">Alocação de médicos na escala</h3>
+          {selectedEscalaId && (
+        <div className="card stagger-5 hidden">
+          <h3 className="text-xs font-semibold uppercase tracking-wider text-viva-600 mb-4 font-display">Alocação de médicos na escala</h3>
           <div className="flex gap-2 mb-4 flex-wrap items-start">
             <div ref={medicoAllocateRef} className="relative flex-1 min-w-[240px] max-w-md">
               <input
@@ -588,7 +595,7 @@ const Escalas = () => {
                       return nome.includes(searchLower) || crm.includes(searchLower);
                     });
                     return filtered.length === 0 ? (
-                      <li className="px-3 py-2 text-sm text-gray-500">Nenhum médico encontrado</li>
+                      <li className="px-3 py-2 text-sm text-viva-600 font-serif">Nenhum médico encontrado</li>
                     ) : (
                       filtered.map((m) => (
                         <li
@@ -614,14 +621,14 @@ const Escalas = () => {
           </div>
 
           {alocacoes.length === 0 ? (
-            <p className="text-sm text-gray-600">Nenhum médico alocado.</p>
+            <p className="text-sm text-viva-700 font-serif">Nenhum médico alocado.</p>
           ) : (
             <div className="space-y-2">
               {alocacoes.map((a) => (
                 <div key={a.id} className="border border-viva-200 rounded-lg px-3 py-2 flex items-center justify-between">
                   <div>
                     <p className="font-medium text-viva-900">{a.medico.nomeCompleto}</p>
-                    <p className="text-xs text-gray-600">
+                    <p className="text-[10px] text-viva-600 font-serif">
                       {a.medico.crm} | {a.medico.email || '-'}
                     </p>
                   </div>
@@ -636,37 +643,37 @@ const Escalas = () => {
       )}
 
       {selectedEscalaId && (
-        <div className="card">
-          <h3 className="text-lg font-bold text-viva-900 mb-4">Visualização semanal</h3>
-          <p className="text-sm text-gray-600 mb-4">
-            Grade da semana. MT = plantão diurno (07h–19h), SN = plantão noturno (19h–07h). Os médicos exibidos são os alocados nesta escala (distribuição ilustrativa por dia/turno).
+        <div className="card stagger-5 border-l-4 border-l-viva-500/50 bg-gradient-to-br from-white to-viva-50/20">
+          <h3 className="text-xs font-semibold uppercase tracking-wider text-viva-600 mb-2 font-display">Visualização semanal</h3>
+          <p className="text-sm text-viva-700 font-serif mb-4">
+            Grade da semana. MT = plantão diurno (07h–19h), SN = plantão noturno (19h–07h). Os médicos exibidos são os alocados nesta escala.
           </p>
           <div className="flex flex-wrap items-center gap-4 mb-4">
             <div className="flex items-center gap-2">
               <button
                 type="button"
-                className="px-3 py-1.5 rounded-lg text-sm font-semibold text-viva-800 bg-viva-100 hover:bg-viva-200 transition"
+                className="btn-sm btn-secondary"
                 onClick={() => setWeekStart((d) => { const m = getMonday(new Date(d)); m.setDate(m.getDate() - 7); return m; })}
               >
                 ← Semana anterior
               </button>
-              <span className="text-sm font-medium text-viva-800">
+              <span className="text-xs font-semibold text-viva-800 font-display">
                 Semana de {formatDayShort(weekStart)}
               </span>
               <button
                 type="button"
-                className="px-3 py-1.5 rounded-lg text-sm font-semibold text-viva-800 bg-viva-100 hover:bg-viva-200 transition"
+                className="btn-sm btn-secondary"
                 onClick={() => setWeekStart((d) => { const m = getMonday(new Date(d)); m.setDate(m.getDate() + 7); return m; })}
               >
                 Próxima semana →
               </button>
             </div>
           </div>
-          <div className="overflow-x-auto rounded-xl border border-viva-200">
+          <div className="overflow-x-auto rounded-xl border border-viva-200/80 shadow-sm">
             <div className="min-w-[800px]">
               <div className="bg-viva-100/60 border-b border-viva-200">
                 <div className="flex">
-                  <div className="w-[140px] min-w-[140px] shrink-0 py-3 px-3 text-center text-sm font-bold text-viva-800 border-r border-viva-200">
+                  <div className="w-[140px] min-w-[140px] shrink-0 py-3 px-3 text-center text-xs font-bold uppercase tracking-wider text-viva-800 border-r border-viva-200 font-display">
                     Grade
                   </div>
                   {getWeekDates(weekStart).map((d, i) => (
@@ -674,8 +681,8 @@ const Escalas = () => {
                       key={i}
                       className="w-[130px] min-w-[130px] shrink-0 py-3 px-2 text-center border-r border-viva-200 last:border-r-0"
                     >
-                      <div className="text-sm font-semibold text-viva-900">{formatDayName(d)}</div>
-                      <div className="text-xs text-viva-700">{formatDayShort(d)}</div>
+                      <div className="text-xs font-semibold text-viva-900 font-display">{formatDayName(d)}</div>
+                      <div className="text-[10px] text-viva-600 mt-0.5">{formatDayShort(d)}</div>
                       <div className="mt-2 flex justify-center gap-1">
                         <span
                           className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-viva-200/80 text-viva-700 hover:bg-viva-300"
@@ -773,7 +780,7 @@ const Escalas = () => {
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between gap-2 px-4 py-3 border-b border-viva-200 bg-viva-50/60">
-              <h4 className="text-base font-bold text-viva-900 flex items-center gap-2 flex-wrap">
+              <h4 className="text-sm font-bold text-viva-900 flex items-center gap-2 flex-wrap font-display">
                 <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-viva-200 text-viva-800">
                   <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20"><path d="M10 12a2 2 0 100-4 2 2 0 000 4z" /><path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z" clipRule="evenodd" /></svg>
                 </span>
@@ -839,14 +846,14 @@ const Escalas = () => {
                   )}
                 </div>
               ) : (
-                <p className="text-sm text-gray-500 mb-4">Sem profissional atribuído a este plantão.</p>
+                <p className="text-sm text-viva-700 font-serif mb-4">Sem profissional atribuído a este plantão.</p>
               )}
 
               <div className="mt-4">
                 <p className="text-xs text-viva-600 mb-3">
                   O valor do plantão é definido em <Link to="/valores-plantao" className="font-semibold text-viva-800 underline hover:text-viva-900">Valores Hora/Plantão</Link> (Administração). Ao alocar ou replicar, o valor configurado para {cellModal.grade.label} será aplicado.
                 </p>
-                <h4 className="text-sm font-bold text-viva-900 mb-2">Atribuir médico a este plantão</h4>
+                <h4 className="text-xs font-semibold uppercase tracking-wider text-viva-700 mb-2 font-display">Atribuir médico a este plantão</h4>
                 <div className="flex gap-2 mb-2 flex-wrap items-start">
                   <div ref={medicoAllocateCellRef} className="relative flex-1 min-w-[200px]">
                     <input
@@ -881,7 +888,7 @@ const Escalas = () => {
                             return nome.includes(searchLower) || crm.includes(searchLower);
                           });
                           return filtered.length === 0 ? (
-                            <li className="px-3 py-2 text-sm text-gray-500">Nenhum médico encontrado</li>
+                            <li className="px-3 py-2 text-sm text-viva-600 font-serif">Nenhum médico encontrado</li>
                           ) : (
                             filtered.map((m) => (
                               <li
@@ -916,7 +923,7 @@ const Escalas = () => {
 
                 {(medicoParaReplicar || cellModal.medico) && (
                   <div className="mt-4 pt-4 border-t border-viva-200">
-                    <h4 className="text-sm font-bold text-viva-900 mb-2">Repetir para outros dias</h4>
+                    <h4 className="text-xs font-semibold uppercase tracking-wider text-viva-700 mb-2 font-display">Repetir para outros dias</h4>
                     <p className="text-xs text-viva-600 mb-2">
                       Aplica o médico {cellModal.medico ? cellModal.medico.nomeCompleto : (medicos.find((m) => m.id === medicoIdToAllocateCell)?.nomeCompleto ?? 'selecionado')} e o valor do plantão no turno {cellModal.grade.label} em todos os 7 dias desta semana.
                     </p>

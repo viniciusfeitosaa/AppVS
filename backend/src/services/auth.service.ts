@@ -6,6 +6,35 @@ import { generateTokens } from '../utils/jwt.util';
 import { createAuditLog } from './auditoria.service';
 import { UserRole } from '@prisma/client';
 import crypto from 'crypto';
+import nodemailer from 'nodemailer';
+
+function hasSmtpConfig(): boolean {
+  const e = process.env;
+  return !!(e.SMTP_HOST && e.SMTP_USER && e.SMTP_PASS);
+}
+
+async function sendResetPasswordEmail(to: string, resetLink: string): Promise<void> {
+  if (!hasSmtpConfig()) return;
+  const host = process.env.SMTP_HOST!;
+  const user = process.env.SMTP_USER!;
+  const pass = process.env.SMTP_PASS!;
+  const port = parseInt(process.env.SMTP_PORT || '587', 10);
+  const secure = process.env.SMTP_SECURE === 'true';
+  const transporter = nodemailer.createTransport({
+    host,
+    port,
+    secure,
+    auth: { user, pass },
+  });
+  const from = process.env.SMTP_FROM || user;
+  await transporter.sendMail({
+    from: from ? `Viva Saúde <${from}>` : user,
+    to,
+    subject: 'Redefinição de senha – Viva Saúde',
+    text: `Olá,\n\nVocê solicitou a redefinição de senha. Clique no link abaixo (válido por 1 hora):\n\n${resetLink}\n\nSe não foi você, ignore este e-mail.\n\n— Viva Saúde`,
+    html: `<div style="font-family:sans-serif;max-width:480px"><p style="color:#14532d;font-weight:600">Viva Saúde</p><p>Olá,</p><p>Você solicitou a redefinição de senha. Clique no link abaixo (válido por 1 hora):</p><p><a href="${resetLink}" style="display:inline-block;padding:12px 24px;background:#166534;color:#fff;text-decoration:none;border-radius:12px;font-weight:600">Redefinir senha</a></p><p style="color:#666;font-size:0.9em">Se não foi você, ignore este e-mail.</p><p style="color:#999;font-size:0.85em">— Viva Saúde</p></div>`,
+  });
+}
 
 export interface LoginResult {
   user: {
@@ -513,10 +542,18 @@ export async function esqueciSenhaService(email: string): Promise<{
   const frontendUrl = (process.env.FRONTEND_URL || 'http://localhost:3000').replace(/\/$/, '');
   const resetLink = `${frontendUrl}/redefinir-senha?token=${token}`;
 
-  // TODO: enviar e-mail com resetLink (nodemailer + SMTP). Por ora em dev retornamos o link.
-  if (process.env.NODE_ENV === 'development') {
-    console.log('[esqueci-senha] Link de redefinição (dev):', resetLink);
+  if (hasSmtpConfig()) {
+    try {
+      await sendResetPasswordEmail(normalizedEmail, resetLink);
+    } catch (err: any) {
+      console.error('[esqueci-senha] Falha ao enviar e-mail:', err?.message || err);
+      throw { statusCode: 500, message: 'Falha ao enviar e-mail. Tente novamente mais tarde.' };
+    }
+  } else if (process.env.NODE_ENV === 'development') {
+    console.log('[esqueci-senha] Link de redefinição (dev, SMTP não configurado):', resetLink);
     return { ok: true, message: 'Se existir uma conta com este e-mail, você receberá um link para redefinir a senha.', resetLink };
+  } else {
+    console.warn('[esqueci-senha] SMTP não configurado. Link (use apenas para teste):', resetLink);
   }
 
   return { ok: true, message: 'Se existir uma conta com este e-mail, você receberá um link para redefinir a senha.' };

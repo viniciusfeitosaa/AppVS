@@ -9,7 +9,7 @@ export default {
       fontFamily: {
         sans: ['Outfit', 'system-ui', 'sans-serif'],
         display: ['Outfit', 'system-ui', 'sans-serif'],
-        serif: ['Source Serif 4', 'Georgia', 'serif'],
+        serif: ['IBM Plex Serif', 'Georgia', 'serif'],
       },
       colors: {
         viva: {

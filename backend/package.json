@@ -39,6 +39,7 @@
     "iconv-lite": "^0.6.3",
     "jsonwebtoken": "^9.0.2",
     "multer": "^2.0.2",
+    "nodemailer": "^8.0.1",
     "pg": "^8.19.0",
     "ts-node": "^10.9.2",
     "zod": "^3.22.4"
@@ -50,6 +51,7 @@
     "@types/jsonwebtoken": "^9.0.5",
     "@types/multer": "^2.0.0",
     "@types/node": "^20.10.5",
+    "@types/nodemailer": "^7.0.11",
     "@types/pg": "^8.16.0",
     "@typescript-eslint/eslint-plugin": "^6.15.0",
     "@typescript-eslint/parser": "^6.15.0",

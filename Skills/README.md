@@ -13,6 +13,7 @@ Esta pasta reúne as práticas adotadas no projeto para **deploy**, **banco de d
 | [05-variaveis-ambiente.md](./05-variaveis-ambiente.md) | Resumo de variáveis de ambiente por ambiente (Netlify, Render) |
 | [06-plugin-document-skills.md](./06-plugin-document-skills.md) | Plugin Cursor: instalação de `document-skills@anthropic-agent-skills` |
 | [07-escala-conexoes-muitos-usuarios.md](./07-escala-conexoes-muitos-usuarios.md) | Pool de conexões, rate limit e escala para muitos usuários simultâneos |
+| [08-supabase-email-reset-password.md](./08-supabase-email-reset-password.md) | Supabase: template de e-mail para reset de senha (Viva Saúde) e Redirect URL |
 
 ## Como usar
 

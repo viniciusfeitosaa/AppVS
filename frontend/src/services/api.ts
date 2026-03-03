@@ -36,6 +36,7 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     const requestUrl = error.config?.url || '';
+    const base = (import.meta.env.BASE_URL || '/').replace(/\/$/, '') || '';
     const isAuthRoute =
       requestUrl.includes('/auth/login') ||
       requestUrl.includes('/auth/login-medico') ||
@@ -46,14 +47,14 @@ api.interceptors.response.use(
       localStorage.removeItem('accessToken');
       localStorage.removeItem('refreshToken');
       localStorage.removeItem('user');
-      window.location.href = '/login';
+      window.location.href = `${base}/login`;
     }
     // Não redirecionar para acesso negado em erros de ponto (ex.: check-in duplo, ponto já fechado)
     const isPontoRoute = requestUrl.includes('/ponto/');
     const status = error.response?.status;
     const isPontoError = isPontoRoute && (status === 403 || status === 404 || status === 409);
     if (status === 403 && !requestUrl.includes('/acesso-negado') && !isPontoError) {
-      window.location.href = '/acesso-negado';
+      window.location.href = `${base}/acesso-negado`;
     }
     return Promise.reject(error);
   }
