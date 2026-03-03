@@ -2,7 +2,30 @@
 
 Configuração do e-mail de redefinição de senha no Supabase (Authentication → Email Templates) para o projeto Viva Saúde.
 
-## Onde configurar
+---
+
+## ⚠️ Este projeto usa o BACKEND para “Esqueci minha senha”
+
+O fluxo atual do app é:
+
+1. Usuário informa o e-mail na tela **Esqueci minha senha**.
+2. O **frontend** chama a API do **backend** (`POST /auth/esqueci-senha`).
+3. O **backend** gera o token, grava no banco e **envia o e-mail** (se SMTP estiver configurado no backend).
+
+Ou seja: **quem envia o e-mail é o backend (nodemailer), não o Supabase.**  
+O template que você configurou em **Supabase → Notifications → Email** só é usado quando se usa **Supabase Auth** (ex.: `supabase.auth.resetPasswordForEmail()`). Como o login e o reset são feitos pelo backend próprio, esse template do Supabase **não é usado** nesse fluxo.
+
+**Para o e-mail de redefinição chegar hoje:**
+
+- **Resend (recomendado):** Configure `RESEND_API_KEY` (e opcionalmente `RESEND_FROM`) no backend. Resend funciona bem quando a conta de e-mail é subconta (ex.: Outlook de organização) e não permite SMTP. Crie a chave em [resend.com](https://resend.com) → API Keys.
+- **Ou SMTP:** Configure `SMTP_HOST`, `SMTP_USER`, `SMTP_PASS` (e opcionalmente `SMTP_FROM`, `SMTP_PORT`) no backend.  
+- Veja a seção **“Backend próprio (esqueci-senha): envio por Resend ou SMTP”** mais abaixo neste arquivo.
+
+Se no futuro o reset for feito via **Supabase Auth**, aí sim o template em Notifications → Email será usado; até lá, o que vale é o envio do backend (Resend ou SMTP).
+
+---
+
+## Onde configurar (quando usar Supabase Auth)
 
 1. **Supabase Dashboard** → seu projeto  
 2. **Authentication** → **Email Templates**  
@@ -99,15 +122,27 @@ Assim, após confirmar o reset, o usuário cai na rota `/redefinir-senha` do fro
 | **URL Configuration → Redirect URLs** | `https://sejavivasaude.com.br/app/redefinir-senha` (e dev se quiser) |
 | **Site URL** | `https://sejavivasaude.com.br/app` (produção) |
 
+**Importante:** O app em produção está em **/app** (ex.: `https://sejavivasaude.com.br/app`). Por isso:
+- No **backend**, use `FRONTEND_URL=https://sejavivasaude.com.br/app` para o link do e-mail de reset ficar correto (`.../app/redefinir-senha?token=...`).
+- No Supabase (se usar Auth), use **Redirect URL** e **Site URL** com `/app` quando for o caso.
+
 O link no e-mail continua sendo **`{{ .ConfirmationURL }}`**; o Supabase substitui por um link que valida o token e depois redireciona para a URL configurada.
 
 ---
 
-## Backend próprio (esqueci-senha): envio por SMTP
+## Backend próprio (esqueci-senha): envio por Resend ou SMTP
 
-O projeto usa **backend próprio** para reset de senha (token no banco, rota `/auth/esqueci-senha`). O e-mail é enviado pelo backend com **nodemailer** quando as variáveis de SMTP estão configuradas.
+O projeto usa **backend próprio** para reset de senha (token no banco, rota `/auth/esqueci-senha`). O e-mail é enviado pelo backend: **prioridade Resend**, se configurado; caso contrário **SMTP (nodemailer)**.
 
-### Variáveis no backend (Render / .env)
+### Opção 1 – Resend (recomendado quando SMTP não funciona, ex.: subconta Outlook)
+
+| Variável        | Obrigatório | Exemplo |
+|-----------------|-------------|---------|
+| `RESEND_API_KEY` | Sim        | `re_xxxxxxxxxxxx` (em [resend.com](https://resend.com) → API Keys) |
+| `RESEND_FROM`   | Não         | `Viva Saúde <noreply@sejavivasaude.com.br>` ou, sem domínio verificado, `onboarding@resend.dev` |
+| `FRONTEND_URL`  | Sim (produção) | `https://sejavivasaude.com.br/app` |
+
+### Opção 2 – SMTP
 
 | Variável     | Obrigatório | Exemplo |
 |-------------|-------------|---------|
@@ -117,9 +152,9 @@ O projeto usa **backend próprio** para reset de senha (token no banco, rota `/a
 | `SMTP_USER` | Sim*        | E-mail que envia |
 | `SMTP_PASS` | Sim*        | Senha ou “app password” |
 | `SMTP_FROM` | Não         | Remetente ex: `noreply@sejavivasaude.com.br` |
-| `FRONTEND_URL` | Sim (produção) | `https://sejavivasaude.com.br/app` (com `/app` se o app está em /app) |
+| `FRONTEND_URL` | Sim (produção) | `https://sejavivasaude.com.br/app` |
 
-\* Sem `SMTP_HOST` + `SMTP_USER` + `SMTP_PASS`, o backend **não envia** e-mail: em produção só registra o link no log (para teste); em desenvolvimento devolve o link na resposta da API.
+\* Sem **nenhum** provedor (Resend ou SMTP) configurado, o backend **não envia** e-mail: em produção só registra o link no log; em desenvolvimento devolve o link na resposta da API.
 
 ### Erro 500 em esqueci-senha
 
@@ -129,4 +164,4 @@ Se a API retornar 500 ao solicitar redefinição:
 2. Causas comuns:
    - **Banco não configurado** (tenant padrão inexistente): rodar `npx prisma db push` e `npm run prisma:seed` no projeto.
    - **Tabela `reset_senha_tokens` ausente**: rodar migrações (`prisma migrate deploy`).
-   - **Falha ao enviar e-mail** (SMTP incorreto): o backend retorna 500 com mensagem “Falha ao enviar e-mail”. Conferir host, porta, usuário, senha e se o provedor permite “app password” ou acesso SMTP.
+   - **Falha ao enviar e-mail** (SMTP ou Resend): o backend não retorna 500 (o token já foi criado); o link é logado. Conferir Resend (API key, domínio verificado) ou SMTP (host, porta, usuário, senha, “app password”).

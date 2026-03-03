@@ -7,13 +7,38 @@ import { createAuditLog } from './auditoria.service';
 import { UserRole } from '@prisma/client';
 import crypto from 'crypto';
 import nodemailer from 'nodemailer';
+import { Resend } from 'resend';
+
+const RESET_EMAIL_SUBJECT = 'Redefinição de senha – Viva Saúde';
+const RESET_EMAIL_HTML = (resetLink: string) =>
+  `<div style="font-family:sans-serif;max-width:480px"><p style="color:#14532d;font-weight:600">Viva Saúde</p><p>Olá,</p><p>Você solicitou a redefinição de senha. Clique no link abaixo (válido por 1 hora):</p><p><a href="${resetLink}" style="display:inline-block;padding:12px 24px;background:#166534;color:#fff;text-decoration:none;border-radius:12px;font-weight:600">Redefinir senha</a></p><p style="color:#666;font-size:0.9em">Se não foi você, ignore este e-mail.</p><p style="color:#999;font-size:0.85em">— Viva Saúde</p></div>`;
+const RESET_EMAIL_TEXT = (resetLink: string) =>
+  `Olá,\n\nVocê solicitou a redefinição de senha. Clique no link abaixo (válido por 1 hora):\n\n${resetLink}\n\nSe não foi você, ignore este e-mail.\n\n— Viva Saúde`;
+
+function hasResendConfig(): boolean {
+  return !!process.env.RESEND_API_KEY;
+}
 
 function hasSmtpConfig(): boolean {
   const e = process.env;
   return !!(e.SMTP_HOST && e.SMTP_USER && e.SMTP_PASS);
 }
 
-async function sendResetPasswordEmail(to: string, resetLink: string): Promise<void> {
+async function sendResetPasswordEmailResend(to: string, resetLink: string): Promise<void> {
+  const apiKey = process.env.RESEND_API_KEY!;
+  const from = process.env.RESEND_FROM || 'Viva Saúde <onboarding@resend.dev>';
+  const resend = new Resend(apiKey);
+  const { error } = await resend.emails.send({
+    from,
+    to,
+    subject: RESET_EMAIL_SUBJECT,
+    html: RESET_EMAIL_HTML(resetLink),
+    text: RESET_EMAIL_TEXT(resetLink),
+  });
+  if (error) throw new Error(error.message);
+}
+
+async function sendResetPasswordEmailSmtp(to: string, resetLink: string): Promise<void> {
   if (!hasSmtpConfig()) return;
   const host = process.env.SMTP_HOST!;
   const user = process.env.SMTP_USER!;
@@ -30,9 +55,9 @@ async function sendResetPasswordEmail(to: string, resetLink: string): Promise<vo
   await transporter.sendMail({
     from: from ? `Viva Saúde <${from}>` : user,
     to,
-    subject: 'Redefinição de senha – Viva Saúde',
-    text: `Olá,\n\nVocê solicitou a redefinição de senha. Clique no link abaixo (válido por 1 hora):\n\n${resetLink}\n\nSe não foi você, ignore este e-mail.\n\n— Viva Saúde`,
-    html: `<div style="font-family:sans-serif;max-width:480px"><p style="color:#14532d;font-weight:600">Viva Saúde</p><p>Olá,</p><p>Você solicitou a redefinição de senha. Clique no link abaixo (válido por 1 hora):</p><p><a href="${resetLink}" style="display:inline-block;padding:12px 24px;background:#166534;color:#fff;text-decoration:none;border-radius:12px;font-weight:600">Redefinir senha</a></p><p style="color:#666;font-size:0.9em">Se não foi você, ignore este e-mail.</p><p style="color:#999;font-size:0.85em">— Viva Saúde</p></div>`,
+    subject: RESET_EMAIL_SUBJECT,
+    text: RESET_EMAIL_TEXT(resetLink),
+    html: RESET_EMAIL_HTML(resetLink),
   });
 }
 
@@ -542,18 +567,30 @@ export async function esqueciSenhaService(email: string): Promise<{
   const frontendUrl = (process.env.FRONTEND_URL || 'http://localhost:3000').replace(/\/$/, '');
   const resetLink = `${frontendUrl}/redefinir-senha?token=${token}`;
 
-  if (hasSmtpConfig()) {
-    try {
-      await sendResetPasswordEmail(normalizedEmail, resetLink);
-    } catch (err: any) {
-      console.error('[esqueci-senha] Falha ao enviar e-mail:', err?.message || err);
-      throw { statusCode: 500, message: 'Falha ao enviar e-mail. Tente novamente mais tarde.' };
+  const sendEmail = async () => {
+    if (hasResendConfig()) {
+      await sendResetPasswordEmailResend(normalizedEmail, resetLink);
+      return;
     }
-  } else if (process.env.NODE_ENV === 'development') {
-    console.log('[esqueci-senha] Link de redefinição (dev, SMTP não configurado):', resetLink);
+    if (hasSmtpConfig()) {
+      await sendResetPasswordEmailSmtp(normalizedEmail, resetLink);
+      return;
+    }
+    throw new Error('Nenhum provedor de e-mail configurado (RESEND_API_KEY ou SMTP)');
+  };
+
+  try {
+    await sendEmail();
+  } catch (err: any) {
+    console.error('[esqueci-senha] Falha ao enviar e-mail:', err?.message || err, err?.code || '');
+    if (process.env.NODE_ENV === 'production') {
+      console.error('[esqueci-senha] Link para uso manual (apague após testar):', resetLink);
+    }
+  }
+
+  if (process.env.NODE_ENV === 'development' && !hasResendConfig() && !hasSmtpConfig()) {
+    console.log('[esqueci-senha] Link de redefinição (dev, e-mail não configurado):', resetLink);
     return { ok: true, message: 'Se existir uma conta com este e-mail, você receberá um link para redefinir a senha.', resetLink };
-  } else {
-    console.warn('[esqueci-senha] SMTP não configurado. Link (use apenas para teste):', resetLink);
   }
 
   return { ok: true, message: 'Se existir uma conta com este e-mail, você receberá um link para redefinir a senha.' };
