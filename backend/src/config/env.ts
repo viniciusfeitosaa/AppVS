@@ -48,6 +48,14 @@ const envSchema = z.object({
   SMTP_USER: z.string().optional(),
   SMTP_PASS: z.string().optional(),
   SMTP_FROM: z.string().email().optional(),
+
+  // WhatsApp – esqueci senha: Evolution API (gratuito, open source) ou Twilio (pago)
+  EVOLUTION_API_URL: z.string().url().optional(), // ex: https://sua-evolution.com ou http://localhost:8080
+  EVOLUTION_API_KEY: z.string().optional(),
+  EVOLUTION_INSTANCE: z.string().optional(),
+  TWILIO_ACCOUNT_SID: z.string().optional(),
+  TWILIO_AUTH_TOKEN: z.string().optional(),
+  TWILIO_WHATSAPP_FROM: z.string().optional(),
 });
 
 // Validar e exportar variáveis de ambiente

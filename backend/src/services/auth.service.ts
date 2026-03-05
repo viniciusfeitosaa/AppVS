@@ -8,6 +8,7 @@ import { UserRole } from '@prisma/client';
 import crypto from 'crypto';
 import nodemailer from 'nodemailer';
 import { Resend } from 'resend';
+import twilio from 'twilio';
 
 const RESET_EMAIL_SUBJECT = 'Redefinição de senha – Viva Saúde';
 const RESET_EMAIL_HTML = (resetLink: string) =>
@@ -22,6 +23,66 @@ function hasResendConfig(): boolean {
 function hasSmtpConfig(): boolean {
   const e = process.env;
   return !!(e.SMTP_HOST && e.SMTP_USER && e.SMTP_PASS);
+}
+
+function hasEvolutionConfig(): boolean {
+  const e = process.env;
+  return !!(e.EVOLUTION_API_URL && e.EVOLUTION_API_KEY && e.EVOLUTION_INSTANCE);
+}
+
+function hasTwilioConfig(): boolean {
+  const e = process.env;
+  return !!(e.TWILIO_ACCOUNT_SID && e.TWILIO_AUTH_TOKEN && e.TWILIO_WHATSAPP_FROM);
+}
+
+function hasWhatsAppConfig(): boolean {
+  return hasEvolutionConfig() || hasTwilioConfig();
+}
+
+/** Normaliza telefone para E.164 (ex.: 11999999999 → 5511999999999). Retorna null se inválido. */
+function normalizePhoneForWhatsApp(telefone: string | null | undefined): string | null {
+  if (!telefone || typeof telefone !== 'string') return null;
+  const digits = telefone.replace(/\D/g, '');
+  if (digits.length < 10) return null;
+  const withCountry = digits.length === 10 || digits.length === 11 ? '55' + digits : digits.startsWith('55') ? digits : '55' + digits;
+  return withCountry.length >= 12 ? withCountry : null;
+}
+
+const RESET_WHATSAPP_BODY = (resetLink: string) =>
+  `Viva Saúde – Redefinição de senha\n\nClique no link para redefinir sua senha (válido por 1 hora):\n${resetLink}\n\nSe não foi você, ignore esta mensagem.`;
+
+async function sendResetPasswordWhatsApp(toPhoneE164: string, resetLink: string): Promise<void> {
+  const number = toPhoneE164.replace(/^\++/, '');
+  const body = RESET_WHATSAPP_BODY(resetLink);
+
+  if (hasEvolutionConfig()) {
+    const baseUrl = (process.env.EVOLUTION_API_URL || '').replace(/\/$/, '');
+    const instance = process.env.EVOLUTION_INSTANCE!;
+    const apiKey = process.env.EVOLUTION_API_KEY!;
+    const res = await fetch(`${baseUrl}/message/sendText/${instance}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({ number, text: body }),
+    });
+    if (!res.ok) {
+      const errText = await res.text();
+      throw new Error(`Evolution API ${res.status}: ${errText}`);
+    }
+    return;
+  }
+
+  const accountSid = process.env.TWILIO_ACCOUNT_SID!;
+  const authToken = process.env.TWILIO_AUTH_TOKEN!;
+  const from = process.env.TWILIO_WHATSAPP_FROM!;
+  const client = twilio(accountSid, authToken);
+  await client.messages.create({
+    from,
+    to: `whatsapp:+${number}`,
+    body,
+  });
 }
 
 async function sendResetPasswordEmailResend(to: string, resetLink: string): Promise<void> {
@@ -541,7 +602,7 @@ export async function esqueciSenhaService(email: string): Promise<{
   const medico = !master
     ? await prisma.medico.findFirst({
         where: { tenantId: tenant.id, email: normalizedEmail, ativo: true },
-        select: { id: true },
+        select: { id: true, telefone: true },
       })
     : null;
 
@@ -567,29 +628,42 @@ export async function esqueciSenhaService(email: string): Promise<{
   const frontendUrl = (process.env.FRONTEND_URL || 'http://localhost:3000').replace(/\/$/, '');
   const resetLink = `${frontendUrl}/redefinir-senha?token=${token}`;
 
-  const sendEmail = async () => {
-    if (hasResendConfig()) {
-      await sendResetPasswordEmailResend(normalizedEmail, resetLink);
-      return;
-    }
-    if (hasSmtpConfig()) {
-      await sendResetPasswordEmailSmtp(normalizedEmail, resetLink);
-      return;
-    }
-    throw new Error('Nenhum provedor de e-mail configurado (RESEND_API_KEY ou SMTP)');
-  };
+  const whatsAppPhone = medico?.telefone ? normalizePhoneForWhatsApp(medico.telefone) : null;
+  const sendViaWhatsApp = !!medico && !!whatsAppPhone && hasWhatsAppConfig();
 
-  try {
-    await sendEmail();
-  } catch (err: any) {
-    console.error('[esqueci-senha] Falha ao enviar e-mail:', err?.message || err, err?.code || '');
-    if (process.env.NODE_ENV === 'production') {
-      console.error('[esqueci-senha] Link para uso manual (apague após testar):', resetLink);
+  if (sendViaWhatsApp) {
+    try {
+      await sendResetPasswordWhatsApp(whatsAppPhone, resetLink);
+    } catch (err: any) {
+      console.error('[esqueci-senha] Falha ao enviar WhatsApp:', err?.message || err);
+      if (process.env.NODE_ENV === 'production') {
+        console.error('[esqueci-senha] Link para uso manual:', resetLink);
+      }
+    }
+  } else {
+    const sendEmail = async () => {
+      if (hasResendConfig()) {
+        await sendResetPasswordEmailResend(normalizedEmail, resetLink);
+        return;
+      }
+      if (hasSmtpConfig()) {
+        await sendResetPasswordEmailSmtp(normalizedEmail, resetLink);
+        return;
+      }
+      throw new Error('Nenhum provedor de e-mail configurado (RESEND_API_KEY ou SMTP)');
+    };
+    try {
+      await sendEmail();
+    } catch (err: any) {
+      console.error('[esqueci-senha] Falha ao enviar e-mail:', err?.message || err, err?.code || '');
+      if (process.env.NODE_ENV === 'production') {
+        console.error('[esqueci-senha] Link para uso manual (apague após testar):', resetLink);
+      }
     }
   }
 
-  if (process.env.NODE_ENV === 'development' && !hasResendConfig() && !hasSmtpConfig()) {
-    console.log('[esqueci-senha] Link de redefinição (dev, e-mail não configurado):', resetLink);
+  if (process.env.NODE_ENV === 'development' && !sendViaWhatsApp && !hasResendConfig() && !hasSmtpConfig()) {
+    console.log('[esqueci-senha] Link de redefinição (dev, e-mail/WhatsApp não configurado):', resetLink);
     return { ok: true, message: 'Se existir uma conta com este e-mail, você receberá um link para redefinir a senha.', resetLink };
   }
 

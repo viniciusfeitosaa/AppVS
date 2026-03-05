@@ -132,15 +132,28 @@ O link no e-mail continua sendo **`{{ .ConfirmationURL }}`**; o Supabase substit
 
 ## Backend próprio (esqueci-senha): envio por Resend ou SMTP
 
-O projeto usa **backend próprio** para reset de senha (token no banco, rota `/auth/esqueci-senha`). O e-mail é enviado pelo backend: **prioridade Resend**, se configurado; caso contrário **SMTP (nodemailer)**.
+O projeto usa **backend próprio** para reset de senha (token no banco, rota `/auth/esqueci-senha`). O link é enviado pelo backend: **WhatsApp** (Evolution API ou Twilio) para médicos com telefone; caso contrário **e-mail** via Resend ou SMTP.
 
-### Opção 1 – Resend (recomendado quando SMTP não funciona, ex.: subconta Outlook)
+---
+
+### Opções 100% gratuitas (sem pagar nada)
+
+| Canal    | Ferramenta       | Custo | Observação |
+|----------|------------------|-------|------------|
+| **E-mail** | Resend           | Grátis | 3.000 e-mails/mês, 100/dia. Use `RESEND_FROM=Viva Saúde <onboarding@resend.dev>` e **não precisa configurar DNS**. |
+| **WhatsApp** | Evolution API   | Grátis | Open source, self-hosted. Você usa seu próprio número WhatsApp; hospeda a API (Docker no seu servidor ou em um free tier). |
+
+Ou seja: **Resend** (e-mail sem DNS) + **Evolution API** (WhatsApp com seu número) = zero custo.
+
+### Opção 1 – Resend (e-mail; free tier, sem DNS)
 
 | Variável        | Obrigatório | Exemplo |
 |-----------------|-------------|---------|
 | `RESEND_API_KEY` | Sim        | `re_xxxxxxxxxxxx` (em [resend.com](https://resend.com) → API Keys) |
-| `RESEND_FROM`   | Não         | `Viva Saúde <noreply@sejavivasaude.com.br>` ou, sem domínio verificado, `onboarding@resend.dev` |
+| `RESEND_FROM`   | Não         | `Viva Saúde <noreply@sejavivasaude.com.br>` ou, **sem configurar DNS**, use `Viva Saúde <onboarding@resend.dev>` |
 | `FRONTEND_URL`  | Sim (produção) | `https://sejavivasaude.com.br/app` |
+
+**Resend sem DNS:** se você não tem acesso ao DNS do domínio, use o remetente de teste do Resend. No Render, defina apenas `RESEND_API_KEY` e `RESEND_FROM=Viva Saúde <onboarding@resend.dev>`. O e-mail será enviado por `onboarding@resend.dev` e **não exige configurar domínio** no Resend.
 
 ### Opção 2 – SMTP
 
@@ -154,7 +167,32 @@ O projeto usa **backend próprio** para reset de senha (token no banco, rota `/a
 | `SMTP_FROM` | Não         | Remetente ex: `noreply@sejavivasaude.com.br` |
 | `FRONTEND_URL` | Sim (produção) | `https://sejavivasaude.com.br/app` |
 
-\* Sem **nenhum** provedor (Resend ou SMTP) configurado, o backend **não envia** e-mail: em produção só registra o link no log; em desenvolvimento devolve o link na resposta da API.
+\* Sem **nenhum** provedor (Resend, SMTP ou WhatsApp) configurado, o backend **não envia**; em produção só registra o link no log; em desenvolvimento devolve o link na resposta da API.
+
+### Opção 3 – WhatsApp (Evolution API = grátis, ou Twilio = pago)
+
+O usuário informa o **e-mail** na tela "Esqueci minha senha". Se a conta for de **médico** com **telefone** cadastrado e WhatsApp estiver configurado, o link vai **por WhatsApp**. Contas **Master** não têm telefone; para elas use Resend com `onboarding@resend.dev`.
+
+**3a) Evolution API (open source, gratuito)** – use seu próprio WhatsApp. Prioridade: se Evolution estiver configurado, o backend usa ela; senão, Twilio.
+
+| Variável | Obrigatório | Exemplo |
+|----------|-------------|---------|
+| `EVOLUTION_API_URL` | Sim | `https://sua-evolution.com` ou `http://localhost:8080` (onde a API está rodando) |
+| `EVOLUTION_API_KEY` | Sim | API key da instância (gerada ao criar a instância) |
+| `EVOLUTION_INSTANCE` | Sim | Nome da instância que você criou |
+| `FRONTEND_URL` | Sim (produção) | `https://sejavivasaude.com.br/app` |
+
+**Como usar:** 1) Hospede a [Evolution API](https://github.com/EvolutionAPI/evolution-api) (Docker: `docker run -p 8080:8080 atendai/evolution-api`). 2) Crie uma instância (POST `/instance/create` com `instanceName` e `integration: WHATSAPP-BAILEYS`). 3) Conecte seu WhatsApp escaneando o QR code. 4) Use a API key retornada e o nome da instância nas variáveis acima. Documentação: [doc.evolution-api.com](https://doc.evolution-api.com).
+
+**3b) Twilio (pago)** – alternativa se não quiser hospedar nada.
+
+| Variável | Obrigatório | Exemplo |
+|----------|-------------|---------|
+| `TWILIO_ACCOUNT_SID` | Sim | [twilio.com](https://www.twilio.com) → Console |
+| `TWILIO_AUTH_TOKEN` | Sim | Console → Auth Token |
+| `TWILIO_WHATSAPP_FROM` | Sim | `whatsapp:+14155238886` (sandbox) ou `whatsapp:+5511...` (número aprovado) |
+
+No sandbox Twilio, o destinatário precisa ter enviado "join &lt;código&gt;" ao número do sandbox antes.
 
 ### Erro 500 em esqueci-senha
 
