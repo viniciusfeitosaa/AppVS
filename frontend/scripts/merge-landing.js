@@ -1,8 +1,7 @@
 /**
- * Após o build do Vite (base: /app/), coloca o app em dist/app/ e copia
- * a landing estática (../landing) para a raiz de dist, para que:
- * - https://sejavivasaude.com.br/  → landing (dist/index.html)
- * - https://sejavivasaude.com.br/app  → React SPA (dist/app/index.html)
+ * Com VITE_APP_BASE=/app/: move o SPA para dist/app/ e, se existir ../landing,
+ * copia a landing para a raiz de dist (site em /, app em /app/).
+ * Com VITE_APP_BASE=/ (padrão): não mexe — ficheiros ficam na raiz de dist (Docker, domínio dedicado).
  */
 const fs = require('fs');
 const path = require('path');
@@ -10,26 +9,36 @@ const path = require('path');
 const distDir = path.join(__dirname, '..', 'dist');
 const landingDir = path.join(__dirname, '..', '..', 'landing');
 
-if (!fs.existsSync(landingDir)) {
-  console.warn('merge-landing: pasta landing/ não encontrada; pulando merge.');
+const rawBase = process.env.VITE_APP_BASE || '/';
+const normalizedBase = rawBase.endsWith('/') ? rawBase : `${rawBase}/`;
+const useAppSubpath = normalizedBase === '/app/';
+
+function moveSpaIntoAppFolder() {
+  const appDir = path.join(distDir, 'app');
+  fs.mkdirSync(appDir, { recursive: true });
+  const indexHtml = path.join(distDir, 'index.html');
+  if (fs.existsSync(indexHtml)) {
+    fs.renameSync(indexHtml, path.join(appDir, 'index.html'));
+  }
+  const distAssets = path.join(distDir, 'assets');
+  if (fs.existsSync(distAssets)) {
+    fs.renameSync(distAssets, path.join(appDir, 'assets'));
+  }
+}
+
+if (!useAppSubpath) {
+  console.log('merge-landing: VITE_APP_BASE na raiz; nada a fazer.');
   process.exit(0);
 }
 
-// 1. Criar dist/app e mover o build do React para dentro
-const appDir = path.join(distDir, 'app');
-fs.mkdirSync(appDir, { recursive: true });
-
-const indexHtml = path.join(distDir, 'index.html');
-if (fs.existsSync(indexHtml)) {
-  fs.renameSync(indexHtml, path.join(appDir, 'index.html'));
+if (!fs.existsSync(landingDir)) {
+  moveSpaIntoAppFolder();
+  console.log('merge-landing: SPA em dist/app/ (sem landing).');
+  process.exit(0);
 }
 
-const distAssets = path.join(distDir, 'assets');
-if (fs.existsSync(distAssets)) {
-  fs.renameSync(distAssets, path.join(appDir, 'assets'));
-}
+moveSpaIntoAppFolder();
 
-// 2. Copiar landing para a raiz de dist
 const copy = (src, dest) => {
   const stat = fs.statSync(src);
   if (stat.isDirectory()) {
@@ -45,8 +54,8 @@ const copy = (src, dest) => {
 for (const name of fs.readdirSync(landingDir)) {
   const src = path.join(landingDir, name);
   const dest = path.join(distDir, name);
-  if (name === 'README.md' || name === 'design.json') continue; // não publicar
+  if (name === 'README.md' || name === 'design.json') continue;
   copy(src, dest);
 }
 
-console.log('merge-landing: landing copiada para raiz; app em /app/');
+console.log('merge-landing: landing na raiz; app em /app/');
