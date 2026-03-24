@@ -10,7 +10,19 @@ import { fileURLToPath } from 'url';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const distDir = path.join(__dirname, '..', 'dist');
-const landingDir = path.join(__dirname, '..', '..', 'landing');
+
+/** Docker: landing em frontend/landing; monorepo local: ../landing */
+function resolveLandingDir() {
+  const candidates = [
+    path.join(__dirname, '..', 'landing'),
+    path.join(__dirname, '..', '..', 'landing'),
+  ];
+  for (const p of candidates) {
+    if (fs.existsSync(p)) return p;
+  }
+  return null;
+}
+const landingDir = resolveLandingDir();
 
 const rawBase = process.env.VITE_APP_BASE || '/';
 const normalizedBase = rawBase.endsWith('/') ? rawBase : `${rawBase}/`;
@@ -34,9 +46,9 @@ if (!useAppSubpath) {
   process.exit(0);
 }
 
-if (!fs.existsSync(landingDir)) {
+if (!landingDir) {
   moveSpaIntoAppFolder();
-  console.log('merge-landing: SPA em dist/app/ (sem landing).');
+  console.warn('merge-landing: pasta landing/ não encontrada; só SPA em /app/ (raiz sem site estático).');
   process.exit(0);
 }
 
