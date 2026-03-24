@@ -4,6 +4,8 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
+    env_file:
+      - .env
     container_name: app-medico-backend
     ports:
       - "${BACKEND_PORT:-3001}:3001"
