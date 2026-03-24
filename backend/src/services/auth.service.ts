@@ -89,14 +89,18 @@ async function sendResetPasswordEmailResend(to: string, resetLink: string): Prom
   const apiKey = process.env.RESEND_API_KEY!;
   const from = process.env.RESEND_FROM || 'Viva Saúde <onboarding@resend.dev>';
   const resend = new Resend(apiKey);
-  const { error } = await resend.emails.send({
+  const { data, error } = await resend.emails.send({
     from,
     to,
     subject: RESET_EMAIL_SUBJECT,
     html: RESET_EMAIL_HTML(resetLink),
     text: RESET_EMAIL_TEXT(resetLink),
   });
-  if (error) throw new Error(error.message);
+  if (error) {
+    console.error('[esqueci-senha] Resend API error:', JSON.stringify(error));
+    throw new Error(error.message || 'Resend falhou');
+  }
+  console.log('[esqueci-senha] Resend enviado com sucesso. id:', data?.id ?? 'n/a', 'para:', to);
 }
 
 async function sendResetPasswordEmailSmtp(to: string, resetLink: string): Promise<void> {
@@ -590,6 +594,8 @@ export async function esqueciSenhaService(email: string): Promise<{
 }> {
   const tenant = await getDefaultTenant();
   const normalizedEmail = email.trim().toLowerCase();
+  console.log('[esqueci-senha] Solicitação para:', normalizedEmail ? `${normalizedEmail.slice(0, 3)}***@***` : '(vazio)');
+
   if (!normalizedEmail) {
     return { ok: true, message: 'Se existir uma conta com este e-mail, você receberá um link para redefinir a senha.' };
   }
@@ -607,8 +613,10 @@ export async function esqueciSenhaService(email: string): Promise<{
     : null;
 
   if (!master && !medico) {
+    console.log('[esqueci-senha] Nenhuma conta encontrada para este e-mail (nem Master nem Médico).');
     return { ok: true, message: 'Se existir uma conta com este e-mail, você receberá um link para redefinir a senha.' };
   }
+  console.log('[esqueci-senha] Conta encontrada:', master ? 'MASTER' : 'MEDICO');
 
   const tipo = master ? 'MASTER' : 'MEDICO';
   const token = crypto.randomBytes(32).toString('hex');
@@ -643,10 +651,12 @@ export async function esqueciSenhaService(email: string): Promise<{
   } else {
     const sendEmail = async () => {
       if (hasResendConfig()) {
+        console.log('[esqueci-senha] Enviando e-mail via Resend para:', normalizedEmail);
         await sendResetPasswordEmailResend(normalizedEmail, resetLink);
         return;
       }
       if (hasSmtpConfig()) {
+        console.log('[esqueci-senha] Enviando e-mail via SMTP para:', normalizedEmail);
         await sendResetPasswordEmailSmtp(normalizedEmail, resetLink);
         return;
       }

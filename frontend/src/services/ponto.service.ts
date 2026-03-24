@@ -33,4 +33,14 @@ export const pontoService = {
     const response = await api.get('/ponto/minhas-escalas');
     return response.data;
   },
+
+  listEquipeColegas: async (escalaId: string) => {
+    const response = await api.get('/ponto/equipe-colegas', { params: { escalaId } });
+    return response.data;
+  },
+
+  listProximosPlantoes: async () => {
+    const response = await api.get('/ponto/proximos-plantoes');
+    return response.data;
+  },
 };

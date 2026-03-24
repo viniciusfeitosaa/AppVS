@@ -63,6 +63,7 @@ const PontoEletronico = () => {
   const registroAberto = meuDiaResp?.data?.registroAberto;
   const registrosHoje = meuDiaResp?.data?.registrosHoje || [];
   const totalMinutosHoje = meuDiaResp?.data?.totalMinutosHoje || 0;
+  const ultimoRegistroPonto = meuDiaResp?.data?.ultimoRegistroPonto;
   const equipeDoDia: string[] = meuDiaResp?.data?.equipeDoDia || [];
   const minhasEquipes: string[] = meuDiaResp?.data?.minhasEquipes || [];
   const equipeExibida: string[] =
@@ -238,8 +239,23 @@ const PontoEletronico = () => {
                 <p className="text-xs font-medium text-viva-700">Ponto atual</p>
                 <span className="text-xs font-bold text-viva-900">
                   {registroAberto
-                    ? `Em aberto desde ${new Date(registroAberto.checkInAt).toLocaleTimeString()}`
+                    ? `Em aberto desde ${new Date(registroAberto.checkInAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}`
                     : 'Fechado'}
+                </span>
+              </div>
+              <div className="flex items-center justify-between p-4 rounded-xl bg-viva-50/60 border border-viva-200/50">
+                <p className="text-xs font-medium text-viva-700">Último ponto batido</p>
+                <span className="text-xs font-bold text-viva-900">
+                  {ultimoRegistroPonto?.checkInAt
+                    ? (() => {
+                        const d = new Date(ultimoRegistroPonto.checkInAt);
+                        const hoje = new Date();
+                        const mesmoDia = d.getDate() === hoje.getDate() && d.getMonth() === hoje.getMonth() && d.getFullYear() === hoje.getFullYear();
+                        return mesmoDia
+                          ? d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+                          : d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' }) + ' às ' + d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+                      })()
+                    : '—'}
                 </span>
               </div>
               <div className="flex items-center justify-between p-4 rounded-xl bg-viva-50/60 border border-viva-200/50">

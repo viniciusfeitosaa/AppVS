@@ -4,6 +4,8 @@ import {
   checkOutService,
   getMeuDiaPontoService,
   listMinhasEscalasService,
+  listEquipeColegasService,
+  listProximosPlantoesService,
 } from '../services/ponto.service';
 
 export const checkInController = async (req: Request, res: Response) => {
@@ -77,6 +79,43 @@ export const listMinhasEscalasController = async (req: Request, res: Response) =
     return res.status(error.statusCode || 500).json({
       success: false,
       error: error.message || 'Erro ao listar escalas do médico',
+    });
+  }
+};
+
+export const listEquipeColegasController = async (req: Request, res: Response) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ success: false, error: 'Não autenticado' });
+    }
+
+    const escalaId = typeof req.query.escalaId === 'string' ? req.query.escalaId : undefined;
+    if (!escalaId) {
+      return res.status(400).json({ success: false, error: 'escalaId é obrigatório' });
+    }
+
+    const data = await listEquipeColegasService(req.user.tenantId, req.user.id, escalaId);
+    return res.status(200).json({ success: true, data });
+  } catch (error: any) {
+    return res.status(error.statusCode || 500).json({
+      success: false,
+      error: error.message || 'Erro ao listar colegas da equipe',
+    });
+  }
+};
+
+export const listProximosPlantoesController = async (req: Request, res: Response) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ success: false, error: 'Não autenticado' });
+    }
+
+    const data = await listProximosPlantoesService(req.user.tenantId, req.user.id, 2);
+    return res.status(200).json({ success: true, data });
+  } catch (error: any) {
+    return res.status(error.statusCode || 500).json({
+      success: false,
+      error: error.message || 'Erro ao listar próximos plantões',
     });
   }
 };

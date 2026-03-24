@@ -6,6 +6,8 @@ import {
   checkOutController,
   getMeuDiaPontoController,
   listMinhasEscalasController,
+  listEquipeColegasController,
+  listProximosPlantoesController,
 } from '../controllers/ponto.controller';
 
 const router = Router();
@@ -18,5 +20,7 @@ router.post('/checkin', checkInController);
 router.post('/checkout', checkOutController);
 router.get('/meu-dia', getMeuDiaPontoController);
 router.get('/minhas-escalas', listMinhasEscalasController);
+router.get('/equipe-colegas', listEquipeColegasController);
+router.get('/proximos-plantoes', listProximosPlantoesController);
 
 export default router;

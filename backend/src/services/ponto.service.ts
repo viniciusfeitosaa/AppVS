@@ -231,7 +231,7 @@ export async function checkOutService(
 }
 
 export async function getMeuDiaPontoService(tenantId: string, medicoId: string) {
-  const [aberto, registros] = await Promise.all([
+  const [aberto, registros, ultimoRegistro] = await Promise.all([
     prisma.registroPonto.findFirst({
       where: { tenantId, medicoId, checkOutAt: null },
       include: {
@@ -251,6 +251,11 @@ export async function getMeuDiaPontoService(tenantId: string, medicoId: string) 
       include: {
         escala: { select: { id: true, nome: true } },
       },
+      orderBy: { checkInAt: 'desc' },
+    }),
+    prisma.registroPonto.findFirst({
+      where: { tenantId, medicoId },
+      select: { id: true, checkInAt: true, checkOutAt: true },
       orderBy: { checkInAt: 'desc' },
     }),
   ]);
@@ -300,6 +305,7 @@ export async function getMeuDiaPontoService(tenantId: string, medicoId: string) 
     registroAberto: aberto,
     registrosHoje: registros,
     totalMinutosHoje: totalMinutos,
+    ultimoRegistroPonto: ultimoRegistro,
     equipeDoDia,
     minhasEquipes: minhasEquipesNomes,
     configHorario,
@@ -378,4 +384,85 @@ export async function listMinhasEscalasService(tenantId: string, medicoId: strin
   }
 
   return Array.from(uniqueByEscala.values());
+}
+
+/** Lista colegas (outros médicos) das mesmas equipes do médico na escala informada, para troca de plantão. */
+export async function listEquipeColegasService(
+  tenantId: string,
+  medicoId: string,
+  escalaId: string
+) {
+  const equipesNaEscala = await prisma.escalaEquipe.findMany({
+    where: { tenantId, escalaId },
+    select: { equipeId: true },
+  });
+  const equipeIds = equipesNaEscala.map((e) => e.equipeId);
+  const meuEquipeIds = await prisma.equipeMedico.findMany({
+    where: { tenantId, medicoId, equipeId: { in: equipeIds } },
+    select: { equipeId: true },
+  });
+  const idsEquipesQueParticipo = new Set(meuEquipeIds.map((e) => e.equipeId));
+  if (idsEquipesQueParticipo.size === 0) return [];
+
+  const colegas = await prisma.equipeMedico.findMany({
+    where: {
+      tenantId,
+      equipeId: { in: Array.from(idsEquipesQueParticipo) },
+      medicoId: { not: medicoId },
+      medico: { ativo: true },
+    },
+    select: {
+      medicoId: true,
+      medico: {
+        select: { id: true, nomeCompleto: true, crm: true, email: true },
+      },
+    },
+    distinct: ['medicoId'],
+  });
+
+  return colegas
+    .filter((c) => c.medico)
+    .map((c) => ({
+      id: c.medico!.id,
+      nomeCompleto: c.medico!.nomeCompleto,
+      crm: c.medico!.crm,
+      email: c.medico!.email,
+    }));
+}
+
+const startOfDay = (d: Date) => {
+  const x = new Date(d);
+  x.setHours(0, 0, 0, 0);
+  return x;
+};
+
+/** Próximos plantões do médico (data >= hoje), ordenados por data, no máximo 2. Apenas escalas ativas. */
+export async function listProximosPlantoesService(tenantId: string, medicoId: string, limit = 2) {
+  const hoje = startOfDay(new Date());
+  const plantoes = await prisma.escalaPlantao.findMany({
+    where: {
+      tenantId,
+      medicoId,
+      data: { gte: hoje },
+      escala: { ativo: true },
+    },
+    select: {
+      id: true,
+      data: true,
+      gradeId: true,
+      escalaId: true,
+      escala: { select: { nome: true, contratoAtivo: { select: { permiteTrocaPlantao: true } } } },
+    },
+    orderBy: { data: 'asc' },
+    take: limit,
+  });
+
+  return plantoes.map((p) => ({
+    id: p.id,
+    data: p.data.toISOString().slice(0, 10),
+    gradeId: p.gradeId,
+    escalaId: p.escalaId,
+    escalaNome: p.escala?.nome ?? null,
+    permiteTrocaPlantao: !!p.escala?.contratoAtivo?.permiteTrocaPlantao,
+  }));
 }

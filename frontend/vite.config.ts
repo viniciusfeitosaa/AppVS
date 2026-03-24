@@ -15,10 +15,17 @@ export default defineConfig({
   server: {
     port: 3000,
     host: true,
+    strictPort: false,
     proxy: {
       '/api': {
-        target: 'http://localhost:3001',
+        target: process.env.VITE_API_TARGET || 'http://127.0.0.1:3001',
         changeOrigin: true,
+        secure: false,
+        configure: (proxy) => {
+          proxy.on('error', (err, _req, _res) => {
+            console.warn('[proxy] Backend em', process.env.VITE_API_TARGET || 'http://127.0.0.1:3001', '— certifique-se de que o backend está rodando (ex: cd backend && npm run dev).', err.message);
+          });
+        },
       },
     },
   },

@@ -6,6 +6,11 @@ export async function listSubgruposService(tenantId: string) {
     where: { tenantId },
     include: {
       _count: { select: { subgrupoMedicos: true, escalaSubgrupos: true, equipes: true } },
+      contratoSubgrupos: {
+        include: {
+          contratoAtivo: { select: { id: true, nome: true, usaEscala: true, usaPonto: true } },
+        },
+      },
     },
     orderBy: { nome: 'asc' },
   });
@@ -306,10 +311,10 @@ export async function addSubgrupoToEscalaService(
   subgrupoId: string
 ) {
   const [escala, subgrupo] = await Promise.all([
-    prisma.escala.findFirst({ where: { id: escalaId, tenantId, ativo: true } }),
+    prisma.escala.findFirst({ where: { id: escalaId, tenantId } }),
     prisma.subgrupo.findFirst({ where: { id: subgrupoId, tenantId, ativo: true } }),
   ]);
-  if (!escala) throw { statusCode: 404, message: 'Escala não encontrada ou inativa' };
+  if (!escala) throw { statusCode: 404, message: 'Escala não encontrada' };
   if (!subgrupo) throw { statusCode: 404, message: 'Subgrupo não encontrado ou inativo' };
 
   const row = await prisma.escalaSubgrupo.upsert({
@@ -360,10 +365,10 @@ export async function addEquipeToEscalaService(
   equipeId: string
 ) {
   const [escala, equipe] = await Promise.all([
-    prisma.escala.findFirst({ where: { id: escalaId, tenantId, ativo: true } }),
+    prisma.escala.findFirst({ where: { id: escalaId, tenantId } }),
     prisma.equipe.findFirst({ where: { id: equipeId, tenantId, ativo: true } }),
   ]);
-  if (!escala) throw { statusCode: 404, message: 'Escala não encontrada ou inativa' };
+  if (!escala) throw { statusCode: 404, message: 'Escala não encontrada' };
   if (!equipe) throw { statusCode: 404, message: 'Equipe não encontrada ou inativa' };
   const row = await prisma.escalaEquipe.upsert({
     where: { tenantId_escalaId_equipeId: { tenantId, escalaId, equipeId } },

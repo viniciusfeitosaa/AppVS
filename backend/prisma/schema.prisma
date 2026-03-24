@@ -108,6 +108,7 @@ model ContratoAtivo {
   ativo       Boolean  @default(true)
   usaEscala   Boolean  @default(true) @map("usa_escala")
   usaPonto    Boolean  @default(true) @map("usa_ponto")
+  permiteTrocaPlantao Boolean @default(false) @map("permite_troca_plantao")
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 

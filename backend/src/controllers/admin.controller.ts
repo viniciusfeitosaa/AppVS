@@ -16,6 +16,8 @@ import {
   listContratoSubgruposService,
   listEscalaMedicosService,
   listEscalaPlantoesService,
+  listEquipePlantoesService,
+  listEquipeEscalasService,
   listEscalasService,
   listRegistrosPontoAdminService,
   listContratosAtivosService,
@@ -557,6 +559,44 @@ export const listEscalaPlantoesController = async (req: Request, res: Response) 
     const statusCode = error.statusCode || 500;
     const message = error.message || 'Erro ao listar plantões da escala';
     if (statusCode === 500) console.error('[listEscalaPlantoes]', error);
+    return res.status(statusCode).json({
+      success: false,
+      error: message,
+    });
+  }
+};
+
+export const listEquipePlantoesController = async (req: Request, res: Response) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ success: false, error: 'Não autenticado' });
+    }
+    const dataInicio = req.query.dataInicio ? String(req.query.dataInicio) : undefined;
+    const dataFim = req.query.dataFim ? String(req.query.dataFim) : undefined;
+    const data = await listEquipePlantoesService(req.user.tenantId, req.params.id, { dataInicio, dataFim });
+    return res.status(200).json({ success: true, data });
+  } catch (error: any) {
+    const statusCode = error.statusCode || 500;
+    const message = error.message || 'Erro ao listar plantões da equipe';
+    if (statusCode === 500) console.error('[listEquipePlantoes]', error);
+    return res.status(statusCode).json({
+      success: false,
+      error: message,
+    });
+  }
+};
+
+export const listEquipeEscalasController = async (req: Request, res: Response) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ success: false, error: 'Não autenticado' });
+    }
+    const data = await listEquipeEscalasService(req.user.tenantId, req.params.id);
+    return res.status(200).json({ success: true, data });
+  } catch (error: any) {
+    const statusCode = error.statusCode || 500;
+    const message = error.message || 'Erro ao listar escalas da equipe';
+    if (statusCode === 500) console.error('[listEquipeEscalas]', error);
     return res.status(statusCode).json({
       success: false,
       error: message,

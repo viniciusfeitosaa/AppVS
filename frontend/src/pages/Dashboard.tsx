@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '../context/AuthContext';
@@ -19,6 +20,56 @@ const HORARIOS_POR_GRADE: Record<string, string> = {
   mt: '07h às 19h',
   sn: '19h às 07h',
 };
+
+/** Retorna o início do plantão. MT = mesmo dia 07h; SN = mesmo dia 19h. */
+function inicioDoPlantao(dataStr: string, gradeId: string): Date {
+  const d = new Date(dataStr + 'T00:00:00');
+  const g = (gradeId || '').toLowerCase();
+  if (g === 'sn') {
+    d.setHours(19, 0, 0, 0);
+    return d;
+  }
+  d.setHours(7, 0, 0, 0);
+  return d;
+}
+
+/** Retorna o fim do plantão (data/hora) para comparação. MT = mesmo dia 19h; SN = dia seguinte 07h. */
+function fimDoPlantao(dataStr: string, gradeId: string): Date {
+  const d = new Date(dataStr + 'T00:00:00');
+  const g = (gradeId || '').toLowerCase();
+  if (g === 'sn') {
+    const next = new Date(d);
+    next.setDate(next.getDate() + 1);
+    next.setHours(7, 0, 0, 0);
+    return next;
+  }
+  d.setHours(19, 0, 0, 0);
+  return d;
+}
+
+/** Limite para troca: até 10 min antes do início do plantão. Após isso o botão some. */
+const MINUTOS_ANTES_INICIO_PARA_TROCA = 10;
+
+/** True se ainda está no período em que a troca é permitida (até 10 min antes do início). */
+function canTrocarPlantao(dataStr: string, gradeId: string): boolean {
+  const now = new Date();
+  const inicio = inicioDoPlantao(dataStr, gradeId);
+  const limite = new Date(inicio.getTime() - MINUTOS_ANTES_INICIO_PARA_TROCA * 60 * 1000);
+  return now < limite;
+}
+
+/** True se o plantão ainda não passou (para exibir "Plantão já passou"). */
+function isPlantaoAindaFuturo(dataStr: string, gradeId: string): boolean {
+  const now = new Date();
+  const fim = fimDoPlantao(dataStr, gradeId);
+  return now < fim;
+}
+
+/** Formata data para exibição (ex.: "27 fev."). */
+function formatDataCurta(dataStr: string): string {
+  const d = new Date(dataStr + 'T12:00:00');
+  return d.toLocaleDateString('pt-BR', { day: 'numeric', month: 'short' }).replace('.', '');
+}
 
 /** Retorna primeiro e segundo nome. */
 const primeiroSegundoNome = (nome?: string | null): string => {
@@ -104,8 +155,36 @@ const Dashboard = () => {
     configHorario?.horarioEntrada ?? null,
     configHorario?.horarioSaida ?? null
   );
-  const horaEntrada = configHorario?.horarioEntrada ? String(configHorario.horarioEntrada).trim().slice(0, 5) : '--:--';
+  const horaEntradaStr = configHorario?.horarioEntrada ? String(configHorario.horarioEntrada).trim().slice(0, 5) : null;
+  const horarioExibicao = horaEntradaStr ?? faixaHorario;
+
+  const { data: proximosResp } = useQuery({
+    queryKey: ['ponto', 'proximos-plantoes'],
+    queryFn: () => pontoService.listProximosPlantoes(),
+    enabled: !!user && isMedico,
+  });
+  type PlantaoProximo = { id: string; data: string; gradeId: string; escalaId: string; escalaNome: string | null; permiteTrocaPlantao?: boolean };
+  const proximosList = (proximosResp?.data ?? proximosResp ?? []) as PlantaoProximo[];
+  const proxima = proximosList[0] ?? null;
+  const segundaProxima = proximosList[1] ?? null;
+  const temProximosPlantoes = proximosList.length > 0;
   const temEscalaAtivaParaPonto = isMedico && escalasEmVigor.length > 0;
+
+  const [showTrocaModal, setShowTrocaModal] = useState(false);
+  const [trocaEscalaId, setTrocaEscalaId] = useState<string | null>(null);
+  const [trocaStep, setTrocaStep] = useState<1 | 2>(1);
+  const [selectedColegaId, setSelectedColegaId] = useState<string | null>(null);
+
+  const { data: colegasResp } = useQuery({
+    queryKey: ['ponto', 'equipe-colegas', trocaEscalaId],
+    queryFn: () => pontoService.listEquipeColegas(trocaEscalaId!),
+    enabled: !!user && isMedico && showTrocaModal && !!trocaEscalaId,
+  });
+  const colegasList = (colegasResp?.data ?? colegasResp ?? []) as Array<{ id: string; nomeCompleto: string; crm?: string | null }>;
+  const selectedColega = selectedColegaId ? colegasList.find((c) => c.id === selectedColegaId) : null;
+
+  const faixaPorGrade = (gradeId: string) =>
+    HORARIOS_POR_GRADE[(gradeId || '').toLowerCase()] ?? '07h às 19h';
 
   if (isLoading) {
     return (
@@ -133,15 +212,161 @@ const Dashboard = () => {
         </p>
       </div>
 
-      {temEscalaAtivaParaPonto && (
+      {temProximosPlantoes && (
+        <div className="col-span-full stagger-2 space-y-3">
+          <h2 className="text-sm font-semibold text-viva-800 font-display px-1">Suas próximas escalas</h2>
+          {/* Próxima escala */}
+          {proxima && (
+            <div className="card flex flex-wrap items-center justify-between gap-4 border-l-4 border-l-viva-500 bg-gradient-to-r from-viva-50/60 to-transparent">
+              <div className="min-w-0">
+                <p className="text-xs font-semibold uppercase tracking-wider text-viva-600 mb-0.5">Próxima escala</p>
+                <p className="text-viva-900 font-medium text-sm">
+                  <span className="font-bold text-viva-800">{fixMojibake(proxima.escalaNome || 'Escala')}</span>
+                  {' · '}
+                  <span className="text-viva-800">{formatDataCurta(proxima.data)}</span>
+                  {' · '}
+                  <span className="font-bold text-viva-800">{faixaPorGrade(proxima.gradeId)}</span>
+                </p>
+              </div>
+              <div className="flex flex-wrap items-center gap-2 shrink-0">
+                {proxima.permiteTrocaPlantao !== false && canTrocarPlantao(proxima.data, proxima.gradeId) && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setTrocaEscalaId(proxima.escalaId);
+                      setShowTrocaModal(true);
+                      setTrocaStep(1);
+                      setSelectedColegaId(null);
+                    }}
+                    className="btn btn-secondary text-sm"
+                  >
+                    Trocar plantão
+                  </button>
+                )}
+                <Link to="/ponto-eletronico" className="btn btn-primary text-sm">
+                  Bater ponto
+                </Link>
+              </div>
+            </div>
+          )}
+          {/* Segunda próxima escala */}
+          {segundaProxima && (
+            <div className="card flex flex-wrap items-center justify-between gap-4 border-l-4 border-l-viva-400/80 bg-gradient-to-r from-viva-50/40 to-transparent">
+              <div className="min-w-0">
+                <p className="text-xs font-semibold uppercase tracking-wider text-viva-600 mb-0.5">Segunda próxima</p>
+                <p className="text-viva-900 font-medium text-sm">
+                  <span className="font-bold text-viva-800">{fixMojibake(segundaProxima.escalaNome || 'Escala')}</span>
+                  {' · '}
+                  <span className="text-viva-800">{formatDataCurta(segundaProxima.data)}</span>
+                  {' · '}
+                  <span className="font-bold text-viva-800">{faixaPorGrade(segundaProxima.gradeId)}</span>
+                </p>
+              </div>
+              <div className="flex flex-wrap items-center gap-2 shrink-0">
+                {segundaProxima.permiteTrocaPlantao !== false && canTrocarPlantao(segundaProxima.data, segundaProxima.gradeId) ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setTrocaEscalaId(segundaProxima.escalaId);
+                      setShowTrocaModal(true);
+                      setTrocaStep(1);
+                      setSelectedColegaId(null);
+                    }}
+                    className="btn btn-secondary text-sm"
+                  >
+                    Trocar plantão
+                  </button>
+                ) : (
+                  <span className="text-xs text-viva-600">
+                    {isPlantaoAindaFuturo(segundaProxima.data, segundaProxima.gradeId)
+                      ? (segundaProxima.permiteTrocaPlantao === false ? 'Troca não permitida neste contrato' : 'Período de troca encerrado')
+                      : 'Plantão já passou'}
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Fallback: tem escala ativa mas nenhum plantão futuro (ex.: escala sem grade definida) */}
+      {isMedico && escalasEmVigor.length > 0 && !temProximosPlantoes && (
         <div className="card col-span-full stagger-2 flex flex-wrap items-center justify-between gap-4 border-l-4 border-l-viva-500 bg-gradient-to-r from-viva-50/60 to-transparent">
           <p className="text-viva-900 font-medium text-sm">
-            Você tem uma escala para <span className="font-bold text-viva-800">{fixMojibake(escalaNome || 'hoje')}</span> às{' '}
-            <span className="font-bold text-viva-800">{horaEntrada}</span>.
+            Você tem escala para <span className="font-bold text-viva-800">{fixMojibake(escalaNome || 'hoje')}</span>{' '}
+            no horário <span className="font-bold text-viva-800">{horarioExibicao}</span>.
           </p>
-          <Link to="/ponto-eletronico" className="btn btn-primary shrink-0">
+          <Link to="/ponto-eletronico" className="btn btn-primary shrink-0 text-sm">
             Bater ponto
           </Link>
+        </div>
+      )}
+
+      {/* Modal Trocar plantão */}
+      {showTrocaModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" onClick={() => setShowTrocaModal(false)}>
+          <div
+            className="bg-white rounded-2xl shadow-xl max-w-md w-full p-5 flex flex-col gap-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="text-lg font-semibold text-viva-900 font-display">
+              {trocaStep === 1 ? 'Trocar plantão' : 'Confirmar troca'}
+            </h3>
+            {trocaStep === 1 ? (
+              <>
+                <p className="text-sm text-viva-700">Com qual profissional da equipe você deseja trocar?</p>
+                <select
+                  value={selectedColegaId ?? ''}
+                  onChange={(e) => setSelectedColegaId(e.target.value || null)}
+                  className="input w-full py-2"
+                >
+                  <option value="">Selecione um profissional</option>
+                  {colegasList.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {fixMojibake(c.nomeCompleto)}
+                      {c.crm ? ` — ${c.crm}` : ''}
+                    </option>
+                  ))}
+                </select>
+                <div className="flex gap-2 justify-end">
+                  <button type="button" className="btn btn-secondary" onClick={() => setShowTrocaModal(false)}>
+                    Cancelar
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-primary"
+                    disabled={!selectedColegaId}
+                    onClick={() => setTrocaStep(2)}
+                  >
+                    Confirmar
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <p className="text-sm text-viva-700">
+                  Deseja confirmar a troca de plantão com <strong>{selectedColega ? fixMojibake(selectedColega.nomeCompleto) : '—'}?</strong>
+                </p>
+                <div className="flex gap-2 justify-end">
+                  <button type="button" className="btn btn-secondary" onClick={() => setTrocaStep(1)}>
+                    Voltar
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-primary"
+                    onClick={() => {
+                      // TODO: chamar API de solicitação de troca quando existir
+                      setShowTrocaModal(false);
+                      setTrocaStep(1);
+                      setSelectedColegaId(null);
+                    }}
+                  >
+                    Confirmar troca
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
         </div>
       )}
 
@@ -208,7 +433,7 @@ const Dashboard = () => {
               )}
             </>
           )}
-          {!isMaster && listaEscalas.length > 0 && (
+          {false && !isMaster && listaEscalas.length > 0 && (
             <div className="rounded-xl bg-viva-50/80 border border-viva-200/50 p-4">
               <p className="text-[10px] font-semibold uppercase tracking-wider text-viva-600">Escala(s)</p>
               <p className="text-xs font-medium text-viva-900 mt-1 leading-snug">

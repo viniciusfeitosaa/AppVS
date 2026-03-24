@@ -10,6 +10,7 @@ interface FormState {
   ativo: boolean;
   usaEscala: boolean;
   usaPonto: boolean;
+  permiteTrocaPlantao: boolean;
 }
 
 const emptyForm: FormState = {
@@ -20,6 +21,7 @@ const emptyForm: FormState = {
   ativo: true,
   usaEscala: true,
   usaPonto: true,
+  permiteTrocaPlantao: false,
 };
 
 const toDateInput = (value?: string | null) => (value ? value.slice(0, 10) : '');
@@ -297,6 +299,7 @@ const ContratosAtivos = () => {
       ativo: contrato.ativo,
       usaEscala: contrato.usaEscala !== false,
       usaPonto: contrato.usaPonto !== false,
+      permiteTrocaPlantao: !!contrato.permiteTrocaPlantao,
     });
     setError(null);
   };
@@ -319,6 +322,7 @@ const ContratosAtivos = () => {
         ativo: form.ativo,
         usaEscala: form.usaEscala,
         usaPonto: form.usaPonto,
+        permiteTrocaPlantao: form.permiteTrocaPlantao,
       };
 
       if (!payload.nome || !payload.dataInicio) {
@@ -411,6 +415,20 @@ const ContratosAtivos = () => {
                 Usar ponto eletrônico
               </label>
             </div>
+          </div>
+          <div className="md:col-span-2 space-y-2">
+            <p className="text-sm font-semibold text-viva-800">Troca de plantão</p>
+            <p className="text-xs text-gray-600">
+              Permite que profissionais da mesma equipe solicitem troca de plantão entre si (quando a escala estiver habilitada no app do médico).
+            </p>
+            <label className="flex items-center gap-2 text-sm text-viva-900">
+              <input
+                type="checkbox"
+                checked={form.permiteTrocaPlantao}
+                onChange={(e) => setForm((prev) => ({ ...prev, permiteTrocaPlantao: e.target.checked }))}
+              />
+              Permitir troca de plantão neste contrato
+            </label>
           </div>
           <label className="flex items-center gap-2 text-sm text-viva-900">
             <input

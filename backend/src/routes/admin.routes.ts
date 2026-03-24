@@ -18,6 +18,8 @@ import {
   listContratoSubgruposController,
   listEscalaMedicosController,
   listEscalaPlantoesController,
+  listEquipePlantoesController,
+  listEquipeEscalasController,
   listEscalasController,
   listRegistrosPontoAdminController,
   getMatrizAcessosModulosController,
@@ -123,6 +125,8 @@ router.post('/equipes', requireModuleAccess(ModuloSistema.MEDICOS), createEquipe
 router.put('/equipes/:id', requireModuleAccess(ModuloSistema.MEDICOS), updateEquipeController);
 router.delete('/equipes/:id', requireModuleAccess(ModuloSistema.MEDICOS), deleteEquipeController);
 router.get('/equipes/:id/medicos', requireModuleAccess(ModuloSistema.MEDICOS), listEquipeMedicosController);
+router.get('/equipes/:id/plantoes', requireModuleAccess(ModuloSistema.ESCALAS), listEquipePlantoesController);
+router.get('/equipes/:id/escalas', requireModuleAccess(ModuloSistema.ESCALAS), listEquipeEscalasController);
 router.post('/equipes/:id/medicos', requireModuleAccess(ModuloSistema.MEDICOS), addMedicoToEquipeController);
 router.delete('/equipes/:id/medicos/:medicoId', requireModuleAccess(ModuloSistema.MEDICOS), removeMedicoFromEquipeController);
 router.get('/escalas/:id/subgrupos', requireModuleAccess(ModuloSistema.ESCALAS), listEscalaSubgruposController);

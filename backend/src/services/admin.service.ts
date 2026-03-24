@@ -56,6 +56,7 @@ interface CreateContratoAtivoInput {
   ativo?: boolean;
   usaEscala?: boolean;
   usaPonto?: boolean;
+  permiteTrocaPlantao?: boolean;
 }
 
 interface UpdateContratoAtivoInput {
@@ -69,6 +70,7 @@ interface UpdateContratoAtivoInput {
   ativo?: boolean;
   usaEscala?: boolean;
   usaPonto?: boolean;
+  permiteTrocaPlantao?: boolean;
 }
 
 interface ListEscalasParams {
@@ -461,6 +463,7 @@ export async function createContratoAtivoService(input: CreateContratoAtivoInput
       ativo: input.ativo ?? true,
       usaEscala,
       usaPonto,
+      permiteTrocaPlantao: input.permiteTrocaPlantao ?? false,
     },
   });
 
@@ -497,6 +500,7 @@ export async function updateContratoAtivoService(input: UpdateContratoAtivoInput
       ativo: input.ativo,
       usaEscala: input.usaEscala,
       usaPonto: input.usaPonto,
+      permiteTrocaPlantao: input.permiteTrocaPlantao,
     },
   });
 
@@ -1121,6 +1125,59 @@ export async function listEscalaPlantoesService(
   });
 }
 
+/** Lista plantões de escalas que incluem a equipe, no período informado. */
+export async function listEquipePlantoesService(
+  tenantId: string,
+  equipeId: string,
+  filters: { dataInicio?: string; dataFim?: string }
+) {
+  const dataInicio = filters.dataInicio ? new Date(filters.dataInicio) : undefined;
+  const dataFim = filters.dataFim ? new Date(filters.dataFim) : undefined;
+
+  const escalaEquipes = await prisma.escalaEquipe.findMany({
+    where: { tenantId, equipeId },
+    select: { escalaId: true },
+  });
+  const escalaIds = escalaEquipes.map((e) => e.escalaId);
+  if (escalaIds.length === 0) {
+    return [];
+  }
+
+  const where: any = {
+    tenantId,
+    escalaId: { in: escalaIds },
+  };
+  if (dataInicio || dataFim) {
+    where.data = {};
+    if (dataInicio) where.data.gte = dataInicio;
+    if (dataFim) where.data.lte = dataFim;
+  }
+
+  return prisma.escalaPlantao.findMany({
+    where,
+    include: {
+      medico: {
+        select: { id: true, nomeCompleto: true, crm: true, email: true, telefone: true },
+      },
+    },
+    orderBy: [{ data: 'asc' }, { gradeId: 'asc' }],
+  });
+}
+
+/** Lista escalas que incluem a equipe (via EscalaEquipe). */
+export async function listEquipeEscalasService(tenantId: string, equipeId: string) {
+  const escalaEquipes = await prisma.escalaEquipe.findMany({
+    where: { tenantId, equipeId },
+    select: { escalaId: true },
+  });
+  const escalaIds = escalaEquipes.map((e) => e.escalaId);
+  if (escalaIds.length === 0) return [];
+  return prisma.escala.findMany({
+    where: { id: { in: escalaIds }, tenantId },
+    orderBy: [{ dataInicio: 'desc' }],
+  });
+}
+
 export async function createEscalaPlantaoService(input: {
   tenantId: string;
   masterId: string;
@@ -1136,7 +1193,8 @@ export async function createEscalaPlantaoService(input: {
   }
   const [escala, medico] = await Promise.all([
     prisma.escala.findFirst({
-      where: { id: input.escalaId, tenantId: input.tenantId, ativo: true },
+      // Permitir atribuir plantões também em escalas em rascunho (ativo=false)
+      where: { id: input.escalaId, tenantId: input.tenantId },
     }),
     prisma.medico.findFirst({
       where: { id: input.medicoId, tenantId: input.tenantId, ativo: true },

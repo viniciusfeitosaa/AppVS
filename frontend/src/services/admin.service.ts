@@ -25,6 +25,7 @@ export interface ContratoAtivo {
   ativo: boolean;
   usaEscala: boolean;
   usaPonto: boolean;
+  permiteTrocaPlantao?: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -126,6 +127,7 @@ export interface Subgrupo {
   createdAt: string;
   updatedAt: string;
   _count?: { subgrupoMedicos: number; escalaSubgrupos: number; equipes?: number };
+  contratoSubgrupos?: { contratoAtivo: { id: string; nome: string; usaEscala: boolean; usaPonto: boolean } }[];
 }
 
 export interface Equipe {
@@ -201,6 +203,7 @@ interface ContratoAtivoPayload {
   ativo?: boolean;
   usaEscala?: boolean;
   usaPonto?: boolean;
+  permiteTrocaPlantao?: boolean;
 }
 
 interface EscalaPayload {
@@ -329,6 +332,19 @@ export const adminService = {
     params?: { dataInicio?: string; dataFim?: string }
   ): Promise<{ success: boolean; data: EscalaPlantao[] }> => {
     const response = await api.get(`/admin/escalas/${escalaId}/plantoes`, { params });
+    return response.data;
+  },
+
+  listEquipePlantoes: async (
+    equipeId: string,
+    params?: { dataInicio?: string; dataFim?: string }
+  ): Promise<{ success: boolean; data: EscalaPlantao[] }> => {
+    const response = await api.get(`/admin/equipes/${equipeId}/plantoes`, { params });
+    return response.data;
+  },
+
+  listEscalasByEquipe: async (equipeId: string): Promise<{ success: boolean; data: Escala[] }> => {
+    const response = await api.get(`/admin/equipes/${equipeId}/escalas`);
     return response.data;
   },
 
