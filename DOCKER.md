@@ -58,14 +58,14 @@ Certifique-se de ter um arquivo `.env` na raiz do projeto com todas as variávei
 
 ### Portas Padrão
 
-- **Frontend**: `80` (HTTP)
+- **Frontend**: `8082` (HTTP no host; padrão evita conflito com NPM na porta 80)
 - **Backend**: `3001`
 - **Nginx**: `8080` (HTTP), `8443` (HTTPS) - apenas em produção
 
 Para alterar, modifique as variáveis no `docker-compose.yml` ou no `.env`:
 
 ```env
-FRONTEND_PORT=80
+FRONTEND_PORT=8082
 BACKEND_PORT=3001
 NGINX_HTTP_PORT=8080
 NGINX_HTTPS_PORT=8443
