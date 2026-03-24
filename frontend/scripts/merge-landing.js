@@ -3,8 +3,11 @@
  * copia a landing para a raiz de dist (site em /, app em /app/).
  * Com VITE_APP_BASE=/ (padrão): não mexe — ficheiros ficam na raiz de dist (Docker, domínio dedicado).
  */
-const fs = require('fs');
-const path = require('path');
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const distDir = path.join(__dirname, '..', 'dist');
 const landingDir = path.join(__dirname, '..', '..', 'landing');
