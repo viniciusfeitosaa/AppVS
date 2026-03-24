@@ -95,7 +95,7 @@ const Escalas = () => {
   const [medicoIdToAllocate, setMedicoIdToAllocate] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [loadingAction, setLoadingAction] = useState(false);
-  const [weekStart, setWeekStart] = useState<Date>(() => getMonday(new Date()));
+  const [weekStart] = useState<Date>(() => getMonday(new Date()));
   /** Primeiro dia do mês exibido na grade mensal (layout principal da escala). */
   const [gradeMonthStart, setGradeMonthStart] = useState<Date>(() => {
     const d = new Date();
@@ -334,14 +334,6 @@ const Escalas = () => {
     if (!searchGruposLower) return base;
     return base.filter((s) => s.nome.toLowerCase().includes(searchGruposLower));
   }, [subgruposComEscala, searchGruposLower]);
-  const equipesFiltradas = useMemo(() => {
-    if (!searchGruposLower) return equipes;
-    return equipes.filter(
-      (e) =>
-        e.nome.toLowerCase().includes(searchGruposLower) ||
-        (e.subgrupo?.nome ?? '').toLowerCase().includes(searchGruposLower)
-    );
-  }, [equipes, searchGruposLower]);
 
   /** Equipes do subgrupo selecionado (só preenchido quando selectedSubgrupoId está setado). */
   const equipesDoSubgrupoSelecionado = useMemo(() => {

@@ -136,11 +136,6 @@ const SubgruposEquipes = () => {
     queryFn: () => adminService.listContratosAtivos({ page: 1, limit: 200 }),
     enabled: isMaster,
   });
-  const { data: escalasResp } = useQuery({
-    queryKey: ['admin', 'escalas'],
-    queryFn: () => adminService.listEscalas({ page: 1, limit: 200 }),
-    enabled: isMaster,
-  });
   const { data: equipeEscalasResp } = useQuery({
     queryKey: ['admin', 'equipes', selectedEquipeId ?? '', 'escalas'],
     queryFn: () => adminService.listEscalasByEquipe(selectedEquipeId!),
@@ -168,7 +163,6 @@ const SubgruposEquipes = () => {
   });
 
   const contratosAtivos = useMemo(() => contratosAtivosResp?.data || [], [contratosAtivosResp]);
-  const escalas = useMemo(() => escalasResp?.data || [], [escalasResp]);
   const medicos = useMemo(() => medicosResp?.data || [], [medicosResp]);
   const subgrupos = useMemo(() => subgruposResp?.data || [], [subgruposResp]);
   const equipes = useMemo(() => equipesResp?.data || [], [equipesResp]);
@@ -295,7 +289,7 @@ const SubgruposEquipes = () => {
   const closeConfirmExcluir = () => setConfirmExcluir(null);
   const executarExcluir = async () => {
     if (!confirmExcluir) return;
-    const { tipo, id, nome } = confirmExcluir;
+    const { tipo, id } = confirmExcluir;
     setLoadingAction(true);
     try {
       if (tipo === 'subgrupo') {

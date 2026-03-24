@@ -168,7 +168,6 @@ const Dashboard = () => {
   const proxima = proximosList[0] ?? null;
   const segundaProxima = proximosList[1] ?? null;
   const temProximosPlantoes = proximosList.length > 0;
-  const temEscalaAtivaParaPonto = isMedico && escalasEmVigor.length > 0;
 
   const [showTrocaModal, setShowTrocaModal] = useState(false);
   const [trocaEscalaId, setTrocaEscalaId] = useState<string | null>(null);
