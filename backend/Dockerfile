@@ -46,6 +46,9 @@ COPY --from=builder /app/prisma ./prisma
 COPY docker-entrypoint.sh ./
 RUN chmod +x docker-entrypoint.sh
 
+RUN mkdir -p /app/uploads/medicos /app/uploads/documentos-enviados \
+  && chown -R nodejs:nodejs /app/uploads
+
 # Mudar para usuário não-root
 USER nodejs
 
