@@ -21,7 +21,7 @@ fi
 
 git fetch origin "${BRANCH}"
 git checkout "${BRANCH}"
-git pull --ff-only "origin/${BRANCH}"
+git pull --ff-only origin "${BRANCH}"
 
 if [ ! -f .env ]; then
   echo "[deploy] Aviso: ficheiro .env não encontrado. Crie a partir de .env.example na VPS." >&2
