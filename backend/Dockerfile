@@ -32,6 +32,10 @@ WORKDIR /app
 
 ENV NODE_ENV=production
 
+# OpenSSL 3 (Alpine ≥3.17); forçar engine Prisma compatível (evita carregar *-musl.so com libssl 1.1)
+RUN apk add --no-cache openssl
+ENV PRISMA_QUERY_ENGINE_LIBRARY=/app/node_modules/.prisma/client/libquery_engine-linux-musl-openssl-3.0.x.so.node
+
 # Criar usuário não-root
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nodejs
