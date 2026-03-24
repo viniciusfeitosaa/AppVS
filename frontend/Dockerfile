@@ -13,7 +13,11 @@ RUN npm ci
 # Copiar código fonte
 COPY . .
 
-# Build da aplicação
+# URL pública da API (vista pelo browser). Ex.: http://187.77.247.33:3001/api ou https://api.teudominio.com/api
+ARG VITE_API_URL
+ENV VITE_API_URL=$VITE_API_URL
+RUN test -n "$VITE_API_URL" || (echo "Defina VITE_API_URL no .env na raiz do projeto (ex.: http://IP_OU_DOMINIO:3001/api) e faça docker compose build" >&2 && exit 1)
+
 RUN npm run build
 
 # Stage 2: Production
