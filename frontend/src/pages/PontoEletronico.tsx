@@ -26,11 +26,13 @@ const PontoEletronico = () => {
   const [agora, setAgora] = useState(() => new Date());
   const [checkinModalOpen, setCheckinModalOpen] = useState(false);
   const [cameraErro, setCameraErro] = useState(false);
+  const [cameraErroTipo, setCameraErroTipo] = useState<string | null>(null);
   const [videoPronto, setVideoPronto] = useState(false);
   const [cameraRetryKey, setCameraRetryKey] = useState(0);
   const [motivoSemFoto, setMotivoSemFoto] = useState('');
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const cameraStartAttemptRef = useRef(0);
 
   const isMedico = user?.role === 'MEDICO';
 
@@ -90,47 +92,82 @@ const PontoEletronico = () => {
     await queryClient.invalidateQueries({ queryKey: ['ponto', 'meu-dia'] });
   };
 
+  const iniciarCamera = async () => {
+    // Importante: chamada no handler (clique) ajuda browsers móveis a exibirem o prompt.
+    const attempt = ++cameraStartAttemptRef.current;
+
+    // Limpa qualquer stream anterior para evitar "estado preso" no vídeo.
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((t) => t.stop());
+      streamRef.current = null;
+    }
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
+    }
+
+    setCameraErro(false);
+    setCameraErroTipo(null);
+    setVideoPronto(false);
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'user', width: { ideal: 720 } },
+        audio: false,
+      });
+
+      if (attempt !== cameraStartAttemptRef.current) {
+        stream.getTracks().forEach((t) => t.stop());
+        return;
+      }
+
+      streamRef.current = stream;
+      const el = videoRef.current;
+      if (el) {
+        el.srcObject = stream;
+        await el.play().catch(() => {});
+      }
+    } catch (err: any) {
+      if (attempt !== cameraStartAttemptRef.current) return;
+      setCameraErro(true);
+      setCameraErroTipo(err?.name || 'UNKNOWN_ERROR');
+    }
+  };
+
   useEffect(() => {
     if (!checkinModalOpen) return;
-    setCameraErro(false);
-    setVideoPronto(false);
-    let cancelled = false;
-    let stream: MediaStream | null = null;
-    (async () => {
-      try {
-        stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: 'user', width: { ideal: 720 } },
-          audio: false,
-        });
-        if (cancelled) {
-          stream.getTracks().forEach((t) => t.stop());
-          return;
-        }
-        streamRef.current = stream;
-        const el = videoRef.current;
-        if (el) {
-          el.srcObject = stream;
-          await el.play().catch(() => {});
-        }
-      } catch {
-        if (!cancelled) setCameraErro(true);
-      }
-    })();
+    void iniciarCamera();
+
     return () => {
-      cancelled = true;
-      stream?.getTracks().forEach((t) => t.stop());
+      // Invalidar qualquer tentativa pendente.
+      cameraStartAttemptRef.current++;
+
       if (streamRef.current) {
         streamRef.current.getTracks().forEach((t) => t.stop());
         streamRef.current = null;
       }
+      if (videoRef.current) {
+        videoRef.current.srcObject = null;
+      }
     };
   }, [checkinModalOpen, cameraRetryKey]);
 
+  // Se o usuário clicou em "Tentar câmera novamente", o stream pode ter sido obtido
+  // antes do <video> ser montado (porque cameraErro controla o render). Este efeito só
+  // anexa o stream ao elemento quando ele existir.
+  useEffect(() => {
+    if (!checkinModalOpen) return;
+    if (cameraErro) return; // só anexa quando a UI volta a mostrar o vídeo
+    const el = videoRef.current;
+    const stream = streamRef.current;
+    if (!el || !stream) return;
+    el.srcObject = stream;
+    void el.play().catch(() => {});
+  }, [checkinModalOpen, cameraErro]);
+
   const tentarCameraNovamente = () => {
     setError(null);
-    setCameraErro(false);
-    setVideoPronto(false);
-    setCameraRetryKey((k) => k + 1);
+    // Chamar direto aqui ajuda a garantir que o getUserMedia ocorre em contexto de clique.
+    void iniciarCamera();
   };
 
   const closeCheckinModal = () => {
@@ -514,8 +551,9 @@ const PontoEletronico = () => {
               ) : (
                 <div className="rounded-xl border border-amber-200 bg-amber-50/90 p-4 space-y-3">
                   <p className="text-xs text-viva-800 font-serif leading-relaxed">
-                    Não foi possível abrir a câmera (permissão negada ou bloqueio do navegador). Ajuste a permissão no site ou use o formulário abaixo
-                    para registrar sem foto.
+                    {cameraErroTipo === 'NotAllowedError' || cameraErroTipo === 'PermissionDeniedError'
+                      ? 'A permissão da câmera foi negada. Em alguns navegadores o prompt não aparece novamente; habilite em Configurações do site e tente novamente.'
+                      : 'Não foi possível abrir a câmera (permissão negada ou bloqueio do navegador). Ajuste a permissão no site ou use o formulário abaixo para registrar sem foto.'}
                   </p>
                   <button type="button" className="btn btn-primary text-sm w-full" onClick={tentarCameraNovamente}>
                     Tentar câmera novamente
