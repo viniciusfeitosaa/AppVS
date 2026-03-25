@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { NotificationProvider } from './context/NotificationContext';
 import ProtectedRoute from './components/Layout/ProtectedRoute';
 import AppShell from './components/Layout/AppShell';
 import LandingLayout from './components/Layout/LandingLayout';
@@ -201,12 +202,14 @@ function AppRoutes() {
 function App() {
   return (
     <AuthProvider>
-      <BrowserRouter
-        basename={(import.meta.env.BASE_URL || '/').replace(/\/$/, '') || undefined}
-        future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
-      >
-        <AppRoutes />
-      </BrowserRouter>
+      <NotificationProvider>
+        <BrowserRouter
+          basename={(import.meta.env.BASE_URL || '/').replace(/\/$/, '') || undefined}
+          future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
+        >
+          <AppRoutes />
+        </BrowserRouter>
+      </NotificationProvider>
     </AuthProvider>
   );
 }

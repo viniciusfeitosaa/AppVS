@@ -1,5 +1,6 @@
+import fs from 'fs';
 import { Request, Response, NextFunction } from 'express';
-import { body, param, validationResult } from 'express-validator';
+import { body, param, query, validationResult } from 'express-validator';
 import { validateCPF, validateCRM } from '../utils/validation.util';
 
 const handleValidationErrors = (req: Request, res: Response, next: NextFunction) => {
@@ -230,12 +231,29 @@ export const validateUUIDParam = (paramName: string) => [
 ];
 
 /**
+ * Valida query string UUID (ex.: ?escalaId=...)
+ */
+export const validateUUIDQuery = (queryName: string) => [
+  query(queryName)
+    .isUUID()
+    .withMessage(`${queryName} inválido`),
+  handleValidationErrors,
+];
+
+/** POST /ponto/solicitar-troca-plantao */
+export const validateSolicitarTrocaPlantao = [
+  body('plantaoId').notEmpty().isUUID().withMessage('plantaoId inválido'),
+  body('medicoDestinoId').notEmpty().isUUID().withMessage('medicoDestinoId inválido'),
+  handleValidationErrors,
+];
+
+/**
  * Check-in: validar tipos e limites básicos.
  * A regra de negócio (geolocalização obrigatória quando há config) está no service.
  */
 export const validateCheckin = [
   body('escalaId')
-    .optional({ values: 'null' })
+    .notEmpty()
     .isUUID()
     .withMessage('escalaId inválido'),
   body('observacao')
@@ -253,6 +271,87 @@ export const validateCheckin = [
     .isFloat({ min: -180, max: 180 })
     .withMessage('longitude inválida'),
   handleValidationErrors,
+];
+
+/**
+ * Check-in sem foto (câmera indisponível): mesmo corpo que validateCheckin + motivo obrigatório.
+ */
+export const validateCheckinSemFoto = [
+  body('escalaId')
+    .notEmpty()
+    .isUUID()
+    .withMessage('escalaId inválido'),
+  body('observacao')
+    .optional({ values: 'falsy' })
+    .isString()
+    .trim()
+    .isLength({ max: 2000 })
+    .withMessage('observacao inválida'),
+  body('latitude')
+    .optional({ values: 'null' })
+    .isFloat({ min: -90, max: 90 })
+    .withMessage('latitude inválida'),
+  body('longitude')
+    .optional({ values: 'null' })
+    .isFloat({ min: -180, max: 180 })
+    .withMessage('longitude inválida'),
+  body('motivoSemFoto')
+    .notEmpty()
+    .isString()
+    .trim()
+    .isLength({ min: 15, max: 500 })
+    .withMessage('motivoSemFoto deve ter entre 15 e 500 caracteres'),
+  handleValidationErrors,
+];
+
+/** Foto obrigatória após multer (check-in). */
+export const requireCheckinFoto = (req: Request, res: Response, next: NextFunction) => {
+  const file = (req as Request & { file?: Express.Multer.File }).file;
+  if (!file) {
+    return res.status(400).json({
+      success: false,
+      error: 'Foto obrigatória para check-in. Envie uma imagem JPEG, PNG ou WebP (máx. 5 MB).',
+    });
+  }
+  return next();
+};
+
+/** Check-in multipart: mesmo corpo que validateCheckin; remove arquivo enviado se validação falhar. */
+const handleCheckinMultipartValidationErrors = (req: Request, res: Response, next: NextFunction) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    const file = (req as Request & { file?: Express.Multer.File }).file;
+    if (file?.path) {
+      fs.unlink(file.path, () => {});
+    }
+    return res.status(400).json({
+      success: false,
+      errors: errors.array(),
+    });
+  }
+  return next();
+};
+
+export const validateCheckinMultipart = [
+  body('escalaId')
+    .notEmpty()
+    .isUUID()
+    .withMessage('escalaId inválido'),
+  body('observacao')
+    .optional({ values: 'falsy' })
+    .isString()
+    .trim()
+    .isLength({ max: 2000 })
+    .withMessage('observacao inválida'),
+  body('latitude')
+    .optional({ values: 'null' })
+    .isFloat({ min: -90, max: 90 })
+    .withMessage('latitude inválida'),
+  body('longitude')
+    .optional({ values: 'null' })
+    .isFloat({ min: -180, max: 180 })
+    .withMessage('longitude inválida'),
+  handleCheckinMultipartValidationErrors,
 ];
 
 /**

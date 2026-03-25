@@ -108,11 +108,30 @@ const endOfToday = () => {
 export async function checkInService(
   tenantId: string,
   medicoId: string,
-  escalaId: string | undefined,
+  escalaId: string,
   observacao?: string,
   latitude?: number | null,
-  longitude?: number | null
+  longitude?: number | null,
+  fotoCheckinCaminho?: string | null,
+  motivoCheckinSemFoto?: string | null
 ) {
+  const hasFoto = !!fotoCheckinCaminho?.trim();
+  const motivo = motivoCheckinSemFoto?.trim();
+  if (hasFoto && motivo) {
+    throw { statusCode: 400, message: 'Não envie motivo quando houver foto de check-in.' };
+  }
+  if (!hasFoto) {
+    if (!motivo || motivo.length < 15) {
+      throw {
+        statusCode: 400,
+        message:
+          'Sem foto é obrigatório informar o motivo (mínimo 15 caracteres). Ex.: permissão de câmera negada no navegador.',
+      };
+    }
+    if (motivo.length > 500) {
+      throw { statusCode: 400, message: 'O motivo deve ter no máximo 500 caracteres.' };
+    }
+  }
   const registroAberto = await prisma.registroPonto.findFirst({
     where: { tenantId, medicoId, checkOutAt: null },
     orderBy: { checkInAt: 'desc' },
@@ -123,28 +142,35 @@ export async function checkInService(
     throw { statusCode: 409, message: 'Já existe um check-in em aberto para este médico' };
   }
 
-  if (escalaId) {
-    const [escala, alocacao] = await Promise.all([
-      prisma.escala.findFirst({
-        where: { id: escalaId, tenantId, ativo: true },
-        select: { id: true, nome: true },
-      }),
-      prisma.escalaMedico.findFirst({
-        where: { tenantId, escalaId, medicoId, ativo: true },
-        select: { id: true },
-      }),
-    ]);
+  // Fail-closed: check-in só é permitido se o médico estiver inserido em um plantão da escala.
+  const escala = await prisma.escala.findFirst({
+    where: { id: escalaId, tenantId, ativo: true },
+    select: { id: true, nome: true, contratoAtivo: { select: { usaEscala: true, usaPonto: true } } },
+  });
+  if (!escala) {
+    throw { statusCode: 404, message: 'Escala não encontrada ou inativa' };
+  }
+  if (!escala.contratoAtivo?.usaPonto) {
+    throw { statusCode: 403, message: 'Ponto eletrônico não está habilitado para este contrato' };
+  }
 
-    if (!escala) {
-      throw { statusCode: 404, message: 'Escala não encontrada ou inativa' };
-    }
-
-    if (!alocacao) {
-      throw { statusCode: 403, message: 'Você não está alocado nesta escala' };
+  // Se o contrato usa escalas, só faz sentido bater ponto se existir plantão do médico hoje nesta escala.
+  if (escala.contratoAtivo?.usaEscala) {
+    const plantaoHoje = await prisma.escalaPlantao.findFirst({
+      where: {
+        tenantId,
+        escalaId,
+        medicoId,
+        data: { gte: startOfToday(), lte: endOfToday() },
+      },
+      select: { id: true },
+    });
+    if (!plantaoHoje) {
+      throw { statusCode: 403, message: 'Você não possui plantão nesta escala para hoje' };
     }
   }
 
-  const configGeo = await getConfigPontoParaMedico(tenantId, medicoId, escalaId ?? null);
+  const configGeo = await getConfigPontoParaMedico(tenantId, medicoId, escalaId);
   if (configGeo) {
     if (latitude == null || longitude == null || Number.isNaN(latitude) || Number.isNaN(longitude)) {
       throw { statusCode: 400, message: 'É necessário informar sua localização para bater ponto neste local. Permita o acesso à localização no navegador ou no app.' };
@@ -170,11 +196,13 @@ export async function checkInService(
     const registro = await tx.registroPonto.create({
       data: {
         tenantId,
-        escalaId: escalaId || null,
+        escalaId,
         medicoId,
         checkInAt: new Date(),
         origem: OrigemRegistroPonto.APP_MEDICO,
         observacao: observacao?.trim() || null,
+        fotoCheckinCaminho: hasFoto ? fotoCheckinCaminho!.trim() : null,
+        motivoCheckinSemFoto: hasFoto ? null : motivo!,
       },
     });
 
@@ -183,7 +211,12 @@ export async function checkInService(
         acao: 'CHECKIN_MEDICO',
         tenantId,
         medicoId,
-        detalhes: { escalaId: registro.escalaId, registroPontoId: registro.id },
+        detalhes: {
+          escalaId: registro.escalaId,
+          registroPontoId: registro.id,
+          checkInSemFoto: !hasFoto,
+          ...(hasFoto ? {} : { motivoResumo: motivo!.slice(0, 120) }),
+        },
       },
       tx
     );
@@ -426,6 +459,13 @@ export async function listEquipeColegasService(
   medicoId: string,
   escalaId: string
 ) {
+  // Fail-closed: se a escala/contrato não permite troca, não expor lista de colegas.
+  const escala = await prisma.escala.findFirst({
+    where: { tenantId, id: escalaId, ativo: true },
+    select: { id: true, contratoAtivo: { select: { permiteTrocaPlantao: true } } },
+  });
+  if (!escala?.contratoAtivo?.permiteTrocaPlantao) return [];
+
   const equipesNaEscala = await prisma.escalaEquipe.findMany({
     where: { tenantId, escalaId },
     select: { equipeId: true },
@@ -499,4 +539,145 @@ export async function listProximosPlantoesService(tenantId: string, medicoId: st
     escalaNome: p.escala?.nome ?? null,
     permiteTrocaPlantao: !!p.escala?.contratoAtivo?.permiteTrocaPlantao,
   }));
+}
+
+const MINUTOS_ANTES_INICIO_PARA_TROCA = 10;
+
+const HORARIOS_POR_GRADE: Record<string, string> = {
+  mt: '07h às 19h',
+  sn: '19h às 07h',
+};
+
+function inicioDoPlantaoParaTroca(dataStr: string, gradeId: string): Date {
+  const d = new Date(dataStr + 'T00:00:00');
+  const g = (gradeId || '').toLowerCase();
+  if (g === 'sn') {
+    d.setHours(19, 0, 0, 0);
+    return d;
+  }
+  d.setHours(7, 0, 0, 0);
+  return d;
+}
+
+function dentroDoPrazoTrocaPlantao(dataStr: string, gradeId: string): boolean {
+  const now = new Date();
+  const inicio = inicioDoPlantaoParaTroca(dataStr, gradeId);
+  const limite = new Date(inicio.getTime() - MINUTOS_ANTES_INICIO_PARA_TROCA * 60 * 1000);
+  return now < limite;
+}
+
+function faixaPorGradeLabel(gradeId: string): string {
+  return HORARIOS_POR_GRADE[(gradeId || '').toLowerCase()] ?? '07h às 19h';
+}
+
+/**
+ * Registra solicitação de troca: notifica colega e solicitante (não altera escala_plantoes).
+ */
+export async function solicitarTrocaPlantaoService(
+  tenantId: string,
+  medicoSolicitanteId: string,
+  plantaoId: string,
+  medicoDestinoId: string
+) {
+  if (medicoSolicitanteId === medicoDestinoId) {
+    throw { statusCode: 400, message: 'Selecione outro profissional para a troca' };
+  }
+
+  const plantao = await prisma.escalaPlantao.findFirst({
+    where: { id: plantaoId, tenantId, medicoId: medicoSolicitanteId },
+    select: {
+      id: true,
+      data: true,
+      gradeId: true,
+      escalaId: true,
+      escala: {
+        select: {
+          nome: true,
+          ativo: true,
+          contratoAtivo: { select: { permiteTrocaPlantao: true } },
+        },
+      },
+    },
+  });
+
+  if (!plantao) {
+    throw { statusCode: 404, message: 'Plantão não encontrado' };
+  }
+  if (!plantao.escala.ativo) {
+    throw { statusCode: 400, message: 'Escala inativa' };
+  }
+  if (!plantao.escala.contratoAtivo?.permiteTrocaPlantao) {
+    throw { statusCode: 403, message: 'Troca de plantão não permitida para este contrato' };
+  }
+
+  const dataStr = plantao.data.toISOString().slice(0, 10);
+  if (!dentroDoPrazoTrocaPlantao(dataStr, plantao.gradeId)) {
+    throw { statusCode: 400, message: 'Período para solicitar troca encerrado' };
+  }
+
+  const colegas = await listEquipeColegasService(tenantId, medicoSolicitanteId, plantao.escalaId);
+  if (!colegas.some((c) => c.id === medicoDestinoId)) {
+    throw { statusCode: 403, message: 'Profissional não pertence às mesmas equipes nesta escala' };
+  }
+
+  const [solicitante, destino] = await Promise.all([
+    prisma.medico.findFirst({
+      where: { id: medicoSolicitanteId, tenantId, ativo: true },
+      select: { nomeCompleto: true },
+    }),
+    prisma.medico.findFirst({
+      where: { id: medicoDestinoId, tenantId, ativo: true },
+      select: { nomeCompleto: true },
+    }),
+  ]);
+
+  if (!solicitante || !destino) {
+    throw { statusCode: 404, message: 'Profissional não encontrado' };
+  }
+
+  const { notificarTrocaPlantaoSolicitada } = await import('./notificacao-medico.service');
+  await notificarTrocaPlantaoSolicitada(tenantId, {
+    medicoSolicitanteId,
+    medicoDestinoId,
+    solicitanteNome: solicitante.nomeCompleto.trim(),
+    destinoNome: destino.nomeCompleto.trim(),
+    plantaoId: plantao.id,
+    escalaId: plantao.escalaId,
+    escalaNome: plantao.escala.nome,
+    dataPlantaoIso: dataStr,
+    gradeLabel: faixaPorGradeLabel(plantao.gradeId),
+  });
+
+  return { ok: true as const };
+}
+
+export async function canCheckInService(tenantId: string, medicoId: string, escalaId: string) {
+  const escala = await prisma.escala.findFirst({
+    where: { id: escalaId, tenantId, ativo: true },
+    select: {
+      id: true,
+      contratoAtivo: { select: { usaEscala: true, usaPonto: true } },
+    },
+  });
+  if (!escala) {
+    return { allowed: false, reason: 'Escala não encontrada ou inativa' as const };
+  }
+  if (!escala.contratoAtivo?.usaPonto) {
+    return { allowed: false, reason: 'Ponto eletrônico não está habilitado para este contrato' as const };
+  }
+  if (escala.contratoAtivo?.usaEscala) {
+    const plantaoHoje = await prisma.escalaPlantao.findFirst({
+      where: {
+        tenantId,
+        escalaId,
+        medicoId,
+        data: { gte: startOfToday(), lte: endOfToday() },
+      },
+      select: { id: true },
+    });
+    if (!plantaoHoje) {
+      return { allowed: false, reason: 'Você não possui plantão nesta escala para hoje' as const };
+    }
+  }
+  return { allowed: true, reason: null };
 }

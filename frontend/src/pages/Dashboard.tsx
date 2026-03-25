@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../context/AuthContext';
+import { notify } from '../lib/notificationEmitter';
 import { medicoService } from '../services/medico.service';
 import { pontoService } from '../services/ponto.service';
 import { formatCRM, fixMojibake } from '../utils/validation.util';
@@ -97,6 +98,7 @@ const formatFaixaEscala = (
 };
 
 const Dashboard = () => {
+  const queryClient = useQueryClient();
   const { user } = useAuth();
   const isMaster = user?.role === 'MASTER';
   const isMedico = user?.role === 'MEDICO';
@@ -155,9 +157,6 @@ const Dashboard = () => {
     configHorario?.horarioEntrada ?? null,
     configHorario?.horarioSaida ?? null
   );
-  const horaEntradaStr = configHorario?.horarioEntrada ? String(configHorario.horarioEntrada).trim().slice(0, 5) : null;
-  const horarioExibicao = horaEntradaStr ?? faixaHorario;
-
   const { data: proximosResp } = useQuery({
     queryKey: ['ponto', 'proximos-plantoes'],
     queryFn: () => pontoService.listProximosPlantoes(),
@@ -171,8 +170,41 @@ const Dashboard = () => {
 
   const [showTrocaModal, setShowTrocaModal] = useState(false);
   const [trocaEscalaId, setTrocaEscalaId] = useState<string | null>(null);
+  const [trocaPlantaoId, setTrocaPlantaoId] = useState<string | null>(null);
   const [trocaStep, setTrocaStep] = useState<1 | 2>(1);
   const [selectedColegaId, setSelectedColegaId] = useState<string | null>(null);
+
+  const resetTrocaModal = () => {
+    setShowTrocaModal(false);
+    setTrocaStep(1);
+    setSelectedColegaId(null);
+    setTrocaEscalaId(null);
+    setTrocaPlantaoId(null);
+  };
+
+  const trocaMutation = useMutation({
+    mutationFn: () =>
+      pontoService.solicitarTrocaPlantao({
+        plantaoId: trocaPlantaoId!,
+        medicoDestinoId: selectedColegaId!,
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['medico', 'notificacoes'] });
+      resetTrocaModal();
+    },
+    onError: (err: unknown) => {
+      const msg =
+        err && typeof err === 'object' && 'response' in err
+          ? (err as { response?: { data?: { error?: string } } }).response?.data?.error
+          : undefined;
+      notify({
+        kind: 'error',
+        title: 'Não foi possível',
+        message: msg ?? 'Tente novamente.',
+        source: 'ponto',
+      });
+    },
+  });
 
   const { data: colegasResp } = useQuery({
     queryKey: ['ponto', 'equipe-colegas', trocaEscalaId],
@@ -220,28 +252,37 @@ const Dashboard = () => {
               <div className="min-w-0">
                 <p className="text-xs font-semibold uppercase tracking-wider text-viva-600 mb-0.5">Próxima escala</p>
                 <p className="text-viva-900 font-medium text-sm">
-                  <span className="font-bold text-viva-800">{fixMojibake(proxima.escalaNome || 'Escala')}</span>
-                  {' · '}
-                  <span className="text-viva-800">{formatDataCurta(proxima.data)}</span>
-                  {' · '}
-                  <span className="font-bold text-viva-800">{faixaPorGrade(proxima.gradeId)}</span>
+                  Você tem escala para <span className="font-bold text-viva-800">{fixMojibake(proxima.escalaNome || 'Escala')}</span> no dia{' '}
+                  <span className="font-bold text-viva-800">{formatDataCurta(proxima.data)}</span> no horário{' '}
+                  <span className="font-bold text-viva-800">{faixaPorGrade(proxima.gradeId)}</span>.
                 </p>
               </div>
               <div className="flex flex-wrap items-center gap-2 shrink-0">
-                {proxima.permiteTrocaPlantao !== false && canTrocarPlantao(proxima.data, proxima.gradeId) && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setTrocaEscalaId(proxima.escalaId);
-                      setShowTrocaModal(true);
-                      setTrocaStep(1);
-                      setSelectedColegaId(null);
-                    }}
-                    className="btn btn-secondary text-sm"
-                  >
-                    Trocar plantão
-                  </button>
-                )}
+                {proxima.permiteTrocaPlantao === false
+                  ? null
+                  : canTrocarPlantao(proxima.data, proxima.gradeId)
+                    ? (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setTrocaEscalaId(proxima.escalaId);
+                            setTrocaPlantaoId(proxima.id);
+                            setShowTrocaModal(true);
+                            setTrocaStep(1);
+                            setSelectedColegaId(null);
+                          }}
+                          className="btn btn-secondary text-sm"
+                        >
+                          Trocar plantão
+                        </button>
+                      )
+                    : (
+                        <span className="text-xs text-viva-600 max-w-[14rem]">
+                          {isPlantaoAindaFuturo(proxima.data, proxima.gradeId)
+                            ? 'Período de troca encerrado (até 10 min antes do início)'
+                            : 'Plantão já passou'}
+                        </span>
+                      )}
                 <Link to="/ponto-eletronico" className="btn btn-primary text-sm">
                   Bater ponto
                 </Link>
@@ -254,34 +295,37 @@ const Dashboard = () => {
               <div className="min-w-0">
                 <p className="text-xs font-semibold uppercase tracking-wider text-viva-600 mb-0.5">Segunda próxima</p>
                 <p className="text-viva-900 font-medium text-sm">
-                  <span className="font-bold text-viva-800">{fixMojibake(segundaProxima.escalaNome || 'Escala')}</span>
-                  {' · '}
-                  <span className="text-viva-800">{formatDataCurta(segundaProxima.data)}</span>
-                  {' · '}
-                  <span className="font-bold text-viva-800">{faixaPorGrade(segundaProxima.gradeId)}</span>
+                  Você tem escala para <span className="font-bold text-viva-800">{fixMojibake(segundaProxima.escalaNome || 'Escala')}</span> no dia{' '}
+                  <span className="font-bold text-viva-800">{formatDataCurta(segundaProxima.data)}</span> no horário{' '}
+                  <span className="font-bold text-viva-800">{faixaPorGrade(segundaProxima.gradeId)}</span>.
                 </p>
               </div>
               <div className="flex flex-wrap items-center gap-2 shrink-0">
-                {segundaProxima.permiteTrocaPlantao !== false && canTrocarPlantao(segundaProxima.data, segundaProxima.gradeId) ? (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setTrocaEscalaId(segundaProxima.escalaId);
-                      setShowTrocaModal(true);
-                      setTrocaStep(1);
-                      setSelectedColegaId(null);
-                    }}
-                    className="btn btn-secondary text-sm"
-                  >
-                    Trocar plantão
-                  </button>
-                ) : (
-                  <span className="text-xs text-viva-600">
-                    {isPlantaoAindaFuturo(segundaProxima.data, segundaProxima.gradeId)
-                      ? (segundaProxima.permiteTrocaPlantao === false ? 'Troca não permitida neste contrato' : 'Período de troca encerrado')
-                      : 'Plantão já passou'}
-                  </span>
-                )}
+                {segundaProxima.permiteTrocaPlantao === false
+                  ? null
+                  : canTrocarPlantao(segundaProxima.data, segundaProxima.gradeId)
+                    ? (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setTrocaEscalaId(segundaProxima.escalaId);
+                            setTrocaPlantaoId(segundaProxima.id);
+                            setShowTrocaModal(true);
+                            setTrocaStep(1);
+                            setSelectedColegaId(null);
+                          }}
+                          className="btn btn-secondary text-sm"
+                        >
+                          Trocar plantão
+                        </button>
+                      )
+                    : (
+                        <span className="text-xs text-viva-600">
+                          {isPlantaoAindaFuturo(segundaProxima.data, segundaProxima.gradeId)
+                            ? 'Período de troca encerrado (até 10 min antes do início)'
+                            : 'Plantão já passou'}
+                        </span>
+                      )}
               </div>
             </div>
           )}
@@ -292,18 +336,15 @@ const Dashboard = () => {
       {isMedico && escalasEmVigor.length > 0 && !temProximosPlantoes && (
         <div className="card col-span-full stagger-2 flex flex-wrap items-center justify-between gap-4 border-l-4 border-l-viva-500 bg-gradient-to-r from-viva-50/60 to-transparent">
           <p className="text-viva-900 font-medium text-sm">
-            Você tem escala para <span className="font-bold text-viva-800">{fixMojibake(escalaNome || 'hoje')}</span>{' '}
-            no horário <span className="font-bold text-viva-800">{horarioExibicao}</span>.
+            Escala cadastrada:{' '}
+            <span className="font-bold text-viva-800">{fixMojibake(escalaNome || '—')}</span>
           </p>
-          <Link to="/ponto-eletronico" className="btn btn-primary shrink-0 text-sm">
-            Bater ponto
-          </Link>
         </div>
       )}
 
       {/* Modal Trocar plantão */}
       {showTrocaModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" onClick={() => setShowTrocaModal(false)}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" onClick={resetTrocaModal}>
           <div
             className="bg-white rounded-2xl shadow-xl max-w-md w-full p-5 flex flex-col gap-4"
             onClick={(e) => e.stopPropagation()}
@@ -328,7 +369,7 @@ const Dashboard = () => {
                   ))}
                 </select>
                 <div className="flex gap-2 justify-end">
-                  <button type="button" className="btn btn-secondary" onClick={() => setShowTrocaModal(false)}>
+                  <button type="button" className="btn btn-secondary" onClick={resetTrocaModal}>
                     Cancelar
                   </button>
                   <button
@@ -353,14 +394,10 @@ const Dashboard = () => {
                   <button
                     type="button"
                     className="btn btn-primary"
-                    onClick={() => {
-                      // TODO: chamar API de solicitação de troca quando existir
-                      setShowTrocaModal(false);
-                      setTrocaStep(1);
-                      setSelectedColegaId(null);
-                    }}
+                    disabled={trocaMutation.isPending || !trocaPlantaoId || !selectedColegaId}
+                    onClick={() => trocaMutation.mutate()}
                   >
-                    Confirmar troca
+                    {trocaMutation.isPending ? 'Enviando…' : 'Confirmar troca'}
                   </button>
                 </div>
               </>

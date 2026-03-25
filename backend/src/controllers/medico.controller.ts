@@ -4,6 +4,11 @@ import {
   listMeusDocumentos,
   getDocumentoForDownload,
 } from '../services/documentosenviados.service';
+import {
+  listNotificacoesMedicoService,
+  marcarNotificacaoLidaService,
+  marcarTodasNotificacoesLidasService,
+} from '../services/notificacao-medico.service';
 
 export const getPerfilController = async (req: Request, res: Response) => {
   try {
@@ -95,6 +100,59 @@ export const downloadDocumentoEnviadoController = async (req: Request, res: Resp
     return res.status(error.statusCode || 500).json({
       success: false,
       error: error.message || 'Erro ao baixar documento',
+    });
+  }
+};
+
+export const listNotificacoesMedicoController = async (req: Request, res: Response) => {
+  try {
+    const medicoId = req.user?.id;
+    const tenantId = req.user?.tenantId;
+    if (!medicoId || !tenantId) {
+      return res.status(401).json({ success: false, error: 'Não autenticado' });
+    }
+    const limit = req.query.limit ? Number(req.query.limit) : 40;
+    const data = await listNotificacoesMedicoService(tenantId, medicoId, limit);
+    return res.status(200).json({ success: true, data });
+  } catch (error: any) {
+    return res.status(error.statusCode || 500).json({
+      success: false,
+      error: error.message || 'Erro ao listar notificações',
+    });
+  }
+};
+
+export const marcarNotificacaoLidaMedicoController = async (req: Request, res: Response) => {
+  try {
+    const medicoId = req.user?.id;
+    const tenantId = req.user?.tenantId;
+    if (!medicoId || !tenantId) {
+      return res.status(401).json({ success: false, error: 'Não autenticado' });
+    }
+    const id = String(req.params.id);
+    await marcarNotificacaoLidaService(tenantId, medicoId, id);
+    return res.status(200).json({ success: true, message: 'Notificação marcada como lida' });
+  } catch (error: any) {
+    return res.status(error.statusCode || 500).json({
+      success: false,
+      error: error.message || 'Erro ao atualizar notificação',
+    });
+  }
+};
+
+export const marcarTodasNotificacoesLidasMedicoController = async (req: Request, res: Response) => {
+  try {
+    const medicoId = req.user?.id;
+    const tenantId = req.user?.tenantId;
+    if (!medicoId || !tenantId) {
+      return res.status(401).json({ success: false, error: 'Não autenticado' });
+    }
+    await marcarTodasNotificacoesLidasService(tenantId, medicoId);
+    return res.status(200).json({ success: true, message: 'Notificações marcadas como lidas' });
+  } catch (error: any) {
+    return res.status(error.statusCode || 500).json({
+      success: false,
+      error: error.message || 'Erro ao atualizar notificações',
     });
   }
 };

@@ -21,7 +21,7 @@ const emptyForm: FormState = {
   ativo: true,
   usaEscala: true,
   usaPonto: true,
-  permiteTrocaPlantao: false,
+  permiteTrocaPlantao: true,
 };
 
 const toDateInput = (value?: string | null) => (value ? value.slice(0, 10) : '');

@@ -1,4 +1,6 @@
 import axios from 'axios';
+import { notify } from '../lib/notificationEmitter';
+import { sanitizeNotificationBody } from '../lib/notificationDisplay';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
 
@@ -31,9 +33,43 @@ api.interceptors.request.use(
   }
 );
 
-// Interceptor para tratar erros de resposta
+function routeLabel(url: string): string | undefined {
+  if (url.includes('/ponto/')) return 'ponto';
+  if (url.includes('/medico/')) return 'perfil';
+  if (url.includes('/admin/')) return 'admin';
+  if (url.includes('/auth/')) return 'sessão';
+  return undefined;
+}
+
+// Interceptor: notificações de sucesso (mutações com message) e falhas graves (rede / 5xx)
 api.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    const url = response.config.url || '';
+    if (
+      url.includes('/auth/login') ||
+      url.includes('/auth/login-medico') ||
+      url.includes('/auth/login-master') ||
+      url.includes('/auth/refresh') ||
+      url.includes('/medico/notificacoes')
+    ) {
+      return response;
+    }
+    const method = response.config.method?.toUpperCase() || '';
+    if (!['POST', 'PUT', 'PATCH', 'DELETE'].includes(method)) {
+      return response;
+    }
+    const data = response.data as { success?: boolean; message?: string } | undefined;
+    const msg = data?.message;
+    if (typeof msg === 'string' && msg.trim() && data?.success !== false) {
+      notify({
+        kind: 'success',
+        title: 'Concluído',
+        message: msg.trim(),
+        source: routeLabel(response.config.url || ''),
+      });
+    }
+    return response;
+  },
   (error) => {
     const requestUrl = error.config?.url || '';
     const base = (import.meta.env.BASE_URL || '/').replace(/\/$/, '') || '';
@@ -56,6 +92,36 @@ api.interceptors.response.use(
     if (status === 403 && !requestUrl.includes('/acesso-negado') && !isPontoError) {
       window.location.href = `${base}/acesso-negado`;
     }
+
+    const skipNotify =
+      isAuthRoute ||
+      (isPontoError && status && status < 500) ||
+      (requestUrl.includes('/ponto/') && status && status < 500) ||
+      // Evita loop: falha ao carregar notificações não dispara outro toast de erro
+      (requestUrl.includes('/medico/notificacoes') && status && status >= 500);
+
+    if (!skipNotify) {
+      if (!error.response) {
+        notify({
+          kind: 'error',
+          title: 'Conexão',
+          message: 'Não foi possível conectar ao servidor. Verifique a internet e tente novamente.',
+          source: routeLabel(requestUrl),
+        });
+      } else if (status && status >= 500) {
+        const raw =
+          (error.response?.data?.error as string) ||
+          (error.response?.data?.message as string) ||
+          '';
+        notify({
+          kind: 'error',
+          title: 'Algo deu errado',
+          message: sanitizeNotificationBody(typeof raw === 'string' ? raw : String(raw ?? '')),
+          source: routeLabel(requestUrl),
+        });
+      }
+    }
+
     return Promise.reject(error);
   }
 );

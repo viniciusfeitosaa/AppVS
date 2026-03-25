@@ -4,9 +4,13 @@ import {
   updatePerfilController,
   listMeusDocumentosController,
   downloadDocumentoEnviadoController,
+  listNotificacoesMedicoController,
+  marcarNotificacaoLidaMedicoController,
+  marcarTodasNotificacoesLidasMedicoController,
 } from '../controllers/medico.controller';
-import { authenticateToken, requireModuleAccess } from '../middleware/auth.middleware';
-import { validateUpdatePerfil } from '../middleware/validation.middleware';
+import { UserRole } from '@prisma/client';
+import { authenticateToken, requireModuleAccess, requireRole } from '../middleware/auth.middleware';
+import { validateUpdatePerfil, validateUUIDParam } from '../middleware/validation.middleware';
 import { uploadPerfilDocumentos } from '../middleware/upload.middleware';
 import { DOCUMENTOS_PERFIL_FIELDS } from '../constants/documentos.const';
 import { ModuloSistema } from '@prisma/client';
@@ -21,6 +25,19 @@ router.get('/perfil', requireModuleAccess(ModuloSistema.PERFIL), getPerfilContro
 // Documentos enviados pelo Master para o profissional
 router.get('/documentos-enviados', requireModuleAccess(ModuloSistema.PERFIL), listMeusDocumentosController);
 router.get('/documentos-enviados/:id/download', requireModuleAccess(ModuloSistema.PERFIL), downloadDocumentoEnviadoController);
+
+router.get('/notificacoes', requireRole([UserRole.MEDICO]), listNotificacoesMedicoController);
+router.patch(
+  '/notificacoes/:id/lida',
+  requireRole([UserRole.MEDICO]),
+  validateUUIDParam('id'),
+  marcarNotificacaoLidaMedicoController
+);
+router.post(
+  '/notificacoes/marcar-todas-lidas',
+  requireRole([UserRole.MEDICO]),
+  marcarTodasNotificacoesLidasMedicoController
+);
 const parseEspecialidadesJson = (req: any, _res: any, next: () => void) => {
   if (typeof req.body?.especialidades === 'string') {
     try {

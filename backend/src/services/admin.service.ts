@@ -752,8 +752,8 @@ export async function createEscalaService(input: CreateEscalaInput) {
     throw { statusCode: 404, message: 'Contrato ativo não encontrado' };
   }
 
-  return prisma.$transaction(async (tx: any) => {
-    const escala = await tx.escala.create({
+  const escala = await prisma.$transaction(async (tx: any) => {
+    const created = await tx.escala.create({
       data: {
         tenantId: input.tenantId,
         contratoAtivoId: input.contratoAtivoId,
@@ -770,13 +770,23 @@ export async function createEscalaService(input: CreateEscalaInput) {
         acao: 'CRIAR_ESCALA',
         tenantId: input.tenantId,
         masterId: input.masterId,
-        detalhes: { escalaId: escala.id, nome: escala.nome },
+        detalhes: { escalaId: created.id, nome: created.nome },
       },
       tx
     );
 
-    return escala;
+    return created;
   });
+
+  const { notificarMedicosNovaEscala } = await import('./notificacao-medico.service');
+  await notificarMedicosNovaEscala(
+    input.tenantId,
+    escala.contratoAtivoId,
+    { id: escala.id, nome: escala.nome },
+    contrato.nome
+  );
+
+  return escala;
 }
 
 export async function updateEscalaService(input: UpdateEscalaInput) {

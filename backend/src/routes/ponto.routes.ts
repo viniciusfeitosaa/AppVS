@@ -1,14 +1,25 @@
 import { Router } from 'express';
 import { ModuloSistema, UserRole } from '@prisma/client';
 import { authenticateToken, requireModuleAccess, requireRole } from '../middleware/auth.middleware';
-import { validateCheckin, validateCheckout } from '../middleware/validation.middleware';
+import { uploadPontoCheckinMiddleware } from '../middleware/upload.middleware';
+import {
+  validateCheckinMultipart,
+  requireCheckinFoto,
+  validateCheckinSemFoto,
+  validateCheckout,
+  validateUUIDQuery,
+  validateSolicitarTrocaPlantao,
+} from '../middleware/validation.middleware';
 import {
   checkInController,
+  checkInSemFotoController,
   checkOutController,
   getMeuDiaPontoController,
   listMinhasEscalasController,
   listEquipeColegasController,
   listProximosPlantoesController,
+  solicitarTrocaPlantaoController,
+  canCheckInController,
 } from '../controllers/ponto.controller';
 
 const router = Router();
@@ -17,11 +28,21 @@ router.use(authenticateToken);
 router.use(requireRole([UserRole.MEDICO]));
 router.use(requireModuleAccess(ModuloSistema.PONTO_ELETRONICO));
 
-router.post('/checkin', validateCheckin, checkInController);
+router.post(
+  '/checkin',
+  uploadPontoCheckinMiddleware,
+  requireCheckinFoto,
+  validateCheckinMultipart,
+  checkInController
+);
+/** Check-in quando a câmera não pode ser usada (motivo obrigatório, auditado). */
+router.post('/checkin-sem-foto', validateCheckinSemFoto, checkInSemFotoController);
 router.post('/checkout', validateCheckout, checkOutController);
 router.get('/meu-dia', getMeuDiaPontoController);
 router.get('/minhas-escalas', listMinhasEscalasController);
-router.get('/equipe-colegas', listEquipeColegasController);
+router.get('/equipe-colegas', validateUUIDQuery('escalaId'), listEquipeColegasController);
 router.get('/proximos-plantoes', listProximosPlantoesController);
+router.post('/solicitar-troca-plantao', validateSolicitarTrocaPlantao, solicitarTrocaPlantaoController);
+router.get('/can-checkin', validateUUIDQuery('escalaId'), canCheckInController);
 
 export default router;

@@ -5,6 +5,7 @@ import { useAuth } from '../../context/AuthContext';
 import { authService } from '../../services/auth.service';
 import { ModuloSistema } from '../../constants/modulos';
 import { useInactivityLogout } from '../../hooks/useInactivityLogout';
+import NotificationBell from './NotificationBell';
 
 type MenuItem = { to: string; label: string };
 type MenuGroup = { title: string; items: MenuItem[] };
@@ -219,22 +220,12 @@ const AppShell = () => {
             </nav>
 
             <div className="flex items-center gap-2">
-              <div className="hidden md:flex items-center rounded-xl border border-viva-200/80 bg-viva-50/80 px-3 py-2">
-                <span className="text-sm font-medium text-viva-900 max-w-[140px] truncate font-display">
-                  {isMaster ? 'Administrador Master' : (user?.nomeCompleto || 'Usuário')}
-                </span>
-              </div>
+              <NotificationBell />
               <button
                 onClick={logout}
                 className="hidden md:inline-flex px-4 py-2 rounded-xl text-sm font-semibold text-white bg-viva-900 hover:bg-viva-800 transition shadow-sm font-display"
               >
                 Sair
-              </button>
-              <button
-                onClick={() => setIsMoreMenuOpen(true)}
-                className="lg:hidden px-4 py-2 rounded-xl text-sm font-semibold text-white bg-viva-900 hover:bg-viva-800 transition font-display"
-              >
-                Menu
               </button>
             </div>
           </div>

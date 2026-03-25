@@ -1,6 +1,16 @@
 import api from './api';
 import { DocumentoPerfilField } from '../constants/documentosPerfil';
 
+export interface NotificacaoMedicoItem {
+  id: string;
+  tipo: string;
+  titulo: string;
+  corpo: string;
+  metadata: unknown;
+  lidaEm: string | null;
+  createdAt: string;
+}
+
 export interface MedicoPerfil {
   id: string;
   tenantId: string;
@@ -92,6 +102,24 @@ export const medicoService = {
       a.click();
     }
     setTimeout(() => URL.revokeObjectURL(url), 60000);
+  },
+
+  listNotificacoes: async (limit?: number): Promise<{
+    success: boolean;
+    data: NotificacaoMedicoItem[];
+  }> => {
+    const response = await api.get<{ success: boolean; data: NotificacaoMedicoItem[] }>('/medico/notificacoes', {
+      params: limit ? { limit } : undefined,
+    });
+    return response.data;
+  },
+
+  marcarNotificacaoLida: async (id: string): Promise<void> => {
+    await api.patch(`/medico/notificacoes/${id}/lida`);
+  },
+
+  marcarTodasNotificacoesLidas: async (): Promise<void> => {
+    await api.post('/medico/notificacoes/marcar-todas-lidas');
   },
 };
 

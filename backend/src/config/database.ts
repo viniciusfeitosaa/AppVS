@@ -30,11 +30,25 @@ declare const globalThis: {
   prismaGlobal: ReturnType<typeof prismaClientSingleton>;
 } & typeof global;
 
-export const prisma = globalThis.prismaGlobal ?? prismaClientSingleton();
-
-if (process.env.NODE_ENV !== 'production') {
-  globalThis.prismaGlobal = prisma;
+/**
+ * Após `prisma generate`, o singleton em memória pode ficar desatualizado (delegate ausente).
+ * Recria o client se o modelo esperado não existir (evita "Cannot read properties of undefined (reading 'findMany')").
+ */
+function resolvePrismaClient(): PrismaClient {
+  let client = globalThis.prismaGlobal ?? prismaClientSingleton();
+  const delegate = (client as unknown as { notificacaoMedico?: { findMany: unknown } }).notificacaoMedico;
+  if (typeof delegate?.findMany !== 'function') {
+    void client.$disconnect().catch(() => {});
+    client = prismaClientSingleton();
+    if (process.env.NODE_ENV !== 'production') {
+      console.warn('[Prisma] Cliente recriado (schema mudou). Reinicie o servidor após `prisma generate` se o aviso persistir.');
+    }
+  }
+  globalThis.prismaGlobal = client;
+  return client;
 }
+
+export const prisma = resolvePrismaClient();
 
 const MAX_RETRIES = 5;
 const RETRY_DELAY_MS = 5000;

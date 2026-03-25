@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../context/AuthContext';
 import { pontoService } from '../services/ponto.service';
@@ -24,6 +24,13 @@ const PontoEletronico = () => {
   const [loadingAction, setLoadingAction] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [agora, setAgora] = useState(() => new Date());
+  const [checkinModalOpen, setCheckinModalOpen] = useState(false);
+  const [cameraErro, setCameraErro] = useState(false);
+  const [videoPronto, setVideoPronto] = useState(false);
+  const [cameraRetryKey, setCameraRetryKey] = useState(0);
+  const [motivoSemFoto, setMotivoSemFoto] = useState('');
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
 
   const isMedico = user?.role === 'MEDICO';
 
@@ -71,8 +78,128 @@ const PontoEletronico = () => {
   const configHorario: { horarioEntrada?: string | null; horarioSaida?: string | null } = meuDiaResp?.data?.configHorario || {};
   const exigeGeolocalizacao = !!meuDiaResp?.data?.exigeGeolocalizacao;
 
+  const { data: canCheckInResp } = useQuery({
+    queryKey: ['ponto', 'can-checkin', selectedEscalaId],
+    queryFn: () => pontoService.canCheckIn(selectedEscalaId!),
+    enabled: isMedico && !!selectedEscalaId && !registroAberto,
+  });
+  const canCheckIn = !!canCheckInResp?.data?.allowed;
+  const canCheckInReason: string | null = canCheckInResp?.data?.reason ?? null;
+
   const refresh = async () => {
     await queryClient.invalidateQueries({ queryKey: ['ponto', 'meu-dia'] });
+  };
+
+  useEffect(() => {
+    if (!checkinModalOpen) return;
+    setCameraErro(false);
+    setVideoPronto(false);
+    let cancelled = false;
+    let stream: MediaStream | null = null;
+    (async () => {
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: 'user', width: { ideal: 720 } },
+          audio: false,
+        });
+        if (cancelled) {
+          stream.getTracks().forEach((t) => t.stop());
+          return;
+        }
+        streamRef.current = stream;
+        const el = videoRef.current;
+        if (el) {
+          el.srcObject = stream;
+          await el.play().catch(() => {});
+        }
+      } catch {
+        if (!cancelled) setCameraErro(true);
+      }
+    })();
+    return () => {
+      cancelled = true;
+      stream?.getTracks().forEach((t) => t.stop());
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach((t) => t.stop());
+        streamRef.current = null;
+      }
+    };
+  }, [checkinModalOpen, cameraRetryKey]);
+
+  const tentarCameraNovamente = () => {
+    setError(null);
+    setCameraErro(false);
+    setVideoPronto(false);
+    setCameraRetryKey((k) => k + 1);
+  };
+
+  const closeCheckinModal = () => {
+    setVideoPronto(false);
+    setMotivoSemFoto('');
+    setCameraRetryKey(0);
+    setCheckinModalOpen(false);
+  };
+
+  const openCheckinModal = () => {
+    if (listaEscalas.length > 0 && !selectedEscalaId) {
+      setError('Selecione uma escala para realizar o check-in.');
+      return;
+    }
+    if (!registroAberto && selectedEscalaId && canCheckInResp?.data?.allowed === false) {
+      setError(null);
+      return;
+    }
+    setError(null);
+    setCameraErro(false);
+    setVideoPronto(false);
+    setMotivoSemFoto('');
+    setCameraRetryKey(0);
+    setCheckinModalOpen(true);
+  };
+
+  const tratarErroCheckin = (err: any) => {
+    const status = err.response?.status;
+    const msg = err.response?.data?.error;
+    if (status === 403) {
+      if (typeof msg === 'string' && /m[oó]dulo|permiss[aã]o/i.test(msg)) {
+        setError('Você não tem permissão para registrar ponto. Verifique o acesso ao módulo Ponto Eletrônico com o administrador.');
+      } else {
+        setError(null);
+      }
+    } else {
+      setError(msg || 'Não foi possível registrar check-in.');
+    }
+  };
+
+  /** Foto tirada no instante da chamada, a partir do quadro atual da câmera (sem galeria/arquivo). */
+  const capturarQuadroAtualComoArquivo = (): Promise<File | null> => {
+    return new Promise((resolve) => {
+      const video = videoRef.current;
+      if (!video || video.videoWidth === 0 || video.videoHeight === 0) {
+        resolve(null);
+        return;
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        resolve(null);
+        return;
+      }
+      ctx.drawImage(video, 0, 0);
+      canvas.toBlob(
+        (blob) => {
+          if (!blob) {
+            resolve(null);
+            return;
+          }
+          resolve(new File([blob], 'checkin-face.jpg', { type: 'image/jpeg' }));
+        },
+        'image/jpeg',
+        0.88
+      );
+    });
   };
 
   const obterPosicao = (): Promise<{ latitude: number; longitude: number } | null> => {
@@ -90,8 +217,46 @@ const PontoEletronico = () => {
   };
 
   const handleCheckIn = async () => {
-    if (listaEscalas.length > 0 && !selectedEscalaId) {
-      setError('Selecione uma escala para realizar o check-in.');
+    setLoadingAction(true);
+    setError(null);
+    try {
+      const foto = await capturarQuadroAtualComoArquivo();
+      if (!foto) {
+        setError(
+          'Não foi possível capturar a imagem da câmera. Aguarde o vídeo carregar e posicione-se em frente à câmera antes de confirmar.'
+        );
+        setLoadingAction(false);
+        return;
+      }
+
+      const pos = await obterPosicao();
+      if (exigeGeolocalizacao && !pos) {
+        setError(
+          'Não foi possível obter sua localização. Verifique se o acesso à localização está permitido para este site no navegador e tente novamente. Se o GPS estiver buscando sinal, aguarde alguns segundos.'
+        );
+        setLoadingAction(false);
+        return;
+      }
+      await pontoService.checkIn({
+        ...(selectedEscalaId && { escalaId: selectedEscalaId }),
+        observacao,
+        ...(pos && { latitude: pos.latitude, longitude: pos.longitude }),
+        foto,
+      });
+      setObservacao('');
+      closeCheckinModal();
+      await refresh();
+    } catch (err: any) {
+      tratarErroCheckin(err);
+    } finally {
+      setLoadingAction(false);
+    }
+  };
+
+  const handleCheckInSemFoto = async () => {
+    const m = motivoSemFoto.trim();
+    if (m.length < 15) {
+      setError('Descreva o motivo em pelo menos 15 caracteres (ex.: permissão de câmera negada no Chrome).');
       return;
     }
 
@@ -106,20 +271,17 @@ const PontoEletronico = () => {
         setLoadingAction(false);
         return;
       }
-      await pontoService.checkIn({
+      await pontoService.checkInSemFoto({
         ...(selectedEscalaId && { escalaId: selectedEscalaId }),
         observacao,
+        motivoSemFoto: m,
         ...(pos && { latitude: pos.latitude, longitude: pos.longitude }),
       });
       setObservacao('');
+      closeCheckinModal();
       await refresh();
     } catch (err: any) {
-      const status = err.response?.status;
-      if (status === 403) {
-        setError('Você não tem permissão para registrar ponto. Verifique o acesso ao módulo Ponto Eletrônico com o administrador.');
-      } else {
-        setError(err.response?.data?.error || 'Não foi possível registrar check-in.');
-      }
+      tratarErroCheckin(err);
     } finally {
       setLoadingAction(false);
     }
@@ -198,7 +360,7 @@ const PontoEletronico = () => {
           )}
         </div>
 
-        {error && (
+        {error && !checkinModalOpen && (
           <p className="mb-4 p-3 rounded-xl bg-red-50 border border-red-200 text-xs text-red-700 text-center">
             {error}
           </p>
@@ -206,13 +368,20 @@ const PontoEletronico = () => {
 
         <div className="flex justify-center">
           {!registroAberto ? (
-            <button
-              className="btn btn-primary px-8 py-3"
-              onClick={handleCheckIn}
-              disabled={loadingAction}
-            >
-              {loadingAction ? 'Registrando...' : 'Bater ponto (entrada)'}
-            </button>
+            canCheckIn ? (
+              <button
+                type="button"
+                className="btn btn-primary px-8 py-3"
+                onClick={openCheckinModal}
+                disabled={loadingAction}
+              >
+                Bater ponto (entrada)
+              </button>
+            ) : (
+              <p className="text-xs text-viva-600 font-serif">
+                {canCheckInReason ? canCheckInReason : 'Sem plantão disponível para registrar ponto.'}
+              </p>
+            )
           ) : (
             <button
               className="btn btn-primary px-8 py-3"
@@ -292,6 +461,113 @@ const PontoEletronico = () => {
           </>
         )}
       </div>
+
+      {checkinModalOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-viva-950/60 backdrop-blur-sm"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="checkin-foto-titulo"
+        >
+          <div className="card max-w-md w-full shadow-2xl border border-viva-200/80 max-h-[90vh] overflow-y-auto">
+            <h2 id="checkin-foto-titulo" className="text-base font-bold text-viva-900 font-display mb-1">
+              Foto do rosto — check-in
+            </h2>
+            <p className="text-xs text-viva-600 font-serif mb-4">
+              O ideal é usar a câmera: ao tocar em Confirmar entrada, a foto é tirada na hora. Se a permissão estiver negada ou o navegador não abrir a
+              câmera de novo, use a opção abaixo com um motivo claro — o registro fica salvo para auditoria.
+            </p>
+
+            <div className="space-y-3">
+              {!cameraErro ? (
+                <>
+                  <div className="rounded-xl overflow-hidden bg-viva-900 aspect-[4/3] flex items-center justify-center relative">
+                    <video
+                      ref={videoRef}
+                      className="w-full h-full object-cover"
+                      playsInline
+                      muted
+                      autoPlay
+                      onLoadedMetadata={(e) => {
+                        if (e.currentTarget.videoWidth > 0) setVideoPronto(true);
+                      }}
+                      onPlaying={(e) => {
+                        if (e.currentTarget.videoWidth > 0) setVideoPronto(true);
+                      }}
+                    />
+                    {!videoPronto && (
+                      <span className="absolute inset-0 flex items-center justify-center bg-viva-950/40 text-xs text-white font-serif px-4 text-center">
+                        Iniciando câmera…
+                      </span>
+                    )}
+                  </div>
+                  {videoPronto && (
+                    <p className="text-[11px] text-viva-600 font-serif text-center">
+                      Quando estiver pronto, confirme — a captura ocorre no momento do clique.
+                    </p>
+                  )}
+                  <p className="text-[10px] text-viva-500 font-serif leading-relaxed">
+                    Se já negou a câmera antes: no Chrome/Edge, clique no ícone de cadeado ou de informações ao lado do endereço, encontre “Câmera” e
+                    altere para Permitir; depois use “Tentar câmera novamente”.
+                  </p>
+                </>
+              ) : (
+                <div className="rounded-xl border border-amber-200 bg-amber-50/90 p-4 space-y-3">
+                  <p className="text-xs text-viva-800 font-serif leading-relaxed">
+                    Não foi possível abrir a câmera (permissão negada ou bloqueio do navegador). Ajuste a permissão no site ou use o formulário abaixo
+                    para registrar sem foto.
+                  </p>
+                  <button type="button" className="btn btn-primary text-sm w-full" onClick={tentarCameraNovamente}>
+                    Tentar câmera novamente
+                  </button>
+                </div>
+              )}
+            </div>
+
+            <div className="mt-5 pt-4 border-t border-viva-100 border-dashed">
+              <p className="text-xs font-semibold text-viva-800 font-display mb-2">Sem câmera agora</p>
+              <p className="text-[11px] text-viva-600 font-serif mb-2">
+                Se não for possível usar a câmera (permissão persistente, dispositivo corporativo, etc.), descreva o motivo em pelo menos 15 caracteres.
+              </p>
+              <textarea
+                className="w-full rounded-xl border border-viva-200 bg-white px-3 py-2 text-xs text-viva-900 font-serif min-h-[72px] resize-y"
+                placeholder="Ex.: permissão de câmera negada no Chrome e o site não mostra o prompt de novo"
+                value={motivoSemFoto}
+                onChange={(e) => setMotivoSemFoto(e.target.value)}
+                maxLength={500}
+                rows={3}
+              />
+              <p className="text-[10px] text-viva-500 mt-1">{motivoSemFoto.trim().length}/500 · mínimo 15 caracteres</p>
+            </div>
+
+            {error && checkinModalOpen && (
+              <p className="mt-3 p-3 rounded-xl bg-red-50 border border-red-200 text-xs text-red-700">{error}</p>
+            )}
+
+            <div className="flex flex-col sm:flex-row flex-wrap gap-2 justify-end mt-6 pt-4 border-t border-viva-100">
+              <button type="button" className="btn text-sm border border-viva-300 bg-white text-viva-800" onClick={closeCheckinModal}>
+                Cancelar
+              </button>
+              <button
+                type="button"
+                className="btn text-sm border border-viva-300 bg-white text-viva-800"
+                onClick={handleCheckInSemFoto}
+                disabled={loadingAction || motivoSemFoto.trim().length < 15}
+              >
+                {loadingAction ? 'Registrando...' : 'Registrar sem foto'}
+              </button>
+              <button
+                type="button"
+                className="btn btn-primary text-sm"
+                onClick={handleCheckIn}
+                disabled={loadingAction || cameraErro || !videoPronto}
+              >
+                {loadingAction ? 'Registrando...' : 'Confirmar entrada (com foto)'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

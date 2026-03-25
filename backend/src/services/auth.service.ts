@@ -432,7 +432,7 @@ export const acceptInviteService = async (
 
   const senhaHash = await hashPassword(password);
 
-  return prisma.$transaction(async (tx: any) => {
+  const result = await prisma.$transaction(async (tx: any) => {
     const medico = await tx.medico.findFirst({
       where: {
         tenantId: tenant.id,
@@ -490,6 +490,15 @@ export const acceptInviteService = async (
       refreshToken,
     };
   });
+
+  try {
+    const { notificarBoasVindasMedico } = await import('./notificacao-medico.service');
+    await notificarBoasVindasMedico(tenant.id, result.user.id, result.user.nomeCompleto);
+  } catch (err) {
+    console.error('[notificacao] boas-vindas (convite):', err);
+  }
+
+  return result;
 };
 
 const PROFISSAO_MEDICO = 'Médico';
@@ -591,6 +600,13 @@ export const registerPublicMedicoService = async (
 
     return created;
   });
+
+  try {
+    const { notificarBoasVindasMedico } = await import('./notificacao-medico.service');
+    await notificarBoasVindasMedico(tenant.id, medico.id, medico.nomeCompleto);
+  } catch (err) {
+    console.error('[notificacao] boas-vindas (cadastro público):', err);
+  }
 
   return {
     medico,

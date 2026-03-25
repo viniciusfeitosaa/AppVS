@@ -111,13 +111,17 @@ export async function addMedicoToSubgrupoService(
   if (!subgrupo) throw { statusCode: 404, message: 'Subgrupo não encontrado ou inativo' };
   if (!medico) throw { statusCode: 404, message: 'Médico não encontrado ou inativo' };
 
-  const row = await prisma.subgrupoMedico.upsert({
-    where: {
-      tenantId_subgrupoId_medicoId: { tenantId, subgrupoId, medicoId },
-    },
-    update: {},
-    create: { tenantId, subgrupoId, medicoId },
+  const existingSg = await prisma.subgrupoMedico.findUnique({
+    where: { tenantId_subgrupoId_medicoId: { tenantId, subgrupoId, medicoId } },
   });
+  if (existingSg) {
+    return existingSg;
+  }
+  const row = await prisma.subgrupoMedico.create({
+    data: { tenantId, subgrupoId, medicoId },
+  });
+  const { notificarMedicoVinculoSubgrupo } = await import('./notificacao-medico.service');
+  await notificarMedicoVinculoSubgrupo(tenantId, medicoId, subgrupo.nome, subgrupoId);
   await createAuditLog({
     acao: 'ADICIONAR_MEDICO_SUBGRUPO',
     tenantId,
@@ -259,13 +263,17 @@ export async function addMedicoToEquipeService(
   if (!equipe) throw { statusCode: 404, message: 'Equipe não encontrada ou inativa' };
   if (!medico) throw { statusCode: 404, message: 'Médico não encontrado ou inativo' };
 
-  const row = await prisma.equipeMedico.upsert({
-    where: {
-      tenantId_equipeId_medicoId: { tenantId, equipeId, medicoId },
-    },
-    update: {},
-    create: { tenantId, equipeId, medicoId },
+  const existingEq = await prisma.equipeMedico.findUnique({
+    where: { tenantId_equipeId_medicoId: { tenantId, equipeId, medicoId } },
   });
+  if (existingEq) {
+    return existingEq;
+  }
+  const row = await prisma.equipeMedico.create({
+    data: { tenantId, equipeId, medicoId },
+  });
+  const { notificarMedicoVinculoEquipe } = await import('./notificacao-medico.service');
+  await notificarMedicoVinculoEquipe(tenantId, medicoId, equipe.nome, equipeId);
   await createAuditLog({
     acao: 'ADICIONAR_MEDICO_EQUIPE',
     tenantId,
@@ -370,11 +378,17 @@ export async function addEquipeToEscalaService(
   ]);
   if (!escala) throw { statusCode: 404, message: 'Escala não encontrada' };
   if (!equipe) throw { statusCode: 404, message: 'Equipe não encontrada ou inativa' };
-  const row = await prisma.escalaEquipe.upsert({
+  const existingV = await prisma.escalaEquipe.findUnique({
     where: { tenantId_escalaId_equipeId: { tenantId, escalaId, equipeId } },
-    update: {},
-    create: { tenantId, escalaId, equipeId },
   });
+  if (existingV) {
+    return existingV;
+  }
+  const row = await prisma.escalaEquipe.create({
+    data: { tenantId, escalaId, equipeId },
+  });
+  const { notificarMedicosEquipeNaEscala } = await import('./notificacao-medico.service');
+  await notificarMedicosEquipeNaEscala(tenantId, escalaId, escala.nome, equipeId, equipe.nome);
   await createAuditLog({
     acao: 'VINCULAR_EQUIPE_ESCALA',
     tenantId,
