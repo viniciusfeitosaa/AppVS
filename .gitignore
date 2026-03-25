@@ -36,6 +36,8 @@ docker-compose.override.yml
 
 # Database
 *.sql
+# Versionar migrations Prisma (regra acima ignoraria *.sql)
+!backend/prisma/migrations/**/*.sql
 *.db
 *.sqlite
 
