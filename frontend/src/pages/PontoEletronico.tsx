@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useLayoutEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../context/AuthContext';
 import { pontoService } from '../services/ponto.service';
@@ -28,7 +28,8 @@ const PontoEletronico = () => {
   const [cameraErro, setCameraErro] = useState(false);
   const [cameraErroTipo, setCameraErroTipo] = useState<string | null>(null);
   const [videoPronto, setVideoPronto] = useState(false);
-  const [cameraRetryKey, setCameraRetryKey] = useState(0);
+  /** Incrementa quando há stream novo — força reanexo ao <video> (mount tardio / iOS). */
+  const [streamAttachKey, setStreamAttachKey] = useState(0);
   const [motivoSemFoto, setMotivoSemFoto] = useState('');
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -92,11 +93,24 @@ const PontoEletronico = () => {
     await queryClient.invalidateQueries({ queryKey: ['ponto', 'meu-dia'] });
   };
 
+  const pararStreamCamera = () => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((t) => t.stop());
+      streamRef.current = null;
+    }
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
+    }
+  };
+
+  /**
+   * Safari/iOS exige que getUserMedia seja invocado a partir de um gesto do usuário.
+   * Chamar só em useEffect após abrir o modal quebra essa cadeia — a câmera não liga ou fecha na hora.
+   * Por isso iniciarCamera deve ser chamado de openCheckinModal / tentarCameraNovamente (e opcionalmente após retry key).
+   */
   const iniciarCamera = async () => {
-    // Importante: chamada no handler (clique) ajuda browsers móveis a exibirem o prompt.
     const attempt = ++cameraStartAttemptRef.current;
 
-    // Limpa qualquer stream anterior para evitar "estado preso" no vídeo.
     if (streamRef.current) {
       streamRef.current.getTracks().forEach((t) => t.stop());
       streamRef.current = null;
@@ -111,7 +125,11 @@ const PontoEletronico = () => {
 
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'user', width: { ideal: 720 } },
+        video: {
+          facingMode: { ideal: 'user' },
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+        },
         audio: false,
       });
 
@@ -121,6 +139,8 @@ const PontoEletronico = () => {
       }
 
       streamRef.current = stream;
+      setStreamAttachKey((k) => k + 1);
+
       const el = videoRef.current;
       if (el) {
         el.srcObject = stream;
@@ -133,47 +153,34 @@ const PontoEletronico = () => {
     }
   };
 
+  /** Só quando o modal fecha: invalida tentativas e para tracks (evita parar stream em remounts estranhos só com modal aberto). */
   useEffect(() => {
-    if (!checkinModalOpen) return;
-    void iniciarCamera();
+    if (checkinModalOpen) return;
+    cameraStartAttemptRef.current++;
+    pararStreamCamera();
+    setVideoPronto(false);
+  }, [checkinModalOpen]);
 
-    return () => {
-      // Invalidar qualquer tentativa pendente.
-      cameraStartAttemptRef.current++;
-
-      if (streamRef.current) {
-        streamRef.current.getTracks().forEach((t) => t.stop());
-        streamRef.current = null;
-      }
-      if (videoRef.current) {
-        videoRef.current.srcObject = null;
-      }
-    };
-  }, [checkinModalOpen, cameraRetryKey]);
-
-  // Se o usuário clicou em "Tentar câmera novamente", o stream pode ter sido obtido
-  // antes do <video> ser montado (porque cameraErro controla o render). Este efeito só
-  // anexa o stream ao elemento quando ele existir.
-  useEffect(() => {
-    if (!checkinModalOpen) return;
-    if (cameraErro) return; // só anexa quando a UI volta a mostrar o vídeo
+  /** Anexa stream ao <video> quando o elemento existe (stream pode chegar antes do primeiro paint). */
+  useLayoutEffect(() => {
+    if (!checkinModalOpen || cameraErro) return;
     const el = videoRef.current;
     const stream = streamRef.current;
     if (!el || !stream) return;
     el.srcObject = stream;
     void el.play().catch(() => {});
-  }, [checkinModalOpen, cameraErro]);
+  }, [checkinModalOpen, cameraErro, streamAttachKey]);
 
   const tentarCameraNovamente = () => {
     setError(null);
-    // Chamar direto aqui ajuda a garantir que o getUserMedia ocorre em contexto de clique.
+    // Mesmo gesto do toque — obrigatório no Safari/iOS; não depender só de useEffect.
     void iniciarCamera();
   };
 
   const closeCheckinModal = () => {
     setVideoPronto(false);
     setMotivoSemFoto('');
-    setCameraRetryKey(0);
+    setStreamAttachKey(0);
     setCheckinModalOpen(false);
   };
 
@@ -190,8 +197,10 @@ const PontoEletronico = () => {
     setCameraErro(false);
     setVideoPronto(false);
     setMotivoSemFoto('');
-    setCameraRetryKey(0);
+    setStreamAttachKey(0);
     setCheckinModalOpen(true);
+    // Mesmo gesto do clique: necessário para Safari/iOS aceitar getUserMedia.
+    void iniciarCamera();
   };
 
   const tratarErroCheckin = (err: any) => {

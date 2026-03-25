@@ -22,6 +22,7 @@ import {
   listEquipeEscalasController,
   listEscalasController,
   listRegistrosPontoAdminController,
+  downloadRegistroPontoFotoAdminController,
   getMatrizAcessosModulosController,
   salvarMatrizAcessosModulosController,
   listContratosAtivosController,
@@ -121,6 +122,12 @@ router.get('/config-ponto', requireModuleAccess(ModuloSistema.PONTO_ELETRONICO),
 router.put('/config-ponto', requireModuleAccess(ModuloSistema.PONTO_ELETRONICO), setConfigPontoController);
 
 router.get('/registros-ponto', requireModuleAccess(ModuloSistema.RELATORIOS), listRegistrosPontoAdminController);
+router.get(
+  '/registros-ponto/:id/foto-checkin',
+  requireModuleAccess(ModuloSistema.RELATORIOS),
+  validateUUIDParam('id'),
+  downloadRegistroPontoFotoAdminController
+);
 router.get('/documentos-enviados', requireModuleAccess(ModuloSistema.ENVIO_DOCUMENTOS), listDocumentosEnviadosController);
 router.post('/documentos-enviados', requireModuleAccess(ModuloSistema.ENVIO_DOCUMENTOS), uploadDocumentoEnviado.single('arquivo'), uploadDocumentoEnviadoController);
 router.delete('/documentos-enviados/:id', requireModuleAccess(ModuloSistema.ENVIO_DOCUMENTOS), deleteDocumentoEnviadoController);

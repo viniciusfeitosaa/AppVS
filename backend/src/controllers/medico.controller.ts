@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { getPerfilService, updatePerfilService } from '../services/medico.service';
+import { getPerfilService, getMedicoDocumentoPerfilForDownload, updatePerfilService } from '../services/medico.service';
 import {
   listMeusDocumentos,
   getDocumentoForDownload,
@@ -77,6 +77,33 @@ export const listMeusDocumentosController = async (req: Request, res: Response) 
     return res.status(error.statusCode || 500).json({
       success: false,
       error: error.message || 'Erro ao listar documentos',
+    });
+  }
+};
+
+export const downloadMedicoDocumentoPerfilController = async (req: Request, res: Response) => {
+  try {
+    const medicoId = req.user?.id;
+    const tenantId = req.user?.tenantId;
+    if (!medicoId || !tenantId) {
+      return res.status(401).json({ success: false, error: 'Não autenticado' });
+    }
+    const docId = req.params.docId;
+    if (!docId) {
+      return res.status(400).json({ success: false, error: 'ID do documento é obrigatório' });
+    }
+    const { path: filePath, nomeArquivo, mimeType } = await getMedicoDocumentoPerfilForDownload(
+      medicoId,
+      tenantId,
+      docId
+    );
+    res.setHeader('Content-Type', mimeType);
+    res.setHeader('Content-Disposition', `inline; filename="${nomeArquivo.replace(/"/g, '\\"')}"`);
+    return res.sendFile(filePath);
+  } catch (error: any) {
+    return res.status(error.statusCode || 500).json({
+      success: false,
+      error: error.message || 'Erro ao baixar documento',
     });
   }
 };

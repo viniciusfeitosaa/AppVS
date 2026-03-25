@@ -1,10 +1,12 @@
 import fs from 'fs';
 import path from 'path';
 import { Request, Response } from 'express';
+import { assertFileIsAllowedImage } from '../utils/image-magic-bytes.util';
 import {
   checkInService,
   checkOutService,
   getMeuDiaPontoService,
+  getFotoCheckinRegistroForMedico,
   listMinhasEscalasService,
   listEquipeColegasService,
   listProximosPlantoesService,
@@ -30,6 +32,16 @@ export const checkInController = async (req: Request, res: Response) => {
       return res.status(400).json({
         success: false,
         error: 'Foto obrigatória para check-in. Envie uma imagem JPEG, PNG ou WebP (máx. 5 MB).',
+      });
+    }
+
+    try {
+      await assertFileIsAllowedImage(file.path);
+    } catch (e: any) {
+      fs.unlink(file.path, () => {});
+      return res.status(400).json({
+        success: false,
+        error: e?.message || 'Arquivo de imagem inválido.',
       });
     }
 
@@ -189,6 +201,28 @@ export const canCheckInController = async (req: Request, res: Response) => {
     return res.status(error.statusCode || 500).json({
       success: false,
       error: error.message || 'Erro ao validar check-in',
+    });
+  }
+};
+
+export const downloadFotoCheckinMedicoController = async (req: Request, res: Response) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ success: false, error: 'Não autenticado' });
+    }
+    const registroId = String(req.params.id);
+    const { path: filePath, mimeType } = await getFotoCheckinRegistroForMedico(
+      req.user.tenantId,
+      req.user.id,
+      registroId
+    );
+    res.setHeader('Content-Type', mimeType);
+    res.setHeader('Content-Disposition', 'inline');
+    return res.sendFile(filePath);
+  } catch (error: any) {
+    return res.status(error.statusCode || 500).json({
+      success: false,
+      error: error.message || 'Erro ao obter foto do check-in',
     });
   }
 };

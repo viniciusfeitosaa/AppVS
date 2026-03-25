@@ -3,6 +3,7 @@ import {
   getPerfilController,
   updatePerfilController,
   listMeusDocumentosController,
+  downloadMedicoDocumentoPerfilController,
   downloadDocumentoEnviadoController,
   listNotificacoesMedicoController,
   marcarNotificacaoLidaMedicoController,
@@ -22,6 +23,12 @@ router.use(authenticateToken);
 
 // GET /api/medico/perfil
 router.get('/perfil', requireModuleAccess(ModuloSistema.PERFIL), getPerfilController);
+router.get(
+  '/perfil/documentos/:docId/download',
+  requireModuleAccess(ModuloSistema.PERFIL),
+  validateUUIDParam('docId'),
+  downloadMedicoDocumentoPerfilController
+);
 // Documentos enviados pelo Master para o profissional
 router.get('/documentos-enviados', requireModuleAccess(ModuloSistema.PERFIL), listMeusDocumentosController);
 router.get('/documentos-enviados/:id/download', requireModuleAccess(ModuloSistema.PERFIL), downloadDocumentoEnviadoController);

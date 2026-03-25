@@ -1,5 +1,4 @@
 import express, { Express, Request, Response, NextFunction } from 'express';
-import path from 'path';
 import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
@@ -61,7 +60,7 @@ app.use('/api', limiter);
 // Body parser
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
-app.use('/uploads', express.static(path.resolve(process.cwd(), 'uploads')));
+// Arquivos em uploads/ não são mais servidos publicamente (ver rotas autenticadas em medico/ponto/admin).
 
 // Garantir que respostas JSON sejam enviadas em UTF-8 (evita mojibake na exibição)
 app.use((_req: Request, res: Response, next: NextFunction) => {

@@ -73,6 +73,7 @@ Foram aplicadas transações (`prisma.$transaction`) nos fluxos críticos para e
 - **Ponto**
   - Check-in: criação do registro + auditoria (atômico) e **revalidação dentro da transação** para reduzir race condition
   - Checkout: update protegido (`updateMany` com `checkOutAt: null`) + auditoria (atômico)
+  - Troca de plantão: persistência em `solicitacoes_troca_plantao` + auditoria (`SOLICITAR_TROCA_PLANTAO`) na mesma transação; notificações ao colega/solicitante fora da transação (I/O externo)
 
 Arquivos:
 - `backend/src/services/auth.service.ts`
@@ -160,11 +161,20 @@ Arquivo:
 
 Padrão mínimo (obrigatório quando houver upload):
 - `fileFilter` (MIME + extensão permitidas)
+- **validação por conteúdo (magic bytes)** após o Multer, não só `Content-Type` — rejeitar arquivos que não sejam JPEG/PNG/WebP reais (ver `backend/src/utils/image-magic-bytes.util.ts`)
 - limite de tamanho
 - salvar fora de diretórios executáveis
 - nunca confiar no `originalname` (sanitizar)
 
-> Observação: se upload ainda não tiver `fileFilter`, isso deve ser tratado como **pendência de segurança**.
+> Observação: se upload ainda não tiver `fileFilter` + validação de magic bytes, isso deve ser tratado como **pendência de segurança**.
+
+### I) Privacidade entre profissionais (app médico)
+
+- **Não expor e-mail de colegas** em listagens usadas para troca de plantão ou equipe: o endpoint `GET /api/ponto/equipe-colegas` retorna apenas identificadores e dados públicos (nome, CRM), não `email`.
+
+### J) Arquivos em `uploads/` (não públicos)
+
+- **Não** expor `express.static` em `/uploads` em produção: arquivos sensíveis devem ser servidos só por rotas **autenticadas** que validam `tenantId` e papel (ver `docs/SECURITY-AUDIT-PLAYBOOK.md` e rotas `.../download` / `.../foto-checkin`).
 
 ### G) CORS / Headers / Rate limit
 
@@ -195,6 +205,12 @@ Para qualquer alteração backend:
 - [ ] Proteção contra race/retry (quando aplicável)
 - [ ] Sem secrets/logs sensíveis
 - [ ] Smoke test básico ou teste automatizado cobrindo o caminho
+
+---
+
+## Auditoria e testes ofensivos (próprio sistema)
+
+Roteiro com técnicas (race condition, upload, IDOR, secrets, authz, RLS): **`docs/SECURITY-AUDIT-PLAYBOOK.md`**.
 
 ---
 

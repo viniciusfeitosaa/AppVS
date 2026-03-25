@@ -1,6 +1,6 @@
 import { prisma } from '../config/database';
-import env from '../config/env';
 import { DOCUMENTO_TIPO_BY_FIELD, DOCUMENTOS_PERFIL_FIELDS } from '../constants/documentos.const';
+import { fileExistsSafe, resolveStoredFileToAbsolute } from '../utils/upload-path.util';
 
 interface UpdatePerfilInput {
   especialidades?: string[];
@@ -10,16 +10,6 @@ interface UpdatePerfilInput {
   dadosBancarios?: string;
   chavePix?: string;
 }
-
-const toPublicFileUrl = (filePath: string) => {
-  const normalized = filePath.replace(/\\/g, '/');
-  const marker = '/uploads/';
-  const idx = normalized.lastIndexOf(marker);
-  const suffix = idx >= 0 ? normalized.slice(idx) : `/uploads/${normalized.split('/').pop()}`;
-  const base =
-    env.FRONTEND_URL?.replace(/\/$/, '').replace(/:3000$/, ':3001') || 'http://localhost:3001';
-  return `${base}${suffix}`;
-};
 
 export const getPerfilService = async (medicoId: string, tenantId: string) => {
   const medico = await prisma.medico.findFirst({
@@ -66,10 +56,28 @@ export const getPerfilService = async (medicoId: string, tenantId: string) => {
     ...medico,
     documentos: medico.documentos.map((doc) => ({
       ...doc,
-      url: toPublicFileUrl(doc.caminhoArquivo),
+      /** Download apenas via GET /api/medico/perfil/documentos/:id/download (autenticado). */
     })),
   };
 };
+
+export async function getMedicoDocumentoPerfilForDownload(
+  medicoId: string,
+  tenantId: string,
+  documentoId: string
+) {
+  const doc = await prisma.medicoDocumento.findFirst({
+    where: { id: documentoId, medicoId, tenantId },
+  });
+  if (!doc) {
+    throw { statusCode: 404, message: 'Documento não encontrado' };
+  }
+  const fullPath = resolveStoredFileToAbsolute(doc.caminhoArquivo);
+  if (!fileExistsSafe(fullPath)) {
+    throw { statusCode: 404, message: 'Arquivo não encontrado no servidor' };
+  }
+  return { path: fullPath, nomeArquivo: doc.nomeArquivo, mimeType: doc.mimeType };
+}
 
 export const updatePerfilService = async (
   medicoId: string,

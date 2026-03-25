@@ -36,7 +36,6 @@ export interface MedicoPerfil {
     mimeType: string;
     tamanhoBytes: number;
     updatedAt: string;
-    url: string;
   }>;
 }
 
@@ -84,6 +83,24 @@ export const medicoService = {
   listDocumentosEnviados: async (): Promise<{ success: boolean; data: DocumentoEnviadoItem[] }> => {
     const response = await api.get<{ success: boolean; data: DocumentoEnviadoItem[] }>('/medico/documentos-enviados');
     return response.data;
+  },
+
+  openDocumentoPerfil: async (docId: string, nomeArquivo?: string): Promise<void> => {
+    const response = await api.get(`/medico/perfil/documentos/${docId}/download`, {
+      responseType: 'blob',
+    });
+    const blob = response.data as Blob;
+    const url = URL.createObjectURL(blob);
+    const opened = window.open(url, '_blank', 'noopener,noreferrer');
+    if (!opened) {
+      const a = document.createElement('a');
+      a.href = url;
+      a.target = '_blank';
+      a.rel = 'noopener noreferrer';
+      if (nomeArquivo) a.download = nomeArquivo;
+      a.click();
+    }
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
   },
 
   openDocumentoEnviado: async (id: string, nomeArquivo?: string): Promise<void> => {

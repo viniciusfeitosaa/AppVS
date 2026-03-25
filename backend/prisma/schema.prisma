@@ -78,6 +78,7 @@ model Tenant {
   contratoEquipes         ContratoEquipe[]
   resetSenhaTokens        ResetSenhaToken[]
   notificacoesMedico      NotificacaoMedico[]
+  solicitacoesTrocaPlantao SolicitacaoTrocaPlantao[]
 
   @@map("tenants")
   @@index([slug])
@@ -183,6 +184,8 @@ model Medico {
   subgrupoMedicos SubgrupoMedico[]
   equipeMedicos   EquipeMedico[]
   notificacoes    NotificacaoMedico[]
+  solicitacoesTrocaComoSolicitante SolicitacaoTrocaPlantao[] @relation("SolicitacaoTrocaSolicitante")
+  solicitacoesTrocaComoDestino     SolicitacaoTrocaPlantao[] @relation("SolicitacaoTrocaDestino")
 
   @@map("medicos")
   @@unique([tenantId, cpf])
@@ -469,6 +472,7 @@ model EscalaPlantao {
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   escala Escala @relation(fields: [escalaId], references: [id], onDelete: Cascade)
   medico Medico @relation(fields: [medicoId], references: [id], onDelete: Cascade)
+  solicitacoesTroca SolicitacaoTrocaPlantao[]
 
   @@map("escala_plantoes")
   @@unique([escalaId, data, gradeId])
@@ -476,6 +480,25 @@ model EscalaPlantao {
   @@index([escalaId])
   @@index([medicoId])
   @@index([data])
+}
+
+// Registro de pedido de troca de plantão (auditoria; não altera a grade automaticamente).
+model SolicitacaoTrocaPlantao {
+  id                  String   @id @default(uuid())
+  tenantId            String   @map("tenant_id")
+  escalaPlantaoId     String   @map("escala_plantao_id")
+  medicoSolicitanteId String   @map("medico_solicitante_id")
+  medicoDestinoId     String   @map("medico_destino_id")
+  createdAt           DateTime @default(now()) @map("created_at")
+
+  tenant      Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  plantao     EscalaPlantao @relation(fields: [escalaPlantaoId], references: [id], onDelete: Cascade)
+  solicitante Medico        @relation("SolicitacaoTrocaSolicitante", fields: [medicoSolicitanteId], references: [id], onDelete: Cascade)
+  destino     Medico        @relation("SolicitacaoTrocaDestino", fields: [medicoDestinoId], references: [id], onDelete: Cascade)
+
+  @@map("solicitacoes_troca_plantao")
+  @@index([tenantId, medicoSolicitanteId])
+  @@index([escalaPlantaoId])
 }
 
 model ValorPlantao {

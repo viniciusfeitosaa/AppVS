@@ -8,6 +8,7 @@ import {
   validateCheckinSemFoto,
   validateCheckout,
   validateUUIDQuery,
+  validateUUIDParam,
   validateSolicitarTrocaPlantao,
 } from '../middleware/validation.middleware';
 import {
@@ -15,6 +16,7 @@ import {
   checkInSemFotoController,
   checkOutController,
   getMeuDiaPontoController,
+  downloadFotoCheckinMedicoController,
   listMinhasEscalasController,
   listEquipeColegasController,
   listProximosPlantoesController,
@@ -44,5 +46,6 @@ router.get('/equipe-colegas', validateUUIDQuery('escalaId'), listEquipeColegasCo
 router.get('/proximos-plantoes', listProximosPlantoesController);
 router.post('/solicitar-troca-plantao', validateSolicitarTrocaPlantao, solicitarTrocaPlantaoController);
 router.get('/can-checkin', validateUUIDQuery('escalaId'), canCheckInController);
+router.get('/registros/:id/foto-checkin', validateUUIDParam('id'), downloadFotoCheckinMedicoController);
 
 export default router;

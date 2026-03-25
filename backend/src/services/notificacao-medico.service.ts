@@ -147,6 +147,8 @@ export async function notificarMedicosEquipeNaEscala(
 export async function notificarTrocaPlantaoSolicitada(
   tenantId: string,
   input: {
+    /** ID da linha em `solicitacoes_troca_plantao` (auditoria / rastreio). */
+    solicitacaoId?: string;
     medicoSolicitanteId: string;
     medicoDestinoId: string;
     solicitanteNome: string;
@@ -159,6 +161,7 @@ export async function notificarTrocaPlantaoSolicitada(
   }
 ) {
   const {
+    solicitacaoId,
     medicoSolicitanteId,
     medicoDestinoId,
     solicitanteNome,
@@ -184,6 +187,7 @@ export async function notificarTrocaPlantaoSolicitada(
       titulo: 'Pedido de troca de plantão',
       corpo: `${solicitanteNome} solicitou trocar o plantão do dia ${dataFmt} (${gradeLabel}) na escala "${escalaNome}". Confira com a pessoa ou a coordenação para alinhar a troca.`,
       metadata: {
+        ...(solicitacaoId ? { solicitacaoId } : {}),
         plantaoId,
         escalaId,
         medicoSolicitanteId,
@@ -201,6 +205,7 @@ export async function notificarTrocaPlantaoSolicitada(
       titulo: 'Solicitação de troca enviada',
       corpo: `Seu pedido de troca de plantão com ${destinoNome} foi registrado (${escalaNome}, ${dataFmt}, ${gradeLabel}). O profissional foi notificado.`,
       metadata: {
+        ...(solicitacaoId ? { solicitacaoId } : {}),
         plantaoId,
         escalaId,
         medicoSolicitanteId,

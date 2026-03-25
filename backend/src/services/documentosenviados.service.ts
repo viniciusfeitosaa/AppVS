@@ -1,6 +1,7 @@
 import path from 'path';
 import fs from 'fs';
 import { prisma } from '../config/database';
+import { fileExistsSafe, resolveStoredFileToAbsolute } from '../utils/upload-path.util';
 
 export async function listDocumentosEnviadosAdmin(tenantId: string, medicoId?: string) {
   const list = await prisma.documentoEnviado.findMany({
@@ -61,7 +62,7 @@ export async function deleteDocumentoEnviado(tenantId: string, id: string) {
   if (!doc) {
     throw { statusCode: 404, message: 'Documento não encontrado' };
   }
-  const fullPath = path.resolve(process.cwd(), 'uploads', doc.caminhoArquivo);
+  const fullPath = resolveStoredFileToAbsolute(doc.caminhoArquivo);
   if (fs.existsSync(fullPath)) {
     fs.unlinkSync(fullPath);
   }
@@ -90,8 +91,8 @@ export async function getDocumentoForDownload(medicoId: string, tenantId: string
   if (!doc) {
     throw { statusCode: 404, message: 'Documento não encontrado' };
   }
-  const fullPath = path.resolve(process.cwd(), 'uploads', doc.caminhoArquivo);
-  if (!fs.existsSync(fullPath)) {
+  const fullPath = resolveStoredFileToAbsolute(doc.caminhoArquivo);
+  if (!fileExistsSafe(fullPath)) {
     throw { statusCode: 404, message: 'Arquivo não encontrado no servidor' };
   }
   return { path: fullPath, nomeArquivo: doc.nomeArquivo, mimeType: doc.mimeType };

@@ -1,4 +1,5 @@
 import { Request, Response } from 'express';
+import { getFotoCheckinRegistroForAdmin } from '../services/ponto.service';
 import {
   addContratoEquipeService,
   addContratoSubgrupoService,
@@ -839,6 +840,24 @@ export const setValorPlantaoController = async (req: Request, res: Response) => 
     return res.status(error.statusCode || 500).json({
       success: false,
       error: error.message || 'Erro ao salvar valor de plantão',
+    });
+  }
+};
+
+export const downloadRegistroPontoFotoAdminController = async (req: Request, res: Response) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ success: false, error: 'Não autenticado' });
+    }
+    const registroId = String(req.params.id);
+    const { path: filePath, mimeType } = await getFotoCheckinRegistroForAdmin(req.user.tenantId, registroId);
+    res.setHeader('Content-Type', mimeType);
+    res.setHeader('Content-Disposition', 'inline');
+    return res.sendFile(filePath);
+  } catch (error: any) {
+    return res.status(error.statusCode || 500).json({
+      success: false,
+      error: error.message || 'Erro ao obter foto do check-in',
     });
   }
 };

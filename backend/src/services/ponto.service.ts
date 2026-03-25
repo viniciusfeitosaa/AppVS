@@ -1,5 +1,6 @@
-import { OrigemRegistroPonto } from '@prisma/client';
+import { OrigemRegistroPonto, Prisma } from '@prisma/client';
 import { prisma } from '../config/database';
+import { fileExistsSafe, resolveStoredFileToAbsolute } from '../utils/upload-path.util';
 import { createAuditLog } from './auditoria.service';
 
 /** Distância em metros entre dois pontos (fórmula de Haversine). */
@@ -488,7 +489,7 @@ export async function listEquipeColegasService(
     select: {
       medicoId: true,
       medico: {
-        select: { id: true, nomeCompleto: true, crm: true, email: true },
+        select: { id: true, nomeCompleto: true, crm: true },
       },
     },
     distinct: ['medicoId'],
@@ -500,7 +501,6 @@ export async function listEquipeColegasService(
       id: c.medico!.id,
       nomeCompleto: c.medico!.nomeCompleto,
       crm: c.medico!.crm,
-      email: c.medico!.email,
     }));
 }
 
@@ -635,20 +635,90 @@ export async function solicitarTrocaPlantaoService(
     throw { statusCode: 404, message: 'Profissional não encontrado' };
   }
 
-  const { notificarTrocaPlantaoSolicitada } = await import('./notificacao-medico.service');
-  await notificarTrocaPlantaoSolicitada(tenantId, {
-    medicoSolicitanteId,
-    medicoDestinoId,
-    solicitanteNome: solicitante.nomeCompleto.trim(),
-    destinoNome: destino.nomeCompleto.trim(),
-    plantaoId: plantao.id,
-    escalaId: plantao.escalaId,
-    escalaNome: plantao.escala.nome,
-    dataPlantaoIso: dataStr,
-    gradeLabel: faixaPorGradeLabel(plantao.gradeId),
+  const solicitacao = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+    const row = await tx.solicitacaoTrocaPlantao.create({
+      data: {
+        tenantId,
+        escalaPlantaoId: plantao.id,
+        medicoSolicitanteId,
+        medicoDestinoId,
+      },
+    });
+    await createAuditLog(
+      {
+        acao: 'SOLICITAR_TROCA_PLANTAO',
+        tenantId,
+        medicoId: medicoSolicitanteId,
+        detalhes: {
+          solicitacaoId: row.id,
+          plantaoId: plantao.id,
+          escalaId: plantao.escalaId,
+          medicoDestinoId,
+        },
+      },
+      tx
+    );
+    return row;
   });
 
-  return { ok: true as const };
+  try {
+    const { notificarTrocaPlantaoSolicitada } = await import('./notificacao-medico.service');
+    await notificarTrocaPlantaoSolicitada(tenantId, {
+      solicitacaoId: solicitacao.id,
+      medicoSolicitanteId,
+      medicoDestinoId,
+      solicitanteNome: solicitante.nomeCompleto.trim(),
+      destinoNome: destino.nomeCompleto.trim(),
+      plantaoId: plantao.id,
+      escalaId: plantao.escalaId,
+      escalaNome: plantao.escala.nome,
+      dataPlantaoIso: dataStr,
+      gradeLabel: faixaPorGradeLabel(plantao.gradeId),
+    });
+  } catch (e) {
+    console.error('[troca-plantao] Falha ao enviar notificações (registro persistido):', e);
+  }
+
+  return { ok: true as const, solicitacaoId: solicitacao.id };
+}
+
+function mimeFromFotoPath(fotoPath: string): string {
+  const lower = fotoPath.toLowerCase();
+  if (lower.endsWith('.png')) return 'image/png';
+  if (lower.endsWith('.webp')) return 'image/webp';
+  return 'image/jpeg';
+}
+
+/** Foto de check-in: apenas o próprio médico (mesmo tenant). */
+export async function getFotoCheckinRegistroForMedico(tenantId: string, medicoId: string, registroId: string) {
+  const r = await prisma.registroPonto.findFirst({
+    where: { id: registroId, tenantId, medicoId },
+    select: { fotoCheckinCaminho: true },
+  });
+  if (!r?.fotoCheckinCaminho?.trim()) {
+    throw { statusCode: 404, message: 'Registro sem foto de check-in' };
+  }
+  const fullPath = resolveStoredFileToAbsolute(r.fotoCheckinCaminho);
+  if (!fileExistsSafe(fullPath)) {
+    throw { statusCode: 404, message: 'Arquivo não encontrado no servidor' };
+  }
+  return { path: fullPath, mimeType: mimeFromFotoPath(r.fotoCheckinCaminho) };
+}
+
+/** Foto de check-in: master com acesso ao relatório (tenant). */
+export async function getFotoCheckinRegistroForAdmin(tenantId: string, registroId: string) {
+  const r = await prisma.registroPonto.findFirst({
+    where: { id: registroId, tenantId },
+    select: { fotoCheckinCaminho: true },
+  });
+  if (!r?.fotoCheckinCaminho?.trim()) {
+    throw { statusCode: 404, message: 'Registro sem foto de check-in' };
+  }
+  const fullPath = resolveStoredFileToAbsolute(r.fotoCheckinCaminho);
+  if (!fileExistsSafe(fullPath)) {
+    throw { statusCode: 404, message: 'Arquivo não encontrado no servidor' };
+  }
+  return { path: fullPath, mimeType: mimeFromFotoPath(r.fotoCheckinCaminho) };
 }
 
 export async function canCheckInService(tenantId: string, medicoId: string, escalaId: string) {

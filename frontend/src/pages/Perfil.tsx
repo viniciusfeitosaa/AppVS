@@ -412,23 +412,22 @@ const Perfil = () => {
                     <p className="text-[10px] text-viva-600 mt-1 mb-2 font-serif">
                       {existing?.nomeArquivo ? `Atual: ${existing.nomeArquivo}` : 'Ainda não anexado'}
                     </p>
-                    {existing?.url && (
+                    {existing?.id && (
                       <div className="flex flex-wrap gap-2 mb-2">
-                        <a
-                          href={existing.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
+                        <button
+                          type="button"
                           className="btn-sm btn-secondary inline-flex items-center gap-1.5"
+                          onClick={() => medicoService.openDocumentoPerfil(existing.id, existing.nomeArquivo)}
                         >
                           Abrir
-                        </a>
-                        <a
-                          href={existing.url}
-                          download={existing.nomeArquivo || undefined}
+                        </button>
+                        <button
+                          type="button"
                           className="btn-sm btn-secondary inline-flex items-center gap-1.5"
+                          onClick={() => medicoService.openDocumentoPerfil(existing.id, existing.nomeArquivo)}
                         >
                           Baixar
-                        </a>
+                        </button>
                       </div>
                     )}
                     <input
