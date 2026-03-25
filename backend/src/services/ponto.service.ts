@@ -155,25 +155,41 @@ export async function checkInService(
     }
   }
 
-  const registro = await prisma.registroPonto.create({
-    data: {
-      tenantId,
-      escalaId: escalaId || null,
-      medicoId,
-      checkInAt: new Date(),
-      origem: OrigemRegistroPonto.APP_MEDICO,
-      observacao: observacao?.trim() || null,
-    },
-  });
+  return prisma.$transaction(async (tx: any) => {
+    // Revalida em transação para evitar race condition (dois check-ins simultâneos)
+    const registroAbertoTx = await tx.registroPonto.findFirst({
+      where: { tenantId, medicoId, checkOutAt: null },
+      orderBy: { checkInAt: 'desc' },
+      select: { id: true },
+    });
 
-  await createAuditLog({
-    acao: 'CHECKIN_MEDICO',
-    tenantId,
-    medicoId,
-    detalhes: { escalaId: registro.escalaId, registroPontoId: registro.id },
-  });
+    if (registroAbertoTx) {
+      throw { statusCode: 409, message: 'Já existe um check-in em aberto para este médico' };
+    }
 
-  return registro;
+    const registro = await tx.registroPonto.create({
+      data: {
+        tenantId,
+        escalaId: escalaId || null,
+        medicoId,
+        checkInAt: new Date(),
+        origem: OrigemRegistroPonto.APP_MEDICO,
+        observacao: observacao?.trim() || null,
+      },
+    });
+
+    await createAuditLog(
+      {
+        acao: 'CHECKIN_MEDICO',
+        tenantId,
+        medicoId,
+        detalhes: { escalaId: registro.escalaId, registroPontoId: registro.id },
+      },
+      tx
+    );
+
+    return registro;
+  });
 }
 
 export async function checkOutService(
@@ -211,23 +227,41 @@ export async function checkOutService(
   const duracaoMs = checkoutTime.getTime() - registroAberto.checkInAt.getTime();
   const duracaoMinutos = Math.max(1, Math.floor(duracaoMs / 60000));
 
-  const registro = await prisma.registroPonto.update({
-    where: { id: registroAberto.id },
-    data: {
-      checkOutAt: checkoutTime,
-      observacao: observacao?.trim() || registroAberto.observacao,
-      duracaoMinutos,
-    },
-  });
+  return prisma.$transaction(async (tx: any) => {
+    const updated = await tx.registroPonto.updateMany({
+      where: { id: registroAberto.id, tenantId, medicoId, checkOutAt: null },
+      data: {
+        checkOutAt: checkoutTime,
+        observacao: observacao?.trim() || registroAberto.observacao,
+        duracaoMinutos,
+      },
+    });
 
-  await createAuditLog({
-    acao: 'CHECKOUT_MEDICO',
-    tenantId,
-    medicoId,
-    detalhes: { escalaId: registro.escalaId, registroPontoId: registro.id, duracaoMinutos },
-  });
+    if (updated.count !== 1) {
+      throw { statusCode: 409, message: 'Checkout já foi processado ou não existe check-in em aberto.' };
+    }
 
-  return registro;
+    const registro = await tx.registroPonto.findFirst({
+      where: { id: registroAberto.id },
+      select: { id: true, escalaId: true },
+    });
+
+    if (!registro) {
+      throw { statusCode: 404, message: 'Registro de ponto não encontrado após update.' };
+    }
+
+    await createAuditLog(
+      {
+        acao: 'CHECKOUT_MEDICO',
+        tenantId,
+        medicoId,
+        detalhes: { escalaId: registro.escalaId, registroPontoId: registro.id, duracaoMinutos },
+      },
+      tx
+    );
+
+    return registro;
+  });
 }
 
 export async function getMeuDiaPontoService(tenantId: string, medicoId: string) {

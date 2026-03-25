@@ -338,24 +338,29 @@ export async function inviteMedicoService(
   const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex');
   const expiresAt = new Date(Date.now() + 72 * 60 * 60 * 1000); // 72h
 
-  await prisma.medico.update({
-    where: { id: medico.id },
-    data: {
-      inviteTokenHash: tokenHash,
-      inviteExpiresAt: expiresAt,
-      inviteAcceptedAt: null,
-    },
-  });
+  await prisma.$transaction(async (tx: any) => {
+    await tx.medico.update({
+      where: { id: medico.id },
+      data: {
+        inviteTokenHash: tokenHash,
+        inviteExpiresAt: expiresAt,
+        inviteAcceptedAt: null,
+      },
+    });
 
-  await createAuditLog({
-    acao: 'CONVIDAR_MEDICO',
-    tenantId,
-    masterId,
-    medicoId: medico.id,
-    detalhes: {
-      email: medico.email,
-      expiresAt: expiresAt.toISOString(),
-    },
+    await createAuditLog(
+      {
+        acao: 'CONVIDAR_MEDICO',
+        tenantId,
+        masterId,
+        medicoId: medico.id,
+        detalhes: {
+          email: medico.email,
+          expiresAt: expiresAt.toISOString(),
+        },
+      },
+      tx
+    );
   });
 
   const inviteUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/ativar-conta/${rawToken}`;
@@ -747,26 +752,31 @@ export async function createEscalaService(input: CreateEscalaInput) {
     throw { statusCode: 404, message: 'Contrato ativo não encontrado' };
   }
 
-  const escala = await prisma.escala.create({
-    data: {
-      tenantId: input.tenantId,
-      contratoAtivoId: input.contratoAtivoId,
-      nome: input.nome.trim(),
-      descricao: input.descricao?.trim() || null,
-      dataInicio: new Date(input.dataInicio),
-      dataFim: new Date(input.dataFim),
-      ativo: input.ativo ?? true,
-    },
-  });
+  return prisma.$transaction(async (tx: any) => {
+    const escala = await tx.escala.create({
+      data: {
+        tenantId: input.tenantId,
+        contratoAtivoId: input.contratoAtivoId,
+        nome: input.nome.trim(),
+        descricao: input.descricao?.trim() || null,
+        dataInicio: new Date(input.dataInicio),
+        dataFim: new Date(input.dataFim),
+        ativo: input.ativo ?? true,
+      },
+    });
 
-  await createAuditLog({
-    acao: 'CRIAR_ESCALA',
-    tenantId: input.tenantId,
-    masterId: input.masterId,
-    detalhes: { escalaId: escala.id, nome: escala.nome },
-  });
+    await createAuditLog(
+      {
+        acao: 'CRIAR_ESCALA',
+        tenantId: input.tenantId,
+        masterId: input.masterId,
+        detalhes: { escalaId: escala.id, nome: escala.nome },
+      },
+      tx
+    );
 
-  return escala;
+    return escala;
+  });
 }
 
 export async function updateEscalaService(input: UpdateEscalaInput) {
@@ -787,26 +797,31 @@ export async function updateEscalaService(input: UpdateEscalaInput) {
     }
   }
 
-  const updated = await prisma.escala.update({
-    where: { id: escala.id },
-    data: {
-      contratoAtivoId: input.contratoAtivoId || undefined,
-      nome: input.nome?.trim() || undefined,
-      descricao: input.descricao === undefined ? undefined : input.descricao?.trim() || null,
-      dataInicio: input.dataInicio ? new Date(input.dataInicio) : undefined,
-      dataFim: input.dataFim ? new Date(input.dataFim) : undefined,
-      ativo: input.ativo,
-    },
-  });
+  return prisma.$transaction(async (tx: any) => {
+    const updated = await tx.escala.update({
+      where: { id: escala.id },
+      data: {
+        contratoAtivoId: input.contratoAtivoId || undefined,
+        nome: input.nome?.trim() || undefined,
+        descricao: input.descricao === undefined ? undefined : input.descricao?.trim() || null,
+        dataInicio: input.dataInicio ? new Date(input.dataInicio) : undefined,
+        dataFim: input.dataFim ? new Date(input.dataFim) : undefined,
+        ativo: input.ativo,
+      },
+    });
 
-  await createAuditLog({
-    acao: 'ATUALIZAR_ESCALA',
-    tenantId: input.tenantId,
-    masterId: input.masterId,
-    detalhes: { escalaId: updated.id, nome: updated.nome },
-  });
+    await createAuditLog(
+      {
+        acao: 'ATUALIZAR_ESCALA',
+        tenantId: input.tenantId,
+        masterId: input.masterId,
+        detalhes: { escalaId: updated.id, nome: updated.nome },
+      },
+      tx
+    );
 
-  return updated;
+    return updated;
+  });
 }
 
 export async function deleteEscalaService(tenantId: string, masterId: string, escalaId: string) {
@@ -818,13 +833,18 @@ export async function deleteEscalaService(tenantId: string, masterId: string, es
     throw { statusCode: 404, message: 'Escala não encontrada' };
   }
 
-  await prisma.escala.delete({ where: { id: escala.id } });
+  await prisma.$transaction(async (tx: any) => {
+    await tx.escala.delete({ where: { id: escala.id } });
 
-  await createAuditLog({
-    acao: 'EXCLUIR_ESCALA',
-    tenantId,
-    masterId,
-    detalhes: { escalaId: escala.id, nome: escala.nome },
+    await createAuditLog(
+      {
+        acao: 'EXCLUIR_ESCALA',
+        tenantId,
+        masterId,
+        detalhes: { escalaId: escala.id, nome: escala.nome },
+      },
+      tx
+    );
   });
 }
 
@@ -857,54 +877,62 @@ export async function listEscalaMedicosService(tenantId: string, escalaId: strin
 }
 
 export async function alocarMedicoEscalaService(input: AlocarMedicoEscalaInput) {
-  const [escala, medico] = await Promise.all([
-    prisma.escala.findFirst({
-      where: { id: input.escalaId, tenantId: input.tenantId, ativo: true },
-    }),
-    prisma.medico.findFirst({
-      where: { id: input.medicoId, tenantId: input.tenantId, ativo: true },
-    }),
-  ]);
+  const cargo = input.cargo?.trim() || null;
+  const valorHora = input.valorHora != null ? Number(input.valorHora) : null;
 
-  if (!escala) {
-    throw { statusCode: 404, message: 'Escala não encontrada ou inativa' };
-  }
-  if (!medico) {
-    throw { statusCode: 404, message: 'Médico não encontrado ou inativo' };
-  }
+  return prisma.$transaction(async (tx: any) => {
+    const [escala, medico] = await Promise.all([
+      tx.escala.findFirst({
+        where: { id: input.escalaId, tenantId: input.tenantId, ativo: true },
+      }),
+      tx.medico.findFirst({
+        where: { id: input.medicoId, tenantId: input.tenantId, ativo: true },
+      }),
+    ]);
 
-  const alocacao = await prisma.escalaMedico.upsert({
-    where: {
-      tenantId_escalaId_medicoId: {
+    if (!escala) {
+      throw { statusCode: 404, message: 'Escala não encontrada ou inativa' };
+    }
+    if (!medico) {
+      throw { statusCode: 404, message: 'Médico não encontrado ou inativo' };
+    }
+
+    const alocacao = await tx.escalaMedico.upsert({
+      where: {
+        tenantId_escalaId_medicoId: {
+          tenantId: input.tenantId,
+          escalaId: input.escalaId,
+          medicoId: input.medicoId,
+        },
+      },
+      update: {
+        cargo,
+        valorHora,
+        ativo: true,
+      },
+      create: {
         tenantId: input.tenantId,
         escalaId: input.escalaId,
         medicoId: input.medicoId,
+        cargo,
+        valorHora,
+        ativo: true,
       },
-    },
-    update: {
-      cargo: input.cargo?.trim() || null,
-      valorHora: input.valorHora ?? null,
-      ativo: true,
-    },
-    create: {
-      tenantId: input.tenantId,
-      escalaId: input.escalaId,
-      medicoId: input.medicoId,
-      cargo: input.cargo?.trim() || null,
-      valorHora: input.valorHora ?? null,
-      ativo: true,
-    },
-  });
+    });
 
-  await createAuditLog({
-    acao: 'ALOCAR_MEDICO_ESCALA',
-    tenantId: input.tenantId,
-    masterId: input.masterId,
-    medicoId: input.medicoId,
-    detalhes: { escalaId: input.escalaId, alocacaoId: alocacao.id },
-  });
+    await createAuditLog(
+      {
+        acao: 'ALOCAR_MEDICO_ESCALA',
+        tenantId: input.tenantId,
+        masterId: input.masterId,
+        medicoId: input.medicoId,
+        detalhes: { escalaId: input.escalaId, alocacaoId: alocacao.id },
+      },
+      tx
+    );
 
-  return alocacao;
+    return alocacao;
+  });
 }
 
 export async function removerMedicoEscalaService(
@@ -913,22 +941,27 @@ export async function removerMedicoEscalaService(
   escalaId: string,
   medicoId: string
 ) {
-  const alocacao = await prisma.escalaMedico.findFirst({
-    where: { tenantId, escalaId, medicoId },
-  });
+  return prisma.$transaction(async (tx: any) => {
+    const alocacao = await tx.escalaMedico.findFirst({
+      where: { tenantId, escalaId, medicoId },
+    });
 
-  if (!alocacao) {
-    throw { statusCode: 404, message: 'Alocação não encontrada' };
-  }
+    if (!alocacao) {
+      throw { statusCode: 404, message: 'Alocação não encontrada' };
+    }
 
-  await prisma.escalaMedico.delete({ where: { id: alocacao.id } });
+    await tx.escalaMedico.delete({ where: { id: alocacao.id } });
 
-  await createAuditLog({
-    acao: 'REMOVER_MEDICO_ESCALA',
-    tenantId,
-    masterId,
-    medicoId,
-    detalhes: { escalaId },
+    await createAuditLog(
+      {
+        acao: 'REMOVER_MEDICO_ESCALA',
+        tenantId,
+        masterId,
+        medicoId,
+        detalhes: { escalaId },
+      },
+      tx
+    );
   });
 }
 
@@ -1208,59 +1241,64 @@ export async function createEscalaPlantaoService(input: {
     throw { statusCode: 404, message: 'Médico não encontrado ou inativo' };
   }
 
-  // Garantir que o médico esteja associado à escala (para "minhas escalas" / dashboard do médico)
-  await prisma.escalaMedico.upsert({
-    where: {
-      tenantId_escalaId_medicoId: {
+  const valorHora = input.valorHora != null ? Number(input.valorHora) : null;
+
+  return prisma.$transaction(async (tx: any) => {
+    // Garantir que o médico esteja associado à escala (para "minhas escalas" / dashboard do médico)
+    await tx.escalaMedico.upsert({
+      where: {
+        tenantId_escalaId_medicoId: {
+          tenantId: input.tenantId,
+          escalaId: input.escalaId,
+          medicoId: input.medicoId,
+        },
+      },
+      update: { ativo: true },
+      create: {
         tenantId: input.tenantId,
         escalaId: input.escalaId,
         medicoId: input.medicoId,
+        ativo: true,
       },
-    },
-    update: { ativo: true },
-    create: {
-      tenantId: input.tenantId,
-      escalaId: input.escalaId,
-      medicoId: input.medicoId,
-      ativo: true,
-    },
-  });
+    });
 
-  const valorHora = input.valorHora != null ? Number(input.valorHora) : null;
-
-  const plantao = await prisma.escalaPlantao.upsert({
-    where: {
-      escalaId_data_gradeId: {
+    const plantao = await tx.escalaPlantao.upsert({
+      where: {
+        escalaId_data_gradeId: {
+          escalaId: input.escalaId,
+          data: dataDate,
+          gradeId: input.gradeId,
+        },
+      },
+      update: { medicoId: input.medicoId, valorHora },
+      create: {
+        tenantId: input.tenantId,
         escalaId: input.escalaId,
         data: dataDate,
         gradeId: input.gradeId,
+        medicoId: input.medicoId,
+        valorHora,
       },
-    },
-    update: { medicoId: input.medicoId, valorHora },
-    create: {
-      tenantId: input.tenantId,
-      escalaId: input.escalaId,
-      data: dataDate,
-      gradeId: input.gradeId,
-      medicoId: input.medicoId,
-      valorHora,
-    },
-    include: {
-      medico: {
-        select: { id: true, nomeCompleto: true, crm: true, email: true, telefone: true },
+      include: {
+        medico: {
+          select: { id: true, nomeCompleto: true, crm: true, email: true, telefone: true },
+        },
       },
-    },
-  });
+    });
 
-  await createAuditLog({
-    acao: 'CRIAR_ESCALA_PLANTAO',
-    tenantId: input.tenantId,
-    masterId: input.masterId,
-    medicoId: input.medicoId,
-    detalhes: { escalaId: input.escalaId, data: input.data, gradeId: input.gradeId, plantaoId: plantao.id },
-  });
+    await createAuditLog(
+      {
+        acao: 'CRIAR_ESCALA_PLANTAO',
+        tenantId: input.tenantId,
+        masterId: input.masterId,
+        medicoId: input.medicoId,
+        detalhes: { escalaId: input.escalaId, data: input.data, gradeId: input.gradeId, plantaoId: plantao.id },
+      },
+      tx
+    );
 
-  return plantao;
+    return plantao;
+  });
 }
 
 export async function removerEscalaPlantaoService(
@@ -1276,14 +1314,19 @@ export async function removerEscalaPlantaoService(
     throw { statusCode: 404, message: 'Plantão não encontrado' };
   }
 
-  await prisma.escalaPlantao.delete({ where: { id: plantaoId } });
+  await prisma.$transaction(async (tx: any) => {
+    await tx.escalaPlantao.delete({ where: { id: plantaoId } });
 
-  await createAuditLog({
-    acao: 'REMOVER_ESCALA_PLANTAO',
-    tenantId,
-    masterId,
-    medicoId: plantao.medicoId,
-    detalhes: { escalaId: plantao.escalaId, data: plantao.data, gradeId: plantao.gradeId },
+    await createAuditLog(
+      {
+        acao: 'REMOVER_ESCALA_PLANTAO',
+        tenantId,
+        masterId,
+        medicoId: plantao.medicoId,
+        detalhes: { escalaId: plantao.escalaId, data: plantao.data, gradeId: plantao.gradeId },
+      },
+      tx
+    );
   });
 }
 

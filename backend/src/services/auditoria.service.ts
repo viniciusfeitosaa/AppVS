@@ -10,9 +10,10 @@ interface CreateAuditLogInput {
   userAgent?: string;
 }
 
-export const createAuditLog = async (input: CreateAuditLogInput) => {
+// Allow passing a Prisma TransactionClient so audit logs can be written atomically.
+export const createAuditLog = async (input: CreateAuditLogInput, prismaClient: any = prisma) => {
   try {
-    await prisma.auditoria.create({
+    await prismaClient.auditoria.create({
       data: {
         medicoId: input.medicoId || undefined,
         masterId: input.masterId || undefined,

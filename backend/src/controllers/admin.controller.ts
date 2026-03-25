@@ -429,10 +429,19 @@ export const createEscalaController = async (req: Request, res: Response) => {
       return res.status(401).json({ success: false, error: 'Não autenticado' });
     }
 
+    const { nome, contratoAtivoId, descricao, dataInicio, dataFim, ativo } = req.body;
+    const ativoBool =
+      ativo === undefined ? undefined : ativo === true || ativo === 'true' ? true : ativo === false || ativo === 'false' ? false : undefined;
+
     const escala = await createEscalaService({
       tenantId: req.user.tenantId,
       masterId: req.user.id,
-      ...req.body,
+      nome,
+      contratoAtivoId,
+      descricao,
+      dataInicio,
+      dataFim,
+      ativo: ativoBool,
     });
 
     return res.status(201).json({
@@ -454,11 +463,20 @@ export const updateEscalaController = async (req: Request, res: Response) => {
       return res.status(401).json({ success: false, error: 'Não autenticado' });
     }
 
+    const { contratoAtivoId, nome, descricao, dataInicio, dataFim, ativo } = req.body;
+    const ativoBool =
+      ativo === undefined ? undefined : ativo === true || ativo === 'true' ? true : ativo === false || ativo === 'false' ? false : undefined;
+
     const escala = await updateEscalaService({
       tenantId: req.user.tenantId,
       masterId: req.user.id,
       escalaId: req.params.id,
-      ...req.body,
+      contratoAtivoId,
+      nome,
+      descricao,
+      dataInicio,
+      dataFim,
+      ativo: ativoBool,
     });
 
     return res.status(200).json({
@@ -515,11 +533,16 @@ export const alocarMedicoEscalaController = async (req: Request, res: Response) 
       return res.status(401).json({ success: false, error: 'Não autenticado' });
     }
 
+    const { medicoId, cargo, valorHora } = req.body;
+    const valorHoraNum = valorHora != null && valorHora !== '' ? Number(valorHora) : null;
+
     const data = await alocarMedicoEscalaService({
       tenantId: req.user.tenantId,
       masterId: req.user.id,
       escalaId: req.params.id,
-      ...req.body,
+      medicoId,
+      cargo: cargo != null && cargo !== '' ? String(cargo) : null,
+      valorHora: valorHoraNum,
     });
     return res.status(201).json({ success: true, data, message: 'Médico alocado com sucesso' });
   } catch (error: any) {

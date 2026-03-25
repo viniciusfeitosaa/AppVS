@@ -65,6 +65,7 @@ import {
 import { authenticateToken, requireAnyModuleAccess, requireModuleAccess, requireRole } from '../middleware/auth.middleware';
 import { uploadDocumentoEnviado } from '../middleware/upload.middleware';
 import { ModuloSistema, UserRole } from '@prisma/client';
+import { validateUUIDParam, validateCreateEscala, validateUpdateEscala, validateCreateEscalaPlantao, validateAlocarMedicoEscala } from '../middleware/validation.middleware';
 
 const router = Router();
 
@@ -75,7 +76,7 @@ router.get('/medicos', requireModuleAccess(ModuloSistema.MEDICOS), listMedicosCo
 router.post('/medicos', requireModuleAccess(ModuloSistema.MEDICOS), createMedicoController);
 router.put('/medicos/:id', requireModuleAccess(ModuloSistema.MEDICOS), updateMedicoController);
 router.patch('/medicos/:id/ativo', requireModuleAccess(ModuloSistema.MEDICOS), toggleMedicoAtivoController);
-router.post('/medicos/:id/invite', requireModuleAccess(ModuloSistema.CONVITES), inviteMedicoController);
+router.post('/medicos/:id/invite', requireModuleAccess(ModuloSistema.CONVITES), validateUUIDParam('id'), inviteMedicoController);
 
 router.get('/contratos-ativos', requireModuleAccess(ModuloSistema.CONTRATOS_ATIVOS), listContratosAtivosController);
 router.post('/contratos-ativos', requireModuleAccess(ModuloSistema.CONTRATOS_ATIVOS), createContratoAtivoController);
@@ -89,15 +90,27 @@ router.post('/contratos-ativos/:id/equipes', requireModuleAccess(ModuloSistema.C
 router.delete('/contratos-ativos/:id/equipes/:equipeId', requireModuleAccess(ModuloSistema.CONTRATOS_ATIVOS), removeContratoEquipeController);
 
 router.get('/escalas', requireModuleAccess(ModuloSistema.ESCALAS), listEscalasController);
-router.post('/escalas', requireModuleAccess(ModuloSistema.ESCALAS), createEscalaController);
-router.put('/escalas/:id', requireModuleAccess(ModuloSistema.ESCALAS), updateEscalaController);
-router.delete('/escalas/:id', requireModuleAccess(ModuloSistema.ESCALAS), deleteEscalaController);
+router.post('/escalas', requireModuleAccess(ModuloSistema.ESCALAS), validateCreateEscala, createEscalaController);
+router.put('/escalas/:id', requireModuleAccess(ModuloSistema.ESCALAS), validateUUIDParam('id'), validateUpdateEscala, updateEscalaController);
+router.delete('/escalas/:id', requireModuleAccess(ModuloSistema.ESCALAS), validateUUIDParam('id'), deleteEscalaController);
 router.get('/escalas/:id/medicos', requireModuleAccess(ModuloSistema.ESCALAS), listEscalaMedicosController);
-router.post('/escalas/:id/medicos', requireModuleAccess(ModuloSistema.ESCALAS), alocarMedicoEscalaController);
-router.delete('/escalas/:id/medicos/:medicoId', requireModuleAccess(ModuloSistema.ESCALAS), removerMedicoEscalaController);
+router.post(
+  '/escalas/:id/medicos',
+  requireModuleAccess(ModuloSistema.ESCALAS),
+  validateUUIDParam('id'),
+  validateAlocarMedicoEscala,
+  alocarMedicoEscalaController
+);
+router.delete(
+  '/escalas/:id/medicos/:medicoId',
+  requireModuleAccess(ModuloSistema.ESCALAS),
+  validateUUIDParam('id'),
+  validateUUIDParam('medicoId'),
+  removerMedicoEscalaController
+);
 router.get('/escalas/:id/plantoes', requireModuleAccess(ModuloSistema.ESCALAS), listEscalaPlantoesController);
-router.post('/escalas/:id/plantoes', requireModuleAccess(ModuloSistema.ESCALAS), createEscalaPlantaoController);
-router.delete('/escalas/:id/plantoes/:plantaoId', requireModuleAccess(ModuloSistema.ESCALAS), removerEscalaPlantaoController);
+router.post('/escalas/:id/plantoes', requireModuleAccess(ModuloSistema.ESCALAS), validateUUIDParam('id'), validateCreateEscalaPlantao, createEscalaPlantaoController);
+router.delete('/escalas/:id/plantoes/:plantaoId', requireModuleAccess(ModuloSistema.ESCALAS), validateUUIDParam('id'), validateUUIDParam('plantaoId'), removerEscalaPlantaoController);
 
 router.get('/valores-plantao/opcoes', requireModuleAccess(ModuloSistema.VALORES_PLANTAO), getValoresPlantaoOpcoesController);
 router.get('/valores-plantao', requireAnyModuleAccess([ModuloSistema.VALORES_PLANTAO, ModuloSistema.ESCALAS]), getValoresPlantaoController);

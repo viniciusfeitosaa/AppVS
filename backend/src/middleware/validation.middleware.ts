@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
-import { body, validationResult } from 'express-validator';
+import { body, param, validationResult } from 'express-validator';
 import { validateCPF, validateCRM } from '../utils/validation.util';
 
 const handleValidationErrors = (req: Request, res: Response, next: NextFunction) => {
@@ -216,5 +216,176 @@ export const validateUpdatePerfil = [
     .trim()
     .isLength({ max: 100 })
     .withMessage('Cada especialidade deve ter no máximo 100 caracteres'),
+  handleValidationErrors,
+];
+
+/**
+ * Valida parâmetros UUID (ex.: :id em rotas /:id)
+ */
+export const validateUUIDParam = (paramName: string) => [
+  param(paramName)
+    .isUUID()
+    .withMessage(`${paramName} inválido`),
+  handleValidationErrors,
+];
+
+/**
+ * Check-in: validar tipos e limites básicos.
+ * A regra de negócio (geolocalização obrigatória quando há config) está no service.
+ */
+export const validateCheckin = [
+  body('escalaId')
+    .optional({ values: 'null' })
+    .isUUID()
+    .withMessage('escalaId inválido'),
+  body('observacao')
+    .optional({ values: 'falsy' })
+    .isString()
+    .trim()
+    .isLength({ max: 2000 })
+    .withMessage('observacao inválida'),
+  body('latitude')
+    .optional({ values: 'null' })
+    .isFloat({ min: -90, max: 90 })
+    .withMessage('latitude inválida'),
+  body('longitude')
+    .optional({ values: 'null' })
+    .isFloat({ min: -180, max: 180 })
+    .withMessage('longitude inválida'),
+  handleValidationErrors,
+];
+
+/**
+ * Checkout: valida tipos e limites básicos.
+ * A regra de negócio (geolocalização obrigatória quando há config) está no service.
+ */
+export const validateCheckout = [
+  body('observacao')
+    .optional({ values: 'falsy' })
+    .isString()
+    .trim()
+    .isLength({ max: 2000 })
+    .withMessage('observacao inválida'),
+  body('latitude')
+    .optional({ values: 'null' })
+    .isFloat({ min: -90, max: 90 })
+    .withMessage('latitude inválida'),
+  body('longitude')
+    .optional({ values: 'null' })
+    .isFloat({ min: -180, max: 180 })
+    .withMessage('longitude inválida'),
+  handleValidationErrors,
+];
+
+/**
+ * Escala: valida criação e update.
+ */
+export const validateCreateEscala = [
+  body('nome')
+    .notEmpty()
+    .isString()
+    .trim()
+    .isLength({ min: 1, max: 255 })
+    .withMessage('nome inválido'),
+  body('contratoAtivoId')
+    .notEmpty()
+    .isUUID()
+    .withMessage('contratoAtivoId inválido'),
+  body('descricao')
+    .optional({ values: 'null' })
+    .isString()
+    .trim()
+    .isLength({ max: 4000 })
+    .withMessage('descricao inválida'),
+  body('dataInicio')
+    .notEmpty()
+    .isISO8601()
+    .withMessage('dataInicio inválida'),
+  body('dataFim')
+    .notEmpty()
+    .isISO8601()
+    .withMessage('dataFim inválida'),
+  body('ativo')
+    .optional({ values: 'falsy' })
+    .isBoolean()
+    .withMessage('ativo deve ser booleano'),
+  handleValidationErrors,
+];
+
+export const validateUpdateEscala = [
+  body('contratoAtivoId')
+    .optional({ values: 'null' })
+    .isUUID()
+    .withMessage('contratoAtivoId inválido'),
+  body('nome')
+    .optional({ values: 'null' })
+    .isString()
+    .trim()
+    .isLength({ min: 1, max: 255 })
+    .withMessage('nome inválido'),
+  body('descricao')
+    .optional({ values: 'null' })
+    .isString()
+    .trim()
+    .isLength({ max: 4000 })
+    .withMessage('descricao inválida'),
+  body('dataInicio')
+    .optional({ values: 'null' })
+    .isISO8601()
+    .withMessage('dataInicio inválida'),
+  body('dataFim')
+    .optional({ values: 'null' })
+    .isISO8601()
+    .withMessage('dataFim inválida'),
+  body('ativo')
+    .optional({ values: 'null' })
+    .isBoolean()
+    .withMessage('ativo deve ser booleano'),
+  handleValidationErrors,
+];
+
+/**
+ * Escala Plantão (POST /escalas/:id/plantoes)
+ */
+export const validateCreateEscalaPlantao = [
+  body('data')
+    .notEmpty()
+    .isISO8601()
+    .withMessage('data inválida'),
+  body('gradeId')
+    .notEmpty()
+    .isString()
+    .trim()
+    .isLength({ min: 1, max: 20 })
+    .withMessage('gradeId inválido'),
+  body('medicoId')
+    .notEmpty()
+    .isUUID()
+    .withMessage('medicoId inválido'),
+  body('valorHora')
+    .optional({ values: 'null' })
+    .isFloat()
+    .withMessage('valorHora inválido'),
+  handleValidationErrors,
+];
+
+/**
+ * Escala: alocar médico na escala (POST /escalas/:id/medicos)
+ */
+export const validateAlocarMedicoEscala = [
+  body('medicoId')
+    .notEmpty()
+    .isUUID()
+    .withMessage('medicoId inválido'),
+  body('cargo')
+    .optional({ values: 'falsy' })
+    .isString()
+    .trim()
+    .isLength({ max: 100 })
+    .withMessage('cargo inválido'),
+  body('valorHora')
+    .optional({ values: 'null' })
+    .isFloat()
+    .withMessage('valorHora inválido'),
   handleValidationErrors,
 ];

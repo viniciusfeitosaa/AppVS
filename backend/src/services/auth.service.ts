@@ -175,8 +175,8 @@ const getDefaultTenant = async () => {
 const hashToken = (token: string) =>
   crypto.createHash('sha256').update(token).digest('hex');
 
-const createMedicoSession = async (medicoId: string, refreshToken: string) => {
-  await prisma.sessao.create({
+const createMedicoSession = async (prismaClient: any, medicoId: string, refreshToken: string) => {
+  await prismaClient.sessao.create({
     data: {
       medicoId,
       tokenHash: hashToken(refreshToken),
@@ -185,8 +185,8 @@ const createMedicoSession = async (medicoId: string, refreshToken: string) => {
   });
 };
 
-const createMasterSession = async (masterId: string, refreshToken: string) => {
-  await prisma.sessaoMaster.create({
+const createMasterSession = async (prismaClient: any, masterId: string, refreshToken: string) => {
+  await prismaClient.sessaoMaster.create({
     data: {
       masterId,
       tokenHash: hashToken(refreshToken),
@@ -244,7 +244,7 @@ export const loginMedicoService = async (
   );
 
   // Salvar sessão (refresh token)
-  await createMedicoSession(medico.id, refreshToken);
+  await createMedicoSession(prisma, medico.id, refreshToken);
 
   // Log de login bem-sucedido
   await createAuditLog({
@@ -312,7 +312,7 @@ export const loginMasterService = async (
     tenant.id
   );
 
-  await createMasterSession(master.id, refreshToken);
+  await createMasterSession(prisma, master.id, refreshToken);
 
   await createAuditLog({
     acao: 'LOGIN_MASTER',
@@ -365,7 +365,7 @@ export const loginByEmailService = async (
       UserRole.MASTER,
       tenant.id
     );
-    await createMasterSession(master.id, refreshToken);
+    await createMasterSession(prisma, master.id, refreshToken);
 
     return {
       user: {
@@ -404,7 +404,7 @@ export const loginByEmailService = async (
     UserRole.MEDICO,
     tenant.id
   );
-  await createMedicoSession(medico.id, refreshToken);
+  await createMedicoSession(prisma, medico.id, refreshToken);
 
   return {
     user: {
@@ -430,60 +430,66 @@ export const acceptInviteService = async (
   const tenant = await getDefaultTenant();
   const tokenHash = hashToken(token);
 
-  const medico = await prisma.medico.findFirst({
-    where: {
-      tenantId: tenant.id,
-      inviteTokenHash: tokenHash,
-      inviteExpiresAt: {
-        gte: new Date(),
-      },
-    },
-  });
-
-  if (!medico) {
-    throw { statusCode: 400, message: 'Convite inválido ou expirado' };
-  }
-
   const senhaHash = await hashPassword(password);
-  const updated = await prisma.medico.update({
-    where: { id: medico.id },
-    data: {
-      senhaHash,
-      inviteTokenHash: null,
-      inviteExpiresAt: null,
-      inviteAcceptedAt: new Date(),
-      ativo: true,
-    },
+
+  return prisma.$transaction(async (tx: any) => {
+    const medico = await tx.medico.findFirst({
+      where: {
+        tenantId: tenant.id,
+        inviteTokenHash: tokenHash,
+        inviteExpiresAt: {
+          gte: new Date(),
+        },
+      },
+    });
+
+    if (!medico) {
+      throw { statusCode: 400, message: 'Convite inválido ou expirado' };
+    }
+
+    const updated = await tx.medico.update({
+      where: { id: medico.id },
+      data: {
+        senhaHash,
+        inviteTokenHash: null,
+        inviteExpiresAt: null,
+        inviteAcceptedAt: new Date(),
+        ativo: true,
+      },
+    });
+
+    const { accessToken, refreshToken } = await generateTokens(
+      updated.id,
+      UserRole.MEDICO,
+      tenant.id
+    );
+
+    await createMedicoSession(tx, updated.id, refreshToken);
+    await createAuditLog(
+      {
+        acao: 'ACEITAR_CONVITE_MEDICO',
+        tenantId: tenant.id,
+        medicoId: updated.id,
+      },
+      tx
+    );
+
+    return {
+      user: {
+        id: updated.id,
+        role: UserRole.MEDICO,
+        tenantId: tenant.id,
+        nomeCompleto: updated.nomeCompleto,
+        profissao: updated.profissao ?? 'Médico',
+        crm: updated.crm,
+        email: updated.email,
+        especialidades: updated.especialidades ?? [],
+        vinculo: updated.vinculo ?? null,
+      },
+      accessToken,
+      refreshToken,
+    };
   });
-
-  const { accessToken, refreshToken } = await generateTokens(
-    updated.id,
-    UserRole.MEDICO,
-    tenant.id
-  );
-  await createMedicoSession(updated.id, refreshToken);
-
-  await createAuditLog({
-    acao: 'ACEITAR_CONVITE_MEDICO',
-    tenantId: tenant.id,
-    medicoId: updated.id,
-  });
-
-  return {
-    user: {
-      id: updated.id,
-      role: UserRole.MEDICO,
-      tenantId: tenant.id,
-      nomeCompleto: updated.nomeCompleto,
-      profissao: updated.profissao ?? 'Médico',
-      crm: updated.crm,
-      email: updated.email,
-      especialidades: updated.especialidades ?? [],
-      vinculo: updated.vinculo ?? null,
-    },
-    accessToken,
-    refreshToken,
-  };
 };
 
 const PROFISSAO_MEDICO = 'Médico';
@@ -542,41 +548,48 @@ export const registerPublicMedicoService = async (
 
   const senhaHash = await hashPassword(input.password);
 
-  const medico = await prisma.medico.create({
-    data: {
-      tenantId: tenant.id,
-      nomeCompleto: input.nomeCompleto.trim(),
-      email,
-      cpf,
-      profissao,
-      crm,
-      senhaHash,
-      especialidades: especialidadesFinal,
-      vinculo: 'Associado',
-      telefone: input.telefone.trim(),
-      ativo: true,
-      inviteTokenHash: null,
-      inviteExpiresAt: null,
-      inviteAcceptedAt: new Date(),
-    },
-    select: {
-      id: true,
-      nomeCompleto: true,
-      email: true,
-      crm: true,
-      vinculo: true,
-    },
-  });
+  const medico = await prisma.$transaction(async (tx: any) => {
+    const created = await tx.medico.create({
+      data: {
+        tenantId: tenant.id,
+        nomeCompleto: input.nomeCompleto.trim(),
+        email,
+        cpf,
+        profissao,
+        crm,
+        senhaHash,
+        especialidades: especialidadesFinal,
+        vinculo: 'Associado',
+        telefone: input.telefone.trim(),
+        ativo: true,
+        inviteTokenHash: null,
+        inviteExpiresAt: null,
+        inviteAcceptedAt: new Date(),
+      },
+      select: {
+        id: true,
+        nomeCompleto: true,
+        email: true,
+        crm: true,
+        vinculo: true,
+      },
+    });
 
-  await createAuditLog({
-    acao: 'CADASTRO_PUBLICO_MEDICO',
-    tenantId: tenant.id,
-    medicoId: medico.id,
-    detalhes: {
-      email: medico.email,
-      crm: medico.crm,
-      vinculo: medico.vinculo ?? null,
-    },
+    await createAuditLog(
+      {
+        acao: 'CADASTRO_PUBLICO_MEDICO',
+        tenantId: tenant.id,
+        medicoId: created.id,
+        detalhes: {
+          email: created.email,
+          crm: created.crm,
+          vinculo: created.vinculo ?? null,
+        },
+      },
+      tx
+    );
+
+    return created;
   });
 
   return {
@@ -623,14 +636,16 @@ export async function esqueciSenhaService(email: string): Promise<{
   const tokenHash = hashToken(token);
   const expiresAt = new Date(Date.now() + RESET_TOKEN_EXPIRY_MS);
 
-  await prisma.resetSenhaToken.create({
-    data: {
-      tenantId: tenant.id,
-      email: normalizedEmail,
-      tokenHash,
-      tipo,
-      expiresAt,
-    },
+  await prisma.$transaction(async (tx: any) => {
+    await tx.resetSenhaToken.create({
+      data: {
+        tenantId: tenant.id,
+        email: normalizedEmail,
+        tokenHash,
+        tipo,
+        expiresAt,
+      },
+    });
   });
 
   const frontendUrl = (process.env.FRONTEND_URL || 'http://localhost:3000').replace(/\/$/, '');
@@ -684,33 +699,35 @@ export async function redefinirSenhaService(token: string, novaSenha: string): P
   const tokenHash = hashToken(token);
   const tenant = await getDefaultTenant();
 
-  const record = await prisma.resetSenhaToken.findFirst({
-    where: { tokenHash, tenantId: tenant.id },
+  return prisma.$transaction(async (tx: any) => {
+    const record = await tx.resetSenhaToken.findFirst({
+      where: { tokenHash, tenantId: tenant.id },
+    });
+
+    if (!record) {
+      throw { statusCode: 400, message: 'Link inválido ou expirado. Solicite uma nova redefinição de senha.' };
+    }
+    if (new Date() > record.expiresAt) {
+      await tx.resetSenhaToken.deleteMany({ where: { id: record.id } });
+      throw { statusCode: 400, message: 'Link expirado. Solicite uma nova redefinição de senha.' };
+    }
+
+    const hashed = await hashPassword(novaSenha);
+
+    if (record.tipo === 'MASTER') {
+      await tx.usuarioMaster.updateMany({
+        where: { tenantId: tenant.id, email: record.email },
+        data: { senhaHash: hashed },
+      });
+    } else {
+      await tx.medico.updateMany({
+        where: { tenantId: tenant.id, email: record.email },
+        data: { senhaHash: hashed },
+      });
+    }
+
+    await tx.resetSenhaToken.deleteMany({ where: { id: record.id } });
+
+    return { ok: true, message: 'Senha alterada com sucesso. Faça login com a nova senha.' };
   });
-
-  if (!record) {
-    throw { statusCode: 400, message: 'Link inválido ou expirado. Solicite uma nova redefinição de senha.' };
-  }
-  if (new Date() > record.expiresAt) {
-    await prisma.resetSenhaToken.deleteMany({ where: { id: record.id } });
-    throw { statusCode: 400, message: 'Link expirado. Solicite uma nova redefinição de senha.' };
-  }
-
-  const hashed = await hashPassword(novaSenha);
-
-  if (record.tipo === 'MASTER') {
-    await prisma.usuarioMaster.updateMany({
-      where: { tenantId: tenant.id, email: record.email },
-      data: { senhaHash: hashed },
-    });
-  } else {
-    await prisma.medico.updateMany({
-      where: { tenantId: tenant.id, email: record.email },
-      data: { senhaHash: hashed },
-    });
-  }
-
-  await prisma.resetSenhaToken.deleteMany({ where: { id: record.id } });
-
-  return { ok: true, message: 'Senha alterada com sucesso. Faça login com a nova senha.' };
 }
