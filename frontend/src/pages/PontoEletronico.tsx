@@ -233,7 +233,13 @@ const PontoEletronico = () => {
         resolve(null);
         return;
       }
-      ctx.drawImage(video, 0, 0);
+      // Câmera frontal costuma gerar imagem espelhada; invertendo no canvas
+      // para salvar a foto na orientação esperada.
+      ctx.save();
+      ctx.translate(canvas.width, 0);
+      ctx.scale(-1, 1);
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      ctx.restore();
       canvas.toBlob(
         (blob) => {
           if (!blob) {
@@ -519,10 +525,6 @@ const PontoEletronico = () => {
             <h2 id="checkin-foto-titulo" className="text-base font-bold text-viva-900 font-display mb-1">
               Foto do rosto — check-in
             </h2>
-            <p className="text-xs text-viva-600 font-serif mb-4">
-              O ideal é usar a câmera: ao tocar em Confirmar entrada, a foto é tirada na hora. Se a permissão estiver negada ou o navegador não abrir a
-              câmera de novo, use a opção abaixo com um motivo claro — o registro fica salvo para auditoria.
-            </p>
 
             <div className="space-y-3">
               {!cameraErro ? (
@@ -552,10 +554,6 @@ const PontoEletronico = () => {
                       Quando estiver pronto, confirme — a captura ocorre no momento do clique.
                     </p>
                   )}
-                  <p className="text-[10px] text-viva-500 font-serif leading-relaxed">
-                    Se já negou a câmera antes: no Chrome/Edge, clique no ícone de cadeado ou de informações ao lado do endereço, encontre “Câmera” e
-                    altere para Permitir; depois use “Tentar câmera novamente”.
-                  </p>
                 </>
               ) : (
                 <div className="rounded-xl border border-amber-200 bg-amber-50/90 p-4 space-y-3">
