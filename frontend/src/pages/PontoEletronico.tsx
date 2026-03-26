@@ -31,6 +31,7 @@ const PontoEletronico = () => {
   /** Incrementa quando há stream novo — força reanexo ao <video> (mount tardio / iOS). */
   const [streamAttachKey, setStreamAttachKey] = useState(0);
   const [motivoSemFoto, setMotivoSemFoto] = useState('');
+  const [showSemFotoSection, setShowSemFotoSection] = useState(false);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const cameraStartAttemptRef = useRef(0);
@@ -180,6 +181,7 @@ const PontoEletronico = () => {
   const closeCheckinModal = () => {
     setVideoPronto(false);
     setMotivoSemFoto('');
+    setShowSemFotoSection(false);
     setStreamAttachKey(0);
     setCheckinModalOpen(false);
   };
@@ -197,6 +199,7 @@ const PontoEletronico = () => {
     setCameraErro(false);
     setVideoPronto(false);
     setMotivoSemFoto('');
+    setShowSemFotoSection(false);
     setStreamAttachKey(0);
     setCheckinModalOpen(true);
     // Mesmo gesto do clique: necessário para Safari/iOS aceitar getUserMedia.
@@ -532,7 +535,7 @@ const PontoEletronico = () => {
                   <div className="rounded-xl overflow-hidden bg-viva-900 aspect-[4/3] flex items-center justify-center relative">
                     <video
                       ref={videoRef}
-                      className="w-full h-full object-cover"
+                      className="w-full h-full object-cover [transform:scaleX(-1)]"
                       playsInline
                       muted
                       autoPlay
@@ -569,21 +572,23 @@ const PontoEletronico = () => {
               )}
             </div>
 
-            <div className="mt-5 pt-4 border-t border-viva-100 border-dashed">
-              <p className="text-xs font-semibold text-viva-800 font-display mb-2">Sem câmera agora</p>
-              <p className="text-[11px] text-viva-600 font-serif mb-2">
-                Se não for possível usar a câmera (permissão persistente, dispositivo corporativo, etc.), descreva o motivo em pelo menos 15 caracteres.
-              </p>
-              <textarea
-                className="w-full rounded-xl border border-viva-200 bg-white px-3 py-2 text-xs text-viva-900 font-serif min-h-[72px] resize-y"
-                placeholder="Ex.: permissão de câmera negada no Chrome e o site não mostra o prompt de novo"
-                value={motivoSemFoto}
-                onChange={(e) => setMotivoSemFoto(e.target.value)}
-                maxLength={500}
-                rows={3}
-              />
-              <p className="text-[10px] text-viva-500 mt-1">{motivoSemFoto.trim().length}/500 · mínimo 15 caracteres</p>
-            </div>
+            {showSemFotoSection && (
+              <div className="mt-5 pt-4 border-t border-viva-100 border-dashed">
+                <p className="text-xs font-semibold text-viva-800 font-display mb-2">Sem câmera agora</p>
+                <p className="text-[11px] text-viva-600 font-serif mb-2">
+                  Se não for possível usar a câmera (permissão persistente, dispositivo corporativo, etc.), descreva o motivo em pelo menos 15 caracteres.
+                </p>
+                <textarea
+                  className="w-full rounded-xl border border-viva-200 bg-white px-3 py-2 text-xs text-viva-900 font-serif min-h-[72px] resize-y"
+                  placeholder="Ex.: permissão de câmera negada no Chrome e o site não mostra o prompt de novo"
+                  value={motivoSemFoto}
+                  onChange={(e) => setMotivoSemFoto(e.target.value)}
+                  maxLength={500}
+                  rows={3}
+                />
+                <p className="text-[10px] text-viva-500 mt-1">{motivoSemFoto.trim().length}/500 · mínimo 15 caracteres</p>
+              </div>
+            )}
 
             {error && checkinModalOpen && (
               <p className="mt-3 p-3 rounded-xl bg-red-50 border border-red-200 text-xs text-red-700">{error}</p>
@@ -596,10 +601,16 @@ const PontoEletronico = () => {
               <button
                 type="button"
                 className="btn text-sm border border-viva-300 bg-white text-viva-800"
-                onClick={handleCheckInSemFoto}
-                disabled={loadingAction || motivoSemFoto.trim().length < 15}
+                onClick={() => {
+                  if (!showSemFotoSection) {
+                    setShowSemFotoSection(true);
+                    return;
+                  }
+                  void handleCheckInSemFoto();
+                }}
+                disabled={loadingAction || (showSemFotoSection && motivoSemFoto.trim().length < 15)}
               >
-                {loadingAction ? 'Registrando...' : 'Registrar sem foto'}
+                {showSemFotoSection ? (loadingAction ? 'Registrando...' : 'Confirmar sem foto') : 'Registrar sem foto'}
               </button>
               <button
                 type="button"
