@@ -253,9 +253,22 @@ const Dashboard = () => {
         </p>
       </div>
 
-      {temProximosPlantoes && (
+      {isMedico && !isMaster && (temProximosPlantoes || listaEscalas.length > 0) && (
         <div className="col-span-full stagger-2 space-y-3">
-          <h2 className="text-sm font-semibold text-viva-800 font-display px-1">Suas próximas escalas</h2>
+          <div className="flex flex-wrap items-center justify-between gap-2 px-1">
+            <h2 className="text-sm font-semibold text-viva-800 font-display">Suas próximas escalas</h2>
+            <Link
+              to="/meu-calendario-plantoes"
+              className="btn btn-secondary text-xs sm:text-sm shrink-0"
+            >
+              Calendário de escalas
+            </Link>
+          </div>
+          {!temProximosPlantoes && (
+            <p className="text-xs text-viva-600 px-1 font-serif leading-relaxed">
+              Não há plantões futuros em destaque. Abra o calendário para ver todas as suas alocações por mês.
+            </p>
+          )}
           {/* Próxima escala */}
           {proxima && (
             <div className="card flex flex-wrap items-center justify-between gap-4 border-l-4 border-l-viva-500 bg-gradient-to-r from-viva-50/60 to-transparent">
@@ -289,7 +302,7 @@ const Dashboard = () => {
                     : (
                         <span className="text-xs text-viva-600 max-w-[14rem]">
                           {isPlantaoAindaFuturo(proxima.data, proxima.gradeId)
-                            ? 'Período de troca encerrado (até 10 min antes do início)'
+                            ? 'Período de troca encerrado'
                             : 'Plantão já passou'}
                         </span>
                       )}
@@ -332,7 +345,7 @@ const Dashboard = () => {
                     : (
                         <span className="text-xs text-viva-600">
                           {isPlantaoAindaFuturo(segundaProxima.data, segundaProxima.gradeId)
-                            ? 'Período de troca encerrado (até 10 min antes do início)'
+                            ? 'Período de troca encerrado'
                             : 'Plantão já passou'}
                         </span>
                       )}
@@ -519,25 +532,6 @@ const Dashboard = () => {
               </div>
             </div>
           )}
-        </div>
-      </div>
-
-      {/* Card de Status */}
-      <div className="card stagger-4">
-        <h3 className="text-xs font-semibold uppercase tracking-wider text-viva-600 mb-4 font-display">
-          Status do Sistema
-        </h3>
-        <div className="space-y-3">
-          <div className="flex items-center justify-between p-4 rounded-xl bg-viva-50/60 border border-viva-200/50">
-            <p className="text-xs font-medium text-viva-700">Status da Conta</p>
-            <span className="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-200/80">
-              Ativo
-            </span>
-          </div>
-          <div className="flex items-center justify-between p-4 rounded-xl bg-viva-50/60 border border-viva-200/50">
-            <p className="text-xs font-medium text-viva-700">Último Acesso</p>
-            <p className="text-xs font-bold text-viva-900">Hoje</p>
-          </div>
         </div>
       </div>
 

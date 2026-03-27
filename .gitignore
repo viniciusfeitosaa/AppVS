@@ -55,3 +55,6 @@ backup/
 tmp/
 temp/
 *.tmp
+
+# Uploads locais (check-in de ponto etc.)
+backend/uploads/

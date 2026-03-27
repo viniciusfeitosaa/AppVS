@@ -165,7 +165,7 @@ const NotificationBell = () => {
             queryClient.invalidateQueries({ queryKey: ['medico', 'notificacoes'] });
           }
         }}
-        className="relative flex items-center justify-center w-10 h-10 rounded-xl border border-viva-200/80 bg-viva-50/80 text-viva-800 hover:bg-viva-100/80 transition"
+        className="relative flex items-center justify-center w-10 h-10 rounded-xl border border-viva-200/70 bg-white/90 text-viva-800 shadow-[0_1px_2px_rgba(8,50,20,0.05)] hover:bg-viva-50/95 hover:border-viva-200 transition"
         aria-label="Notificações"
         aria-expanded={open}
       >

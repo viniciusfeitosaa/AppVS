@@ -91,6 +91,7 @@ export interface ConfigPontoEletronico {
   equipeId: string | null;
   horasPrevistasMes: number | null;
   valorHora: string | null;
+  valorHoraCobranca: string | null;
   horarioEntrada: string | null;
   horarioSaida: string | null;
   toleranciaMinutos: number | null;
@@ -468,6 +469,7 @@ export const adminService = {
     payload: {
       horasPrevistasMes: number | null;
       valorHora: number | null;
+      valorHoraCobranca: number | null;
       horarioEntrada?: string | null;
       horarioSaida?: string | null;
       toleranciaMinutos?: number | null;

@@ -36,6 +36,10 @@ type AgrupamentoHoras = {
   /** Valor/h (R$) usado no cálculo quando aplicável */
   valorHora?: number;
   valorCalculado?: number;
+  /** Contrato só ponto: total repasse (valor hora repasse × horas) */
+  valorRepasse?: number;
+  /** Contrato só ponto: total cobrança (valor hora cobrança × horas) */
+  valorCobranca?: number;
 };
 
 const formatDuration = (minutes: number) => {
@@ -70,16 +74,35 @@ const inferGradeIdFromCheckIn = (checkInAtIso: string): 'mt' | 'sn' => {
   return h >= 7 && h < 19 ? 'mt' : 'sn';
 };
 
-const exportHorasCsv = (agrupado: AgrupamentoHoras[], dataInicio: string, dataFim: string) => {
-  const header = ['Médico', 'Escala', 'Registros', 'Total (min)', 'Total (horas)', 'Valor (R$)'];
-  const rows = agrupado.map((item) => [
-    escapeCsvCell(item.medicoNome),
-    escapeCsvCell(item.escalaNome),
-    escapeCsvCell(item.totalRegistros),
-    escapeCsvCell(item.totalMinutos),
-    escapeCsvCell(formatDuration(item.totalMinutos)),
-    escapeCsvCell(item.valorCalculado != null ? formatValor(item.valorCalculado) : ''),
-  ]);
+const exportHorasCsv = (
+  agrupado: AgrupamentoHoras[],
+  dataInicio: string,
+  dataFim: string,
+  apenasPonto: boolean
+) => {
+  const header = apenasPonto
+    ? ['Médico', 'Escala', 'Registros', 'Total (min)', 'Total (horas)', 'Repasse (R$)', 'Cobrança (R$)']
+    : ['Médico', 'Escala', 'Registros', 'Total (min)', 'Total (horas)', 'Valor (R$)'];
+  const rows = agrupado.map((item) =>
+    apenasPonto
+      ? [
+          escapeCsvCell(item.medicoNome),
+          escapeCsvCell(item.escalaNome),
+          escapeCsvCell(item.totalRegistros),
+          escapeCsvCell(item.totalMinutos),
+          escapeCsvCell(formatDuration(item.totalMinutos)),
+          escapeCsvCell(item.valorRepasse != null ? formatValor(item.valorRepasse) : ''),
+          escapeCsvCell(item.valorCobranca != null ? formatValor(item.valorCobranca) : ''),
+        ]
+      : [
+          escapeCsvCell(item.medicoNome),
+          escapeCsvCell(item.escalaNome),
+          escapeCsvCell(item.totalRegistros),
+          escapeCsvCell(item.totalMinutos),
+          escapeCsvCell(formatDuration(item.totalMinutos)),
+          escapeCsvCell(item.valorCalculado != null ? formatValor(item.valorCalculado) : ''),
+        ]
+  );
   const csv = [header.join(','), ...rows.map((r) => r.join(','))].join('\r\n');
   const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8' });
   const url = URL.createObjectURL(blob);
@@ -90,7 +113,12 @@ const exportHorasCsv = (agrupado: AgrupamentoHoras[], dataInicio: string, dataFi
   URL.revokeObjectURL(url);
 };
 
-const exportHorasPdf = (agrupado: AgrupamentoHoras[], dataInicio: string, dataFim: string) => {
+const exportHorasPdf = (
+  agrupado: AgrupamentoHoras[],
+  dataInicio: string,
+  dataFim: string,
+  apenasPonto: boolean
+) => {
   const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
   doc.setFontSize(14);
   doc.text('Relatório de Horas por médico e escala', 14, 12);
@@ -98,14 +126,29 @@ const exportHorasPdf = (agrupado: AgrupamentoHoras[], dataInicio: string, dataFi
   doc.text(`Período: ${dataInicio} a ${dataFim}`, 14, 18);
   autoTable(doc, {
     startY: 24,
-    head: [['Médico', 'Escala', 'Registros', 'Total (horas)', 'Valor (R$)']],
-    body: agrupado.map((item) => [
-      item.medicoNome,
-      item.escalaNome,
-      String(item.totalRegistros),
-      formatDuration(item.totalMinutos),
-      item.valorCalculado != null ? formatValor(item.valorCalculado) : '—',
-    ]),
+    head: [
+      apenasPonto
+        ? [['Médico', 'Escala', 'Registros', 'Total (horas)', 'Repasse (R$)', 'Cobrança (R$)']]
+        : [['Médico', 'Escala', 'Registros', 'Total (horas)', 'Valor (R$)']],
+    ],
+    body: agrupado.map((item) =>
+      apenasPonto
+        ? [
+            item.medicoNome,
+            item.escalaNome,
+            String(item.totalRegistros),
+            formatDuration(item.totalMinutos),
+            item.valorRepasse != null ? formatValor(item.valorRepasse) : '—',
+            item.valorCobranca != null ? formatValor(item.valorCobranca) : '—',
+          ]
+        : [
+            item.medicoNome,
+            item.escalaNome,
+            String(item.totalRegistros),
+            formatDuration(item.totalMinutos),
+            item.valorCalculado != null ? formatValor(item.valorCalculado) : '—',
+          ]
+    ),
     styles: { fontSize: 9 },
     headStyles: { fillColor: [22, 163, 74] },
   });
@@ -176,6 +219,7 @@ const Relatorios = () => {
     [contratoId, contratos]
   );
   const usaEscalaEPonto = Boolean(contratoSelecionado?.usaEscala && contratoSelecionado?.usaPonto);
+  const apenasPonto = Boolean(contratoSelecionado?.usaPonto && !contratoSelecionado?.usaEscala);
 
   const { data: valoresPlantaoResp } = useQuery({
     queryKey: ['admin', 'valores-plantao', contratoId, subgrupoId, 'relatorio'],
@@ -183,15 +227,19 @@ const Relatorios = () => {
     enabled: isMaster && usaEscalaEPonto && Boolean(contratoId && subgrupoId),
   });
 
-  const valorHoraDerivadoPorGrade = useMemo(() => {
+  /**
+   * Valor total do plantão (12h) por grade, igual ao cadastro em Valores de plantão.
+   * O valor/hora usado no relatório é (este valor ÷ 12), uma única vez — ver cálculo por registro.
+   */
+  const valorPlantao12hPorGrade = useMemo(() => {
     const map = new Map<string, number>();
     const rows = valoresPlantaoResp?.data ?? [];
     for (const v of rows as any[]) {
-      const gradeId = String(v.gradeId ?? '').trim();
+      const gradeId = String(v.gradeId ?? '').trim().toLowerCase();
       if (!gradeId) continue;
       const n = v.valorHora != null && v.valorHora !== '' ? Number(v.valorHora) : NaN;
       if (!Number.isFinite(n) || n <= 0) continue;
-      map.set(gradeId, round2(n / 12));
+      map.set(gradeId, round2(n));
     }
     return map;
   }, [valoresPlantaoResp?.data]);
@@ -208,6 +256,8 @@ const Relatorios = () => {
   const raw = registrosResp?.data;
   const registros: RegistroPontoAdmin[] = Array.isArray(raw) ? raw : raw?.data ?? [];
   const valorHoraPorMedico: Record<string, number> = !Array.isArray(raw) && raw?.valorHoraPorMedico ? raw.valorHoraPorMedico : {};
+  const valorHoraCobrancaPorMedico: Record<string, number> =
+    !Array.isArray(raw) && raw?.valorHoraCobrancaPorMedico ? raw.valorHoraCobrancaPorMedico : {};
   const valorHoraPorMedicoEscala: Record<string, number> = !Array.isArray(raw) && raw?.valorHoraPorMedicoEscala ? raw.valorHoraPorMedicoEscala : {};
   const plantoesValorHoraPorEscalaDataGrade: Record<string, number> =
     !Array.isArray(raw) && raw?.plantoesValorHoraPorEscalaDataGrade ? raw.plantoesValorHoraPorEscalaDataGrade : {};
@@ -230,9 +280,14 @@ const Relatorios = () => {
           ? plantoesValorHoraPorEscalaDataGrade[`${escId}::${dateStr}::${gradeIdInferido}`] ?? null
           : null;
 
+      const total12h =
+        valorPlantaoGravado != null && Number(valorPlantaoGravado) > 0
+          ? Number(valorPlantaoGravado)
+          : valorPlantao12hPorGrade.get(gradeIdInferido) ?? null;
+
       const valorHoraDerivado =
-        usaEscalaEPonto && contratoId && subgrupoId
-          ? round2(Number(valorPlantaoGravado ?? valorHoraDerivadoPorGrade.get(gradeIdInferido) ?? 0) / 12) || null
+        usaEscalaEPonto && contratoId && subgrupoId && total12h != null && total12h > 0
+          ? round2(total12h / 12)
           : null;
       const valorRegistro =
         valorHoraDerivado != null && valorHoraDerivado > 0 ? (minutos / 60) * valorHoraDerivado : null;
@@ -265,8 +320,15 @@ const Relatorios = () => {
 
     const rows = Array.from(map.values()).sort((a, b) => b.totalMinutos - a.totalMinutos);
 
-    // Fallback antigo (quando não for contrato escala+ponto ou quando não tiver valores-plantao)
-    if (!usaEscalaEPonto || !contratoId || !subgrupoId || valorHoraDerivadoPorGrade.size === 0) {
+    const temValorPlantaoGravadoNoPeriodo = Object.keys(plantoesValorHoraPorEscalaDataGrade).length > 0;
+    const temValorBaseGrade = valorPlantao12hPorGrade.size > 0;
+    // Fallback antigo: só quando não dá para usar nem valores-plantao nem valor gravado por plantão/dia
+    if (
+      !usaEscalaEPonto ||
+      !contratoId ||
+      !subgrupoId ||
+      (!temValorBaseGrade && !temValorPlantaoGravadoNoPeriodo)
+    ) {
       for (const row of rows) {
         const keyMedEsc = `${row.medicoId}::${row.escalaId}`;
         if (row.escalaId !== 'sem-escala') {
@@ -277,7 +339,15 @@ const Relatorios = () => {
           }
         } else if (row.medicoId !== 'sem-medico') {
           const vh = valorHoraPorMedico[row.medicoId];
-          if (vh != null && vh > 0) {
+          const vhCob = valorHoraCobrancaPorMedico[row.medicoId];
+          if (apenasPonto) {
+            if (vh != null && vh > 0) {
+              row.valorRepasse = round2((row.totalMinutos / 60) * vh);
+            }
+            if (vhCob != null && vhCob > 0) {
+              row.valorCobranca = round2((row.totalMinutos / 60) * vhCob);
+            }
+          } else if (vh != null && vh > 0) {
             row.valorHora = vh;
             row.valorCalculado = (row.totalMinutos / 60) * vh;
           }
@@ -296,11 +366,35 @@ const Relatorios = () => {
     registros,
     subgrupoId,
     usaEscalaEPonto,
-    valorHoraDerivadoPorGrade,
+    valorPlantao12hPorGrade,
     valorHoraPorMedico,
+    valorHoraCobrancaPorMedico,
     valorHoraPorMedicoEscala,
     plantoesValorHoraPorEscalaDataGrade,
+    apenasPonto,
   ]);
+
+  const totaisRepasseCobranca = useMemo(() => {
+    if (!apenasPonto) return { repasse: null as number | null, cobranca: null as number | null };
+    let rep = 0;
+    let cob = 0;
+    let temRep = false;
+    let temCob = false;
+    for (const r of agrupado) {
+      if (r.valorRepasse != null) {
+        rep += r.valorRepasse;
+        temRep = true;
+      }
+      if (r.valorCobranca != null) {
+        cob += r.valorCobranca;
+        temCob = true;
+      }
+    }
+    return {
+      repasse: temRep ? round2(rep) : null,
+      cobranca: temCob ? round2(cob) : null,
+    };
+  }, [agrupado, apenasPonto]);
 
   return (
     <div className="space-y-6">
@@ -410,7 +504,7 @@ const Relatorios = () => {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className={`grid grid-cols-1 gap-4 ${apenasPonto ? 'md:grid-cols-2 xl:grid-cols-5' : 'md:grid-cols-3'}`}>
         <div className="card">
           <p className="text-xs uppercase tracking-wide text-viva-600">Total de horas</p>
           <p className="text-2xl font-bold text-viva-900 mt-1">{formatDuration(totalMinutos)}</p>
@@ -423,6 +517,22 @@ const Relatorios = () => {
           <p className="text-xs uppercase tracking-wide text-viva-600">Agrupamentos</p>
           <p className="text-2xl font-bold text-viva-900 mt-1">{agrupado.length}</p>
         </div>
+        {apenasPonto && (
+          <>
+            <div className="card border-l-4 border-viva-500">
+              <p className="text-xs uppercase tracking-wide text-viva-600">Total repasse</p>
+              <p className="text-2xl font-bold text-viva-900 mt-1">
+                {totaisRepasseCobranca.repasse != null ? formatValor(totaisRepasseCobranca.repasse) : '—'}
+              </p>
+            </div>
+            <div className="card border-l-4 border-viva-600">
+              <p className="text-xs uppercase tracking-wide text-viva-600">Total cobrança</p>
+              <p className="text-2xl font-bold text-viva-900 mt-1">
+                {totaisRepasseCobranca.cobranca != null ? formatValor(totaisRepasseCobranca.cobranca) : '—'}
+              </p>
+            </div>
+          </>
+        )}
       </div>
 
       <div className="card">
@@ -432,7 +542,7 @@ const Relatorios = () => {
             type="button"
             className="btn btn-secondary inline-flex items-center gap-2"
             disabled={isLoading || agrupado.length === 0}
-            onClick={() => exportHorasCsv(agrupado, dataInicio, dataFim)}
+            onClick={() => exportHorasCsv(agrupado, dataInicio, dataFim, apenasPonto)}
           >
             <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clipRule="evenodd" /></svg>
             Exportar CSV
@@ -441,7 +551,7 @@ const Relatorios = () => {
             type="button"
             className="btn btn-secondary inline-flex items-center gap-2"
             disabled={isLoading || agrupado.length === 0}
-            onClick={() => exportHorasPdf(agrupado, dataInicio, dataFim)}
+            onClick={() => exportHorasPdf(agrupado, dataInicio, dataFim, apenasPonto)}
           >
             <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z" clipRule="evenodd" /></svg>
             Exportar PDF
@@ -460,7 +570,14 @@ const Relatorios = () => {
                   <th className="py-2 pr-4">Escala</th>
                   <th className="py-2 pr-4">Registros</th>
                   <th className="py-2 pr-4">Total de horas</th>
-                  <th className="py-2 pr-4">Valor (R$)</th>
+                  {apenasPonto ? (
+                    <>
+                      <th className="py-2 pr-4">Repasse (R$)</th>
+                      <th className="py-2 pr-4">Cobrança (R$)</th>
+                    </>
+                  ) : (
+                    <th className="py-2 pr-4">Valor (R$)</th>
+                  )}
                 </tr>
               </thead>
               <tbody>
@@ -470,9 +587,20 @@ const Relatorios = () => {
                     <td className="py-2 pr-4 text-gray-700">{item.escalaNome}</td>
                     <td className="py-2 pr-4 text-gray-700">{item.totalRegistros}</td>
                     <td className="py-2 pr-4 font-semibold text-viva-900">{formatDuration(item.totalMinutos)}</td>
-                    <td className="py-2 pr-4 text-gray-700">
-                      {item.valorCalculado != null ? formatValor(item.valorCalculado) : '—'}
-                    </td>
+                    {apenasPonto ? (
+                      <>
+                        <td className="py-2 pr-4 text-gray-700">
+                          {item.valorRepasse != null ? formatValor(item.valorRepasse) : '—'}
+                        </td>
+                        <td className="py-2 pr-4 text-gray-700">
+                          {item.valorCobranca != null ? formatValor(item.valorCobranca) : '—'}
+                        </td>
+                      </>
+                    ) : (
+                      <td className="py-2 pr-4 text-gray-700">
+                        {item.valorCalculado != null ? formatValor(item.valorCalculado) : '—'}
+                      </td>
+                    )}
                   </tr>
                 ))}
               </tbody>

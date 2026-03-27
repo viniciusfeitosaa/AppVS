@@ -552,6 +552,8 @@ model ConfigPontoEletronico {
   equipeId          String?  @map("equipe_id")
   horasPrevistasMes Int?     @map("horas_previstas_mes")
   valorHora         Decimal? @map("valor_hora") @db.Decimal(10, 2)
+  // valor/hora cobrança (só ponto); repasse ao profissional em valorHora
+  valorHoraCobranca Decimal? @map("valor_hora_cobranca") @db.Decimal(10, 2)
   horarioEntrada    String?   @map("horario_entrada") @db.VarChar(5)
   horarioSaida      String?   @map("horario_saida") @db.VarChar(5)
   toleranciaMinutos Int?      @map("tolerancia_minutos")

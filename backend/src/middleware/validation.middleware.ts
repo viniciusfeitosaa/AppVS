@@ -553,3 +553,28 @@ export const validateRemoverAdicionalPlantao = [
     .withMessage('gradeId inválido'),
   handleValidationErrors,
 ];
+
+/** GET /ponto/meus-plantoes-calendario?ano=&mes= */
+export const validateMeusPlantoesCalendarioQuery = [
+  query('ano').optional({ values: 'falsy' }).isInt({ min: 2000, max: 2100 }).withMessage('ano inválido'),
+  query('mes').optional({ values: 'falsy' }).isInt({ min: 1, max: 12 }).withMessage('mês inválido'),
+  query('equipeIds')
+    .optional({ values: 'falsy' })
+    .isString()
+    .withMessage('equipeIds inválido')
+    .custom((value) => {
+      const parts = String(value)
+        .split(',')
+        .map((p) => p.trim())
+        .filter(Boolean);
+
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+      for (const part of parts) {
+        if (!uuidRegex.test(part)) {
+          throw new Error('equipeIds inválido');
+        }
+      }
+      return true;
+    }),
+  handleValidationErrors,
+];

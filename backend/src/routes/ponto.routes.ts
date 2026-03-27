@@ -10,6 +10,7 @@ import {
   validateUUIDQuery,
   validateUUIDParam,
   validateSolicitarTrocaPlantao,
+  validateMeusPlantoesCalendarioQuery,
 } from '../middleware/validation.middleware';
 import {
   checkInController,
@@ -20,6 +21,8 @@ import {
   listMinhasEscalasController,
   listEquipeColegasController,
   listProximosPlantoesController,
+  listMeusPlantoesCalendarioController,
+  listMinhasEquipesCalendarioController,
   solicitarTrocaPlantaoController,
   canCheckInController,
 } from '../controllers/ponto.controller';
@@ -44,6 +47,12 @@ router.get('/meu-dia', getMeuDiaPontoController);
 router.get('/minhas-escalas', listMinhasEscalasController);
 router.get('/equipe-colegas', validateUUIDQuery('escalaId'), listEquipeColegasController);
 router.get('/proximos-plantoes', listProximosPlantoesController);
+router.get(
+  '/meus-plantoes-calendario',
+  validateMeusPlantoesCalendarioQuery,
+  listMeusPlantoesCalendarioController
+);
+router.get('/minhas-equipes-calendario', listMinhasEquipesCalendarioController);
 router.post('/solicitar-troca-plantao', validateSolicitarTrocaPlantao, solicitarTrocaPlantaoController);
 router.get('/can-checkin', validateUUIDQuery('escalaId'), canCheckInController);
 router.get('/registros/:id/foto-checkin', validateUUIDParam('id'), downloadFotoCheckinMedicoController);

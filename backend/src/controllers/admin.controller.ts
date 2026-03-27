@@ -890,7 +890,21 @@ export const setConfigPontoController = async (req: Request, res: Response) => {
     if (!req.user) {
       return res.status(401).json({ success: false, error: 'Não autenticado' });
     }
-    const { contratoId, subgrupoId, equipeId, horasPrevistasMes, valorHora, horarioEntrada, horarioSaida, toleranciaMinutos, latitude, longitude, raioMetros, enderecoPonto } = req.body;
+    const {
+      contratoId,
+      subgrupoId,
+      equipeId,
+      horasPrevistasMes,
+      valorHora,
+      valorHoraCobranca,
+      horarioEntrada,
+      horarioSaida,
+      toleranciaMinutos,
+      latitude,
+      longitude,
+      raioMetros,
+      enderecoPonto,
+    } = req.body;
     if (!contratoId || typeof contratoId !== 'string') {
       return res.status(400).json({ success: false, error: 'contratoId é obrigatório' });
     }
@@ -906,6 +920,7 @@ export const setConfigPontoController = async (req: Request, res: Response) => {
       equipeId: equipeIdTrimmed,
       horasPrevistasMes: horasPrevistasMes != null ? Number(horasPrevistasMes) : null,
       valorHora: valorHora != null ? Number(valorHora) : null,
+      valorHoraCobranca: valorHoraCobranca != null ? Number(valorHoraCobranca) : null,
       horarioEntrada: horarioEntrada != null && typeof horarioEntrada === 'string' ? horarioEntrada.trim() || null : null,
       horarioSaida: horarioSaida != null && typeof horarioSaida === 'string' ? horarioSaida.trim() || null : null,
       toleranciaMinutos: toleranciaMinutos != null ? Number(toleranciaMinutos) : null,

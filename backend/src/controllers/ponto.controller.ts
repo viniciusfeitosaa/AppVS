@@ -10,6 +10,8 @@ import {
   listMinhasEscalasService,
   listEquipeColegasService,
   listProximosPlantoesService,
+  listMeusPlantoesMesCalendarioService,
+  listMinhasEquipesCalendarioService,
   solicitarTrocaPlantaoService,
   canCheckInService,
 } from '../services/ponto.service';
@@ -184,6 +186,47 @@ export const listProximosPlantoesController = async (req: Request, res: Response
     return res.status(error.statusCode || 500).json({
       success: false,
       error: error.message || 'Erro ao listar próximos plantões',
+    });
+  }
+};
+
+export const listMeusPlantoesCalendarioController = async (req: Request, res: Response) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ success: false, error: 'Não autenticado' });
+    }
+    const now = new Date();
+    const ano = req.query.ano != null && req.query.ano !== '' ? Number(req.query.ano) : now.getFullYear();
+    const mes = req.query.mes != null && req.query.mes !== '' ? Number(req.query.mes) : now.getMonth() + 1;
+    const equipeIds =
+      typeof req.query.equipeIds === 'string' && req.query.equipeIds.trim()
+        ? req.query.equipeIds
+            .split(',')
+            .map((p) => p.trim())
+            .filter(Boolean)
+        : undefined;
+
+    const data = await listMeusPlantoesMesCalendarioService(req.user.tenantId, req.user.id, ano, mes, equipeIds);
+    return res.status(200).json({ success: true, data, meta: { ano, mes } });
+  } catch (error: any) {
+    return res.status(error.statusCode || 500).json({
+      success: false,
+      error: error.message || 'Erro ao listar plantões do mês',
+    });
+  }
+};
+
+export const listMinhasEquipesCalendarioController = async (req: Request, res: Response) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ success: false, error: 'Não autenticado' });
+    }
+    const data = await listMinhasEquipesCalendarioService(req.user.tenantId, req.user.id);
+    return res.status(200).json({ success: true, data });
+  } catch (error: any) {
+    return res.status(error.statusCode || 500).json({
+      success: false,
+      error: error.message || 'Erro ao listar equipes para o calendário',
     });
   }
 };

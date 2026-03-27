@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useLayoutEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../context/AuthContext';
+import { authService } from '../services/auth.service';
 import { pontoService } from '../services/ponto.service';
 
 const formatDuration = (minutes: number) => {
@@ -38,6 +39,12 @@ const PontoEletronico = () => {
 
   const isMedico = user?.role === 'MEDICO';
 
+  const { data: modulosResp } = useQuery({
+    queryKey: ['auth', 'modulos-acesso', user?.id],
+    queryFn: () => authService.getModulosAcesso(),
+    enabled: !!user && isMedico,
+  });
+
   const { data: escalasResp } = useQuery({
     queryKey: ['ponto', 'minhas-escalas'],
     queryFn: () => pontoService.listMinhasEscalas(),
@@ -66,7 +73,20 @@ const PontoEletronico = () => {
     return (
       <div className="card border-l-4 border-red-400">
         <h2 className="text-base font-bold text-viva-900 mb-2 font-display">Acesso restrito</h2>
-        <p className="text-sm text-viva-700 font-serif">Somente médicos podem registrar ponto eletrônico.</p>
+        <p className="text-sm text-viva-700 font-serif">Somente profissionais (perfil médico) podem registrar ponto eletrônico.</p>
+      </div>
+    );
+  }
+
+  const mapModulos = modulosResp?.data?.map;
+  if (modulosResp && mapModulos && mapModulos.PONTO_ELETRONICO === false) {
+    return (
+      <div className="card border-l-4 border-amber-500">
+        <h2 className="text-base font-bold text-viva-900 mb-2 font-display">Acesso ao módulo</h2>
+        <p className="text-sm text-viva-700 font-serif">
+          O Ponto Eletrônico não está habilitado para o seu perfil neste tenant. Peça ao administrador para ativar o
+          módulo ou verifique suas permissões.
+        </p>
       </div>
     );
   }
@@ -537,7 +557,7 @@ const PontoEletronico = () => {
             <div className="space-y-3">
               {!cameraErro ? (
                 <>
-                  <div className="rounded-xl overflow-hidden bg-viva-900 aspect-[4/3] flex items-center justify-center relative">
+                  <div className="rounded-xl overflow-hidden bg-viva-900 w-full max-w-[min(100%,320px)] mx-auto aspect-[3/4] flex items-center justify-center relative">
                     <video
                       ref={videoRef}
                       className="w-full h-full object-cover [transform:scaleX(-1)]"
@@ -551,24 +571,6 @@ const PontoEletronico = () => {
                         if (e.currentTarget.videoWidth > 0) setVideoPronto(true);
                       }}
                     />
-                    {/* Guia simples de enquadramento do rosto (sem detecção) */}
-                    <div className="pointer-events-none absolute inset-0">
-                      {/* máscara escura com “janela” oval */}
-                      <div
-                        className="absolute inset-0 bg-black/35"
-                        style={{
-                          WebkitMaskImage:
-                            'radial-gradient(ellipse 38% 46% at 50% 45%, transparent 0 62%, black 64%)',
-                          maskImage: 'radial-gradient(ellipse 38% 46% at 50% 45%, transparent 0 62%, black 64%)',
-                        }}
-                      />
-                      {/* contorno */}
-                      <div className="absolute left-1/2 top-[45%] -translate-x-1/2 -translate-y-1/2 w-[76%] h-[68%] rounded-[999px] border border-white/70 shadow-[0_0_0_1px_rgba(0,0,0,0.15)]" />
-                      {/* dica curta */}
-                      <div className="absolute bottom-3 left-1/2 -translate-x-1/2 text-[10px] text-white/90 font-serif bg-black/30 px-2 py-1 rounded-lg">
-                        Centralize o rosto na moldura
-                      </div>
-                    </div>
                     {!videoPronto && (
                       <span className="absolute inset-0 flex items-center justify-center bg-viva-950/40 text-xs text-white font-serif px-4 text-center">
                         Iniciando câmera…

@@ -1091,6 +1091,7 @@ export async function listRegistrosPontoAdminService(
     )
   ];
   const valorHoraPorMedico: Record<string, number> = {};
+  const valorHoraCobrancaPorMedico: Record<string, number> = {};
 
   for (const medicoId of medicoIdsSemEscala) {
     const equipeIds = await prisma.equipeMedico
@@ -1106,14 +1107,17 @@ export async function listRegistrosPontoAdminService(
       where: {
         tenantId,
         equipeId: { in: equipeIds },
-        valorHora: { not: null },
+        OR: [{ valorHora: { not: null } }, { valorHoraCobranca: { not: null } }],
       },
-      select: { valorHora: true },
+      select: { valorHora: true, valorHoraCobranca: true },
       orderBy: { createdAt: 'asc' },
     });
 
     if (config?.valorHora != null) {
       valorHoraPorMedico[medicoId] = Number(config.valorHora);
+    }
+    if (config?.valorHoraCobranca != null) {
+      valorHoraCobrancaPorMedico[medicoId] = Number(config.valorHoraCobranca);
     }
   }
 
@@ -1170,13 +1174,15 @@ export async function listRegistrosPontoAdminService(
     for (const p of plantoes) {
       if (p.valorHora == null) continue;
       const dateStr = p.data.toISOString().slice(0, 10);
-      plantoesValorHoraPorEscalaDataGrade[`${p.escalaId}::${dateStr}::${p.gradeId}`] = Number(p.valorHora);
+      const gradeKey = String(p.gradeId ?? '').toLowerCase();
+      plantoesValorHoraPorEscalaDataGrade[`${p.escalaId}::${dateStr}::${gradeKey}`] = Number(p.valorHora);
     }
   }
 
   return {
     data: registrosComFotoDisponivel,
     valorHoraPorMedico,
+    valorHoraCobrancaPorMedico,
     valorHoraPorMedicoEscala,
     plantoesValorHoraPorEscalaDataGrade,
   };
@@ -1261,6 +1267,9 @@ export async function listEquipeEscalasService(tenantId: string, equipeId: strin
   return prisma.escala.findMany({
     where: { id: { in: escalaIds }, tenantId },
     orderBy: [{ dataInicio: 'desc' }],
+    include: {
+      contratoAtivo: { select: { id: true, nome: true, ativo: true } },
+    },
   });
 }
 
@@ -1599,6 +1608,7 @@ export async function setConfigPontoService(input: {
   equipeId: string | null;
   horasPrevistasMes: number | null;
   valorHora: number | null;
+  valorHoraCobranca: number | null;
   horarioEntrada?: string | null;
   horarioSaida?: string | null;
   toleranciaMinutos?: number | null;
@@ -1609,6 +1619,7 @@ export async function setConfigPontoService(input: {
 }) {
   const horasPrevistasMes = input.horasPrevistasMes != null ? Number(input.horasPrevistasMes) : null;
   const valorHora = input.valorHora != null ? Number(input.valorHora) : null;
+  const valorHoraCobranca = input.valorHoraCobranca != null ? Number(input.valorHoraCobranca) : null;
   const horarioEntrada = normalizarHorario(input.horarioEntrada);
   const horarioSaida = normalizarHorario(input.horarioSaida);
   const toleranciaMinutos =
@@ -1633,6 +1644,7 @@ export async function setConfigPontoService(input: {
   const data = {
     horasPrevistasMes,
     valorHora,
+    valorHoraCobranca,
     horarioEntrada,
     horarioSaida,
     toleranciaMinutos,

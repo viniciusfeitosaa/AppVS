@@ -64,6 +64,13 @@ const getMobileIcon = (label: string) => {
       );
     case 'Ponto Eletrônico':
       return getMobileIcon('Ponto');
+    case 'Calendário de escalas':
+      return (
+        <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
+          <rect x="4" y="5" width="16" height="15" rx="2" />
+          <path d="M4 10h16M8 3v4M16 3v4" />
+        </svg>
+      );
     case 'Minha Conta':
     case 'Perfil':
       return (
@@ -118,7 +125,13 @@ const AppShell = () => {
         },
       ]
     : [
-        { title: 'Ponto', items: [{ to: '/ponto-eletronico', label: 'Ponto Eletrônico' }] },
+        {
+          title: 'Ponto',
+          items: [
+            { to: '/ponto-eletronico', label: 'Ponto Eletrônico' },
+            { to: '/meu-calendario-plantoes', label: 'Calendário de escalas' },
+          ],
+        },
         { title: 'Produtividade', items: [{ to: '/atendimentos', label: 'Atendimentos' }] },
         {
           title: 'Conta',
@@ -144,6 +157,7 @@ const AppShell = () => {
     '/perfil': 'PERFIL',
     '/documentos': 'PERFIL',
     '/ponto-eletronico': 'PONTO_ELETRONICO',
+    '/meu-calendario-plantoes': 'PONTO_ELETRONICO',
     '/atendimentos': 'ATENDIMENTOS',
   };
 
@@ -162,7 +176,7 @@ const AppShell = () => {
 
   return (
     <div className="app-shell min-h-screen">
-      <header className="sticky top-0 z-30 bg-white/80 backdrop-blur-md border-b border-[var(--app-border)]">
+      <header className="sticky top-0 z-30 isolate border-b border-viva-200/60 bg-white/95 backdrop-blur-xl shadow-[0_4px_24px_-12px_rgba(8,50,20,0.1)] ring-1 ring-viva-900/[0.03]">
         <div className="max-w-screen-2xl mx-auto px-4 md:px-6 lg:px-8">
           <div className="h-16 flex items-center justify-between gap-3">
             <div className="flex items-center gap-3">
@@ -196,7 +210,9 @@ const AppShell = () => {
                   </button>
 
                   {openDesktopGroup === group.title && (
-                    <div className="absolute left-0 top-full mt-2 min-w-56 bg-white/95 backdrop-blur-md border border-[var(--app-border)] rounded-2xl shadow-lg p-2">
+                    <div
+                      className="absolute left-0 top-full mt-2 min-w-56 z-50 overflow-hidden rounded-2xl border border-viva-200/70 bg-gradient-to-b from-white via-white to-viva-50/[0.35] p-2 shadow-[0_16px_48px_-12px_rgba(8,50,20,0.18),0_4px_16px_-4px_rgba(8,50,20,0.08)] ring-1 ring-viva-900/[0.04] backdrop-blur-xl animate-fade-in"
+                    >
                       {group.items.map((item) => (
                         <NavLink
                           key={item.to}

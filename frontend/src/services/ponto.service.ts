@@ -67,6 +67,33 @@ export const pontoService = {
     return response.data;
   },
 
+  /** Plantões do mês para calendário (profissional). */
+  listMeusPlantoesCalendario: async (ano: number, mes: number, equipeIds?: string[]) => {
+    const params: Record<string, unknown> = { ano, mes };
+    if (equipeIds && equipeIds.length > 0) {
+      params.equipeIds = equipeIds.join(',');
+    }
+
+    const response = await api.get('/ponto/meus-plantoes-calendario', { params });
+    return response.data as {
+      success: boolean;
+      data: Array<{
+        id: string;
+        data: string;
+        gradeId: string;
+        escalaId: string;
+        escalaNome: string | null;
+        permiteTrocaPlantao?: boolean;
+      }>;
+      meta: { ano: number; mes: number };
+    };
+  },
+
+  listMinhasEquipesCalendario: async () => {
+    const response = await api.get('/ponto/minhas-equipes-calendario');
+    return response.data as { success: boolean; data: Array<{ id: string; nome: string }> };
+  },
+
   canCheckIn: async (escalaId: string) => {
     const response = await api.get('/ponto/can-checkin', { params: { escalaId } });
     return response.data;

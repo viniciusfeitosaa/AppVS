@@ -20,6 +20,7 @@ import SubgruposEquipes from './pages/SubgruposEquipes';
 import ValoresPlantao from './pages/ValoresPlantao';
 import ValoresPonto from './pages/ValoresPonto';
 import PontoEletronico from './pages/PontoEletronico';
+import MeuCalendarioPlantoes from './pages/MeuCalendarioPlantoes';
 import Relatorios from './pages/Relatorios';
 import Perfil from './pages/Perfil';
 import EnvioDocumentos from './pages/EnvioDocumentos';
@@ -147,6 +148,7 @@ function AppRoutes() {
           path="/ponto-eletronico"
           element={<PontoEletronico />}
         />
+        <Route path="/meu-calendario-plantoes" element={<MeuCalendarioPlantoes />} />
         <Route
           path="/atendimentos"
           element={

@@ -1,5 +1,24 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { authService, LoginCredentials } from '../services/auth.service';
+import { decodeJwtPayloadUnsafe } from '../utils/jwtPayload';
+
+/** Alinha role ao access token (fonte de verdade na sessão) e normaliza strings legadas. */
+function mergeRoleFromAccessToken(user: User): User {
+  let next = { ...user };
+  const raw = String(next.role ?? '').toUpperCase();
+  if (raw === 'MEDICO' || raw === 'MASTER') {
+    next.role = raw as User['role'];
+  }
+  const token = localStorage.getItem('accessToken');
+  if (!token) return next;
+  const payload = decodeJwtPayloadUnsafe<{ role?: string; id?: string }>(token);
+  if (!payload?.id || payload.id !== next.id) return next;
+  const r = payload.role;
+  if (r === 'MEDICO' || r === 'MASTER') {
+    next = { ...next, role: r };
+  }
+  return next;
+}
 
 interface User {
   id: string;
@@ -52,7 +71,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             parsed.especialidades = parsed.especialidade ? [parsed.especialidade] : [];
           }
           if (!Array.isArray(parsed.especialidades)) parsed.especialidades = [];
-          setUser(parsed);
+          setUser(mergeRoleFromAccessToken(parsed as User));
         }
       }
     } catch {
@@ -75,8 +94,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
         localStorage.setItem('accessToken', response.data.accessToken);
         localStorage.setItem('refreshToken', response.data.refreshToken);
-        localStorage.setItem('user', JSON.stringify(userData));
-        setUser(userData);
+        const merged = mergeRoleFromAccessToken(userData as User);
+        localStorage.setItem('user', JSON.stringify(merged));
+        setUser(merged);
       }
     } catch (error) {
       throw error;

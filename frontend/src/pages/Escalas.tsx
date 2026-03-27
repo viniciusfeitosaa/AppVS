@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../context/AuthContext';
 import { adminService, Escala } from '../services/admin.service';
+import { fixMojibake } from '../utils/validation.util';
 
 interface EscalaFormState {
   contratoAtivoId: string;
@@ -83,6 +84,22 @@ function formatValorHora(valor: string | number | null | undefined): string {
   const n = typeof valor === 'string' ? parseFloat(valor) : valor;
   if (Number.isNaN(n)) return '—';
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(n);
+}
+
+/** Escala cujo período (data fim) já terminou antes de hoje. */
+function isEscalaEncerrada(dataFim: string): boolean {
+  const hoje = new Date();
+  hoje.setHours(0, 0, 0, 0);
+  const f = new Date(toDateInput(dataFim) + 'T12:00:00');
+  f.setHours(0, 0, 0, 0);
+  return f < hoje;
+}
+
+function formatDuracaoMinutos(minutes: number): string {
+  const safe = Math.max(0, Math.round(minutes || 0));
+  const h = Math.floor(safe / 60);
+  const m = safe % 60;
+  return `${h}h ${m.toString().padStart(2, '0')}min`;
 }
 
 const Escalas = () => {
@@ -299,6 +316,88 @@ const Escalas = () => {
     queryFn: () => adminService.listEscalasByEquipe(selectedEquipeId!),
     enabled: isMaster && !!selectedEquipeId,
   });
+
+  const periodoRegistrosEquipeRelatorio = useMemo(() => {
+    const list = (equipeEscalasResp?.data ?? []) as Escala[];
+    if (list.length === 0) return null;
+    let min = list[0].dataInicio.slice(0, 10);
+    for (const e of list) {
+      const di = e.dataInicio.slice(0, 10);
+      if (di < min) min = di;
+    }
+    return { inicio: min, fim: dateToInput(new Date()) };
+  }, [equipeEscalasResp?.data]);
+
+  const { data: registrosEquipeRelatorioResp, isLoading: loadingRegistrosEquipeRelatorio } = useQuery({
+    queryKey: [
+      'admin',
+      'registros-ponto',
+      'equipe-drawer',
+      selectedEquipeId,
+      periodoRegistrosEquipeRelatorio?.inicio,
+      periodoRegistrosEquipeRelatorio?.fim,
+    ],
+    queryFn: () =>
+      adminService.listRegistrosPonto({
+        equipeId: selectedEquipeId!,
+        dataInicio: `${periodoRegistrosEquipeRelatorio!.inicio}T00:00:00.000`,
+        dataFim: `${periodoRegistrosEquipeRelatorio!.fim}T23:59:59.999`,
+      }),
+    enabled:
+      isMaster &&
+      !!selectedEquipeId &&
+      equipePanelTab === 'relatorio' &&
+      !!periodoRegistrosEquipeRelatorio?.inicio &&
+      !!periodoRegistrosEquipeRelatorio?.fim,
+  });
+
+  /** Todas as escalas da equipe, com horas por profissional (inclui escalas em andamento — antes só listávamos encerradas). */
+  const escalasHorasPontoRelatorio = useMemo(() => {
+    const escalas = (equipeEscalasResp?.data ?? []) as Escala[];
+    const raw = registrosEquipeRelatorioResp?.data;
+    const registros: Array<{
+      duracaoMinutos?: number | null;
+      escalaId?: string | null;
+      medico?: { id: string; nomeCompleto: string } | null;
+      escala?: { id: string; nome?: string } | null;
+    }> = Array.isArray(raw) ? raw : raw?.data ?? [];
+
+    const nomePorMedico = new Map<string, string>();
+    const minutosPorEscalaMedico = new Map<string, Map<string, number>>();
+
+    for (const r of registros) {
+      const eid = r.escala?.id ?? r.escalaId;
+      const mid = r.medico?.id;
+      if (!eid || !mid) continue;
+      const add = r.duracaoMinutos ?? 0;
+      if (!minutosPorEscalaMedico.has(eid)) minutosPorEscalaMedico.set(eid, new Map());
+      const inner = minutosPorEscalaMedico.get(eid)!;
+      inner.set(mid, (inner.get(mid) ?? 0) + add);
+      if (r.medico?.nomeCompleto) nomePorMedico.set(mid, fixMojibake(r.medico.nomeCompleto));
+    }
+
+    return escalas
+      .sort((a, b) => {
+        const aEnc = isEscalaEncerrada(a.dataFim);
+        const bEnc = isEscalaEncerrada(b.dataFim);
+        if (aEnc !== bEnc) return aEnc ? 1 : -1;
+        return new Date(b.dataFim).getTime() - new Date(a.dataFim).getTime();
+      })
+      .map((esc) => {
+        const encerrada = isEscalaEncerrada(esc.dataFim);
+        const medMap = minutosPorEscalaMedico.get(esc.id) ?? new Map();
+        const linhas = Array.from(medMap.entries())
+          .map(([medicoId, minutos]) => ({
+            medicoId,
+            minutos,
+            nome: nomePorMedico.get(medicoId) ?? medicoId,
+          }))
+          .filter((x) => x.minutos > 0)
+          .sort((a, b) => b.minutos - a.minutos);
+        return { escala: esc, linhas, encerrada };
+      });
+  }, [equipeEscalasResp?.data, registrosEquipeRelatorioResp?.data]);
+
   const { data: escalaEquipesResp } = useQuery({
     queryKey: ['admin', 'escalas', selectedEscalaId, 'equipes'],
     queryFn: () => adminService.listEscalaEquipes(selectedEscalaId),
@@ -979,13 +1078,6 @@ const Escalas = () => {
                   <h2 className="text-white font-semibold truncate">{selectedEquipe.nome}</h2>
                   <p className="text-viva-100 text-sm truncate">{selectedEquipe.subgrupo?.nome ?? 'Sem subgrupo'}</p>
                 </div>
-                <Link
-                  to="/subgrupos-equipes"
-                  className="p-2 rounded-lg text-white hover:bg-viva-500 transition"
-                  aria-label="Mais opções"
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="1" /><circle cx="12" cy="19" r="1" /><circle cx="12" cy="5" r="1" /></svg>
-                </Link>
               </div>
             </div>
             <div className="flex items-center overflow-x-auto border-b border-viva-200 flex-shrink-0">
@@ -1328,12 +1420,103 @@ const Escalas = () => {
                   </div>
                 );
               })()}
-              {equipePanelTab === 'relatorio' && (
-                <div className="text-center py-8 text-viva-700">
-                  <p className="font-medium mb-1">Relatório</p>
-                  <p className="text-sm">Em breve: relatórios da equipe.</p>
-                </div>
-              )}
+              {equipePanelTab === 'relatorio' && (() => {
+                const equipeEscalasList = (equipeEscalasResp?.data ?? []) as Escala[];
+                if (equipeEscalasResp === undefined) {
+                  return (
+                    <div className="flex flex-col items-center justify-center py-12 text-viva-700">
+                      <p className="text-sm">Carregando escalas…</p>
+                    </div>
+                  );
+                }
+                if (equipeEscalasList.length === 0) {
+                  return (
+                    <div className="text-center py-8 text-viva-700">
+                      <p className="font-medium mb-1">Relatório de horas</p>
+                      <p className="text-sm">Nenhuma escala vinculada a esta equipe.</p>
+                    </div>
+                  );
+                }
+                if (loadingRegistrosEquipeRelatorio) {
+                  return (
+                    <div className="flex flex-col items-center justify-center py-12 text-viva-700">
+                      <p className="text-sm">Carregando registros de ponto…</p>
+                    </div>
+                  );
+                }
+                return (
+                  <div className="space-y-5 text-left">
+                    <p className="text-xs font-semibold uppercase tracking-wider text-viva-600 font-display mb-3">
+                      Relatório de horas
+                    </p>
+                    {escalasHorasPontoRelatorio.length === 0 ? (
+                      <p className="text-sm text-viva-600 rounded-xl border border-viva-200/80 bg-viva-50/40 px-3 py-2.5">
+                        Nenhuma escala encontrada para esta equipe.
+                      </p>
+                    ) : (
+                      <ul className="space-y-4">
+                        {escalasHorasPontoRelatorio.map(({ escala, linhas, encerrada }) => (
+                          <li
+                            key={escala.id}
+                            className="rounded-xl border border-viva-200/80 bg-white shadow-sm overflow-hidden"
+                          >
+                            <div className="px-3 py-2.5 bg-viva-50/80 border-b border-viva-200/60 flex flex-wrap items-start justify-between gap-2">
+                              <div className="min-w-0">
+                                {escala.contratoAtivo?.nome && (
+                                  <p className="text-[10px] font-semibold uppercase tracking-wide text-viva-500 mb-1">
+                                    {fixMojibake(escala.contratoAtivo.nome)}
+                                  </p>
+                                )}
+                                <p className="font-semibold text-viva-900 text-sm font-display">
+                                  <span className="text-viva-600 font-medium">Escala</span>
+                                  <span className="text-viva-400 mx-1.5" aria-hidden>
+                                    ·
+                                  </span>
+                                  {fixMojibake(escala.nome)}
+                                </p>
+                              </div>
+                              <span
+                                className={`shrink-0 text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-md ${
+                                  encerrada
+                                    ? 'bg-slate-200/80 text-slate-800'
+                                    : 'bg-amber-100 text-amber-900'
+                                }`}
+                              >
+                                {encerrada ? 'Encerrada' : 'Em andamento'}
+                              </span>
+                            </div>
+                            {linhas.length === 0 ? (
+                              <p className="text-xs text-viva-600 px-3 py-3 font-serif">
+                                Nenhum registro de ponto com duração nesta escala no período (verifique se o
+                                profissional pertence a esta equipe e se o ponto foi registrado nesta escala).
+                              </p>
+                            ) : (
+                              <table className="w-full text-sm">
+                                <thead>
+                                  <tr className="text-left text-viva-600 border-b border-viva-100">
+                                    <th className="py-2 px-3 font-semibold">Profissional</th>
+                                    <th className="py-2 px-3 font-semibold text-right">Total</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {linhas.map((row) => (
+                                    <tr key={row.medicoId} className="border-b border-viva-50 last:border-0">
+                                      <td className="py-2 px-3 text-viva-900">{row.nome}</td>
+                                      <td className="py-2 px-3 text-right font-semibold text-viva-700 tabular-nums">
+                                        {formatDuracaoMinutos(row.minutos)}
+                                      </td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            )}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                );
+              })()}
             </div>
           </div>
         </>

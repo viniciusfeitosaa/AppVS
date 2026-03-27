@@ -45,6 +45,7 @@ const ValoresPonto = () => {
   const [ano, setAno] = useState<number>(() => new Date().getFullYear());
   const [draftHoras, setDraftHoras] = useState<string>('');
   const [draftValor, setDraftValor] = useState<string>('');
+  const [draftValorCobranca, setDraftValorCobranca] = useState<string>('');
   const [draftHorarioEntrada, setDraftHorarioEntrada] = useState<string>('');
   const [draftHorarioSaida, setDraftHorarioSaida] = useState<string>('');
   const [draftTolerancia, setDraftTolerancia] = useState<string>('');
@@ -154,6 +155,8 @@ const ValoresPonto = () => {
 
   const horasPrevistasDisplay = draftHoras !== '' ? draftHoras : (config?.horasPrevistasMes != null ? String(config.horasPrevistasMes) : '');
   const valorHoraDisplay = draftValor !== '' ? draftValor : (config?.valorHora != null ? formatValor(config.valorHora) : '');
+  const valorHoraCobrancaDisplay =
+    draftValorCobranca !== '' ? draftValorCobranca : (config?.valorHoraCobranca != null ? formatValor(config.valorHoraCobranca) : '');
   const horarioEntradaDisplay = draftHorarioEntrada !== '' ? draftHorarioEntrada : (config?.horarioEntrada ?? '');
   const horarioSaidaDisplay = draftHorarioSaida !== '' ? draftHorarioSaida : (config?.horarioSaida ?? '');
   const toleranciaDisplay = draftTolerancia !== '' ? draftTolerancia : (config?.toleranciaMinutos != null ? String(config.toleranciaMinutos) : '');
@@ -223,6 +226,7 @@ const ValoresPonto = () => {
     setEquipeId('');
     setDraftHoras('');
     setDraftValor('');
+    setDraftValorCobranca('');
     setDraftHorarioEntrada('');
     setDraftHorarioSaida('');
     setDraftTolerancia('');
@@ -237,6 +241,7 @@ const ValoresPonto = () => {
     setEquipeId('');
     setDraftHoras('');
     setDraftValor('');
+    setDraftValorCobranca('');
     setDraftHorarioEntrada('');
     setDraftHorarioSaida('');
     setDraftTolerancia('');
@@ -250,6 +255,7 @@ const ValoresPonto = () => {
     setEquipeId(id);
     setDraftHoras('');
     setDraftValor('');
+    setDraftValorCobranca('');
     setDraftHorarioEntrada('');
     setDraftHorarioSaida('');
     setDraftTolerancia('');
@@ -267,6 +273,12 @@ const ValoresPonto = () => {
     try {
       const horas = draftHoras !== '' ? parseInt(draftHoras, 10) : (config?.horasPrevistasMes ?? null);
       const valor = draftValor !== '' ? parseValorInput(draftValor) : (config?.valorHora != null ? parseFloat(String(config.valorHora)) : null);
+      const valorCobranca =
+        draftValorCobranca !== ''
+          ? parseValorInput(draftValorCobranca)
+          : config?.valorHoraCobranca != null
+            ? parseFloat(String(config.valorHoraCobranca))
+            : null;
       if (horas !== null && (Number.isNaN(horas) || horas < 0)) {
         throw new Error('Horas previstas deve ser um número válido.');
       }
@@ -283,6 +295,7 @@ const ValoresPonto = () => {
       await adminService.setConfigPonto(contratoId, subgrupoId, equipeId || null, {
         horasPrevistasMes: horas ?? null,
         valorHora: valor,
+        valorHoraCobranca: valorCobranca,
         horarioEntrada: horarioEntrada || null,
         horarioSaida: horarioSaida || null,
         toleranciaMinutos,
@@ -294,6 +307,7 @@ const ValoresPonto = () => {
       await queryClient.invalidateQueries({ queryKey: ['admin', 'config-ponto', contratoId, subgrupoId, equipeId || null] });
       setDraftHoras('');
       setDraftValor('');
+      setDraftValorCobranca('');
       setDraftHorarioEntrada('');
       setDraftHorarioSaida('');
       setDraftTolerancia('');
@@ -324,7 +338,7 @@ const ValoresPonto = () => {
       <div className="card border-l-4 border-viva-500">
         <h2 className="text-2xl font-bold text-viva-900 mb-1">Horas e valor – Ponto Eletrônico</h2>
         <p className="text-gray-600">
-          Por <strong>Contrato</strong>, <strong>Subgrupo</strong> e <strong>Equipe</strong>, defina as <strong>horas previstas no mês</strong> e o <strong>valor da hora</strong>. Se não escolher equipe, a configuração vale para todo o subgrupo. Use a seção &quot;Dias úteis do mês&quot; para consultar quantos dias úteis tem cada mês.
+          Por <strong>Contrato</strong>, <strong>Subgrupo</strong> e <strong>Equipe</strong>, defina as <strong>horas previstas no mês</strong> e os <strong>valores por hora</strong> (repasse ao profissional e cobrança). Se não escolher equipe, a configuração vale para todo o subgrupo. Use a seção &quot;Dias úteis do mês&quot; para consultar quantos dias úteis tem cada mês.
         </p>
       </div>
 
@@ -430,11 +444,14 @@ const ValoresPonto = () => {
 
       {temContratoESubgrupo && (
         <div className="card">
-          <h3 className="text-lg font-bold text-viva-900 mb-4">Horas previstas e valor da hora</h3>
+          <h3 className="text-lg font-bold text-viva-900 mb-4">Horas previstas e valores por hora</h3>
           {loadingConfig ? (
             <p className="text-sm text-gray-600">Carregando configuração...</p>
           ) : (
             <div className="space-y-6">
+              <p className="text-sm text-gray-600 mb-3">
+                Para contratos que usam <strong>só ponto</strong> (sem escala), o <strong>valor hora repasse</strong> multiplica as horas trabalhadas para o total repassado ao profissional; o <strong>valor hora cobrança</strong> multiplica as mesmas horas para o total faturado. Ambos aparecem no Relatório de Horas quando o contrato selecionado for desse tipo.
+              </p>
               <div className="flex flex-wrap items-end gap-4 p-4 rounded-xl border border-viva-200 bg-viva-50/30">
                 <div className="min-w-[200px]">
                   <label className="block text-sm font-semibold text-viva-800 mb-1">Horas previstas no mês</label>
@@ -448,15 +465,26 @@ const ValoresPonto = () => {
                     onChange={(e) => setDraftHoras(e.target.value)}
                   />
                 </div>
-                <div className="min-w-[200px]">
-                  <label className="block text-sm font-semibold text-viva-800 mb-1">Valor da hora (R$)</label>
+                <div className="min-w-[220px]">
+                  <label className="block text-sm font-semibold text-viva-800 mb-1">Valor hora repasse (R$)</label>
                   <input
                     type="text"
                     inputMode="decimal"
-                    className="input w-full max-w-[180px]"
+                    className="input w-full max-w-[200px]"
                     placeholder="Ex: 85,00"
                     value={valorHoraDisplay}
                     onChange={(e) => setDraftValor(e.target.value)}
+                  />
+                </div>
+                <div className="min-w-[220px]">
+                  <label className="block text-sm font-semibold text-viva-800 mb-1">Valor hora cobrança (R$)</label>
+                  <input
+                    type="text"
+                    inputMode="decimal"
+                    className="input w-full max-w-[200px]"
+                    placeholder="Ex: 120,00"
+                    value={valorHoraCobrancaDisplay}
+                    onChange={(e) => setDraftValorCobranca(e.target.value)}
                   />
                 </div>
                 <button
