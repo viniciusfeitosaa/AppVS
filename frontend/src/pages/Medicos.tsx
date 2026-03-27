@@ -1,7 +1,9 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '../context/AuthContext';
 import { adminService } from '../services/admin.service';
+import { notify } from '../lib/notificationEmitter';
 import { formatCRM, fixMojibake } from '../utils/validation.util';
 
 const PAGE_SIZE = 20;
@@ -15,6 +17,10 @@ const Medicos = () => {
   const [search, setSearch] = useState('');
   const [searchInput, setSearchInput] = useState('');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
+  const [selectedMedico, setSelectedMedico] = useState<any | null>(null);
+  const [pontoModalOpen, setPontoModalOpen] = useState(false);
+  const [pontoInicio, setPontoInicio] = useState('');
+  const [pontoFim, setPontoFim] = useState('');
 
   const ativoParam =
     statusFilter === 'all' ? undefined : statusFilter === 'active';
@@ -57,6 +63,25 @@ const Medicos = () => {
   const total = pagination?.total ?? 0;
   const from = total === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
   const to = Math.min(page * PAGE_SIZE, total);
+
+  const selectedLabel = useMemo(() => {
+    if (!selectedMedico) return 'Selecione um profissional';
+    const nome = fixMojibake(selectedMedico.nomeCompleto);
+    const crm = selectedMedico.crm ? formatCRM(selectedMedico.crm) : '';
+    return crm ? `${nome} · ${crm}` : nome;
+  }, [selectedMedico]);
+
+  const { data: registrosPontoResp, isLoading: loadingPontos } = useQuery({
+    queryKey: ['admin', 'registros-ponto', selectedMedico?.id, pontoInicio, pontoFim],
+    queryFn: () =>
+      adminService.listRegistrosPonto({
+        medicoId: selectedMedico!.id,
+        ...(pontoInicio ? { dataInicio: pontoInicio } : {}),
+        ...(pontoFim ? { dataFim: pontoFim } : {}),
+      }),
+    enabled: !!user && isMaster && pontoModalOpen && !!selectedMedico?.id,
+  });
+  const registrosPonto: any[] = registrosPontoResp?.data?.data ?? registrosPontoResp?.data ?? [];
 
   return (
     <div className="card hover:shadow-lg transition-shadow">
@@ -121,6 +146,23 @@ const Medicos = () => {
         </p>
       ) : (
         <>
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-viva-200/60 bg-viva-50/50 px-4 py-3">
+            <div className="min-w-[220px] flex-1">
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-viva-600 font-display">Profissional selecionado</p>
+              <p className="text-sm font-semibold text-viva-900 font-display truncate">{selectedLabel}</p>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                className="btn btn-secondary text-sm"
+                disabled={!selectedMedico}
+                onClick={() => setPontoModalOpen(true)}
+              >
+                Histórico de pontos
+              </button>
+            </div>
+          </div>
+
           <div className="overflow-x-auto">
             <table className="min-w-full text-sm">
               <thead>
@@ -136,7 +178,14 @@ const Medicos = () => {
               </thead>
               <tbody>
                 {medicos.map((medico) => (
-                  <tr key={medico.id} className="border-b last:border-b-0">
+                  <tr
+                    key={medico.id}
+                    className={`border-b last:border-b-0 cursor-pointer ${
+                      selectedMedico?.id === medico.id ? 'bg-viva-50/70' : 'hover:bg-viva-50/40'
+                    }`}
+                    onClick={() => setSelectedMedico(medico)}
+                    title="Clique para selecionar"
+                  >
                     <td className="py-2 pr-4 font-medium text-viva-900">
                       {fixMojibake(medico.nomeCompleto)}
                     </td>
@@ -198,6 +247,130 @@ const Medicos = () => {
           )}
         </>
       )}
+
+      {pontoModalOpen &&
+        selectedMedico &&
+        createPortal(
+          <div
+            className="fixed inset-0 z-50 bg-black/40 overflow-y-auto sm:overflow-hidden flex items-start sm:items-center justify-center"
+            role="dialog"
+            aria-modal="true"
+            onClick={() => setPontoModalOpen(false)}
+          >
+            <div
+              className="card w-full sm:max-w-5xl border border-viva-200/70 shadow-2xl overflow-hidden flex flex-col rounded-none sm:rounded-2xl h-[100svh] sm:h-auto sm:max-h-[90vh]"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex-none bg-white/95 backdrop-blur-sm border-b border-viva-100 px-4 sm:px-5 py-4 flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <h3 className="text-base font-bold text-viva-900 font-display">Histórico de pontos</h3>
+                  <p className="text-xs text-viva-600 font-serif truncate">{selectedLabel}</p>
+                </div>
+                <button
+                  type="button"
+                  className="btn text-sm border border-viva-300 bg-white text-viva-800"
+                  onClick={() => setPontoModalOpen(false)}
+                >
+                  Fechar
+                </button>
+              </div>
+
+              <div className="flex-1 overflow-y-auto px-4 sm:px-5 pb-5">
+                <div className="mt-4 flex flex-wrap items-end gap-3 rounded-xl border border-viva-200/60 bg-viva-50/50 p-3">
+                  <div className="min-w-[160px]">
+                    <label className="block text-[10px] font-semibold uppercase tracking-wider text-viva-600 font-display mb-1">Início</label>
+                    <input type="date" className="input w-full" value={pontoInicio} onChange={(e) => setPontoInicio(e.target.value)} />
+                  </div>
+                  <div className="min-w-[160px]">
+                    <label className="block text-[10px] font-semibold uppercase tracking-wider text-viva-600 font-display mb-1">Fim</label>
+                    <input type="date" className="input w-full" value={pontoFim} onChange={(e) => setPontoFim(e.target.value)} />
+                  </div>
+                  <button
+                    type="button"
+                    className="btn btn-secondary text-sm"
+                    onClick={() => {
+                      setPontoInicio('');
+                      setPontoFim('');
+                    }}
+                  >
+                    Limpar
+                  </button>
+                </div>
+
+                <div className="mt-4">
+                  {loadingPontos ? (
+                    <p className="text-sm text-viva-700">Carregando registros...</p>
+                  ) : registrosPonto.length === 0 ? (
+                    <p className="text-sm text-viva-700">Nenhum registro encontrado.</p>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="min-w-full text-sm">
+                        <thead>
+                          <tr className="text-left text-viva-700 border-b">
+                            <th className="py-2 pr-4">Check-in</th>
+                            <th className="py-2 pr-4">Check-out</th>
+                            <th className="py-2 pr-4">Duração</th>
+                            <th className="py-2 pr-4">Escala</th>
+                            <th className="py-2 pr-4">Origem</th>
+                            <th className="py-2 pr-4">Foto</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {registrosPonto.map((r) => {
+                            const checkIn = r.checkInAt ? new Date(r.checkInAt).toLocaleString('pt-BR') : '—';
+                            const checkOut = r.checkOutAt ? new Date(r.checkOutAt).toLocaleString('pt-BR') : '—';
+                            const dur = r.duracaoMinutos != null ? `${r.duracaoMinutos} min` : '—';
+                            const escalaNome = r.escala?.nome ? fixMojibake(r.escala.nome) : r.escalaId ? 'Escala' : '—';
+                          const hasFoto = typeof r.fotoCheckinCaminho === 'string' && r.fotoCheckinCaminho.trim().length > 0;
+                            return (
+                              <tr key={r.id} className="border-b last:border-b-0">
+                                <td className="py-2 pr-4 text-viva-900">{checkIn}</td>
+                                <td className="py-2 pr-4 text-viva-900">{checkOut}</td>
+                                <td className="py-2 pr-4 text-viva-900">{dur}</td>
+                                <td className="py-2 pr-4 text-viva-900">{escalaNome}</td>
+                                <td className="py-2 pr-4 text-viva-900">{r.origem ?? '—'}</td>
+                                <td className="py-2 pr-4">
+                                  {hasFoto ? (
+                                    <button
+                                      type="button"
+                                      className="btn-sm btn-primary"
+                                    onClick={async () => {
+                                      try {
+                                        await adminService.openRegistroPontoFotoCheckin(r.id);
+                                      } catch (err: any) {
+                                        const status = err?.response?.status;
+                                        const msg = err?.response?.data?.error;
+                                        notify({
+                                          kind: 'warning',
+                                          title: 'Foto indisponível',
+                                          message:
+                                            status === 404
+                                              ? 'Este registro não possui foto (ou o arquivo não está mais disponível no servidor).'
+                                              : (typeof msg === 'string' && msg.trim()) || 'Não foi possível abrir a foto.',
+                                          source: 'admin',
+                                        });
+                                      }
+                                    }}
+                                    >
+                                      Ver
+                                    </button>
+                                  ) : (
+                                    <span className="text-xs text-viva-600">—</span>
+                                  )}
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>,
+          document.body
+        )}
     </div>
   );
 };

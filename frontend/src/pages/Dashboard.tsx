@@ -151,6 +151,16 @@ const Dashboard = () => {
   });
   const escalaAtiva = escalasEmVigor.length > 0 ? (escalasEmVigor[0] as EscalaItem) : (listaEscalas[0] as EscalaItem) ?? null;
   const escalaNome = escalaAtiva?.nome ?? null;
+  const minhasEquipes = Array.from(
+    new Set(
+      [
+        ...((meuDiaResp?.data?.minhasEquipes as string[] | undefined) ?? []),
+        ...listaEscalas.flatMap((e: any) => (Array.isArray(e?.equipes) ? e.equipes : [])),
+      ]
+        .map((nome: string) => fixMojibake(String(nome || '').trim()))
+        .filter(Boolean)
+    )
+  );
   const configHorario = meuDiaResp?.data?.configHorario as { horarioEntrada?: string | null; horarioSaida?: string | null } | undefined;
   const faixaHorario = formatFaixaEscala(
     escalaAtiva?.gradeIds,
@@ -453,6 +463,25 @@ const Dashboard = () => {
               <p className="text-sm font-semibold text-viva-900 mt-0.5">
                 {displayUser?.vinculo?.toUpperCase() === 'PJ' ? 'PJ' : 'Associado'}
               </p>
+            </div>
+          )}
+          {!isMaster && (
+            <div className="rounded-xl bg-viva-50/80 border border-viva-200/50 p-4">
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-viva-600">Equipes vinculadas</p>
+              {minhasEquipes.length > 0 ? (
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  {minhasEquipes.map((nome) => (
+                    <span
+                      key={nome}
+                      className="inline-flex items-center rounded-full border border-viva-200 bg-white px-2.5 py-1 text-[11px] font-medium text-viva-800"
+                    >
+                      {nome}
+                    </span>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-xs text-viva-700 mt-1 font-serif">Sem equipe vinculada no momento.</p>
+              )}
             </div>
           )}
           {isMaster && (

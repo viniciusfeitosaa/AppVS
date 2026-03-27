@@ -9,6 +9,7 @@ import {
   createMedicoController,
   deleteEscalaController,
   deleteContratoAtivoController,
+  listAdicionaisPlantaoController,
   getConfigPontoController,
   getConfigPontoOpcoesController,
   getValoresPlantaoOpcoesController,
@@ -34,7 +35,9 @@ import {
   removerMedicoEscalaController,
   removeContratoEquipeController,
   removeContratoSubgrupoController,
+  removerAdicionalPlantaoController,
   setConfigPontoController,
+  upsertAdicionalPlantaoController,
   setValorPlantaoController,
   toggleMedicoAtivoController,
   updateEscalaController,
@@ -66,7 +69,7 @@ import {
 import { authenticateToken, requireAnyModuleAccess, requireModuleAccess, requireRole } from '../middleware/auth.middleware';
 import { uploadDocumentoEnviado } from '../middleware/upload.middleware';
 import { ModuloSistema, UserRole } from '@prisma/client';
-import { validateUUIDParam, validateCreateEscala, validateUpdateEscala, validateCreateEscalaPlantao, validateAlocarMedicoEscala } from '../middleware/validation.middleware';
+import { validateUUIDParam, validateCreateEscala, validateUpdateEscala, validateCreateEscalaPlantao, validateAlocarMedicoEscala, validateUpsertAdicionalPlantao, validateListAdicionaisPlantao, validateRemoverAdicionalPlantao } from '../middleware/validation.middleware';
 
 const router = Router();
 
@@ -116,6 +119,10 @@ router.delete('/escalas/:id/plantoes/:plantaoId', requireModuleAccess(ModuloSist
 router.get('/valores-plantao/opcoes', requireModuleAccess(ModuloSistema.VALORES_PLANTAO), getValoresPlantaoOpcoesController);
 router.get('/valores-plantao', requireAnyModuleAccess([ModuloSistema.VALORES_PLANTAO, ModuloSistema.ESCALAS]), getValoresPlantaoController);
 router.put('/valores-plantao', requireModuleAccess(ModuloSistema.VALORES_PLANTAO), setValorPlantaoController);
+
+router.get('/adicionais-plantao', requireAnyModuleAccess([ModuloSistema.VALORES_PLANTAO, ModuloSistema.ESCALAS]), validateListAdicionaisPlantao, listAdicionaisPlantaoController);
+router.put('/adicionais-plantao', requireModuleAccess(ModuloSistema.VALORES_PLANTAO), validateUpsertAdicionalPlantao, upsertAdicionalPlantaoController);
+router.delete('/adicionais-plantao', requireModuleAccess(ModuloSistema.VALORES_PLANTAO), validateRemoverAdicionalPlantao, removerAdicionalPlantaoController);
 
 router.get('/config-ponto/opcoes', requireModuleAccess(ModuloSistema.PONTO_ELETRONICO), getConfigPontoOpcoesController);
 router.get('/config-ponto', requireModuleAccess(ModuloSistema.PONTO_ELETRONICO), getConfigPontoController);

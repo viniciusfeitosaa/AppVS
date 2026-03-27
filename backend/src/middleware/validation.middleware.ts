@@ -488,3 +488,68 @@ export const validateAlocarMedicoEscala = [
     .withMessage('valorHora inválido'),
   handleValidationErrors,
 ];
+
+/**
+ * Adicional do plantão por data (PUT /admin/adicionais-plantao)
+ */
+export const validateUpsertAdicionalPlantao = [
+  body('contratoAtivoId')
+    .notEmpty()
+    .isUUID()
+    .withMessage('contratoAtivoId inválido'),
+  body('data')
+    .notEmpty()
+    .isISO8601()
+    .withMessage('data inválida'),
+  body('gradeId')
+    .notEmpty()
+    .isString()
+    .trim()
+    .isLength({ min: 1, max: 20 })
+    .withMessage('gradeId inválido'),
+  body('percentual')
+    .notEmpty()
+    .isFloat({ min: 0, max: 300 })
+    .withMessage('percentual inválido'),
+  handleValidationErrors,
+];
+
+/**
+ * Lista adicionais do plantão (GET /admin/adicionais-plantao)
+ */
+export const validateListAdicionaisPlantao = [
+  query('contratoAtivoId')
+    .notEmpty()
+    .isUUID()
+    .withMessage('contratoAtivoId inválido'),
+  query('dataInicio')
+    .optional({ values: 'falsy' })
+    .isISO8601()
+    .withMessage('dataInicio inválida'),
+  query('dataFim')
+    .optional({ values: 'falsy' })
+    .isISO8601()
+    .withMessage('dataFim inválida'),
+  handleValidationErrors,
+];
+
+/**
+ * Remove adicional do plantão (DELETE /admin/adicionais-plantao)
+ */
+export const validateRemoverAdicionalPlantao = [
+  query('contratoAtivoId')
+    .notEmpty()
+    .isUUID()
+    .withMessage('contratoAtivoId inválido'),
+  query('data')
+    .notEmpty()
+    .isISO8601()
+    .withMessage('data inválida'),
+  query('gradeId')
+    .notEmpty()
+    .isString()
+    .trim()
+    .isLength({ min: 1, max: 20 })
+    .withMessage('gradeId inválido'),
+  handleValidationErrors,
+];

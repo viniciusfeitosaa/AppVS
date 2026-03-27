@@ -74,6 +74,7 @@ const PontoEletronico = () => {
   const registroAberto = meuDiaResp?.data?.registroAberto;
   const registrosHoje = meuDiaResp?.data?.registrosHoje || [];
   const totalMinutosHoje = meuDiaResp?.data?.totalMinutosHoje || 0;
+  const totalMinutosSemana = meuDiaResp?.data?.totalMinutosSemana || 0;
   const ultimoRegistroPonto = meuDiaResp?.data?.ultimoRegistroPonto;
   const equipeDoDia: string[] = meuDiaResp?.data?.equipeDoDia || [];
   const minhasEquipes: string[] = meuDiaResp?.data?.minhasEquipes || [];
@@ -486,6 +487,10 @@ const PontoEletronico = () => {
                 <p className="text-xs font-medium text-viva-700">Total de horas hoje</p>
                 <span className="text-xs font-bold text-viva-900">{formatDuration(totalMinutosHoje)}</span>
               </div>
+              <div className="flex items-center justify-between p-4 rounded-xl bg-viva-50/60 border border-viva-200/50">
+                <p className="text-xs font-medium text-viva-700">Total da semana</p>
+                <span className="text-xs font-bold text-viva-900">{formatDuration(totalMinutosSemana)}</span>
+              </div>
             </div>
 
             {registrosHoje.length === 0 ? (
@@ -546,6 +551,24 @@ const PontoEletronico = () => {
                         if (e.currentTarget.videoWidth > 0) setVideoPronto(true);
                       }}
                     />
+                    {/* Guia simples de enquadramento do rosto (sem detecção) */}
+                    <div className="pointer-events-none absolute inset-0">
+                      {/* máscara escura com “janela” oval */}
+                      <div
+                        className="absolute inset-0 bg-black/35"
+                        style={{
+                          WebkitMaskImage:
+                            'radial-gradient(ellipse 38% 46% at 50% 45%, transparent 0 62%, black 64%)',
+                          maskImage: 'radial-gradient(ellipse 38% 46% at 50% 45%, transparent 0 62%, black 64%)',
+                        }}
+                      />
+                      {/* contorno */}
+                      <div className="absolute left-1/2 top-[45%] -translate-x-1/2 -translate-y-1/2 w-[76%] h-[68%] rounded-[999px] border border-white/70 shadow-[0_0_0_1px_rgba(0,0,0,0.15)]" />
+                      {/* dica curta */}
+                      <div className="absolute bottom-3 left-1/2 -translate-x-1/2 text-[10px] text-white/90 font-serif bg-black/30 px-2 py-1 rounded-lg">
+                        Centralize o rosto na moldura
+                      </div>
+                    </div>
                     {!videoPronto && (
                       <span className="absolute inset-0 flex items-center justify-center bg-viva-950/40 text-xs text-white font-serif px-4 text-center">
                         Iniciando câmera…

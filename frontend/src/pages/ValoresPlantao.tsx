@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../context/AuthContext';
 import { adminService, ValorPlantaoConfig } from '../services/admin.service';
@@ -40,9 +40,31 @@ const ValoresPlantao = () => {
   });
 
   const opcoes = opcoesResp?.data;
-  const contratos = opcoes?.contratos ?? [];
-  const subgrupos = opcoes?.subgrupos ?? [];
+  const contratos = useMemo(() => opcoes?.contratos ?? [], [opcoes]);
+  const subgrupos = useMemo(() => opcoes?.subgrupos ?? [], [opcoes]);
+  const contratoSubgrupos = useMemo(() => opcoes?.contratoSubgrupos ?? [], [opcoes]);
   const temContratoESubgrupo = !!contratoId && !!subgrupoId;
+
+  const allowedSubgrupoIds = useMemo(() => {
+    if (!contratoId) return new Set<string>();
+    return new Set(
+      contratoSubgrupos
+        .filter((cs) => cs.contratoAtivoId === contratoId)
+        .map((cs) => cs.subgrupoId)
+    );
+  }, [contratoId, contratoSubgrupos]);
+
+  const subgruposDoContrato = useMemo(() => {
+    if (!contratoId) return [];
+    return subgrupos
+      .filter((s) => s.ativo !== false)
+      .filter((s) => allowedSubgrupoIds.has(s.id));
+  }, [allowedSubgrupoIds, contratoId, subgrupos]);
+
+  const contratosEscalaEPonto = useMemo(
+    () => contratos.filter((c: any) => Boolean(c?.usaEscala && c?.usaPonto)),
+    [contratos]
+  );
 
   const { data: resp, isLoading: loadingValores } = useQuery({
     queryKey: ['admin', 'valores-plantao', contratoId, subgrupoId],
@@ -86,7 +108,7 @@ const ValoresPlantao = () => {
 
   const onContratoChange = (id: string) => {
     setContratoId(id);
-    setSubgrupoId((prev) => (id ? prev : ''));
+    setSubgrupoId('');
     setDraft({});
   };
 
@@ -138,7 +160,7 @@ const ValoresPlantao = () => {
                 onChange={(e) => onContratoChange(e.target.value)}
               >
                 <option value="">Selecione o contrato</option>
-                {contratos.map((c) => (
+                {contratosEscalaEPonto.map((c: any) => (
                   <option key={c.id} value={c.id}>
                     {c.nome}
                   </option>
@@ -153,8 +175,8 @@ const ValoresPlantao = () => {
                 onChange={(e) => onSubgrupoChange(e.target.value)}
                 disabled={!contratoId}
               >
-                <option value="">Selecione o subgrupo</option>
-                {subgrupos.filter((s) => s.ativo !== false).map((s) => (
+                <option value="">{contratoId ? 'Selecione o subgrupo' : 'Selecione o contrato primeiro'}</option>
+                {subgruposDoContrato.map((s) => (
                   <option key={s.id} value={s.id}>
                     {s.nome}
                   </option>

@@ -112,9 +112,32 @@ const ValoresPonto = () => {
   });
 
   const opcoes = opcoesResp?.data;
-  const contratos = opcoes?.contratos ?? [];
-  const subgrupos = opcoes?.subgrupos ?? [];
-  const equipes = opcoes?.equipes ?? [];
+  const contratos = useMemo(() => opcoes?.contratos ?? [], [opcoes]);
+  const subgrupos = useMemo(() => opcoes?.subgrupos ?? [], [opcoes]);
+  const equipes = useMemo(() => opcoes?.equipes ?? [], [opcoes]);
+  const contratoSubgrupos = useMemo(() => opcoes?.contratoSubgrupos ?? [], [opcoes]);
+
+  const allowedSubgrupoIds = useMemo(() => {
+    if (!contratoId) return new Set<string>();
+    return new Set(
+      contratoSubgrupos
+        .filter((cs) => cs.contratoAtivoId === contratoId)
+        .map((cs) => cs.subgrupoId)
+    );
+  }, [contratoId, contratoSubgrupos]);
+
+  const subgruposDoContrato = useMemo(() => {
+    if (!contratoId) return [];
+    return subgrupos
+      .filter((s) => s.ativo !== false)
+      .filter((s) => allowedSubgrupoIds.has(s.id));
+  }, [allowedSubgrupoIds, contratoId, subgrupos]);
+
+  const contratosPontoSemEscala = useMemo(
+    () => contratos.filter((c: any) => !(c?.usaEscala && c?.usaPonto)),
+    [contratos]
+  );
+
   const equipesDoSubgrupo = useMemo(
     () => (subgrupoId ? equipes.filter((e) => e.subgrupoId === subgrupoId && e.ativo !== false) : []),
     [equipes, subgrupoId]
@@ -196,7 +219,7 @@ const ValoresPonto = () => {
 
   const onContratoChange = (id: string) => {
     setContratoId(id);
-    setSubgrupoId((prev) => (id ? prev : ''));
+    setSubgrupoId('');
     setEquipeId('');
     setDraftHoras('');
     setDraftValor('');
@@ -330,7 +353,7 @@ const ValoresPonto = () => {
                 onChange={(e) => onContratoChange(e.target.value)}
               >
                 <option value="">Selecione o contrato</option>
-                {contratos.map((c) => (
+                {contratosPontoSemEscala.map((c: any) => (
                   <option key={c.id} value={c.id}>{c.nome}</option>
                 ))}
               </select>
@@ -343,8 +366,8 @@ const ValoresPonto = () => {
                 onChange={(e) => onSubgrupoChange(e.target.value)}
                 disabled={!contratoId}
               >
-                <option value="">Selecione o subgrupo</option>
-                {subgrupos.filter((s) => s.ativo !== false).map((s) => (
+                <option value="">{contratoId ? 'Selecione o subgrupo' : 'Selecione o contrato primeiro'}</option>
+                {subgruposDoContrato.map((s) => (
                   <option key={s.id} value={s.id}>{s.nome}</option>
                 ))}
               </select>

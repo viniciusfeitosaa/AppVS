@@ -73,6 +73,7 @@ model Tenant {
   escalaSubgrupos EscalaSubgrupo[]
   escalaEquipes           EscalaEquipe[]
   valoresPlantao          ValorPlantao[]
+  adicionaisPlantaoData   AdicionalPlantaoData[]
   configPontoEletronico   ConfigPontoEletronico[]
   contratoSubgrupos       ContratoSubgrupo[]
   contratoEquipes         ContratoEquipe[]
@@ -117,6 +118,7 @@ model ContratoAtivo {
   tenant               Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   escalas              Escala[]
   valoresPlantao       ValorPlantao[]
+  adicionaisPlantaoData AdicionalPlantaoData[]
   configPontoEletronico ConfigPontoEletronico[]
   contratoSubgrupos    ContratoSubgrupo[]
   contratoEquipes      ContratoEquipe[]
@@ -520,6 +522,26 @@ model ValorPlantao {
   @@index([tenantId])
   @@index([contratoAtivoId])
   @@index([subgrupoId])
+}
+
+model AdicionalPlantaoData {
+  id              String   @id @default(uuid())
+  tenantId        String   @map("tenant_id")
+  contratoAtivoId String   @map("contrato_ativo_id")
+  data            DateTime @map("data") @db.Date
+  gradeId         String   @map("grade_id") @db.VarChar(20)
+  percentual      Decimal  @map("percentual") @db.Decimal(6, 2)
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  tenant        Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  contratoAtivo ContratoAtivo @relation(fields: [contratoAtivoId], references: [id], onDelete: Cascade)
+
+  @@map("adicionais_plantao_data")
+  @@unique([tenantId, contratoAtivoId, data, gradeId])
+  @@index([tenantId])
+  @@index([contratoAtivoId])
+  @@index([data])
 }
 
 model ConfigPontoEletronico {

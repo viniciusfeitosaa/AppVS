@@ -33,7 +33,7 @@ type AgrupamentoHoras = {
   escalaNome: string;
   totalMinutos: number;
   totalRegistros: number;
-  /** Valor (R$) apenas para contratos sem escala: totalHoras × valorHora */
+  /** Valor/h (R$) usado no cálculo quando aplicável */
   valorHora?: number;
   valorCalculado?: number;
 };
@@ -60,6 +60,15 @@ const escapeCsvCell = (value: string | number): string => {
 
 const formatValor = (valor: number) =>
   new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(valor);
+
+const round2 = (n: number) => Math.round(n * 100) / 100;
+
+const inferGradeIdFromCheckIn = (checkInAtIso: string): 'mt' | 'sn' => {
+  const d = new Date(checkInAtIso);
+  const h = d.getHours();
+  // MT: 07:00–18:59, SN: 19:00–06:59
+  return h >= 7 && h < 19 ? 'mt' : 'sn';
+};
 
 const exportHorasCsv = (agrupado: AgrupamentoHoras[], dataInicio: string, dataFim: string) => {
   const header = ['Médico', 'Escala', 'Registros', 'Total (min)', 'Total (horas)', 'Valor (R$)'];
@@ -162,6 +171,31 @@ const Relatorios = () => {
     enabled: isMaster && Boolean(dataInicio && dataFim),
   });
 
+  const contratoSelecionado = useMemo(
+    () => (contratoId ? contratos.find((c: any) => c.id === contratoId) : null),
+    [contratoId, contratos]
+  );
+  const usaEscalaEPonto = Boolean(contratoSelecionado?.usaEscala && contratoSelecionado?.usaPonto);
+
+  const { data: valoresPlantaoResp } = useQuery({
+    queryKey: ['admin', 'valores-plantao', contratoId, subgrupoId, 'relatorio'],
+    queryFn: () => adminService.getValoresPlantao(contratoId, subgrupoId),
+    enabled: isMaster && usaEscalaEPonto && Boolean(contratoId && subgrupoId),
+  });
+
+  const valorHoraDerivadoPorGrade = useMemo(() => {
+    const map = new Map<string, number>();
+    const rows = valoresPlantaoResp?.data ?? [];
+    for (const v of rows as any[]) {
+      const gradeId = String(v.gradeId ?? '').trim();
+      if (!gradeId) continue;
+      const n = v.valorHora != null && v.valorHora !== '' ? Number(v.valorHora) : NaN;
+      if (!Number.isFinite(n) || n <= 0) continue;
+      map.set(gradeId, round2(n / 12));
+    }
+    return map;
+  }, [valoresPlantaoResp?.data]);
+
   if (!isMaster) {
     return (
       <div className="card border-l-4 border-red-400">
@@ -175,6 +209,8 @@ const Relatorios = () => {
   const registros: RegistroPontoAdmin[] = Array.isArray(raw) ? raw : raw?.data ?? [];
   const valorHoraPorMedico: Record<string, number> = !Array.isArray(raw) && raw?.valorHoraPorMedico ? raw.valorHoraPorMedico : {};
   const valorHoraPorMedicoEscala: Record<string, number> = !Array.isArray(raw) && raw?.valorHoraPorMedicoEscala ? raw.valorHoraPorMedicoEscala : {};
+  const plantoesValorHoraPorEscalaDataGrade: Record<string, number> =
+    !Array.isArray(raw) && raw?.plantoesValorHoraPorEscalaDataGrade ? raw.plantoesValorHoraPorEscalaDataGrade : {};
 
   const { agrupado, totalMinutos, totalRegistros } = useMemo(() => {
     const map = new Map<string, AgrupamentoHoras>();
@@ -187,11 +223,27 @@ const Relatorios = () => {
       const medNome = fixMojibake(item.medico?.nomeCompleto || 'Médico não identificado');
       const escNome = fixMojibake(item.escala?.nome || 'Escala não identificada');
       const key = `${medId}::${escId}`;
+      const gradeIdInferido = inferGradeIdFromCheckIn(item.checkInAt);
+      const dateStr = String(item.checkInAt ?? '').slice(0, 10);
+      const valorPlantaoGravado =
+        escId !== 'sem-escala' && dateStr
+          ? plantoesValorHoraPorEscalaDataGrade[`${escId}::${dateStr}::${gradeIdInferido}`] ?? null
+          : null;
+
+      const valorHoraDerivado =
+        usaEscalaEPonto && contratoId && subgrupoId
+          ? round2(Number(valorPlantaoGravado ?? valorHoraDerivadoPorGrade.get(gradeIdInferido) ?? 0) / 12) || null
+          : null;
+      const valorRegistro =
+        valorHoraDerivado != null && valorHoraDerivado > 0 ? (minutos / 60) * valorHoraDerivado : null;
 
       const prev = map.get(key);
       if (prev) {
         prev.totalMinutos += minutos;
         prev.totalRegistros += 1;
+        if (valorRegistro != null) {
+          prev.valorCalculado = round2((prev.valorCalculado ?? 0) + valorRegistro);
+        }
         if (escNome && escNome !== 'Escala não identificada' && prev.escalaNome === 'Escala não identificada') {
           prev.escalaNome = escNome;
         }
@@ -204,6 +256,7 @@ const Relatorios = () => {
           escalaNome: escNome,
           totalMinutos: minutos,
           totalRegistros: 1,
+          valorCalculado: valorRegistro != null ? round2(valorRegistro) : undefined,
         });
       }
 
@@ -212,19 +265,22 @@ const Relatorios = () => {
 
     const rows = Array.from(map.values()).sort((a, b) => b.totalMinutos - a.totalMinutos);
 
-    for (const row of rows) {
-      const keyMedEsc = `${row.medicoId}::${row.escalaId}`;
-      if (row.escalaId !== 'sem-escala') {
-        const vh = valorHoraPorMedicoEscala[keyMedEsc];
-        if (vh != null && vh > 0) {
-          row.valorHora = vh;
-          row.valorCalculado = (row.totalMinutos / 60) * vh;
-        }
-      } else if (row.medicoId !== 'sem-medico') {
-        const vh = valorHoraPorMedico[row.medicoId];
-        if (vh != null && vh > 0) {
-          row.valorHora = vh;
-          row.valorCalculado = (row.totalMinutos / 60) * vh;
+    // Fallback antigo (quando não for contrato escala+ponto ou quando não tiver valores-plantao)
+    if (!usaEscalaEPonto || !contratoId || !subgrupoId || valorHoraDerivadoPorGrade.size === 0) {
+      for (const row of rows) {
+        const keyMedEsc = `${row.medicoId}::${row.escalaId}`;
+        if (row.escalaId !== 'sem-escala') {
+          const vh = valorHoraPorMedicoEscala[keyMedEsc];
+          if (vh != null && vh > 0) {
+            row.valorHora = vh;
+            row.valorCalculado = (row.totalMinutos / 60) * vh;
+          }
+        } else if (row.medicoId !== 'sem-medico') {
+          const vh = valorHoraPorMedico[row.medicoId];
+          if (vh != null && vh > 0) {
+            row.valorHora = vh;
+            row.valorCalculado = (row.totalMinutos / 60) * vh;
+          }
         }
       }
     }
@@ -234,7 +290,17 @@ const Relatorios = () => {
       totalMinutos: somaMinutos,
       totalRegistros: registros.length,
     };
-  }, [registros, valorHoraPorMedico, valorHoraPorMedicoEscala]);
+  }, [
+    contratoId,
+    fixMojibake,
+    registros,
+    subgrupoId,
+    usaEscalaEPonto,
+    valorHoraDerivadoPorGrade,
+    valorHoraPorMedico,
+    valorHoraPorMedicoEscala,
+    plantoesValorHoraPorEscalaDataGrade,
+  ]);
 
   return (
     <div className="space-y-6">

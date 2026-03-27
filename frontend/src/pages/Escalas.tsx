@@ -95,6 +95,8 @@ const Escalas = () => {
   const [medicoIdToAllocate, setMedicoIdToAllocate] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [loadingAction, setLoadingAction] = useState(false);
+  const [adicionalPercentualInput, setAdicionalPercentualInput] = useState<string>('');
+  const [adicionalDiaOpenGradeId, setAdicionalDiaOpenGradeId] = useState<string | null>(null);
   const [weekStart] = useState<Date>(() => getMonday(new Date()));
   /** Primeiro dia do mês exibido na grade mensal (layout principal da escala). */
   const [gradeMonthStart, setGradeMonthStart] = useState<Date>(() => {
@@ -212,6 +214,76 @@ const Escalas = () => {
     return `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
   }, [selectedCalendarDay]);
 
+  const abrirAdicionalDoDia = (gradeId: string, currentPercentual: number) => {
+    setAdicionalPercentualInput(String(currentPercentual ?? 0));
+    setAdicionalDiaOpenGradeId(gradeId);
+  };
+
+  const fecharAdicionalDoDia = () => {
+    setAdicionalDiaOpenGradeId(null);
+  };
+
+  const salvarAdicionalDoDiaPanel = async (gradeId: string) => {
+    if (!isMaster || !contratoAtivoIdContext || !plantoesDiaDateStr) return;
+    setLoadingAction(true);
+    setError(null);
+    try {
+      const percentual = Number(adicionalPercentualInput.replace(',', '.'));
+      if (!Number.isFinite(percentual) || percentual < 0 || percentual > 300) {
+        setError('Percentual inválido (use um número entre 0 e 300).');
+        return;
+      }
+      await adminService.upsertAdicionalPlantao({
+        contratoAtivoId: contratoAtivoIdContext,
+        data: plantoesDiaDateStr,
+        gradeId,
+        percentual,
+      });
+      await queryClient.invalidateQueries({
+        queryKey: [
+          'admin',
+          'adicionais-plantao',
+          contratoAtivoIdContext,
+          dateToInput(gradeMonthStart),
+          dateToInput(gradeMonthEnd),
+        ],
+      });
+      setAdicionalDiaOpenGradeId(null);
+    } catch (err: any) {
+      setError(err.response?.data?.error || 'Erro ao salvar adicional');
+    } finally {
+      setLoadingAction(false);
+    }
+  };
+
+  const removerAdicionalDoDiaPanel = async (gradeId: string) => {
+    if (!isMaster || !contratoAtivoIdContext || !plantoesDiaDateStr) return;
+    setLoadingAction(true);
+    setError(null);
+    try {
+      await adminService.removerAdicionalPlantao({
+        contratoAtivoId: contratoAtivoIdContext,
+        data: plantoesDiaDateStr,
+        gradeId,
+      });
+      await queryClient.invalidateQueries({
+        queryKey: [
+          'admin',
+          'adicionais-plantao',
+          contratoAtivoIdContext,
+          dateToInput(gradeMonthStart),
+          dateToInput(gradeMonthEnd),
+        ],
+      });
+      setAdicionalPercentualInput('0');
+      setAdicionalDiaOpenGradeId(null);
+    } catch (err: any) {
+      setError(err.response?.data?.error || 'Erro ao remover adicional');
+    } finally {
+      setLoadingAction(false);
+    }
+  };
+
   const { data: equipePlantoesDiaResp } = useQuery({
     queryKey: ['admin', 'equipes', selectedEquipeId ?? '', 'plantoes', plantoesDiaDateStr],
     queryFn: () =>
@@ -291,6 +363,14 @@ const Escalas = () => {
     () => (escalasResp?.data || []).find((e: Escala) => e.id === selectedEscalaId),
     [escalasResp?.data, selectedEscalaId]
   );
+
+  const contratoAtivoIdContext = useMemo(() => {
+    return (
+      selectedEscala?.contratoAtivoId ??
+      (equipeEscalasResp?.data?.[0] as any)?.contratoAtivoId ??
+      ''
+    );
+  }, [equipeEscalasResp?.data, selectedEscala?.contratoAtivoId]);
   const firstSubgrupoId = useMemo(() => {
     const list = escalaSubgruposResp?.data || [];
     const first = list[0];
@@ -305,6 +385,28 @@ const Escalas = () => {
       isMaster &&
       !!selectedEscala?.contratoAtivoId &&
       !!firstSubgrupoId,
+  });
+
+  const { data: adicionaisPlantaoResp } = useQuery({
+    queryKey: [
+      'admin',
+      'adicionais-plantao',
+      contratoAtivoIdContext,
+      dateToInput(gradeMonthStart),
+      dateToInput(gradeMonthEnd),
+    ],
+    queryFn: async () => {
+      try {
+        return await adminService.listAdicionaisPlantao({
+          contratoAtivoId: contratoAtivoIdContext,
+          dataInicio: dateToInput(gradeMonthStart),
+          dataFim: dateToInput(gradeMonthEnd),
+        });
+      } catch {
+        return { success: true, data: [] };
+      }
+    },
+    enabled: isMaster && !!contratoAtivoIdContext,
   });
 
   const contratos = useMemo(() => contratosResp?.data || [], [contratosResp]);
@@ -364,6 +466,35 @@ const Escalas = () => {
     }
     return map;
   }, [valoresPlantao]);
+
+  const adicionalPercentualByDataGrade = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const a of adicionaisPlantaoResp?.data ?? []) {
+      const dateStr = (a.data ?? '').slice(0, 10);
+      if (!dateStr || !a.gradeId) continue;
+      const p = typeof a.percentual === 'number' ? a.percentual : parseFloat(String(a.percentual));
+      if (Number.isNaN(p)) continue;
+      map.set(`${dateStr}_${a.gradeId}`, p);
+    }
+    return map;
+  }, [adicionaisPlantaoResp?.data]);
+
+  const adicionalPercentualDoDiaPorGrade = useMemo(() => {
+    if (!plantoesDiaDateStr) return new Map<string, number>();
+    const map = new Map<string, number>();
+    for (const g of DEFAULT_GRADES) {
+      const p = adicionalPercentualByDataGrade.get(`${plantoesDiaDateStr}_${g.id}`);
+      if (p != null) map.set(g.id, p);
+    }
+    return map;
+  }, [adicionalPercentualByDataGrade, plantoesDiaDateStr]);
+
+  const round2 = (n: number) => Math.round(n * 100) / 100;
+  const getValorFinalComAdicional = (base: number | null, percentual: number | null) => {
+    if (base == null) return null;
+    if (percentual == null || percentual === 0) return base;
+    return round2(base * (1 + percentual / 100));
+  };
 
   const plantaoMap = useMemo(() => {
     const map = new Map<
@@ -540,11 +671,15 @@ const Escalas = () => {
     setLoadingAction(true);
     setError(null);
     try {
+      const baseValor = valorByGrade.get(cellModal.grade.id) ?? null;
+      const dateStr = dateToInput(cellModal.date);
+      const percentual = adicionalPercentualByDataGrade.get(`${dateStr}_${cellModal.grade.id}`) ?? null;
+      const valorFinal = getValorFinalComAdicional(baseValor, percentual);
       await adminService.createEscalaPlantao(selectedEscalaId, {
-        data: dateToInput(cellModal.date),
+        data: dateStr,
         gradeId: cellModal.grade.id,
         medicoId: medicoIdToAllocateCell,
-        valorHora: cellModal.grade ? valorByGrade.get(cellModal.grade.id) ?? null : null,
+        valorHora: valorFinal,
       });
       setMedicoIdToAllocateCell('');
       setMedicoAllocateCellSearch('');
@@ -585,16 +720,96 @@ const Escalas = () => {
     return Number.isNaN(n) ? null : n;
   }, [cellModal.date, cellModal.grade, plantaoMap]);
 
+  const valorBaseModal = useMemo(() => {
+    if (!cellModal.grade) return null;
+    return valorByGrade.get(cellModal.grade.id) ?? null;
+  }, [cellModal.grade, valorByGrade]);
+
+  const adicionalPercentualModal = useMemo(() => {
+    if (!cellModal.date || !cellModal.grade) return null;
+    const key = `${dateToInput(cellModal.date)}_${cellModal.grade.id}`;
+    return adicionalPercentualByDataGrade.get(key) ?? null;
+  }, [adicionalPercentualByDataGrade, cellModal.date, cellModal.grade]);
+
+  const valorFinalModal = getValorFinalComAdicional(valorBaseModal, adicionalPercentualModal);
+
+  useEffect(() => {
+    if (!cellModal.open || !cellModal.date || !cellModal.grade) return;
+    setAdicionalPercentualInput(String(adicionalPercentualModal ?? 0));
+  }, [cellModal.open, cellModal.date, cellModal.grade, adicionalPercentualModal]);
+
+  const salvarAdicionalDoDiaModal = async () => {
+    if (!isMaster || !selectedEscala?.contratoAtivoId || !cellModal.date || !cellModal.grade) return;
+    setLoadingAction(true);
+    setError(null);
+    try {
+      const percentual = Number(adicionalPercentualInput.replace(',', '.'));
+      if (!Number.isFinite(percentual) || percentual < 0 || percentual > 300) {
+        setError('Percentual inválido (use um número entre 0 e 300).');
+        return;
+      }
+      await adminService.upsertAdicionalPlantao({
+        contratoAtivoId: selectedEscala.contratoAtivoId,
+        data: dateToInput(cellModal.date),
+        gradeId: cellModal.grade.id,
+        percentual,
+      });
+      await queryClient.invalidateQueries({
+        queryKey: [
+          'admin',
+          'adicionais-plantao',
+          selectedEscala.contratoAtivoId,
+          dateToInput(gradeMonthStart),
+          dateToInput(gradeMonthEnd),
+        ],
+      });
+    } catch (err: any) {
+      setError(err.response?.data?.error || 'Erro ao salvar adicional');
+    } finally {
+      setLoadingAction(false);
+    }
+  };
+
+  const removerAdicionalDoDiaModal = async () => {
+    if (!isMaster || !selectedEscala?.contratoAtivoId || !cellModal.date || !cellModal.grade) return;
+    setLoadingAction(true);
+    setError(null);
+    try {
+      await adminService.removerAdicionalPlantao({
+        contratoAtivoId: selectedEscala.contratoAtivoId,
+        data: dateToInput(cellModal.date),
+        gradeId: cellModal.grade.id,
+      });
+      await queryClient.invalidateQueries({
+        queryKey: [
+          'admin',
+          'adicionais-plantao',
+          selectedEscala.contratoAtivoId,
+          dateToInput(gradeMonthStart),
+          dateToInput(gradeMonthEnd),
+        ],
+      });
+      setAdicionalPercentualInput('0');
+    } catch (err: any) {
+      setError(err.response?.data?.error || 'Erro ao remover adicional');
+    } finally {
+      setLoadingAction(false);
+    }
+  };
+
   const replicarMedicoNaSemana = async () => {
     if (!selectedEscalaId || !cellModal.grade || !medicoParaReplicar) return;
     setLoadingAction(true);
     setError(null);
-    const valorHora = cellModal.grade ? valorByGrade.get(cellModal.grade.id) ?? null : null;
     try {
       const dias = getWeekDates(weekStart);
       for (const d of dias) {
+        const baseValor = valorByGrade.get(cellModal.grade.id) ?? null;
+        const dateStr = dateToInput(d);
+        const percentual = adicionalPercentualByDataGrade.get(`${dateStr}_${cellModal.grade.id}`) ?? null;
+        const valorHora = getValorFinalComAdicional(baseValor, percentual);
         await adminService.createEscalaPlantao(selectedEscalaId, {
-          data: dateToInput(d),
+          data: dateStr,
           gradeId: cellModal.grade.id,
           medicoId: medicoParaReplicar,
           valorHora,
@@ -619,7 +834,7 @@ const Escalas = () => {
       { id: 'historico', label: 'Histórico' },
       { id: 'relatorio', label: 'Relatório' },
     ];
-    return (
+  return (
       <>
       <div className="flex flex-col h-full">
         <div className="flex-1 bg-white rounded-lg border border-viva-200/80 flex flex-col overflow-hidden">
@@ -664,7 +879,7 @@ const Escalas = () => {
               </div>
             ) : (
               <>
-                <div>
+        <div>
                   <h2 className="sticky top-0 px-4 py-3 bg-white border-b border-viva-100 text-lg font-bold text-viva-800 shadow-sm z-10">Subgrupos</h2>
                   <div className="flex flex-col gap-0 p-4">
                     {subgruposFiltrados.map((s) => {
@@ -693,7 +908,7 @@ const Escalas = () => {
                               {countEquipes} equipe(s) · {s._count?.escalaSubgrupos ?? 0} escala(s)
                               {contratosLabel ? ` · ${contratosLabel}` : ''}
                             </p>
-                          </div>
+        </div>
                         </button>
                       );
                     })}
@@ -715,7 +930,7 @@ const Escalas = () => {
                             className="text-sm font-semibold text-viva-600 hover:text-viva-800 underline"
                           >
                             Ir para Subgrupos e Equipes para adicionar
-                          </Link>
+        </Link>
                         </div>
                       ) : (
                         equipesDoSubgrupoSelecionado.map((e) => (
@@ -1220,12 +1435,87 @@ const Escalas = () => {
                         `${g.regua[0].replace(':', 'h')} às ${g.regua[1].replace(':', 'h')}`;
                       return DEFAULT_GRADES.map((grade) => {
                         const alocados = plantoesDia.filter((p) => p.gradeId === grade.id);
+                        const adicionalPercentualDia = adicionalPercentualDoDiaPorGrade.get(grade.id) ?? 0;
                         return (
                           <div key={grade.id} className="rounded-xl overflow-hidden my-2">
-                            <div className="p-4 text-white uppercase font-bold text-lg bg-viva-500 font-display">
-                              <p>{grade.label} - {horarioLabel(grade)}</p>
+                            <div className="p-4 text-white uppercase font-bold text-lg bg-viva-500 font-display flex items-center justify-between gap-3">
+                              <div className="min-w-0">
+                                <div className="flex items-center gap-2 min-w-0">
+                                  <p className="truncate">
+                                    {grade.label} - {horarioLabel(grade)}
+                                  </p>
+                                  {adicionalPercentualDia > 0 && (
+                                    <span
+                                      className="relative inline-flex items-center justify-center w-6 h-6 rounded-full overflow-hidden"
+                                      title={`Adicional ativo: +${adicionalPercentualDia}%`}
+                                    >
+                                      <span className="absolute inset-0 bg-gradient-to-br from-[#2F80FF] via-[#256FFF] to-[#00B2FF]" />
+                                      <span className="absolute -top-2 -left-2 w-7 h-7 rounded-full bg-white/25 blur-[2px]" />
+                                      <span className="absolute -bottom-2 -right-2 w-8 h-8 rounded-full bg-black/10 blur-[3px]" />
+                                      <span className="absolute inset-0 ring-1 ring-white/25" />
+                                      <span className="relative text-white text-[10px] leading-none font-extrabold tabular-nums">
+                                        {Math.round(adicionalPercentualDia)}%
+                                      </span>
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                              {isMaster && !!contratoAtivoIdContext && plantoesDiaDateStr && (
+                                <button
+                                  type="button"
+                                  className="px-3 py-1.5 rounded-lg bg-white/15 hover:bg-white/25 transition text-[12px] font-semibold normal-case"
+                                  onClick={() => {
+                                    if (adicionalDiaOpenGradeId === grade.id) return fecharAdicionalDoDia();
+                                    return abrirAdicionalDoDia(grade.id, adicionalPercentualDia);
+                                  }}
+                                >
+                                  {adicionalPercentualDia > 0 ? 'Editar adicional' : 'Adicional'}
+                                </button>
+                              )}
                             </div>
                             <div className="w-full flex flex-wrap gap-2 border border-viva-200 rounded-b-xl p-2 bg-white">
+                              {isMaster &&
+                                !!contratoAtivoIdContext &&
+                                plantoesDiaDateStr &&
+                                adicionalDiaOpenGradeId === grade.id && (
+                                  <div className="w-full mb-2 rounded-xl border border-viva-200 bg-viva-50/40 p-3">
+                                    <p className="text-[11px] text-viva-700 font-serif mb-2">
+                                      Percentual para {plantoesDiaDateStr} ({grade.label}). Aplica sobre o valor base do turno.
+                                    </p>
+                                    <div className="flex flex-wrap items-end gap-2">
+                                      <div className="min-w-[160px]">
+                                        <label className="block text-[10px] font-semibold uppercase tracking-wider text-viva-600 font-display mb-1">
+                                          Percentual (%)
+                                        </label>
+          <input
+                                          type="text"
+                                          inputMode="decimal"
+                                          className="input w-full"
+                                          placeholder="Ex.: 50"
+                                          value={adicionalPercentualInput}
+                                          onChange={(e) => setAdicionalPercentualInput(e.target.value)}
+                                          disabled={loadingAction}
+                                        />
+                                      </div>
+                                      <button
+                                        type="button"
+                                        className="btn btn-primary text-sm"
+                                        onClick={() => salvarAdicionalDoDiaPanel(grade.id)}
+                                        disabled={loadingAction}
+                                      >
+                                        Salvar
+                                      </button>
+                                      <button
+                                        type="button"
+                                        className="btn btn-secondary text-sm"
+                                        onClick={() => removerAdicionalDoDiaPanel(grade.id)}
+                                        disabled={loadingAction || adicionalPercentualDia <= 0}
+                                      >
+                                        Remover
+                                      </button>
+                                    </div>
+                                  </div>
+                                )}
                               {alocados.length === 0 ? (
                                 <p className="text-sm text-viva-600 py-2 font-serif">Nenhum profissional alocado</p>
                               ) : (
@@ -1283,12 +1573,12 @@ const Escalas = () => {
           >
             <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16" /></svg>
             Lista de grupos
-          </button>
+            </button>
           <Link to="/subgrupos-equipes" className="btn btn-secondary inline-flex items-center gap-2">
             <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20"><path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zM18 8a2 2 0 11-4 0 2 2 0 014 0zM14 15a4 4 0 00-8 0v3h8v-3zM6 8a2 2 0 11-4 0 2 2 0 014 0zM16 18v-3a5.972 5.972 0 00-.75-2.906A3.005 3.005 0 0119 15v3h-3zM4.75 12.094A5.973 5.973 0 004 15v3H1v-3a3 3 0 013.75-2.906z" /></svg>
             Gerenciar Subgrupos e Equipes
           </Link>
-        </div>
+          </div>
       </div>
 
       <main className="min-h-[calc(100vh-12rem)] flex flex-col p-5 bg-viva-100/30 flex-1 overflow-hidden">
@@ -1314,18 +1604,18 @@ const Escalas = () => {
                 </div>
               </div>
               <div className="overflow-y-auto flex-1 p-4">
-                {loadingEscalas ? (
+        {loadingEscalas ? (
                   <p className="text-sm text-viva-700 font-serif">Carregando escalas...</p>
-                ) : escalas.length === 0 ? (
+        ) : escalas.length === 0 ? (
                   <p className="text-sm text-viva-700 font-serif">Nenhuma escala cadastrada. Clique em &quot;Nova escala&quot; para criar.</p>
-                ) : (
-                  <div className="space-y-2">
-                    {escalas.map((escala) => (
-                      <div
-                        key={escala.id}
+        ) : (
+          <div className="space-y-2">
+            {escalas.map((escala) => (
+              <div
+                key={escala.id}
                         className="border rounded-xl p-3 transition border-viva-200/80 bg-viva-50/30 hover:bg-viva-50/50 flex flex-wrap items-center justify-between gap-2"
-                      >
-                        <button
+              >
+                  <button
                           type="button"
                           className="text-left min-w-0 flex-1"
                           onClick={() => setSelectedEscalaId(escala.id)}
@@ -1333,8 +1623,8 @@ const Escalas = () => {
                           <p className="font-semibold text-viva-900 text-sm font-display">{escala.nome}</p>
                           <p className="text-[10px] text-viva-600 mt-0.5 font-serif">
                             {escala.contratoAtivo?.nome || '-'} · {toDateInput(escala.dataInicio)} até {toDateInput(escala.dataFim)} · Alocados: {escala._count?.alocacoes ?? 0}
-                          </p>
-                        </button>
+                    </p>
+                  </button>
                         <div className="flex gap-2 shrink-0">
                           <button type="button" className="btn-sm btn-secondary" onClick={() => { startEdit(escala); setEscalaFormModalOpen(true); }}>Editar</button>
                           <button type="button" className="btn-sm btn-secondary" onClick={() => deleteEscala(escala)}>Excluir</button>
@@ -1356,7 +1646,7 @@ const Escalas = () => {
                     aria-label="Voltar"
                   >
                     <svg stroke="currentColor" fill="currentColor" strokeWidth="0" viewBox="0 0 448 512" className="w-5 h-5" xmlns="http://www.w3.org/2000/svg"><path d="M257.5 445.1l-22.2 22.2c-9.4 9.4-24.6 9.4-33.9 0L7 273c-9.4-9.4-9.4-24.6 0-33.9L201.4 44.7c9.4-9.4 24.6-9.4 33.9 0l22.2 22.2c9.5 9.5 9.3 25-.4 34.3L136.6 216H424c13.3 0 24 10.7 24 24v32c0 13.3-10.7 24-24 24H136.6l120.5 114.8c9.8 9.3 10 24.8.4 34.3z" /></svg>
-                  </button>
+                    </button>
                   <div>
                     <p className="font-semibold text-white font-display">{selectedEscala?.nome ?? 'Escala'}</p>
                     <p className="text-white/90 text-sm">{selectedEscala?.contratoAtivo?.nome ?? '-'}</p>
@@ -1369,8 +1659,8 @@ const Escalas = () => {
                   <div className="flex gap-2 mt-1">
                     <button type="button" className="text-white/90 hover:underline text-sm" onClick={() => setGradeMonthStart((d) => { const x = new Date(d); x.setMonth(x.getMonth() - 1); return x; })}>← Anterior</button>
                     <button type="button" className="text-white/90 hover:underline text-sm" onClick={() => setGradeMonthStart((d) => { const x = new Date(d); x.setMonth(x.getMonth() + 1); return x; })}>Próximo →</button>
-                  </div>
-                </div>
+              </div>
+          </div>
               </div>
               <div className="overflow-hidden p-3 flex-1 flex min-h-0">
                 <div className="relative flex-1 flex flex-col overflow-y-auto overflow-x-auto min-w-0">
@@ -1494,7 +1784,11 @@ const Escalas = () => {
                                             data: dateStr,
                                             gradeId,
                                             medicoId: row.medicoId,
-                                            valorHora: grade ? valorByGrade.get(grade.id) ?? null : null,
+                                            valorHora: (() => {
+                                              const baseValor = valorByGrade.get(gradeId) ?? null;
+                                              const percentual = adicionalPercentualByDataGrade.get(`${dateStr}_${gradeId}`) ?? null;
+                                              return getValorFinalComAdicional(baseValor, percentual);
+                                            })(),
                                           });
                                         }
                                         invalidatePlantoes();
@@ -1534,8 +1828,8 @@ const Escalas = () => {
                                         </div>
                                       ) : (
                                         ''
-                                      )}
-                                    </div>
+        )}
+      </div>
                                   </td>
                                 );
                               })}
@@ -1614,7 +1908,7 @@ const Escalas = () => {
         </div>
       )}
 
-          {selectedEscalaId && (
+      {selectedEscalaId && (
         <div className="card stagger-5 hidden">
           <h3 className="text-xs font-semibold uppercase tracking-wider text-viva-600 mb-4 font-display">Alocação de médicos na escala</h3>
           <div className="flex gap-2 mb-4 flex-wrap items-start">
@@ -1713,17 +2007,17 @@ const Escalas = () => {
               /* Modal Plantão Vago: divulgar quantidade de vagas */
               <div className="relative flex flex-col items-center p-6">
                 <h2 className="text-lg font-bold text-viva-900 font-display">Plantão Vago</h2>
-                <button
-                  type="button"
+              <button
+                type="button"
                   className="absolute top-4 right-4 p-1 rounded-lg hover:bg-viva-100 text-viva-600"
                   onClick={() => setCellModal((m) => ({ ...m, open: false }))}
                   aria-label="Fechar"
-                >
+              >
                   <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6L6 18M6 6l12 12" /></svg>
-                </button>
+              </button>
                 <span className="inline-flex h-16 w-16 items-center justify-center rounded-full bg-viva-500 text-white mt-2">
                   <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="currentColor" strokeWidth="0"><path d="M8.243 7.34l-6.38 .925l-.113 .023a1 1 0 0 0 -.44 1.684l4.622 4.499l-1.09 6.355l-.013 .11a1 1 0 0 0 1.464 .944l5.706 -3l5.693 3l.1 .046a1 1 0 0 0 1.352 -1.1l-1.091 -6.355l4.624 -4.5l.078 -.085a1 1 0 0 0 -.633 -1.62l-6.38 -.926l-2.852 -5.78a1 1 0 0 0 -1.794 0l-2.853 5.78z" /></svg>
-                </span>
+                        </span>
                 <p className="text-xs text-viva-600 mt-2">{cellModal.grade?.label} – {cellModal.date && formatDayShort(cellModal.date)}</p>
                 <div className="w-full mt-4">
                   <label className="block text-sm font-medium text-viva-800 mb-1">Quantidade de vagas</label>
@@ -1740,7 +2034,7 @@ const Escalas = () => {
                 <button
                   type="button"
                   className="btn btn-primary w-full mt-4"
-                  onClick={() => {
+                          onClick={() => {
                     if (!cellModal.grade || !cellModal.date) {
                       setCellModal((m) => ({ ...m, open: false }));
                       return;
@@ -1755,8 +2049,8 @@ const Escalas = () => {
                 >
                   Confirmar
                 </button>
-              </div>
-            ) : (
+                            </div>
+                          ) : (
               <>
             {/* Header: turno com destaque */}
             <div className="flex items-start justify-between gap-3 px-5 pt-5 pb-4 border-b border-viva-200/80 bg-gradient-to-br from-viva-50/80 to-white">
@@ -1771,8 +2065,8 @@ const Escalas = () => {
                   <p className="text-[11px] text-viva-600 font-medium mt-0.5">
                     {cellModal.grade.regua?.join(' – ')}
                   </p>
-                </div>
-              </div>
+                        </div>
+                  </div>
               <button
                 type="button"
                 className="p-2 rounded-xl hover:bg-viva-200/80 text-viva-600 transition-colors shrink-0"
@@ -1789,14 +2083,36 @@ const Escalas = () => {
                 <svg className="h-4 w-4 text-viva-500 shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clipRule="evenodd" /></svg>
                 <span className="font-medium font-display text-sm">
                   {formatDayShort(cellModal.date)} · {formatDayName(cellModal.date)}
-                </span>
+              </span>
                 <span className="text-viva-400">·</span>
                 <span className="text-sm font-serif text-viva-700">{cellModal.grade.horario}</span>
               </div>
-              {(valorByGrade.get(cellModal.grade.id) != null || plantaoSlotValor != null || alocacaoParaValor?.valorHora != null) && (
-                <p className="mt-2 text-xs font-semibold text-viva-700 font-display">
-                  Valor do plantão: {formatValorHora(plantaoSlotValor ?? valorByGrade.get(cellModal.grade.id) ?? alocacaoParaValor?.valorHora)}
-                </p>
+              {(valorBaseModal != null || adicionalPercentualModal != null || valorFinalModal != null || plantaoSlotValor != null || alocacaoParaValor?.valorHora != null) && (
+                <div className="mt-2 text-xs text-viva-700 font-display space-y-1">
+                  {valorBaseModal != null && (
+                    <p className="font-semibold">
+                      Valor base: {formatValorHora(valorBaseModal)}
+                    </p>
+                  )}
+                  {valorBaseModal != null && adicionalPercentualModal != null && adicionalPercentualModal !== 0 && (
+                    <p className="font-semibold text-viva-800">
+                      Adicional ({formatDayShort(cellModal.date)}): +{adicionalPercentualModal}%
+                    </p>
+                  )}
+                  {plantaoSlotValor != null ? (
+                    <p className="font-semibold">
+                      Valor gravado: {formatValorHora(plantaoSlotValor)}
+                    </p>
+                  ) : valorFinalModal != null ? (
+                    <p className="font-bold text-viva-900">
+                      Valor final: {formatValorHora(valorFinalModal)}
+                    </p>
+                  ) : alocacaoParaValor?.valorHora != null ? (
+                    <p className="font-semibold">
+                      Valor (alocação): {formatValorHora(alocacaoParaValor.valorHora)}
+                    </p>
+                  ) : null}
+              </div>
               )}
             </div>
 
@@ -1810,8 +2126,10 @@ const Escalas = () => {
                     <p className="text-xs text-viva-600 mt-0.5">{cellModal.medico.telefone || cellModal.medico.email}</p>
                   )}
                   <p className="text-[10px] text-viva-500 mt-2 font-serif">{cellModal.grade.horario}</p>
-                  {(plantaoSlotValor != null || valorByGrade.get(cellModal.grade.id) != null || alocacaoParaValor?.valorHora != null) && (
-                    <p className="text-xs font-medium text-viva-700 mt-1">Valor: {formatValorHora(plantaoSlotValor ?? valorByGrade.get(cellModal.grade.id) ?? alocacaoParaValor?.valorHora)}</p>
+                  {(plantaoSlotValor != null || valorFinalModal != null || valorBaseModal != null || alocacaoParaValor?.valorHora != null) && (
+                    <p className="text-xs font-medium text-viva-700 mt-1">
+                      Valor: {formatValorHora(plantaoSlotValor ?? valorFinalModal ?? valorBaseModal ?? alocacaoParaValor?.valorHora)}
+                    </p>
                   )}
                   {cellModal.plantaoId && (
                     <button
@@ -1828,6 +2146,49 @@ const Escalas = () => {
                 <p className="text-sm text-viva-700 font-serif mb-5 rounded-xl bg-viva-50/50 border border-viva-200/60 px-3 py-2.5">
                   Sem profissional atribuído a este plantão.
                 </p>
+              )}
+
+              {isMaster && selectedEscala?.contratoAtivoId && cellModal.date && cellModal.grade && (
+                <div className="rounded-2xl border border-viva-200 bg-white p-4 mb-5">
+                  <p className="text-xs font-semibold uppercase tracking-wider text-viva-700 font-display mb-2">
+                    Adicional por data (contrato)
+                  </p>
+                  <p className="text-[11px] text-viva-600 font-serif mb-3">
+                    Define um percentual para este dia e turno. O valor final do plantão será calculado como \(valor\\_base \\times (1 + percentual/100)\).
+                  </p>
+                  <div className="flex flex-wrap items-end gap-3">
+                    <div className="min-w-[160px]">
+                      <label className="block text-[10px] font-semibold uppercase tracking-wider text-viva-600 font-display mb-1">
+                        Percentual (%)
+                      </label>
+                      <input
+                        type="text"
+                        inputMode="decimal"
+                        className="input w-full"
+                        placeholder="Ex.: 50"
+                        value={adicionalPercentualInput}
+                        onChange={(e) => setAdicionalPercentualInput(e.target.value)}
+                        disabled={loadingAction}
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      className="btn btn-primary"
+                      onClick={salvarAdicionalDoDiaModal}
+                      disabled={loadingAction}
+                    >
+                      Salvar adicional
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-secondary"
+                      onClick={removerAdicionalDoDiaModal}
+                      disabled={loadingAction || !adicionalPercentualModal || adicionalPercentualModal === 0}
+                    >
+                      Remover
+                    </button>
+                  </div>
+                </div>
               )}
 
               {/* CTA: Atribuir médico (destaque visual) */}
@@ -1902,25 +2263,25 @@ const Escalas = () => {
 
               <p className="text-[11px] text-viva-600 font-serif mb-4">
                 Valor definido em <Link to="/valores-plantao" className="font-semibold text-viva-800 underline hover:text-viva-900">Valores Hora/Plantão</Link>. Ao alocar, o valor de {cellModal.grade.label} será aplicado.
-              </p>
+                </p>
 
-              {(medicoParaReplicar || cellModal.medico) && (
+                {(medicoParaReplicar || cellModal.medico) && (
                 <div className="pt-4 mt-4 border-t border-viva-200">
                   <h3 className="text-xs font-semibold uppercase tracking-wider text-viva-700 font-display mb-2">Repetir para outros dias</h3>
                   <p className="text-xs text-viva-600 font-serif mb-3">
                     Aplica o médico {cellModal.medico ? cellModal.medico.nomeCompleto : (medicos.find((m) => m.id === medicoIdToAllocateCell)?.nomeCompleto ?? 'selecionado')} e o valor no turno {cellModal.grade.label} nos 7 dias desta semana.
-                  </p>
-                  <button
-                    type="button"
+                    </p>
+                    <button
+                      type="button"
                     className="btn btn-secondary w-full sm:w-auto text-sm"
-                    onClick={replicarMedicoNaSemana}
-                    disabled={loadingAction || !medicoParaReplicar}
-                  >
+                      onClick={replicarMedicoNaSemana}
+                      disabled={loadingAction || !medicoParaReplicar}
+                    >
                     {loadingAction ? 'Aplicando...' : `Repetir na semana (${cellModal.grade.label})`}
-                  </button>
-                </div>
-              )}
-            </div>
+                    </button>
+                  </div>
+                )}
+              </div>
 
             <div className="px-5 py-4 border-t border-viva-200 bg-viva-50/30 flex justify-end">
               <button

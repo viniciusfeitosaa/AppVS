@@ -106,6 +106,22 @@ const endOfToday = () => {
   return date;
 };
 
+const startOfWeek = () => {
+  const date = new Date();
+  const day = date.getDay(); // 0 domingo, 1 segunda...
+  const diffToMonday = day === 0 ? -6 : 1 - day;
+  date.setDate(date.getDate() + diffToMonday);
+  date.setHours(0, 0, 0, 0);
+  return date;
+};
+
+const endOfWeek = () => {
+  const date = startOfWeek();
+  date.setDate(date.getDate() + 6);
+  date.setHours(23, 59, 59, 999);
+  return date;
+};
+
 export async function checkInService(
   tenantId: string,
   medicoId: string,
@@ -299,7 +315,13 @@ export async function checkOutService(
 }
 
 export async function getMeuDiaPontoService(tenantId: string, medicoId: string) {
-  const [aberto, registros, ultimoRegistro] = await Promise.all([
+  const now = new Date();
+  const hojeInicio = startOfToday();
+  const hojeFim = endOfToday();
+  const semanaInicio = startOfWeek();
+  const semanaFim = endOfWeek();
+
+  const [aberto, registros, registrosSemana, ultimoRegistro] = await Promise.all([
     prisma.registroPonto.findFirst({
       where: { tenantId, medicoId, checkOutAt: null },
       include: {
@@ -312,14 +334,30 @@ export async function getMeuDiaPontoService(tenantId: string, medicoId: string) 
         tenantId,
         medicoId,
         checkInAt: {
-          gte: startOfToday(),
-          lte: endOfToday(),
+          gte: hojeInicio,
+          lte: hojeFim,
         },
       },
       include: {
         escala: { select: { id: true, nome: true } },
       },
       orderBy: { checkInAt: 'desc' },
+    }),
+    prisma.registroPonto.findMany({
+      where: {
+        tenantId,
+        medicoId,
+        checkInAt: {
+          gte: semanaInicio,
+          lte: semanaFim,
+        },
+      },
+      select: {
+        id: true,
+        checkInAt: true,
+        checkOutAt: true,
+        duracaoMinutos: true,
+      },
     }),
     prisma.registroPonto.findFirst({
       where: { tenantId, medicoId },
@@ -328,7 +366,23 @@ export async function getMeuDiaPontoService(tenantId: string, medicoId: string) 
     }),
   ]);
 
-  const totalMinutos = registros.reduce((acc, item) => acc + (item.duracaoMinutos || 0), 0);
+  const totalMinutosHojeFechado = registros.reduce((acc, item) => acc + (item.duracaoMinutos || 0), 0);
+  const minutosEmAbertoHoje =
+    aberto && aberto.checkInAt >= hojeInicio
+      ? Math.max(0, Math.floor((now.getTime() - new Date(aberto.checkInAt).getTime()) / 60000))
+      : 0;
+  const totalMinutos = totalMinutosHojeFechado + minutosEmAbertoHoje;
+
+  const totalSemanaFechado = registrosSemana.reduce((acc, item) => acc + (item.duracaoMinutos || 0), 0);
+  const minutosEmAbertoSemana = aberto
+    ? Math.max(
+        0,
+        Math.floor(
+          (now.getTime() - Math.max(new Date(aberto.checkInAt).getTime(), semanaInicio.getTime())) / 60000
+        )
+      )
+    : 0;
+  const totalMinutosSemana = totalSemanaFechado + minutosEmAbertoSemana;
 
   let equipeDoDia: string[] = [];
   if (aberto?.escalaId) {
@@ -373,6 +427,7 @@ export async function getMeuDiaPontoService(tenantId: string, medicoId: string) 
     registroAberto: aberto,
     registrosHoje: registros,
     totalMinutosHoje: totalMinutos,
+    totalMinutosSemana,
     ultimoRegistroPonto: ultimoRegistro,
     equipeDoDia,
     minhasEquipes: minhasEquipesNomes,

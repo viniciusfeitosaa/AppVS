@@ -1,4 +1,5 @@
 import { Request, Response } from 'express';
+import { prisma } from '../config/database';
 import { getFotoCheckinRegistroForAdmin } from '../services/ponto.service';
 import {
   addContratoEquipeService,
@@ -12,6 +13,7 @@ import {
   deleteContratoAtivoService,
   getConfigPontoService,
   getValoresPlantaoService,
+  listAdicionaisPlantaoService,
   inviteMedicoService,
   listContratoEquipesService,
   listContratoSubgruposService,
@@ -28,6 +30,8 @@ import {
   removeContratoEquipeService,
   removeContratoSubgrupoService,
   setConfigPontoService,
+  removerAdicionalPlantaoService,
+  upsertAdicionalPlantaoService,
   setValorPlantaoService,
   toggleMedicoAtivoService,
   updateEscalaService,
@@ -672,15 +676,20 @@ export const getValoresPlantaoOpcoesController = async (req: Request, res: Respo
       return res.status(401).json({ success: false, error: 'Não autenticado' });
     }
     const tenantId = req.user.tenantId;
-    const [contratosResult, subgrupos] = await Promise.all([
+    const [contratosResult, subgrupos, contratoSubgrupos] = await Promise.all([
       listContratosAtivosService({ tenantId, page: 1, limit: 500 }),
       listSubgruposService(tenantId),
+      prisma.contratoSubgrupo.findMany({
+        where: { tenantId },
+        select: { contratoAtivoId: true, subgrupoId: true },
+      }),
     ]);
     return res.status(200).json({
       success: true,
       data: {
         contratos: contratosResult.items,
         subgrupos: subgrupos.map((s) => ({ id: s.id, nome: s.nome, ativo: s.ativo })),
+        contratoSubgrupos,
       },
     });
   } catch (error: any) {
@@ -718,16 +727,117 @@ export const getValoresPlantaoController = async (req: Request, res: Response) =
   }
 };
 
+export const listAdicionaisPlantaoController = async (req: Request, res: Response) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ success: false, error: 'Não autenticado' });
+    }
+    const contratoAtivoId = (req.query.contratoAtivoId as string)?.trim();
+    if (!contratoAtivoId) {
+      return res.status(400).json({ success: false, error: 'contratoAtivoId é obrigatório' });
+    }
+    const dataInicioStr = req.query.dataInicio ? String(req.query.dataInicio) : undefined;
+    const dataFimStr = req.query.dataFim ? String(req.query.dataFim) : undefined;
+    const dataInicio = dataInicioStr ? new Date(dataInicioStr) : undefined;
+    const dataFim = dataFimStr ? new Date(dataFimStr) : undefined;
+    const data = await listAdicionaisPlantaoService({
+      tenantId: req.user.tenantId,
+      contratoAtivoId,
+      dataInicio,
+      dataFim,
+    });
+    return res.status(200).json({ success: true, data });
+  } catch (error: any) {
+    return res.status(error.statusCode || 500).json({
+      success: false,
+      error: error.message || 'Erro ao listar adicionais de plantão',
+    });
+  }
+};
+
+export const upsertAdicionalPlantaoController = async (req: Request, res: Response) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ success: false, error: 'Não autenticado' });
+    }
+    const { contratoAtivoId, data, gradeId, percentual } = req.body;
+    if (!contratoAtivoId || typeof contratoAtivoId !== 'string') {
+      return res.status(400).json({ success: false, error: 'contratoAtivoId é obrigatório' });
+    }
+    if (!data || typeof data !== 'string') {
+      return res.status(400).json({ success: false, error: 'data é obrigatória' });
+    }
+    if (!gradeId || typeof gradeId !== 'string') {
+      return res.status(400).json({ success: false, error: 'gradeId é obrigatório' });
+    }
+    const nPercentual = Number(percentual);
+    if (!Number.isFinite(nPercentual)) {
+      return res.status(400).json({ success: false, error: 'percentual inválido' });
+    }
+    const row = await upsertAdicionalPlantaoService({
+      tenantId: req.user.tenantId,
+      masterId: req.user.id,
+      contratoAtivoId: String(contratoAtivoId).trim(),
+      data: new Date(String(data)),
+      gradeId: String(gradeId).trim(),
+      percentual: nPercentual,
+    });
+    return res.status(200).json({ success: true, data: row, message: 'Adicional atualizado' });
+  } catch (error: any) {
+    return res.status(error.statusCode || 500).json({
+      success: false,
+      error: error.message || 'Erro ao salvar adicional de plantão',
+    });
+  }
+};
+
+export const removerAdicionalPlantaoController = async (req: Request, res: Response) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ success: false, error: 'Não autenticado' });
+    }
+    const contratoAtivoId = (req.query.contratoAtivoId as string)?.trim();
+    const dataStr = req.query.data ? String(req.query.data) : '';
+    const gradeId = (req.query.gradeId as string)?.trim();
+    if (!contratoAtivoId) {
+      return res.status(400).json({ success: false, error: 'contratoAtivoId é obrigatório' });
+    }
+    if (!dataStr) {
+      return res.status(400).json({ success: false, error: 'data é obrigatória' });
+    }
+    if (!gradeId) {
+      return res.status(400).json({ success: false, error: 'gradeId é obrigatório' });
+    }
+    await removerAdicionalPlantaoService({
+      tenantId: req.user.tenantId,
+      masterId: req.user.id,
+      contratoAtivoId,
+      data: new Date(dataStr),
+      gradeId,
+    });
+    return res.status(200).json({ success: true, message: 'Adicional removido' });
+  } catch (error: any) {
+    return res.status(error.statusCode || 500).json({
+      success: false,
+      error: error.message || 'Erro ao remover adicional de plantão',
+    });
+  }
+};
+
 export const getConfigPontoOpcoesController = async (req: Request, res: Response) => {
   try {
     if (!req.user) {
       return res.status(401).json({ success: false, error: 'Não autenticado' });
     }
     const tenantId = req.user.tenantId;
-    const [contratosResult, subgrupos, equipes] = await Promise.all([
+    const [contratosResult, subgrupos, equipes, contratoSubgrupos] = await Promise.all([
       listContratosAtivosService({ tenantId, page: 1, limit: 500 }),
       listSubgruposService(tenantId),
       listEquipesService(tenantId, null),
+      prisma.contratoSubgrupo.findMany({
+        where: { tenantId },
+        select: { contratoAtivoId: true, subgrupoId: true },
+      }),
     ]);
     return res.status(200).json({
       success: true,
@@ -740,6 +850,7 @@ export const getConfigPontoOpcoesController = async (req: Request, res: Response
           ativo: e.ativo,
           subgrupoId: e.subgrupoId ?? null,
         })),
+        contratoSubgrupos,
       },
     });
   } catch (error: any) {

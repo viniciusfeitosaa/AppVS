@@ -118,6 +118,17 @@ export interface EscalaPlantao {
   };
 }
 
+export interface AdicionalPlantaoData {
+  id: string;
+  tenantId: string;
+  contratoAtivoId: string;
+  data: string;
+  gradeId: string;
+  percentual: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface Subgrupo {
   id: string;
   tenantId: string;
@@ -356,6 +367,34 @@ export const adminService = {
     return response.data;
   },
 
+  listAdicionaisPlantao: async (params: {
+    contratoAtivoId: string;
+    dataInicio?: string;
+    dataFim?: string;
+  }): Promise<{ success: boolean; data: AdicionalPlantaoData[] }> => {
+    const response = await api.get('/admin/adicionais-plantao', { params });
+    return response.data;
+  },
+
+  upsertAdicionalPlantao: async (payload: {
+    contratoAtivoId: string;
+    data: string;
+    gradeId: string;
+    percentual: number;
+  }): Promise<{ success: boolean; data: AdicionalPlantaoData }> => {
+    const response = await api.put('/admin/adicionais-plantao', payload);
+    return response.data;
+  },
+
+  removerAdicionalPlantao: async (params: {
+    contratoAtivoId: string;
+    data: string;
+    gradeId: string;
+  }): Promise<{ success: boolean; message?: string }> => {
+    const response = await api.delete('/admin/adicionais-plantao', { params });
+    return response.data;
+  },
+
   removerEscalaPlantao: async (escalaId: string, plantaoId: string) => {
     const response = await api.delete(`/admin/escalas/${escalaId}/plantoes/${plantaoId}`);
     return response.data;
@@ -366,6 +405,7 @@ export const adminService = {
     data: {
       contratos: { id: string; nome: string }[];
       subgrupos: { id: string; nome: string; ativo: boolean }[];
+      contratoSubgrupos: { contratoAtivoId: string; subgrupoId: string }[];
     };
   }> => {
     const response = await api.get('/admin/valores-plantao/opcoes');
@@ -403,6 +443,7 @@ export const adminService = {
       contratos: { id: string; nome: string }[];
       subgrupos: { id: string; nome: string; ativo: boolean }[];
       equipes: { id: string; nome: string; ativo: boolean; subgrupoId: string | null }[];
+      contratoSubgrupos: { contratoAtivoId: string; subgrupoId: string }[];
     };
   }> => {
     const response = await api.get('/admin/config-ponto/opcoes');
@@ -456,6 +497,19 @@ export const adminService = {
   }) => {
     const response = await api.get('/admin/registros-ponto', { params });
     return response.data;
+  },
+
+  openRegistroPontoFotoCheckin: async (registroId: string) => {
+    const response = await api.get(`/admin/registros-ponto/${registroId}/foto-checkin`, {
+      responseType: 'blob',
+    });
+    const blob = new Blob([response.data], {
+      type: response.headers['content-type'] || 'image/jpeg',
+    });
+    const url = URL.createObjectURL(blob);
+    window.open(url, '_blank', 'noopener,noreferrer');
+    // libera depois (tempo para o navegador carregar o blob)
+    window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
   },
 
   getMatrizAcessosModulos: async (): Promise<{
