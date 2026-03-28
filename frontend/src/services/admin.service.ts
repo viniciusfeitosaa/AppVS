@@ -83,6 +83,19 @@ export interface ValorPlantaoConfig {
   updatedAt: string;
 }
 
+export interface TipoPlantaoConfig {
+  id: string;
+  tenantId: string;
+  contratoAtivoId: string;
+  nome: string;
+  horaInicio: string;
+  horaFim: string;
+  cruzaMeiaNoite: boolean;
+  ordem: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface ConfigPontoEletronico {
   id: string;
   tenantId: string;
@@ -415,10 +428,10 @@ export const adminService = {
 
   getValoresPlantao: async (
     contratoId: string,
-    subgrupoId: string
+    subgrupoId?: string
   ): Promise<{ success: boolean; data: ValorPlantaoConfig[] }> => {
     const response = await api.get('/admin/valores-plantao', {
-      params: { contratoId, subgrupoId },
+      params: subgrupoId ? { contratoId, subgrupoId } : { contratoId },
     });
     return response.data;
   },
@@ -435,6 +448,39 @@ export const adminService = {
       gradeId,
       valorHora,
     });
+    return response.data;
+  },
+
+  listTiposPlantao: async (
+    contratoAtivoId: string
+  ): Promise<{ success: boolean; data: TipoPlantaoConfig[] }> => {
+    const response = await api.get('/admin/tipos-plantao', {
+      params: { contratoAtivoId },
+    });
+    return response.data;
+  },
+
+  createTipoPlantao: async (payload: {
+    contratoAtivoId: string;
+    nome: string;
+    horaInicio: string;
+    horaFim: string;
+    cruzaMeiaNoite?: boolean;
+  }) => {
+    const response = await api.post('/admin/tipos-plantao', payload);
+    return response.data;
+  },
+
+  updateTipoPlantao: async (
+    id: string,
+    payload: { nome?: string; horaInicio?: string; horaFim?: string; cruzaMeiaNoite?: boolean }
+  ) => {
+    const response = await api.put(`/admin/tipos-plantao/${id}`, payload);
+    return response.data;
+  },
+
+  deleteTipoPlantao: async (id: string) => {
+    const response = await api.delete(`/admin/tipos-plantao/${id}`);
     return response.data;
   },
 

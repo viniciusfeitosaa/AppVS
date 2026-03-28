@@ -5,86 +5,61 @@ import { useAuth } from '../context/AuthContext';
 import { notify } from '../lib/notificationEmitter';
 import { pontoService } from '../services/ponto.service';
 import { fixMojibake } from '../utils/validation.util';
+import {
+  faixaExibicaoPlantao,
+  fimPlantaoCliente,
+  inicioPlantaoCliente,
+  plantaoChipClassesFromOrdem,
+  rotuloCurtoTipo,
+  type PlantaoAgendaInput,
+} from '../utils/plantao-agenda';
 
 const WEEK_DAYS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
 
-const gradeShort = (g: string) => ((g || '').toLowerCase() === 'sn' ? 'SN' : 'MT');
-
-const faixaGrade = (g: string) => ((g || '').toLowerCase() === 'sn' ? '19h–07h' : '07h–19h');
-
-/** MT vs SN na mesma família viva, com leve contraste entre turnos. */
-const plantaoChipClasses = (g: string) => {
-  const sn = (g || '').toLowerCase() === 'sn';
-  return sn
-    ? 'bg-viva-200/60 text-viva-950 border-viva-400/50'
-    : 'bg-viva-100/95 text-viva-900 border-viva-200/80';
-};
-
-const HORARIOS_POR_GRADE: Record<string, string> = {
-  mt: '07h às 19h',
-  sn: '19h às 07h',
-};
-
 const MINUTOS_ANTES_INICIO_PARA_TROCA = 10;
 
-function inicioDoPlantao(dataStr: string, gradeId: string): Date {
-  const d = new Date(dataStr + 'T00:00:00');
-  const g = (gradeId || '').toLowerCase();
-  if (g === 'sn') {
-    d.setHours(19, 0, 0, 0);
-    return d;
-  }
-  d.setHours(7, 0, 0, 0);
-  return d;
-}
-
-function fimDoPlantao(dataStr: string, gradeId: string): Date {
-  const d = new Date(dataStr + 'T00:00:00');
-  const g = (gradeId || '').toLowerCase();
-  if (g === 'sn') {
-    const next = new Date(d);
-    next.setDate(next.getDate() + 1);
-    next.setHours(7, 0, 0, 0);
-    return next;
-  }
-  d.setHours(19, 0, 0, 0);
-  return d;
-}
-
-function canTrocarPlantao(dataStr: string, gradeId: string): boolean {
+function canTrocarPlantaoAgenda(dataStr: string, p: PlantaoAgendaInput): boolean {
   const now = new Date();
-  const inicio = inicioDoPlantao(dataStr, gradeId);
+  const inicio = inicioPlantaoCliente(dataStr, p);
   const limite = new Date(inicio.getTime() - MINUTOS_ANTES_INICIO_PARA_TROCA * 60 * 1000);
   return now < limite;
 }
 
-function isPlantaoAindaFuturo(dataStr: string, gradeId: string): boolean {
+function isPlantaoAindaFuturoAgenda(dataStr: string, p: PlantaoAgendaInput): boolean {
   const now = new Date();
-  const fim = fimDoPlantao(dataStr, gradeId);
+  const fim = fimPlantaoCliente(dataStr, p);
   return now < fim;
 }
-
-const faixaPorGrade = (gradeId: string) =>
-  HORARIOS_POR_GRADE[(gradeId || '').toLowerCase()] ?? '07h às 19h';
 
 function labelDiaCompleto(dateKey: string): string {
   const d = new Date(dateKey + 'T12:00:00');
   return d.toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
 }
 
-type PlantaoCal = {
+type PlantaoCal = PlantaoAgendaInput & {
   id: string;
   data: string;
   gradeId: string;
   escalaId: string;
   escalaNome: string | null;
   permiteTrocaPlantao?: boolean;
+  tipoNome?: string | null;
+  tipoOrdem?: number | null;
 };
 
 const MeuCalendarioPlantoes = () => {
   const queryClient = useQueryClient();
   const { user } = useAuth();
   const isMedico = user?.role === 'MEDICO';
+
+  const { data: meuDiaCtx, isLoading: carregandoContextoPonto } = useQuery({
+    queryKey: ['ponto', 'meu-dia'],
+    queryFn: () => pontoService.getMeuDia(),
+    enabled: isMedico,
+  });
+  const temContratoComEscala =
+    (meuDiaCtx?.data as { temContratoComEscala?: boolean } | undefined)?.temContratoComEscala !== false;
+
   const [view, setView] = useState(() => {
     const d = new Date();
     return { ano: d.getFullYear(), mes: d.getMonth() + 1 };
@@ -292,6 +267,38 @@ const MeuCalendarioPlantoes = () => {
     );
   }
 
+  if (carregandoContextoPonto) {
+    return (
+      <div className="card flex flex-col items-center justify-center py-16 gap-3">
+        <div className="animate-spin rounded-full h-10 w-10 border-2 border-viva-200 border-t-viva-600" />
+        <p className="text-sm text-viva-600 font-serif">Carregando…</p>
+      </div>
+    );
+  }
+
+  if (!temContratoComEscala) {
+    return (
+      <div className="space-y-4 max-w-lg">
+        <div className="card border-l-4 border-viva-500">
+          <h1 className="text-lg font-bold text-viva-900 font-display mb-2">Calendário de plantões</h1>
+          <p className="text-sm text-viva-700 font-serif leading-relaxed">
+            O calendário de escalas e plantões está disponível apenas para contratos que utilizam <strong>escala de
+            plantão</strong>. Nos seus vínculos atuais o ponto é registrado sem essa grade — use o{' '}
+            <strong>Ponto eletrônico</strong> para entrada e saída.
+          </p>
+          <div className="flex flex-wrap gap-2 mt-5">
+            <Link to="/ponto-eletronico" className="btn btn-primary text-sm">
+              Ir ao ponto eletrônico
+            </Link>
+            <Link to="/dashboard" className="btn btn-secondary text-sm">
+              Voltar ao painel
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6 max-w-5xl mx-auto px-1 sm:px-0">
       <div>
@@ -427,10 +434,10 @@ const MeuCalendarioPlantoes = () => {
                             {list.map((p) => (
                               <span
                                 key={p.id}
-                                title={`${fixMojibake(p.escalaNome || 'Escala')} · ${faixaGrade(p.gradeId)}`}
-                                className={`truncate rounded px-0.5 py-0.5 text-[8px] font-semibold leading-tight border sm:px-1 sm:text-[9px] ${plantaoChipClasses(p.gradeId)}`}
+                                title={`${fixMojibake(p.escalaNome || 'Escala')} · ${faixaExibicaoPlantao(p)}`}
+                                className={`truncate rounded px-0.5 py-0.5 text-[8px] font-semibold leading-tight border sm:px-1 sm:text-[9px] ${plantaoChipClassesFromOrdem(p)}`}
                               >
-                                {gradeShort(p.gradeId)} · {fixMojibake(p.escalaNome || '—')}
+                                {rotuloCurtoTipo(p)} · {fixMojibake(p.escalaNome || '—')}
                               </span>
                             ))}
                           </div>
@@ -471,7 +478,7 @@ const MeuCalendarioPlantoes = () => {
               <ul className="space-y-3">
                 {(byDay.get(dayModalKey) ?? []).map((p) => {
                   const podeContrato = p.permiteTrocaPlantao !== false;
-                  const noPrazo = canTrocarPlantao(p.data, p.gradeId);
+                  const noPrazo = canTrocarPlantaoAgenda(p.data, p);
                   const mostrarTrocar = podeContrato && noPrazo;
                   return (
                     <li
@@ -481,7 +488,7 @@ const MeuCalendarioPlantoes = () => {
                       <div className="min-w-0 flex-1">
                         <p className="text-sm font-semibold text-viva-900">{fixMojibake(p.escalaNome || 'Escala')}</p>
                         <p className="text-xs text-viva-600 mt-1">
-                          {gradeShort(p.gradeId)} · {faixaPorGrade(p.gradeId)}
+                          {rotuloCurtoTipo(p)} · {faixaExibicaoPlantao(p)}
                         </p>
                       </div>
                       <div className="shrink-0 flex flex-col items-stretch sm:items-end gap-1">
@@ -497,7 +504,7 @@ const MeuCalendarioPlantoes = () => {
                           <span className="text-xs text-viva-600 text-right sm:max-w-[11rem]">
                             {!podeContrato
                               ? 'Troca não habilitada neste contrato.'
-                              : isPlantaoAindaFuturo(p.data, p.gradeId)
+                              : isPlantaoAindaFuturoAgenda(p.data, p)
                                 ? 'Período de troca encerrado'
                                 : 'Plantão já passou'}
                           </span>

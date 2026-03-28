@@ -3,6 +3,7 @@ import { NavLink, Outlet } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '../../context/AuthContext';
 import { authService } from '../../services/auth.service';
+import { pontoService } from '../../services/ponto.service';
 import { ModuloSistema } from '../../constants/modulos';
 import { useInactivityLogout } from '../../hooks/useInactivityLogout';
 import NotificationBell from './NotificationBell';
@@ -103,10 +104,22 @@ const AppShell = () => {
     enabled: !!user,
   });
 
+  const { data: meuDiaNavResp } = useQuery({
+    queryKey: ['ponto', 'meu-dia'],
+    queryFn: () => pontoService.getMeuDia(),
+    enabled: !!user && user?.role === 'MEDICO',
+  });
+  const mostrarCalendarioEscalasNoMenu =
+    (meuDiaNavResp?.data as { temContratoComEscala?: boolean } | undefined)?.temContratoComEscala !== false;
+
   const modulosMap = modulosAcessoResp?.data?.map || ({} as Record<ModuloSistema, boolean>);
   const hasAccess = (modulo: ModuloSistema) => modulosMap[modulo] ?? true;
 
   const dashboardItem: MenuItem = { to: '/dashboard', label: 'Dashboard' };
+  const pontoMenuItemsMedico: MenuItem[] = [
+    { to: '/ponto-eletronico', label: 'Ponto Eletrônico' },
+    ...(mostrarCalendarioEscalasNoMenu ? [{ to: '/meu-calendario-plantoes', label: 'Calendário de escalas' } as MenuItem] : []),
+  ];
   const menuGroupsBase: MenuGroup[] = isMaster
     ? [
         { title: 'Escalas', items: [{ to: '/escalas', label: 'Escalas' }, { to: '/subgrupos-equipes', label: 'Subgrupos e Equipes' }, { to: '/convites', label: 'Convites' }] },
@@ -127,10 +140,7 @@ const AppShell = () => {
     : [
         {
           title: 'Ponto',
-          items: [
-            { to: '/ponto-eletronico', label: 'Ponto Eletrônico' },
-            { to: '/meu-calendario-plantoes', label: 'Calendário de escalas' },
-          ],
+          items: pontoMenuItemsMedico,
         },
         { title: 'Produtividade', items: [{ to: '/atendimentos', label: 'Atendimentos' }] },
         {

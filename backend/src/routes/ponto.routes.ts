@@ -8,6 +8,7 @@ import {
   validateCheckinSemFoto,
   validateCheckout,
   validateUUIDQuery,
+  validateEscalaIdQueryPonto,
   validateUUIDParam,
   validateSolicitarTrocaPlantao,
   validateMeusPlantoesCalendarioQuery,
@@ -54,7 +55,7 @@ router.get(
 );
 router.get('/minhas-equipes-calendario', listMinhasEquipesCalendarioController);
 router.post('/solicitar-troca-plantao', validateSolicitarTrocaPlantao, solicitarTrocaPlantaoController);
-router.get('/can-checkin', validateUUIDQuery('escalaId'), canCheckInController);
+router.get('/can-checkin', validateEscalaIdQueryPonto, canCheckInController);
 router.get('/registros/:id/foto-checkin', validateUUIDParam('id'), downloadFotoCheckinMedicoController);
 
 export default router;

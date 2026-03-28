@@ -73,6 +73,7 @@ model Tenant {
   escalaSubgrupos EscalaSubgrupo[]
   escalaEquipes           EscalaEquipe[]
   valoresPlantao          ValorPlantao[]
+  tiposPlantao            TipoPlantao[]
   adicionaisPlantaoData   AdicionalPlantaoData[]
   configPontoEletronico   ConfigPontoEletronico[]
   contratoSubgrupos       ContratoSubgrupo[]
@@ -118,6 +119,7 @@ model ContratoAtivo {
   tenant               Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   escalas              Escala[]
   valoresPlantao       ValorPlantao[]
+  tiposPlantao         TipoPlantao[]
   adicionaisPlantaoData AdicionalPlantaoData[]
   configPontoEletronico ConfigPontoEletronico[]
   contratoSubgrupos    ContratoSubgrupo[]
@@ -465,9 +467,11 @@ model EscalaPlantao {
   tenantId   String   @map("tenant_id")
   escalaId   String   @map("escala_id")
   data       DateTime @db.Date
-  gradeId    String   @map("grade_id") @db.VarChar(20)
+  gradeId    String   @map("grade_id") @db.VarChar(36)
   medicoId   String   @map("medico_id")
   valorHora  Decimal? @map("valor_hora") @db.Decimal(10, 2)
+  /// Duração prevista do turno (h) congelada ao criar/editar o slot — relatório não recalcula com tipo alterado depois.
+  horasTurnoSnapshot Decimal? @map("horas_turno_snapshot") @db.Decimal(10, 4)
   createdAt  DateTime @default(now()) @map("created_at")
   updatedAt  DateTime @updatedAt @map("updated_at")
 
@@ -503,12 +507,31 @@ model SolicitacaoTrocaPlantao {
   @@index([escalaPlantaoId])
 }
 
+model TipoPlantao {
+  id               String   @id @default(uuid())
+  tenantId         String   @map("tenant_id")
+  contratoAtivoId  String   @map("contrato_ativo_id")
+  nome             String   @db.VarChar(120)
+  horaInicio       String   @map("hora_inicio") @db.VarChar(5)
+  horaFim          String   @map("hora_fim") @db.VarChar(5)
+  cruzaMeiaNoite   Boolean  @default(false) @map("cruza_meia_noite")
+  ordem            Int      @default(0)
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  tenant        Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  contratoAtivo ContratoAtivo @relation(fields: [contratoAtivoId], references: [id], onDelete: Cascade)
+
+  @@map("tipos_plantao")
+  @@index([tenantId, contratoAtivoId])
+}
+
 model ValorPlantao {
   id               String   @id @default(uuid())
   tenantId         String   @map("tenant_id")
   contratoAtivoId  String   @map("contrato_ativo_id")
   subgrupoId       String   @map("subgrupo_id")
-  gradeId          String   @map("grade_id") @db.VarChar(20)
+  gradeId          String   @map("grade_id") @db.VarChar(36)
   valorHora        Decimal? @map("valor_hora") @db.Decimal(10, 2)
   createdAt        DateTime @default(now()) @map("created_at")
   updatedAt        DateTime @updatedAt @map("updated_at")
@@ -529,7 +552,7 @@ model AdicionalPlantaoData {
   tenantId        String   @map("tenant_id")
   contratoAtivoId String   @map("contrato_ativo_id")
   data            DateTime @map("data") @db.Date
-  gradeId         String   @map("grade_id") @db.VarChar(20)
+  gradeId         String   @map("grade_id") @db.VarChar(36)
   percentual      Decimal  @map("percentual") @db.Decimal(6, 2)
   createdAt       DateTime @default(now()) @map("created_at")
   updatedAt       DateTime @updatedAt @map("updated_at")
@@ -587,6 +610,8 @@ model RegistroPonto {
   origem         OrigemRegistroPonto @default(APP_MEDICO)
   observacao     String?             @db.Text
   duracaoMinutos Int?                @map("duracao_minutos")
+  /// Valor de repasse (escala+ponto proporcional) congelado no checkout; relatório usa isto em vez de recalcular com tipos/valores atuais.
+  repasseValorCongelado Decimal?     @map("repasse_valor_congelado") @db.Decimal(12, 2)
   fotoCheckinCaminho String?         @map("foto_checkin_caminho") @db.VarChar(512)
   motivoCheckinSemFoto String?      @map("motivo_checkin_sem_foto") @db.VarChar(500)
   createdAt      DateTime            @default(now()) @map("created_at")

@@ -2,7 +2,13 @@ import { useState, useEffect, useRef, useLayoutEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../context/AuthContext';
 import { authService } from '../services/auth.service';
+import { PONTO_SEM_ESCALA_ESCALA_ID } from '../constants/ponto';
 import { pontoService } from '../services/ponto.service';
+import {
+  fimPlantaoCliente,
+  inicioPlantaoCliente,
+  type PlantaoAgendaInput,
+} from '../utils/plantao-agenda';
 
 const formatDuration = (minutes: number) => {
   const h = Math.floor(minutes / 60);
@@ -15,6 +21,60 @@ const formatClock = (d: Date) => {
   const m = d.getMinutes().toString().padStart(2, '0');
   const s = d.getSeconds().toString().padStart(2, '0');
   return `${h}:${m}:${s}`;
+};
+
+type PlantaoHojeMeuDia = {
+  id: string;
+  escalaId: string;
+  data: string;
+  gradeId: string;
+  faixaHorario?: string | null;
+  horaInicio?: string | null;
+  horaFim?: string | null;
+  cruzaMeiaNoite?: boolean | null;
+};
+
+/** Um plantão: em andamento agora, senão o próximo, senão o que acabou mais tarde hoje. */
+function escolherPlantaoMaisRelevante(lista: PlantaoHojeMeuDia[], at: Date): PlantaoHojeMeuDia | null {
+  if (lista.length === 0) return null;
+  if (lista.length === 1) return lista[0];
+
+  const toAgenda = (p: PlantaoHojeMeuDia): PlantaoAgendaInput => ({
+    gradeId: p.gradeId,
+    horaInicio: p.horaInicio ?? null,
+    horaFim: p.horaFim ?? null,
+    cruzaMeiaNoite: p.cruzaMeiaNoite ?? null,
+  });
+
+  const scored = lista.map((p) => {
+    const q = toAgenda(p);
+    return {
+      p,
+      inicio: inicioPlantaoCliente(p.data, q),
+      fim: fimPlantaoCliente(p.data, q),
+    };
+  });
+
+  const t = at.getTime();
+  const emAndamento = scored.find((s) => t >= s.inicio.getTime() && t <= s.fim.getTime());
+  if (emAndamento) return emAndamento.p;
+
+  const futuros = scored
+    .filter((s) => s.inicio.getTime() > t)
+    .sort((a, b) => a.inicio.getTime() - b.inicio.getTime());
+  if (futuros.length > 0) return futuros[0].p;
+
+  const passados = scored
+    .filter((s) => s.fim.getTime() < t)
+    .sort((a, b) => b.fim.getTime() - a.fim.getTime());
+  return passados[0]?.p ?? lista[0];
+}
+
+const formatDiaPlantaoCurto = (dataStr: string) => {
+  const d = new Date(`${dataStr}T12:00:00`);
+  return d
+    .toLocaleDateString('pt-BR', { weekday: 'short', day: 'numeric', month: 'short' })
+    .replace(/\./g, '');
 };
 
 const PontoEletronico = () => {
@@ -100,6 +160,17 @@ const PontoEletronico = () => {
   const minhasEquipes: string[] = meuDiaResp?.data?.minhasEquipes || [];
   const equipeExibida: string[] =
     equipeDoDia.length > 0 ? equipeDoDia : minhasEquipes;
+  const plantoesHoje: PlantaoHojeMeuDia[] = (meuDiaResp?.data as { plantoesHoje?: PlantaoHojeMeuDia[] } | undefined)
+    ?.plantoesHoje ?? [];
+  const plantoesHojeNaEscala = selectedEscalaId
+    ? plantoesHoje.filter((p) => p.escalaId === selectedEscalaId)
+    : [];
+  const plantaoHojeExibir =
+    selectedEscalaId &&
+    selectedEscalaId !== PONTO_SEM_ESCALA_ESCALA_ID &&
+    plantoesHojeNaEscala.length > 0
+      ? escolherPlantaoMaisRelevante(plantoesHojeNaEscala, agora)
+      : null;
   const configHorario: { horarioEntrada?: string | null; horarioSaida?: string | null } = meuDiaResp?.data?.configHorario || {};
   const exigeGeolocalizacao = !!meuDiaResp?.data?.exigeGeolocalizacao;
 
@@ -107,6 +178,8 @@ const PontoEletronico = () => {
     queryKey: ['ponto', 'can-checkin', selectedEscalaId],
     queryFn: () => pontoService.canCheckIn(selectedEscalaId!),
     enabled: isMedico && !!selectedEscalaId && !registroAberto,
+    refetchInterval:
+      !registroAberto && selectedEscalaId && selectedEscalaId !== PONTO_SEM_ESCALA_ESCALA_ID ? 30000 : false,
   });
   const canCheckIn = !!canCheckInResp?.data?.allowed;
   const canCheckInReason: string | null = canCheckInResp?.data?.reason ?? null;
@@ -425,10 +498,42 @@ const PontoEletronico = () => {
         <h3 className="text-xs font-semibold uppercase tracking-wider text-viva-600 mb-4 font-display">
           Registrar ponto
         </h3>
+        {listaEscalas.length > 1 && (
+          <div className="w-full max-w-sm mx-auto mb-4 text-left">
+            <label className="block text-xs font-semibold text-viva-800 mb-1 font-display">
+              Onde está registrando o ponto
+            </label>
+            <select
+              className="input w-full text-sm"
+              value={selectedEscalaId}
+              onChange={(e) => setSelectedEscalaId(e.target.value)}
+            >
+              {listaEscalas.map((e: { id: string; nome: string }) => (
+                <option key={e.id} value={e.id}>
+                  {e.nome}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
         <div className="flex flex-col items-center gap-3 text-center mb-6">
           <p className="text-sm text-viva-800 font-medium font-serif">
             {equipeExibida.length > 0 ? equipeExibida.join(', ') : '—'}
           </p>
+          {selectedEscalaId === PONTO_SEM_ESCALA_ESCALA_ID ? (
+            <p className="text-xs text-viva-600 font-serif">
+              <span className="font-medium text-viva-800">Ponto sem escala de plantão</span>
+            </p>
+          ) : plantaoHojeExibir ? (
+            <p className="text-xs text-viva-600 font-serif">
+              <span className="font-medium text-viva-800">
+                {formatDiaPlantaoCurto(plantaoHojeExibir.data)} ·{' '}
+                {plantaoHojeExibir.faixaHorario?.trim() || '—'}
+              </span>
+            </p>
+          ) : selectedEscalaId ? (
+            <p className="text-xs text-viva-600 font-serif">Sem plantão seu nesta escala para hoje.</p>
+          ) : null}
           {(configHorario.horarioEntrada || configHorario.horarioSaida) && (
             <p className="text-xs text-viva-600">
               Entrada: {configHorario.horarioEntrada ?? '—'} · Saída: {configHorario.horarioSaida ?? '—'}
@@ -520,7 +625,9 @@ const PontoEletronico = () => {
                 {registrosHoje.map((r: any) => {
                   const nomeEscala =
                     r.escala?.nome ??
-                    (r.escalaId && listaEscalas.find((e: { id?: string; nome?: string }) => e.id === r.escalaId)?.nome) ??
+                    (!r.escalaId
+                      ? 'Ponto sem escala de plantão'
+                      : listaEscalas.find((e: { id?: string; nome?: string }) => e.id === r.escalaId)?.nome) ??
                     (listaEscalas.length > 0 ? (listaEscalas[0] as { nome?: string }).nome ?? 'Sem escala' : 'Sem escala');
                   return (
                     <div

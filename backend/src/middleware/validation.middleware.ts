@@ -1,7 +1,20 @@
 import fs from 'fs';
 import { Request, Response, NextFunction } from 'express';
 import { body, param, query, validationResult } from 'express-validator';
+import { PONTO_SEM_ESCALA_ESCALA_ID } from '../constants/ponto.const';
 import { validateCPF, validateCRM } from '../utils/validation.util';
+
+const UUID_ANY_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+function isEscalaIdOuPontoSemEscala(val: string) {
+  return typeof val === 'string' && (val === PONTO_SEM_ESCALA_ESCALA_ID || UUID_ANY_RE.test(val));
+}
+
+const escalaIdPontoBody = body('escalaId')
+  .notEmpty()
+  .custom((val: string) => isEscalaIdOuPontoSemEscala(val))
+  .withMessage('escalaId inválido');
 
 const handleValidationErrors = (req: Request, res: Response, next: NextFunction) => {
   const errors = validationResult(req);
@@ -240,6 +253,15 @@ export const validateUUIDQuery = (queryName: string) => [
   handleValidationErrors,
 ];
 
+/** Query escalaId em rotas de ponto: UUID de escala ou sentinela "ponto sem escala". */
+export const validateEscalaIdQueryPonto = [
+  query('escalaId')
+    .notEmpty()
+    .custom((val: string) => isEscalaIdOuPontoSemEscala(val))
+    .withMessage('escalaId inválido'),
+  handleValidationErrors,
+];
+
 /** POST /ponto/solicitar-troca-plantao */
 export const validateSolicitarTrocaPlantao = [
   body('plantaoId').notEmpty().isUUID().withMessage('plantaoId inválido'),
@@ -252,10 +274,7 @@ export const validateSolicitarTrocaPlantao = [
  * A regra de negócio (geolocalização obrigatória quando há config) está no service.
  */
 export const validateCheckin = [
-  body('escalaId')
-    .notEmpty()
-    .isUUID()
-    .withMessage('escalaId inválido'),
+  escalaIdPontoBody,
   body('observacao')
     .optional({ values: 'falsy' })
     .isString()
@@ -277,10 +296,7 @@ export const validateCheckin = [
  * Check-in sem foto (câmera indisponível): mesmo corpo que validateCheckin + motivo obrigatório.
  */
 export const validateCheckinSemFoto = [
-  body('escalaId')
-    .notEmpty()
-    .isUUID()
-    .withMessage('escalaId inválido'),
+  escalaIdPontoBody,
   body('observacao')
     .optional({ values: 'falsy' })
     .isString()
@@ -333,10 +349,7 @@ const handleCheckinMultipartValidationErrors = (req: Request, res: Response, nex
 };
 
 export const validateCheckinMultipart = [
-  body('escalaId')
-    .notEmpty()
-    .isUUID()
-    .withMessage('escalaId inválido'),
+  escalaIdPontoBody,
   body('observacao')
     .optional({ values: 'falsy' })
     .isString()
@@ -455,7 +468,7 @@ export const validateCreateEscalaPlantao = [
     .notEmpty()
     .isString()
     .trim()
-    .isLength({ min: 1, max: 20 })
+    .isLength({ min: 1, max: 36 })
     .withMessage('gradeId inválido'),
   body('medicoId')
     .notEmpty()
@@ -465,6 +478,37 @@ export const validateCreateEscalaPlantao = [
     .optional({ values: 'null' })
     .isFloat()
     .withMessage('valorHora inválido'),
+  handleValidationErrors,
+];
+
+/** POST /admin/tipos-plantao */
+export const validateCreateTipoPlantao = [
+  body('contratoAtivoId').notEmpty().isUUID().withMessage('contratoAtivoId inválido'),
+  body('nome').notEmpty().isString().trim().isLength({ min: 1, max: 120 }).withMessage('nome inválido'),
+  body('horaInicio')
+    .notEmpty()
+    .matches(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/)
+    .withMessage('horaInicio inválida (use HH:mm)'),
+  body('horaFim')
+    .notEmpty()
+    .matches(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/)
+    .withMessage('horaFim inválida (use HH:mm)'),
+  body('cruzaMeiaNoite').optional().isBoolean().withMessage('cruzaMeiaNoite deve ser booleano'),
+  handleValidationErrors,
+];
+
+/** PUT /admin/tipos-plantao/:id */
+export const validateUpdateTipoPlantao = [
+  body('nome').optional().isString().trim().isLength({ min: 1, max: 120 }).withMessage('nome inválido'),
+  body('horaInicio')
+    .optional()
+    .matches(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/)
+    .withMessage('horaInicio inválida'),
+  body('horaFim')
+    .optional()
+    .matches(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/)
+    .withMessage('horaFim inválida'),
+  body('cruzaMeiaNoite').optional().isBoolean().withMessage('cruzaMeiaNoite deve ser booleano'),
   handleValidationErrors,
 ];
 
@@ -505,7 +549,7 @@ export const validateUpsertAdicionalPlantao = [
     .notEmpty()
     .isString()
     .trim()
-    .isLength({ min: 1, max: 20 })
+    .isLength({ min: 1, max: 36 })
     .withMessage('gradeId inválido'),
   body('percentual')
     .notEmpty()
@@ -549,7 +593,7 @@ export const validateRemoverAdicionalPlantao = [
     .notEmpty()
     .isString()
     .trim()
-    .isLength({ min: 1, max: 20 })
+    .isLength({ min: 1, max: 36 })
     .withMessage('gradeId inválido'),
   handleValidationErrors,
 ];

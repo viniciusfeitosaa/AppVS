@@ -2,6 +2,12 @@ import { Request, Response } from 'express';
 import { prisma } from '../config/database';
 import { getFotoCheckinRegistroForAdmin } from '../services/ponto.service';
 import {
+  createTipoPlantaoService,
+  deleteTipoPlantaoService,
+  listTiposPlantaoService,
+  updateTipoPlantaoService,
+} from '../services/tipo-plantao.service';
+import {
   addContratoEquipeService,
   addContratoSubgrupoService,
   alocarMedicoEscalaService,
@@ -707,22 +713,106 @@ export const getValoresPlantaoController = async (req: Request, res: Response) =
     }
     const contratoId = (req.query.contratoId as string)?.trim();
     const subgrupoId = (req.query.subgrupoId as string)?.trim();
-    if (!contratoId || !subgrupoId) {
+    if (!contratoId) {
       return res.status(400).json({
         success: false,
-        error: 'contratoId e subgrupoId são obrigatórios na query',
+        error: 'contratoId é obrigatório na query',
       });
     }
     const data = await getValoresPlantaoService(
       req.user.tenantId,
       contratoId,
-      subgrupoId
+      subgrupoId || undefined
     );
     return res.status(200).json({ success: true, data });
   } catch (error: any) {
     return res.status(error.statusCode || 500).json({
       success: false,
       error: error.message || 'Erro ao listar valores de plantão',
+    });
+  }
+};
+
+export const listTiposPlantaoController = async (req: Request, res: Response) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ success: false, error: 'Não autenticado' });
+    }
+    const contratoAtivoId = (req.query.contratoAtivoId as string)?.trim();
+    if (!contratoAtivoId) {
+      return res.status(400).json({ success: false, error: 'contratoAtivoId é obrigatório' });
+    }
+    const data = await listTiposPlantaoService(req.user.tenantId, contratoAtivoId);
+    return res.status(200).json({ success: true, data });
+  } catch (error: any) {
+    return res.status(error.statusCode || 500).json({
+      success: false,
+      error: error.message || 'Erro ao listar tipos de plantão',
+    });
+  }
+};
+
+export const createTipoPlantaoController = async (req: Request, res: Response) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ success: false, error: 'Não autenticado' });
+    }
+    const { contratoAtivoId, nome, horaInicio, horaFim, cruzaMeiaNoite } = req.body;
+    const row = await createTipoPlantaoService({
+      tenantId: req.user.tenantId,
+      masterId: req.user.id,
+      contratoAtivoId,
+      nome,
+      horaInicio,
+      horaFim,
+      cruzaMeiaNoite,
+    });
+    return res.status(201).json({ success: true, data: row });
+  } catch (error: any) {
+    return res.status(error.statusCode || 500).json({
+      success: false,
+      error: error.message || 'Erro ao criar tipo de plantão',
+    });
+  }
+};
+
+export const updateTipoPlantaoController = async (req: Request, res: Response) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ success: false, error: 'Não autenticado' });
+    }
+    const { id } = req.params;
+    const { nome, horaInicio, horaFim, cruzaMeiaNoite } = req.body;
+    const row = await updateTipoPlantaoService({
+      tenantId: req.user.tenantId,
+      masterId: req.user.id,
+      id,
+      nome,
+      horaInicio,
+      horaFim,
+      cruzaMeiaNoite,
+    });
+    return res.status(200).json({ success: true, data: row });
+  } catch (error: any) {
+    return res.status(error.statusCode || 500).json({
+      success: false,
+      error: error.message || 'Erro ao atualizar tipo de plantão',
+    });
+  }
+};
+
+export const deleteTipoPlantaoController = async (req: Request, res: Response) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ success: false, error: 'Não autenticado' });
+    }
+    const { id } = req.params;
+    await deleteTipoPlantaoService(req.user.tenantId, req.user.id, id);
+    return res.status(200).json({ success: true, message: 'Tipo removido' });
+  } catch (error: any) {
+    return res.status(error.statusCode || 500).json({
+      success: false,
+      error: error.message || 'Erro ao excluir tipo de plantão',
     });
   }
 };

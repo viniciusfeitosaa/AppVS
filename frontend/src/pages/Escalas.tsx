@@ -2,7 +2,7 @@ import { useMemo, useState, useRef, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../context/AuthContext';
-import { adminService, Escala } from '../services/admin.service';
+import { adminService, Escala, type TipoPlantaoConfig } from '../services/admin.service';
 import { fixMojibake } from '../utils/validation.util';
 
 interface EscalaFormState {
@@ -38,10 +38,38 @@ function dateToInput(d: Date): string {
   return `${y}-${m}-${day}`;
 }
 
-const DEFAULT_GRADES = [
+type GradeColDef = {
+  id: string;
+  label: string;
+  horario: string;
+  tipo: string;
+  regua: [string, string];
+};
+
+const FALLBACK_GRADES: GradeColDef[] = [
   { id: 'mt', label: 'MT', horario: '07-19', tipo: 'Diurno', regua: ['07:00', '19:00'] },
   { id: 'sn', label: 'SN', horario: '19-07', tipo: 'Noturno', regua: ['19:00', '07:00'] },
 ];
+
+/** Fim do dia civil local (YYYY-MM-DD) para comparar com createdAt dos tipos. */
+function endOfLocalCalendarDayYmd(dateStr: string): Date {
+  const parts = dateStr.split('-').map(Number);
+  const y = parts[0];
+  const m = parts[1];
+  const d = parts[2];
+  if (!y || !m || !d) return new Date();
+  return new Date(y, m - 1, d, 23, 59, 59, 999);
+}
+
+function tipoPlantaoToGradeCol(t: TipoPlantaoConfig): GradeColDef {
+  return {
+    id: t.id,
+    label: t.nome.length > 12 ? `${t.nome.slice(0, 10)}…` : t.nome,
+    horario: `${t.horaInicio.slice(0, 5)}-${t.horaFim.slice(0, 5)}`,
+    tipo: t.nome,
+    regua: [t.horaInicio.slice(0, 5), t.horaFim.slice(0, 5)] as [string, string],
+  };
+}
 
 function getMonday(d: Date): Date {
   const x = new Date(d);
@@ -154,7 +182,7 @@ const Escalas = () => {
 
   type CellModalState = {
     open: boolean;
-    grade?: (typeof DEFAULT_GRADES)[0];
+    grade?: GradeColDef;
     date?: Date;
     gradeIndex?: number;
     dayIndex?: number;
@@ -463,6 +491,137 @@ const Escalas = () => {
     [escalasResp?.data, selectedEscalaId]
   );
 
+  /** Calendário da equipe não define selectedEscalaId; tipos vinham vazios e a UI caía só em MT/SN fixos. */
+  const contratoAtivoIdParaTipos = useMemo(() => {
+    const eq0 = (equipeEscalasResp?.data ?? [])[0] as Escala | undefined;
+    return (
+      selectedEscala?.contratoAtivoId ??
+      selectedEscala?.contratoAtivo?.id ??
+      eq0?.contratoAtivoId ??
+      eq0?.contratoAtivo?.id ??
+      ''
+    );
+  }, [selectedEscala, equipeEscalasResp?.data]);
+
+  const { data: tiposPlantaoEscalResp } = useQuery({
+    queryKey: ['admin', 'tipos-plantao', contratoAtivoIdParaTipos],
+    queryFn: () => adminService.listTiposPlantao(contratoAtivoIdParaTipos),
+    enabled: isMaster && !!contratoAtivoIdParaTipos,
+  });
+
+  const gradesForGrid = useMemo((): GradeColDef[] => {
+    const tipos = tiposPlantaoEscalResp?.data ?? [];
+    if (tipos.length > 0) {
+      return tipos.map(tipoPlantaoToGradeCol);
+    }
+    const byId = new Map<string, GradeColDef>();
+    for (const fg of FALLBACK_GRADES) byId.set(fg.id, { ...fg });
+    const plantoesUnion = [
+      ...(plantoesResp?.data ?? []),
+      ...(plantoesMonthResp?.data ?? []),
+      ...(equipePlantoesDiaResp?.data ?? []),
+    ];
+    for (const p of plantoesUnion) {
+      const gid = String(p.gradeId);
+      if (byId.has(gid)) continue;
+      const low = gid.toLowerCase();
+      const fb = low === 'mt' || low === 'sn' ? FALLBACK_GRADES.find((g) => g.id === low) : undefined;
+      if (fb) {
+        byId.set(gid, { ...fb, id: gid });
+      } else {
+        byId.set(gid, {
+          id: gid,
+          label: gid.length > 10 ? `${gid.slice(0, 8)}…` : gid,
+          horario: '—',
+          tipo: 'Turno',
+          regua: ['—', '—'] as [string, string],
+        });
+      }
+    }
+    return Array.from(byId.values());
+  }, [tiposPlantaoEscalResp?.data, plantoesResp?.data, plantoesMonthResp?.data, equipePlantoesDiaResp?.data]);
+
+  /**
+   * Colunas do painel "Plantões do dia" respeitam a data clicada: só tipos já criados até aquele dia
+   * (createdAt ≤ fim do dia) + grades que aparecem nos plantões daquele dia (ex.: mt/sn legado).
+   * Evita mostrar turnos novos em dias anteriores à criação do tipo.
+   */
+  const gradesParaPlantoesDoDia = useMemo((): GradeColDef[] => {
+    if (!selectedCalendarDay || !plantoesDiaDateStr) return gradesForGrid;
+    const tipos = tiposPlantaoEscalResp?.data ?? [];
+    const plantoesDia = equipePlantoesDiaResp?.data ?? [];
+    const fimDia = endOfLocalCalendarDayYmd(plantoesDiaDateStr);
+
+    const tiposQueJaExistiam = tipos.filter((t) => new Date(t.createdAt).getTime() <= fimDia.getTime());
+    const byId = new Map<string, GradeColDef>();
+
+    for (const t of tiposQueJaExistiam) {
+      byId.set(t.id, tipoPlantaoToGradeCol(t));
+    }
+
+    for (const p of plantoesDia) {
+      const gid = String(p.gradeId);
+      if (byId.has(gid)) continue;
+      const t = tipos.find((x) => x.id === gid);
+      if (t) {
+        byId.set(gid, tipoPlantaoToGradeCol(t));
+        continue;
+      }
+      const low = gid.toLowerCase();
+      const fb = low === 'mt' || low === 'sn' ? FALLBACK_GRADES.find((g) => g.id === low) : undefined;
+      if (fb) {
+        byId.set(gid, { ...fb, id: gid });
+      } else {
+        byId.set(gid, {
+          id: gid,
+          label: gid.length > 10 ? `${gid.slice(0, 8)}…` : gid,
+          horario: '—',
+          tipo: 'Turno',
+          regua: ['—', '—'] as [string, string],
+        });
+      }
+    }
+
+    // Se só existia um tipo "vigente" na data (ex.: SN antigo) e o MT novo foi criado depois,
+    // mantém o par legado 07h–19h / 19h–07h como antes (colunas vazias ou com alocação).
+    if (tiposQueJaExistiam.length <= 1) {
+      const colList = Array.from(byId.values());
+      const hasFullDiurnal =
+        byId.has('mt') ||
+        colList.some((g) => g.regua[0] === '07:00' && g.regua[1] === '19:00');
+      const hasNight =
+        byId.has('sn') ||
+        colList.some((g) => g.regua[0] === '19:00' && g.regua[1] === '07:00');
+      const mtFb = FALLBACK_GRADES.find((x) => x.id === 'mt');
+      const snFb = FALLBACK_GRADES.find((x) => x.id === 'sn');
+      if (mtFb && !hasFullDiurnal) byId.set('mt', { ...mtFb });
+      if (snFb && !hasNight) byId.set('sn', { ...snFb });
+    }
+
+    const sortCols = (cols: GradeColDef[]) =>
+      [...cols].sort((a, b) => {
+        const ta = tipos.find((x) => x.id === a.id);
+        const tb = tipos.find((x) => x.id === b.id);
+        const oa = ta?.ordem ?? 9999;
+        const ob = tb?.ordem ?? 9999;
+        if (oa !== ob) return oa - ob;
+        return (ta?.horaInicio ?? '').localeCompare(tb?.horaInicio ?? '');
+      });
+
+    if (byId.size === 0) {
+      if (tiposQueJaExistiam.length > 0) return sortCols(tiposQueJaExistiam.map(tipoPlantaoToGradeCol));
+      return FALLBACK_GRADES;
+    }
+
+    return sortCols(Array.from(byId.values()));
+  }, [
+    selectedCalendarDay,
+    plantoesDiaDateStr,
+    tiposPlantaoEscalResp?.data,
+    equipePlantoesDiaResp?.data,
+    gradesForGrid,
+  ]);
+
   const contratoAtivoIdContext = useMemo(() => {
     return (
       selectedEscala?.contratoAtivoId ??
@@ -581,12 +740,12 @@ const Escalas = () => {
   const adicionalPercentualDoDiaPorGrade = useMemo(() => {
     if (!plantoesDiaDateStr) return new Map<string, number>();
     const map = new Map<string, number>();
-    for (const g of DEFAULT_GRADES) {
+    for (const g of gradesParaPlantoesDoDia) {
       const p = adicionalPercentualByDataGrade.get(`${plantoesDiaDateStr}_${g.id}`);
       if (p != null) map.set(g.id, p);
     }
     return map;
-  }, [adicionalPercentualByDataGrade, plantoesDiaDateStr]);
+  }, [adicionalPercentualByDataGrade, plantoesDiaDateStr, gradesParaPlantoesDoDia]);
 
   const round2 = (n: number) => Math.round(n * 100) / 100;
   const getValorFinalComAdicional = (base: number | null, percentual: number | null) => {
@@ -1368,7 +1527,7 @@ const Escalas = () => {
                   medico: { nomeCompleto: string; crm: string };
                 }[]) {
                   const d = new Date(p.data);
-                  const grade = DEFAULT_GRADES.find((g) => g.id === p.gradeId);
+                  const grade = gradesForGrid.find((g) => g.id === p.gradeId);
                   historico.push({
                     id: `plantao-${p.id}`,
                     data: d,
@@ -1614,9 +1773,13 @@ const Escalas = () => {
                   <div className="flex-1 overflow-auto">
                     {(() => {
                       const plantoesDia = equipePlantoesDiaResp?.data ?? [];
-                      const horarioLabel = (g: (typeof DEFAULT_GRADES)[0]) =>
-                        `${g.regua[0].replace(':', 'h')} às ${g.regua[1].replace(':', 'h')}`;
-                      return DEFAULT_GRADES.map((grade) => {
+                      const horarioLabel = (g: GradeColDef) => {
+                        const a = g.regua[0];
+                        const b = g.regua[1];
+                        if (a === '—' || b === '—') return 'ver tipos no contrato';
+                        return `${a.replace(':', 'h')} às ${b.replace(':', 'h')}`;
+                      };
+                      return gradesParaPlantoesDoDia.map((grade) => {
                         const alocados = plantoesDia.filter((p) => p.gradeId === grade.id);
                         const adicionalPercentualDia = adicionalPercentualDoDiaPorGrade.get(grade.id) ?? 0;
                         return (
@@ -1897,14 +2060,14 @@ const Escalas = () => {
                           ...filtrados.map((r) => ({ label: r.label, medicoId: r.medicoId })),
                         ];
                       })().map((row, rowGroupIndex) =>
-                        DEFAULT_GRADES.map((grade, gradeSubIndex) => {
+                        gradesForGrid.map((grade, gradeSubIndex) => {
                           const gradeId = grade.id;
                           return (
-                            <tr key={`${rowGroupIndex}-${gradeSubIndex}`} className={gradeSubIndex === DEFAULT_GRADES.length - 1 ? 'tr-last' : ''}>
+                            <tr key={`${rowGroupIndex}-${gradeSubIndex}`} className={gradeSubIndex === gradesForGrid.length - 1 ? 'tr-last' : ''}>
                               {gradeSubIndex === 0 ? (
                                 <td
                                   className={`border border-viva-200 p-1.5 align-top ${row.medicoId === '' ? 'bg-viva-50/40' : 'bg-white'}`}
-                                  rowSpan={DEFAULT_GRADES.length}
+                                  rowSpan={gradesForGrid.length}
                                 >
                                   <p className="font-medium text-viva-900 text-xs">{row.label}</p>
                                   <div className="text-[10px] text-viva-600">0h</div>

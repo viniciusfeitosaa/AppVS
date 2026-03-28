@@ -1,11 +1,18 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../context/AuthContext';
 import { notify } from '../lib/notificationEmitter';
 import { medicoService } from '../services/medico.service';
+import { PONTO_SEM_ESCALA_ESCALA_ID } from '../constants/ponto';
 import { pontoService } from '../services/ponto.service';
 import { formatCRM, fixMojibake } from '../utils/validation.util';
+import {
+  faixaExibicaoPlantao,
+  fimPlantaoCliente,
+  inicioPlantaoCliente,
+  type PlantaoAgendaInput,
+} from '../utils/plantao-agenda';
 
 /** Extrai a hora no formato "HHh" de "HH:mm" ou "HH:mm:ss". */
 const toHoraLabel = (horario: string | null | undefined): string | null => {
@@ -16,53 +23,42 @@ const toHoraLabel = (horario: string | null | undefined): string | null => {
   return `${h}h`;
 };
 
-/** MT = 07h às 19h, SN = 19h às 07h. Apenas horas, sem label MT/SN. Vários turnos unidos com " e ". */
-const HORARIOS_POR_GRADE: Record<string, string> = {
-  mt: '07h às 19h',
-  sn: '19h às 07h',
-};
-
-/** Retorna o início do plantão. MT = mesmo dia 07h; SN = mesmo dia 19h. */
-function inicioDoPlantao(dataStr: string, gradeId: string): Date {
-  const d = new Date(dataStr + 'T00:00:00');
-  const g = (gradeId || '').toLowerCase();
-  if (g === 'sn') {
-    d.setHours(19, 0, 0, 0);
-    return d;
-  }
-  d.setHours(7, 0, 0, 0);
-  return d;
-}
-
-/** Retorna o fim do plantão (data/hora) para comparação. MT = mesmo dia 19h; SN = dia seguinte 07h. */
-function fimDoPlantao(dataStr: string, gradeId: string): Date {
-  const d = new Date(dataStr + 'T00:00:00');
-  const g = (gradeId || '').toLowerCase();
-  if (g === 'sn') {
-    const next = new Date(d);
-    next.setDate(next.getDate() + 1);
-    next.setHours(7, 0, 0, 0);
-    return next;
-  }
-  d.setHours(19, 0, 0, 0);
-  return d;
-}
-
 /** Limite para troca: até 10 min antes do início do plantão. Após isso o botão some. */
 const MINUTOS_ANTES_INICIO_PARA_TROCA = 10;
 
-/** True se ainda está no período em que a troca é permitida (até 10 min antes do início). */
-function canTrocarPlantao(dataStr: string, gradeId: string): boolean {
+/** Escala + ponto: link e check-in a partir de 10 min antes do início até o fim do plantão. */
+const MINUTOS_ANTES_INICIO_PARA_CHECKIN = 10;
+
+function podeExibirLinkBaterPontoAgenda(dataStr: string, p: PlantaoAgendaInput, at: Date): boolean {
+  const inicio = inicioPlantaoCliente(dataStr, p);
+  const fim = fimPlantaoCliente(dataStr, p);
+  const abertura = new Date(inicio.getTime() - MINUTOS_ANTES_INICIO_PARA_CHECKIN * 60 * 1000);
+  return at.getTime() >= abertura.getTime() && at.getTime() <= fim.getTime();
+}
+
+function antesDaAberturaCheckinPonto(dataStr: string, p: PlantaoAgendaInput, at: Date): boolean {
+  const inicio = inicioPlantaoCliente(dataStr, p);
+  const abertura = new Date(inicio.getTime() - MINUTOS_ANTES_INICIO_PARA_CHECKIN * 60 * 1000);
+  return at.getTime() < abertura.getTime();
+}
+
+function mensagemLinkBaterPontoAntesDaJanela(dataStr: string, p: PlantaoAgendaInput): string {
+  const inicio = inicioPlantaoCliente(dataStr, p);
+  const abertura = new Date(inicio.getTime() - MINUTOS_ANTES_INICIO_PARA_CHECKIN * 60 * 1000);
+  const hm = abertura.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+  return `Ponto disponível a partir das ${hm}.`;
+}
+
+function canTrocarPlantaoAgenda(dataStr: string, p: PlantaoAgendaInput): boolean {
   const now = new Date();
-  const inicio = inicioDoPlantao(dataStr, gradeId);
+  const inicio = inicioPlantaoCliente(dataStr, p);
   const limite = new Date(inicio.getTime() - MINUTOS_ANTES_INICIO_PARA_TROCA * 60 * 1000);
   return now < limite;
 }
 
-/** True se o plantão ainda não passou (para exibir "Plantão já passou"). */
-function isPlantaoAindaFuturo(dataStr: string, gradeId: string): boolean {
+function isPlantaoAindaFuturoAgenda(dataStr: string, p: PlantaoAgendaInput): boolean {
   const now = new Date();
-  const fim = fimDoPlantao(dataStr, gradeId);
+  const fim = fimPlantaoCliente(dataStr, p);
   return now < fim;
 }
 
@@ -81,14 +77,16 @@ const primeiroSegundoNome = (nome?: string | null): string => {
 };
 
 const formatFaixaEscala = (
+  gradeFaixas: string[] | undefined,
   gradeIds: string[] | undefined,
   horarioEntrada: string | null | undefined,
   horarioSaida: string | null | undefined
 ): string => {
+  if (gradeFaixas && gradeFaixas.length > 0) {
+    return gradeFaixas.filter(Boolean).join(' e ');
+  }
   if (gradeIds && gradeIds.length > 0) {
-    const faixas = gradeIds
-      .map((g) => HORARIOS_POR_GRADE[g.toLowerCase()])
-      .filter(Boolean);
+    const faixas = gradeIds.map((g) => faixaExibicaoPlantao({ gradeId: g })).filter(Boolean);
     if (faixas.length > 0) return faixas.join(' e ');
   }
   const entrada = toHoraLabel(horarioEntrada);
@@ -134,7 +132,15 @@ const Dashboard = () => {
   const displayUser = isMaster ? user : perfil || user;
   const rawEscalas = escalasResp?.data ?? escalasResp;
   const listaEscalas = Array.isArray(rawEscalas) ? rawEscalas : [];
-  type EscalaItem = { id?: string; nome?: string; ativo?: boolean; dataInicio?: string; dataFim?: string; gradeIds?: string[] };
+  type EscalaItem = {
+    id?: string;
+    nome?: string;
+    ativo?: boolean;
+    dataInicio?: string;
+    dataFim?: string;
+    gradeIds?: string[];
+    gradeFaixas?: string[];
+  };
   const escalasEmVigor = listaEscalas.filter((e: EscalaItem) => {
     if (e?.ativo === false) return false;
     const inicio = e?.dataInicio ? new Date(e.dataInicio) : null;
@@ -163,6 +169,7 @@ const Dashboard = () => {
   );
   const configHorario = meuDiaResp?.data?.configHorario as { horarioEntrada?: string | null; horarioSaida?: string | null } | undefined;
   const faixaHorario = formatFaixaEscala(
+    escalaAtiva?.gradeFaixas,
     escalaAtiva?.gradeIds,
     configHorario?.horarioEntrada ?? null,
     configHorario?.horarioSaida ?? null
@@ -172,11 +179,38 @@ const Dashboard = () => {
     queryFn: () => pontoService.listProximosPlantoes(),
     enabled: !!user && isMedico,
   });
-  type PlantaoProximo = { id: string; data: string; gradeId: string; escalaId: string; escalaNome: string | null; permiteTrocaPlantao?: boolean };
-  const proximosList = (proximosResp?.data ?? proximosResp ?? []) as PlantaoProximo[];
+  type PlantaoProximo = PlantaoAgendaInput & {
+    id: string;
+    data: string;
+    gradeId: string;
+    escalaId: string;
+    escalaNome: string | null;
+    permiteTrocaPlantao?: boolean;
+    tipoNome?: string | null;
+    tipoOrdem?: number | null;
+    usaPonto?: boolean;
+    usaEscala?: boolean;
+  };
+  const proximosList = useMemo(() => {
+    const raw = (proximosResp?.data ?? proximosResp ?? []) as PlantaoProximo[];
+    return [...raw].sort((a, b) => {
+      const ta = inicioPlantaoCliente(a.data, a).getTime();
+      const tb = inicioPlantaoCliente(b.data, b).getTime();
+      if (ta !== tb) return ta - tb;
+      return String(a.id).localeCompare(String(b.id));
+    });
+  }, [proximosResp]);
   const proxima = proximosList[0] ?? null;
   const segundaProxima = proximosList[1] ?? null;
   const temProximosPlantoes = proximosList.length > 0;
+  const temContratoComEscala =
+    (meuDiaResp?.data as { temContratoComEscala?: boolean } | undefined)?.temContratoComEscala !== false;
+
+  const [relogioUi, setRelogioUi] = useState(() => new Date());
+  useEffect(() => {
+    const t = setInterval(() => setRelogioUi(new Date()), 30000);
+    return () => clearInterval(t);
+  }, []);
 
   const [showTrocaModal, setShowTrocaModal] = useState(false);
   const [trocaEscalaId, setTrocaEscalaId] = useState<string | null>(null);
@@ -224,8 +258,8 @@ const Dashboard = () => {
   const colegasList = (colegasResp?.data ?? colegasResp ?? []) as Array<{ id: string; nomeCompleto: string; crm?: string | null }>;
   const selectedColega = selectedColegaId ? colegasList.find((c) => c.id === selectedColegaId) : null;
 
-  const faixaPorGrade = (gradeId: string) =>
-    HORARIOS_POR_GRADE[(gradeId || '').toLowerCase()] ?? '07h às 19h';
+  const faixaPorPlantao = (p: PlantaoProximo | null) =>
+    p ? faixaExibicaoPlantao(p) : '07h às 19h';
 
   if (isLoading) {
     return (
@@ -253,7 +287,7 @@ const Dashboard = () => {
         </p>
       </div>
 
-      {isMedico && !isMaster && (temProximosPlantoes || listaEscalas.length > 0) && (
+      {isMedico && !isMaster && temContratoComEscala && (temProximosPlantoes || listaEscalas.length > 0) && (
         <div className="col-span-full stagger-2 space-y-3">
           <div className="flex flex-wrap items-center justify-between gap-2 px-1">
             <h2 className="text-sm font-semibold text-viva-800 font-display">Suas próximas escalas</h2>
@@ -277,13 +311,13 @@ const Dashboard = () => {
                 <p className="text-viva-900 font-medium text-sm">
                   Você tem escala para <span className="font-bold text-viva-800">{fixMojibake(proxima.escalaNome || 'Escala')}</span> no dia{' '}
                   <span className="font-bold text-viva-800">{formatDataCurta(proxima.data)}</span> no horário{' '}
-                  <span className="font-bold text-viva-800">{faixaPorGrade(proxima.gradeId)}</span>.
+                  <span className="font-bold text-viva-800">{faixaPorPlantao(proxima)}</span>.
                 </p>
               </div>
               <div className="flex flex-wrap items-center gap-2 shrink-0">
                 {proxima.permiteTrocaPlantao === false
                   ? null
-                  : canTrocarPlantao(proxima.data, proxima.gradeId)
+                  : canTrocarPlantaoAgenda(proxima.data, proxima)
                     ? (
                         <button
                           type="button"
@@ -301,14 +335,28 @@ const Dashboard = () => {
                       )
                     : (
                         <span className="text-xs text-viva-600 max-w-[14rem]">
-                          {isPlantaoAindaFuturo(proxima.data, proxima.gradeId)
+                          {isPlantaoAindaFuturoAgenda(proxima.data, proxima)
                             ? 'Período de troca encerrado'
                             : 'Plantão já passou'}
                         </span>
                       )}
-                <Link to="/ponto-eletronico" className="btn btn-primary text-sm">
-                  Bater ponto
-                </Link>
+                {proxima.usaPonto === false ? (
+                  <span className="text-xs text-viva-600 max-w-[14rem] text-right">
+                    Ponto eletrônico não está habilitado para esta escala.
+                  </span>
+                ) : proxima.usaEscala === false ? (
+                  <Link to="/ponto-eletronico" className="btn btn-primary text-sm">
+                    Bater ponto
+                  </Link>
+                ) : podeExibirLinkBaterPontoAgenda(proxima.data, proxima, relogioUi) ? (
+                  <Link to="/ponto-eletronico" className="btn btn-primary text-sm">
+                    Bater ponto
+                  </Link>
+                ) : antesDaAberturaCheckinPonto(proxima.data, proxima, relogioUi) ? (
+                  <span className="text-xs text-viva-600 max-w-[14rem] text-right leading-snug">
+                    {mensagemLinkBaterPontoAntesDaJanela(proxima.data, proxima)}
+                  </span>
+                ) : null}
               </div>
             </div>
           )}
@@ -320,13 +368,13 @@ const Dashboard = () => {
                 <p className="text-viva-900 font-medium text-sm">
                   Você tem escala para <span className="font-bold text-viva-800">{fixMojibake(segundaProxima.escalaNome || 'Escala')}</span> no dia{' '}
                   <span className="font-bold text-viva-800">{formatDataCurta(segundaProxima.data)}</span> no horário{' '}
-                  <span className="font-bold text-viva-800">{faixaPorGrade(segundaProxima.gradeId)}</span>.
+                  <span className="font-bold text-viva-800">{faixaPorPlantao(segundaProxima)}</span>.
                 </p>
               </div>
               <div className="flex flex-wrap items-center gap-2 shrink-0">
                 {segundaProxima.permiteTrocaPlantao === false
                   ? null
-                  : canTrocarPlantao(segundaProxima.data, segundaProxima.gradeId)
+                  : canTrocarPlantaoAgenda(segundaProxima.data, segundaProxima)
                     ? (
                         <button
                           type="button"
@@ -343,12 +391,29 @@ const Dashboard = () => {
                         </button>
                       )
                     : (
-                        <span className="text-xs text-viva-600">
-                          {isPlantaoAindaFuturo(segundaProxima.data, segundaProxima.gradeId)
+                        <span className="text-xs text-viva-600 max-w-[14rem]">
+                          {isPlantaoAindaFuturoAgenda(segundaProxima.data, segundaProxima)
                             ? 'Período de troca encerrado'
                             : 'Plantão já passou'}
                         </span>
                       )}
+                {segundaProxima.usaPonto === false ? (
+                  <span className="text-xs text-viva-600 max-w-[14rem] text-right">
+                    Ponto eletrônico não está habilitado para esta escala.
+                  </span>
+                ) : segundaProxima.usaEscala === false ? (
+                  <Link to="/ponto-eletronico" className="btn btn-primary text-sm">
+                    Bater ponto
+                  </Link>
+                ) : podeExibirLinkBaterPontoAgenda(segundaProxima.data, segundaProxima, relogioUi) ? (
+                  <Link to="/ponto-eletronico" className="btn btn-primary text-sm">
+                    Bater ponto
+                  </Link>
+                ) : antesDaAberturaCheckinPonto(segundaProxima.data, segundaProxima, relogioUi) ? (
+                  <span className="text-xs text-viva-600 max-w-[14rem] text-right leading-snug">
+                    {mensagemLinkBaterPontoAntesDaJanela(segundaProxima.data, segundaProxima)}
+                  </span>
+                ) : null}
               </div>
             </div>
           )}
@@ -356,7 +421,10 @@ const Dashboard = () => {
       )}
 
       {/* Fallback: tem escala ativa mas nenhum plantão futuro (ex.: escala sem grade definida) */}
-      {isMedico && escalasEmVigor.length > 0 && !temProximosPlantoes && (
+      {isMedico &&
+        temContratoComEscala &&
+        escalasEmVigor.some((e: EscalaItem) => e?.id && e.id !== PONTO_SEM_ESCALA_ESCALA_ID) &&
+        !temProximosPlantoes && (
         <div className="card col-span-full stagger-2 flex flex-wrap items-center justify-between gap-4 border-l-4 border-l-viva-500 bg-gradient-to-r from-viva-50/60 to-transparent">
           <p className="text-viva-900 font-medium text-sm">
             Escala cadastrada:{' '}

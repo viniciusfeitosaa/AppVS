@@ -3,6 +3,18 @@ import { hashPassword } from '../utils/password.util';
 import { normalizeCRM, validateCPF, validateCRM } from '../utils/validation.util';
 import { fileExistsSafe, resolveStoredFileToAbsolute } from '../utils/upload-path.util';
 import { createAuditLog } from './auditoria.service';
+import {
+  ensureTiposLegadoMigrados,
+  resolveGradeIdParaContrato,
+} from './tipo-plantao.service';
+import { resolverHorasTurnoSnapshotParaGrade } from './repasse-registro-ponto.service';
+import {
+  duracaoPlantaoHorasUtc,
+  instanteDentroDaJanelaPlantaoUtc,
+  scheduleFromLegacyGradeId,
+  scheduleFromTipoRow,
+} from '../utils/plantao-horario';
+import { isMissingDatabaseColumnError } from '../utils/prisma-column-error';
 import crypto from 'crypto';
 
 interface ListMedicosParams {
@@ -1040,18 +1052,46 @@ export async function listRegistrosPontoAdminService(
       : {}),
   };
 
-  const registros = await prisma.registroPonto.findMany({
-    where,
-    include: {
-      medico: {
-        select: { id: true, nomeCompleto: true, crm: true, email: true },
-      },
-      escala: {
-        select: { id: true, nome: true, dataInicio: true, dataFim: true },
-      },
+  const registroSelectSemCongelado = {
+    id: true,
+    tenantId: true,
+    escalaId: true,
+    medicoId: true,
+    checkInAt: true,
+    checkOutAt: true,
+    origem: true,
+    observacao: true,
+    duracaoMinutos: true,
+    fotoCheckinCaminho: true,
+    motivoCheckinSemFoto: true,
+    createdAt: true,
+    updatedAt: true,
+    medico: {
+      select: { id: true, nomeCompleto: true, crm: true, email: true },
     },
-    orderBy: { checkInAt: 'desc' },
-  });
+    escala: {
+      select: { id: true, nome: true, dataInicio: true, dataFim: true },
+    },
+  } as const;
+
+  let registros: any[];
+  try {
+    registros = await prisma.registroPonto.findMany({
+      where,
+      select: { ...registroSelectSemCongelado, repasseValorCongelado: true } as any,
+      orderBy: { checkInAt: 'desc' },
+    });
+  } catch (e: any) {
+    if (isMissingDatabaseColumnError(e, 'repasse_valor_congelado')) {
+      registros = await prisma.registroPonto.findMany({
+        where,
+        select: { ...registroSelectSemCongelado },
+        orderBy: { checkInAt: 'desc' },
+      });
+    } else {
+      throw e;
+    }
+  }
 
   const escalaIdsParaBuscar = [
     ...new Set(
@@ -1167,16 +1207,151 @@ export async function listRegistrosPontoAdminService(
       if (dataInicio) wherePlantao.data.gte = dataInicio;
       if (dataFim) wherePlantao.data.lte = dataFim;
     }
-    const plantoes = await prisma.escalaPlantao.findMany({
-      where: wherePlantao,
-      select: { escalaId: true, data: true, gradeId: true, valorHora: true },
-    });
+    const plantaoSelectSemSnapshot = {
+      escalaId: true,
+      medicoId: true,
+      data: true,
+      gradeId: true,
+      valorHora: true,
+    } as const;
+    type PlantaoRelatorioRow = {
+      escalaId: string;
+      medicoId: string;
+      data: Date;
+      gradeId: string;
+      valorHora: unknown;
+      horasTurnoSnapshot?: unknown;
+    };
+    let plantoes: PlantaoRelatorioRow[];
+    try {
+      plantoes = (await prisma.escalaPlantao.findMany({
+        where: wherePlantao,
+        select: { ...plantaoSelectSemSnapshot, horasTurnoSnapshot: true } as any,
+      })) as unknown as PlantaoRelatorioRow[];
+    } catch (e: any) {
+      if (isMissingDatabaseColumnError(e, 'horas_turno_snapshot')) {
+        plantoes = (await prisma.escalaPlantao.findMany({
+          where: wherePlantao,
+          select: { ...plantaoSelectSemSnapshot },
+        })) as unknown as PlantaoRelatorioRow[];
+      } else {
+        throw e;
+      }
+    }
     for (const p of plantoes) {
       if (p.valorHora == null) continue;
       const dateStr = p.data.toISOString().slice(0, 10);
       const gradeKey = String(p.gradeId ?? '').toLowerCase();
       plantoesValorHoraPorEscalaDataGrade[`${p.escalaId}::${dateStr}::${gradeKey}`] = Number(p.valorHora);
     }
+
+    const escalasDosRegistros = await prisma.escala.findMany({
+      where: { id: { in: escalaIdsNosRegistros }, tenantId },
+      select: { id: true, contratoAtivoId: true },
+    });
+    const contratoIdsRelatorio = [
+      ...new Set(escalasDosRegistros.map((e) => e.contratoAtivoId).filter(Boolean)),
+    ] as string[];
+    const todosTiposDosContratos =
+      contratoIdsRelatorio.length > 0
+        ? await prisma.tipoPlantao.findMany({
+            where: { tenantId, contratoAtivoId: { in: contratoIdsRelatorio } },
+            select: { id: true, horaInicio: true, horaFim: true, cruzaMeiaNoite: true },
+          })
+        : [];
+
+    const tipoScheduleByGradeId = new Map(
+      todosTiposDosContratos.map((t) => [t.id, scheduleFromTipoRow(t)] as const)
+    );
+
+    const horasTurnoPorGradeId: Record<string, number> = { mt: 12, sn: 12 };
+    for (const t of todosTiposDosContratos) {
+      const sch = scheduleFromTipoRow(t);
+      horasTurnoPorGradeId[String(t.id).toLowerCase()] =
+        Math.round(duracaoPlantaoHorasUtc(sch) * 10000) / 10000;
+    }
+
+    const scheduleForPlantaoGrade = (gradeId: string) => {
+      const fromTipo = tipoScheduleByGradeId.get(gradeId);
+      if (fromTipo) return fromTipo;
+      return scheduleFromLegacyGradeId(gradeId);
+    };
+
+    const inferLegacyGradeFromCheckIn = (d: Date): 'mt' | 'sn' => {
+      const h = d.getHours();
+      return h >= 7 && h < 19 ? 'mt' : 'sn';
+    };
+
+    /** Horas previstas do turno (por registro), para dividir valor total do plantão no relatório. */
+    const horasTurnoPorRegistroPontoId: Record<string, number> = {};
+
+    const valorPlantao12hPorRegistroPontoId: Record<string, number> = {};
+    /**
+     * Grade do plantão cuja janela horária contém o check-in (UUID do tipo ou mt/sn legado).
+     * Permite faturamento via cadastro "Valores" quando o plantão não tem valorHora, e convive
+     * com escalas antigas (2 turnos) e novas (N turnos) sem misturar chaves.
+     */
+    const gradeIdPlantaoPorRegistroPontoId: Record<string, string> = {};
+    for (const r of registrosComFotoDisponivel as { id: string; escalaId: string | null; medicoId: string; checkInAt: Date }[]) {
+      if (!r.escalaId || !r.medicoId || !r.checkInAt) continue;
+      const checkInAt = r.checkInAt instanceof Date ? r.checkInAt : new Date(r.checkInAt);
+      const candidates = plantoes.filter((p) => p.escalaId === r.escalaId && p.medicoId === r.medicoId);
+      if (candidates.length === 0) continue;
+
+      const matches = candidates.filter((p) =>
+        instanteDentroDaJanelaPlantaoUtc(checkInAt, p.data, scheduleForPlantaoGrade(p.gradeId))
+      );
+
+      let chosen: (typeof plantoes)[number] | null = null;
+      if (matches.length === 1) {
+        chosen = matches[0];
+      } else if (matches.length > 1) {
+        // Várias janelas cobrem o mesmo instante (ex.: 07–12 dentro de 07–19): usa o turno mais curto
+        // para não aplicar valor/duração do slot errado ao histórico.
+        chosen = [...matches].sort((a, b) => {
+          const da = duracaoPlantaoHorasUtc(scheduleForPlantaoGrade(a.gradeId));
+          const db = duracaoPlantaoHorasUtc(scheduleForPlantaoGrade(b.gradeId));
+          if (da !== db) return da - db;
+          return a.gradeId.localeCompare(b.gradeId);
+        })[0];
+      } else if (candidates.length === 1) {
+        chosen = candidates[0];
+      } else {
+        const leg = inferLegacyGradeFromCheckIn(checkInAt);
+        const legacyHits = candidates.filter((p) => String(p.gradeId).toLowerCase() === leg);
+        chosen = legacyHits.length === 1 ? legacyHits[0] : null;
+      }
+
+      if (chosen) {
+        gradeIdPlantaoPorRegistroPontoId[r.id] = chosen.gradeId;
+        const gk = String(chosen.gradeId).toLowerCase();
+        const snapH =
+          chosen.horasTurnoSnapshot != null ? Number(chosen.horasTurnoSnapshot) : NaN;
+        const h =
+          Number.isFinite(snapH) && snapH > 0
+            ? snapH
+            : horasTurnoPorGradeId[gk] ??
+              Math.round(duracaoPlantaoHorasUtc(scheduleForPlantaoGrade(chosen.gradeId)) * 10000) / 10000;
+        if (h > 0) {
+          horasTurnoPorRegistroPontoId[r.id] = h;
+        }
+        if (chosen.valorHora != null) {
+          valorPlantao12hPorRegistroPontoId[r.id] = Number(chosen.valorHora);
+        }
+      }
+    }
+
+    return {
+      data: registrosComFotoDisponivel,
+      valorHoraPorMedico,
+      valorHoraCobrancaPorMedico,
+      valorHoraPorMedicoEscala,
+      plantoesValorHoraPorEscalaDataGrade,
+      valorPlantao12hPorRegistroPontoId,
+      gradeIdPlantaoPorRegistroPontoId,
+      horasTurnoPorRegistroPontoId,
+      horasTurnoPorGradeId,
+    };
   }
 
   return {
@@ -1185,6 +1360,10 @@ export async function listRegistrosPontoAdminService(
     valorHoraCobrancaPorMedico,
     valorHoraPorMedicoEscala,
     plantoesValorHoraPorEscalaDataGrade,
+    valorPlantao12hPorRegistroPontoId: {} as Record<string, number>,
+    gradeIdPlantaoPorRegistroPontoId: {} as Record<string, string>,
+    horasTurnoPorRegistroPontoId: {} as Record<string, number>,
+    horasTurnoPorGradeId: {} as Record<string, number>,
   };
 }
 
@@ -1303,64 +1482,90 @@ export async function createEscalaPlantaoService(input: {
     throw { statusCode: 404, message: 'Médico não encontrado ou inativo' };
   }
 
-  const valorHora = input.valorHora != null ? Number(input.valorHora) : null;
+  const gradeId = await resolveGradeIdParaContrato(input.tenantId, escala.contratoAtivoId, input.gradeId);
 
-  return prisma.$transaction(async (tx: any) => {
-    // Garantir que o médico esteja associado à escala (para "minhas escalas" / dashboard do médico)
-    await tx.escalaMedico.upsert({
-      where: {
-        tenantId_escalaId_medicoId: {
+  const valorHora = input.valorHora != null ? Number(input.valorHora) : null;
+  const horasTurnoSnapshot = await resolverHorasTurnoSnapshotParaGrade(
+    input.tenantId,
+    escala.contratoAtivoId,
+    gradeId
+  );
+
+  const snapshotFields =
+    horasTurnoSnapshot != null ? { horasTurnoSnapshot } : ({} as { horasTurnoSnapshot?: number });
+
+  const runPlantaoTx = async (includeSnapshot: boolean) => {
+    const snap = includeSnapshot ? snapshotFields : {};
+    return prisma.$transaction(async (tx: any) => {
+      await tx.escalaMedico.upsert({
+        where: {
+          tenantId_escalaId_medicoId: {
+            tenantId: input.tenantId,
+            escalaId: input.escalaId,
+            medicoId: input.medicoId,
+          },
+        },
+        update: { ativo: true },
+        create: {
           tenantId: input.tenantId,
           escalaId: input.escalaId,
           medicoId: input.medicoId,
+          ativo: true,
         },
-      },
-      update: { ativo: true },
-      create: {
-        tenantId: input.tenantId,
-        escalaId: input.escalaId,
-        medicoId: input.medicoId,
-        ativo: true,
-      },
-    });
+      });
 
-    const plantao = await tx.escalaPlantao.upsert({
-      where: {
-        escalaId_data_gradeId: {
+      const plantao = await tx.escalaPlantao.upsert({
+        where: {
+          escalaId_data_gradeId: {
+            escalaId: input.escalaId,
+            data: dataDate,
+            gradeId,
+          },
+        },
+        update: {
+          medicoId: input.medicoId,
+          valorHora,
+          ...snap,
+        },
+        create: {
+          tenantId: input.tenantId,
           escalaId: input.escalaId,
           data: dataDate,
-          gradeId: input.gradeId,
+          gradeId,
+          medicoId: input.medicoId,
+          valorHora,
+          ...snap,
         },
-      },
-      update: { medicoId: input.medicoId, valorHora },
-      create: {
-        tenantId: input.tenantId,
-        escalaId: input.escalaId,
-        data: dataDate,
-        gradeId: input.gradeId,
-        medicoId: input.medicoId,
-        valorHora,
-      },
-      include: {
-        medico: {
-          select: { id: true, nomeCompleto: true, crm: true, email: true, telefone: true },
+        include: {
+          medico: {
+            select: { id: true, nomeCompleto: true, crm: true, email: true, telefone: true },
+          },
         },
-      },
+      });
+
+      await createAuditLog(
+        {
+          acao: 'CRIAR_ESCALA_PLANTAO',
+          tenantId: input.tenantId,
+          masterId: input.masterId,
+          medicoId: input.medicoId,
+          detalhes: { escalaId: input.escalaId, data: input.data, gradeId, plantaoId: plantao.id },
+        },
+        tx
+      );
+
+      return plantao;
     });
+  };
 
-    await createAuditLog(
-      {
-        acao: 'CRIAR_ESCALA_PLANTAO',
-        tenantId: input.tenantId,
-        masterId: input.masterId,
-        medicoId: input.medicoId,
-        detalhes: { escalaId: input.escalaId, data: input.data, gradeId: input.gradeId, plantaoId: plantao.id },
-      },
-      tx
-    );
-
-    return plantao;
-  });
+  try {
+    return await runPlantaoTx(true);
+  } catch (e) {
+    if (isMissingDatabaseColumnError(e, 'horas_turno_snapshot')) {
+      return await runPlantaoTx(false);
+    }
+    throw e;
+  }
 }
 
 export async function removerEscalaPlantaoService(
@@ -1395,11 +1600,18 @@ export async function removerEscalaPlantaoService(
 export async function getValoresPlantaoService(
   tenantId: string,
   contratoAtivoId: string,
-  subgrupoId: string
+  subgrupoId?: string | null
 ) {
+  await ensureTiposLegadoMigrados(tenantId, contratoAtivoId);
+  const where: { tenantId: string; contratoAtivoId: string; subgrupoId?: string } = {
+    tenantId,
+    contratoAtivoId,
+  };
+  const sg = subgrupoId?.trim();
+  if (sg) where.subgrupoId = sg;
   const rows = await prisma.valorPlantao.findMany({
-    where: { tenantId, contratoAtivoId, subgrupoId },
-    orderBy: { gradeId: 'asc' },
+    where,
+    orderBy: [{ subgrupoId: 'asc' }, { gradeId: 'asc' }],
   });
   return rows;
 }
@@ -1410,6 +1622,7 @@ export async function listAdicionaisPlantaoService(input: {
   dataInicio?: Date;
   dataFim?: Date;
 }) {
+  await ensureTiposLegadoMigrados(input.tenantId, input.contratoAtivoId);
   const where: any = {
     tenantId: input.tenantId,
     contratoAtivoId: input.contratoAtivoId,
@@ -1434,6 +1647,11 @@ export async function upsertAdicionalPlantaoService(input: {
   gradeId: string;
   percentual: number;
 }) {
+  const gradeId = await resolveGradeIdParaContrato(
+    input.tenantId,
+    input.contratoAtivoId,
+    input.gradeId
+  );
   const percentual = Number(input.percentual);
   return prisma.$transaction(async (tx: any) => {
     const row = await tx.adicionalPlantaoData.upsert({
@@ -1442,7 +1660,7 @@ export async function upsertAdicionalPlantaoService(input: {
           tenantId: input.tenantId,
           contratoAtivoId: input.contratoAtivoId,
           data: input.data,
-          gradeId: input.gradeId,
+          gradeId,
         },
       },
       update: { percentual },
@@ -1450,7 +1668,7 @@ export async function upsertAdicionalPlantaoService(input: {
         tenantId: input.tenantId,
         contratoAtivoId: input.contratoAtivoId,
         data: input.data,
-        gradeId: input.gradeId,
+        gradeId,
         percentual,
       },
     });
@@ -1462,7 +1680,7 @@ export async function upsertAdicionalPlantaoService(input: {
         detalhes: {
           contratoAtivoId: input.contratoAtivoId,
           data: input.data,
-          gradeId: input.gradeId,
+          gradeId,
           percentual,
         },
       },
@@ -1479,6 +1697,11 @@ export async function removerAdicionalPlantaoService(input: {
   data: Date;
   gradeId: string;
 }) {
+  const gradeId = await resolveGradeIdParaContrato(
+    input.tenantId,
+    input.contratoAtivoId,
+    input.gradeId
+  );
   return prisma.$transaction(async (tx: any) => {
     const row = await tx.adicionalPlantaoData.findUnique({
       where: {
@@ -1486,7 +1709,7 @@ export async function removerAdicionalPlantaoService(input: {
           tenantId: input.tenantId,
           contratoAtivoId: input.contratoAtivoId,
           data: input.data,
-          gradeId: input.gradeId,
+          gradeId,
         },
       },
     });
@@ -1502,7 +1725,7 @@ export async function removerAdicionalPlantaoService(input: {
         detalhes: {
           contratoAtivoId: input.contratoAtivoId,
           data: input.data,
-          gradeId: input.gradeId,
+          gradeId,
           percentual: row.percentual,
         },
       },
@@ -1520,6 +1743,11 @@ export async function setValorPlantaoService(input: {
   gradeId: string;
   valorHora: number | null;
 }) {
+  const gradeId = await resolveGradeIdParaContrato(
+    input.tenantId,
+    input.contratoAtivoId,
+    input.gradeId
+  );
   const valorHora = input.valorHora != null ? Number(input.valorHora) : null;
   const row = await prisma.valorPlantao.upsert({
     where: {
@@ -1527,7 +1755,7 @@ export async function setValorPlantaoService(input: {
         tenantId: input.tenantId,
         contratoAtivoId: input.contratoAtivoId,
         subgrupoId: input.subgrupoId,
-        gradeId: input.gradeId,
+        gradeId,
       },
     },
     update: { valorHora },
@@ -1535,7 +1763,7 @@ export async function setValorPlantaoService(input: {
       tenantId: input.tenantId,
       contratoAtivoId: input.contratoAtivoId,
       subgrupoId: input.subgrupoId,
-      gradeId: input.gradeId,
+      gradeId,
       valorHora,
     },
   });
@@ -1546,7 +1774,7 @@ export async function setValorPlantaoService(input: {
     detalhes: {
       contratoAtivoId: input.contratoAtivoId,
       subgrupoId: input.subgrupoId,
-      gradeId: input.gradeId,
+      gradeId,
       valorHora,
     },
   });

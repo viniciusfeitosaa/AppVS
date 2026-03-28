@@ -53,11 +53,36 @@ export const prisma = resolvePrismaClient();
 const MAX_RETRIES = 5;
 const RETRY_DELAY_MS = 5000;
 
+/**
+ * Garante colunas usadas por ponto/repasse/relatórios (schema Prisma vs DB legado sem `migrate deploy`).
+ * Idempotente (IF NOT EXISTS). Falha silenciosa com log se o usuário do banco não tiver permissão de DDL.
+ */
+export async function ensureCriticalPontoSchemaPatches(): Promise<void> {
+  if (process.env.SKIP_AUTO_SCHEMA_PATCH === '1') return;
+  try {
+    await prisma.$executeRawUnsafe(
+      `ALTER TABLE "escala_plantoes" ADD COLUMN IF NOT EXISTS "horas_turno_snapshot" DECIMAL(10,4)`
+    );
+    await prisma.$executeRawUnsafe(
+      `ALTER TABLE "registros_ponto" ADD COLUMN IF NOT EXISTS "repasse_valor_congelado" DECIMAL(12,2)`
+    );
+    if (process.env.NODE_ENV === 'development') {
+      console.log('[DB] Colunas críticas ponto/repasse alinhadas ao schema.');
+    }
+  } catch (e) {
+    console.warn(
+      '[DB] Patch opcional de colunas (ponto/repasse) não aplicado:',
+      (e as Error)?.message ?? e
+    );
+  }
+}
+
 /** Conecta ao banco com retry (útil para Render + Supabase: cold start / rede). */
 export async function connectDatabase(): Promise<void> {
   for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
     try {
       await prisma.$connect();
+      await ensureCriticalPontoSchemaPatches();
       console.log('✅ Conectado ao banco de dados PostgreSQL');
       return;
     } catch (error) {

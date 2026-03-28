@@ -1,7 +1,80 @@
-import { OrigemRegistroPonto, Prisma } from '@prisma/client';
+import { OrigemRegistroPonto, Prisma, type TipoPlantao } from '@prisma/client';
 import { prisma } from '../config/database';
+import { PONTO_SEM_ESCALA_ESCALA_ID } from '../constants/ponto.const';
 import { fileExistsSafe, resolveStoredFileToAbsolute } from '../utils/upload-path.util';
 import { createAuditLog } from './auditoria.service';
+import { fimPlantaoAsDate, inicioPlantaoAsDate } from '../utils/plantao-horario';
+import {
+  enrichPlantaoComTipo,
+  faixaHorarioLabelExibicao,
+  loadTiposMapPorContrato,
+  scheduleForGradeId,
+} from './tipo-plantao.service';
+import { calcularRepasseCongeladoCheckout } from './repasse-registro-ponto.service';
+import { isMissingDatabaseColumnError } from '../utils/prisma-column-error';
+
+function isPontoSemEscalaEscalaId(escalaId: string) {
+  return escalaId === PONTO_SEM_ESCALA_ESCALA_ID;
+}
+
+/** Contrato com usaPonto e sem usaEscala (ponto sem grade de plantão). */
+export async function medicoTemContratoSoPonto(tenantId: string, medicoId: string): Promise<boolean> {
+  const rows = await prisma.equipeMedico.findMany({
+    where: { tenantId, medicoId },
+    select: {
+      equipe: {
+        select: {
+          subgrupo: {
+            select: {
+              contratoSubgrupos: {
+                select: {
+                  contratoAtivo: { select: { usaPonto: true, usaEscala: true } },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+  });
+  for (const row of rows) {
+    const css = row.equipe?.subgrupo?.contratoSubgrupos ?? [];
+    for (const cs of css) {
+      const c = cs.contratoAtivo;
+      if (c?.usaPonto && c?.usaEscala === false) return true;
+    }
+  }
+  return false;
+}
+
+/** Pelo menos um contrato vinculado às equipes do médico usa escala de plantão. */
+export async function medicoTemContratoComEscala(tenantId: string, medicoId: string): Promise<boolean> {
+  const rows = await prisma.equipeMedico.findMany({
+    where: { tenantId, medicoId },
+    select: {
+      equipe: {
+        select: {
+          subgrupo: {
+            select: {
+              contratoSubgrupos: {
+                select: {
+                  contratoAtivo: { select: { usaEscala: true } },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+  });
+  for (const row of rows) {
+    const css = row.equipe?.subgrupo?.contratoSubgrupos ?? [];
+    for (const cs of css) {
+      if (cs.contratoAtivo?.usaEscala === true) return true;
+    }
+  }
+  return false;
+}
 
 /** Distância em metros entre dois pontos (fórmula de Haversine). */
 function distanciaMetros(
@@ -106,6 +179,57 @@ const endOfToday = () => {
   return date;
 };
 
+/** Contratos com escala + ponto: check-in só entre (início − 10 min) e o fim do plantão do dia. */
+const MINUTOS_ANTES_INICIO_CHECKIN_PONTO_ESCALA = 10;
+
+type ResultadoJanelaCheckinEscala = { ok: true } | { ok: false; message: string };
+
+async function validarJanelaCheckinPlantaoEscalaHoje(
+  tenantId: string,
+  medicoId: string,
+  escalaId: string
+): Promise<ResultadoJanelaCheckinEscala> {
+  const plantaoHoje = await prisma.escalaPlantao.findFirst({
+    where: {
+      tenantId,
+      escalaId,
+      medicoId,
+      data: { gte: startOfToday(), lte: endOfToday() },
+    },
+    select: {
+      id: true,
+      data: true,
+      gradeId: true,
+      escala: { select: { contratoAtivoId: true } },
+    },
+  });
+  if (!plantaoHoje) {
+    return { ok: false, message: 'Você não possui plantão nesta escala para hoje' };
+  }
+  const cid = plantaoHoje.escala?.contratoAtivoId;
+  if (!cid) {
+    return { ok: false, message: 'Escala sem contrato vinculado para calcular o horário do plantão.' };
+  }
+  const tipoMaps = await loadTiposMapPorContrato(tenantId, [cid]);
+  const schedule = scheduleForGradeId(plantaoHoje.gradeId, tipoMaps.get(cid));
+  const dataStr = plantaoHoje.data.toISOString().slice(0, 10);
+  const inicio = inicioPlantaoAsDate(dataStr, schedule);
+  const fim = fimPlantaoAsDate(dataStr, schedule);
+  const now = new Date();
+  const abertura = new Date(inicio.getTime() - MINUTOS_ANTES_INICIO_CHECKIN_PONTO_ESCALA * 60 * 1000);
+  if (now.getTime() < abertura.getTime()) {
+    const hm = abertura.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+    return {
+      ok: false,
+      message: `Check-in liberado a partir das ${hm}.`,
+    };
+  }
+  if (now.getTime() > fim.getTime()) {
+    return { ok: false, message: 'Entrada não permitida neste horário.' };
+  }
+  return { ok: true };
+}
+
 const startOfWeek = () => {
   const date = new Date();
   const day = date.getDay(); // 0 domingo, 1 segunda...
@@ -159,7 +283,78 @@ export async function checkInService(
     throw { statusCode: 409, message: 'Já existe um check-in em aberto para este médico' };
   }
 
-  // Fail-closed: check-in só é permitido se o médico estiver inserido em um plantão da escala.
+  if (isPontoSemEscalaEscalaId(escalaId)) {
+    const pode = await medicoTemContratoSoPonto(tenantId, medicoId);
+    if (!pode) {
+      throw {
+        statusCode: 403,
+        message: 'Ponto sem escala de plantão não está disponível para o seu vínculo com o contrato.',
+      };
+    }
+    const configGeoSemEscala = await getConfigPontoParaMedico(tenantId, medicoId, null);
+    if (configGeoSemEscala) {
+      if (latitude == null || longitude == null || Number.isNaN(latitude) || Number.isNaN(longitude)) {
+        throw {
+          statusCode: 400,
+          message:
+            'É necessário informar sua localização para bater ponto neste local. Permita o acesso à localização no navegador ou no app.',
+        };
+      }
+      const dist = distanciaMetros(
+        configGeoSemEscala.latitude,
+        configGeoSemEscala.longitude,
+        latitude,
+        longitude
+      );
+      if (dist > configGeoSemEscala.raioMetros) {
+        throw {
+          statusCode: 400,
+          message: `Você está fora do raio permitido para bater ponto (distância: ${Math.round(dist)} m, raio: ${configGeoSemEscala.raioMetros} m).`,
+        };
+      }
+    }
+
+    return prisma.$transaction(async (tx: any) => {
+      const registroAbertoTx = await tx.registroPonto.findFirst({
+        where: { tenantId, medicoId, checkOutAt: null },
+        orderBy: { checkInAt: 'desc' },
+        select: { id: true },
+      });
+      if (registroAbertoTx) {
+        throw { statusCode: 409, message: 'Já existe um check-in em aberto para este médico' };
+      }
+      const registro = await tx.registroPonto.create({
+        data: {
+          tenantId,
+          escalaId: null,
+          medicoId,
+          checkInAt: new Date(),
+          origem: OrigemRegistroPonto.APP_MEDICO,
+          observacao: observacao?.trim() || null,
+          fotoCheckinCaminho: hasFoto ? fotoCheckinCaminho!.trim() : null,
+          motivoCheckinSemFoto: hasFoto ? null : motivo!,
+        },
+      });
+      await createAuditLog(
+        {
+          acao: 'CHECKIN_MEDICO',
+          tenantId,
+          medicoId,
+          detalhes: {
+            escalaId: null,
+            pontoSemEscala: true,
+            registroPontoId: registro.id,
+            checkInSemFoto: !hasFoto,
+            ...(hasFoto ? {} : { motivoResumo: motivo!.slice(0, 120) }),
+          },
+        },
+        tx
+      );
+      return registro;
+    });
+  }
+
+  // Com escala real: check-in vinculado à escala (e plantão hoje se o contrato usa escala).
   const escala = await prisma.escala.findFirst({
     where: { id: escalaId, tenantId, ativo: true },
     select: { id: true, nome: true, contratoAtivo: { select: { usaEscala: true, usaPonto: true } } },
@@ -171,19 +366,10 @@ export async function checkInService(
     throw { statusCode: 403, message: 'Ponto eletrônico não está habilitado para este contrato' };
   }
 
-  // Se o contrato usa escalas, só faz sentido bater ponto se existir plantão do médico hoje nesta escala.
   if (escala.contratoAtivo?.usaEscala) {
-    const plantaoHoje = await prisma.escalaPlantao.findFirst({
-      where: {
-        tenantId,
-        escalaId,
-        medicoId,
-        data: { gte: startOfToday(), lte: endOfToday() },
-      },
-      select: { id: true },
-    });
-    if (!plantaoHoje) {
-      throw { statusCode: 403, message: 'Você não possui plantão nesta escala para hoje' };
+    const janela = await validarJanelaCheckinPlantaoEscalaHoje(tenantId, medicoId, escalaId);
+    if (!janela.ok) {
+      throw { statusCode: 403, message: janela.message };
     }
   }
 
@@ -277,15 +463,48 @@ export async function checkOutService(
   const duracaoMs = checkoutTime.getTime() - registroAberto.checkInAt.getTime();
   const duracaoMinutos = Math.max(1, Math.floor(duracaoMs / 60000));
 
-  return prisma.$transaction(async (tx: any) => {
-    const updated = await tx.registroPonto.updateMany({
-      where: { id: registroAberto.id, tenantId, medicoId, checkOutAt: null },
-      data: {
-        checkOutAt: checkoutTime,
-        observacao: observacao?.trim() || registroAberto.observacao,
+  let repasseValorCongelado: number | null = null;
+  if (registroAberto.escalaId) {
+    try {
+      repasseValorCongelado = await calcularRepasseCongeladoCheckout(tenantId, {
+        escalaId: registroAberto.escalaId,
+        medicoId,
+        checkInAt: new Date(registroAberto.checkInAt),
         duracaoMinutos,
-      },
-    });
+      });
+    } catch (e) {
+      console.warn('[ponto] checkout: cálculo de repasse congelado ignorado:', (e as Error)?.message ?? e);
+    }
+  }
+
+  return prisma.$transaction(async (tx: any) => {
+    const baseCheckoutData = {
+      checkOutAt: checkoutTime,
+      observacao: observacao?.trim() || registroAberto.observacao,
+      duracaoMinutos,
+    };
+    let updated;
+    try {
+      updated = await tx.registroPonto.updateMany({
+        where: { id: registroAberto.id, tenantId, medicoId, checkOutAt: null },
+        data: {
+          ...baseCheckoutData,
+          ...(repasseValorCongelado != null ? { repasseValorCongelado } : {}),
+        },
+      });
+    } catch (e) {
+      if (
+        isMissingDatabaseColumnError(e, 'repasse_valor_congelado') &&
+        repasseValorCongelado != null
+      ) {
+        updated = await tx.registroPonto.updateMany({
+          where: { id: registroAberto.id, tenantId, medicoId, checkOutAt: null },
+          data: baseCheckoutData,
+        });
+      } else {
+        throw e;
+      }
+    }
 
     if (updated.count !== 1) {
       throw { statusCode: 409, message: 'Checkout já foi processado ou não existe check-in em aberto.' };
@@ -321,7 +540,7 @@ export async function getMeuDiaPontoService(tenantId: string, medicoId: string) 
   const semanaInicio = startOfWeek();
   const semanaFim = endOfWeek();
 
-  const [aberto, registros, registrosSemana, ultimoRegistro] = await Promise.all([
+  const [aberto, registros, registrosSemana, ultimoRegistro, temContratoComEscala] = await Promise.all([
     prisma.registroPonto.findFirst({
       where: { tenantId, medicoId, checkOutAt: null },
       include: {
@@ -364,6 +583,7 @@ export async function getMeuDiaPontoService(tenantId: string, medicoId: string) 
       select: { id: true, checkInAt: true, checkOutAt: true },
       orderBy: { checkInAt: 'desc' },
     }),
+    medicoTemContratoComEscala(tenantId, medicoId),
   ]);
 
   const totalMinutosHojeFechado = registros.reduce((acc, item) => acc + (item.duracaoMinutos || 0), 0);
@@ -423,6 +643,34 @@ export async function getMeuDiaPontoService(tenantId: string, medicoId: string) 
   const configGeo = await getConfigPontoParaMedico(tenantId, medicoId, aberto?.escalaId ?? null);
   const exigeGeolocalizacao = configGeo != null;
 
+  const plantoesHojeRows = await prisma.escalaPlantao.findMany({
+    where: {
+      tenantId,
+      medicoId,
+      data: { gte: hojeInicio, lte: hojeFim },
+      escala: { ativo: true },
+    },
+    select: {
+      id: true,
+      data: true,
+      gradeId: true,
+      escalaId: true,
+      escala: { select: { contratoAtivoId: true } },
+    },
+  });
+  const cidsHoje = [...new Set(plantoesHojeRows.map((p) => p.escala?.contratoAtivoId).filter(Boolean) as string[])];
+  const tipoMapsHoje = await loadTiposMapPorContrato(tenantId, cidsHoje);
+  const plantoesHoje = plantoesHojeRows.map((p) => {
+    const cid = p.escala?.contratoAtivoId ?? '';
+    const base = {
+      id: p.id,
+      data: p.data.toISOString().slice(0, 10),
+      gradeId: p.gradeId,
+      escalaId: p.escalaId,
+    };
+    return enrichPlantaoComTipo(base, cid, tipoMapsHoje);
+  });
+
   return {
     registroAberto: aberto,
     registrosHoje: registros,
@@ -433,6 +681,8 @@ export async function getMeuDiaPontoService(tenantId: string, medicoId: string) 
     minhasEquipes: minhasEquipesNomes,
     configHorario,
     exigeGeolocalizacao,
+    temContratoComEscala,
+    plantoesHoje,
   };
 }
 
@@ -521,6 +771,20 @@ export async function listMinhasEscalasService(tenantId: string, medicoId: strin
   }
 
   const escalaIds = Array.from(uniqueByEscala.keys());
+  const escalasMeta =
+    escalaIds.length > 0
+      ? await prisma.escala.findMany({
+          where: { id: { in: escalaIds }, tenantId },
+          select: { id: true, contratoAtivoId: true },
+        })
+      : [];
+  const contratoPorEscala = new Map(escalasMeta.map((e) => [e.id, e.contratoAtivoId]));
+  const contratoIdsUnicos = [...new Set(escalasMeta.map((e) => e.contratoAtivoId))];
+  const tipoMapsPorContrato =
+    contratoIdsUnicos.length > 0
+      ? await loadTiposMapPorContrato(tenantId, contratoIdsUnicos)
+      : new Map<string, Map<string, TipoPlantao>>();
+
   for (const escalaId of escalaIds) {
     const [equipesNaEscala, gradeIdsDoMedico] = await Promise.all([
       prisma.escalaEquipe.findMany({
@@ -541,11 +805,31 @@ export async function listMinhasEscalasService(tenantId: string, medicoId: strin
     const entry = uniqueByEscala.get(escalaId);
     if (entry) {
       entry.equipes = minhasEquipes.map((em) => em.equipe.nome);
-      entry.gradeIds = gradeIdsDoMedico.map((p) => p.gradeId?.toLowerCase()).filter(Boolean);
+      const gids = gradeIdsDoMedico.map((p) => p.gradeId?.toLowerCase()).filter(Boolean) as string[];
+      entry.gradeIds = gids;
+      const cid = contratoPorEscala.get(escalaId);
+      const tmap = cid ? tipoMapsPorContrato.get(cid) : undefined;
+      entry.gradeFaixas = gids.map((gid) => {
+        const t = tmap?.get(gid);
+        return faixaHorarioLabelExibicao(gid, t ?? null);
+      });
     }
   }
 
-  return Array.from(uniqueByEscala.values());
+  const result = Array.from(uniqueByEscala.values());
+  if ((await medicoTemContratoSoPonto(tenantId, medicoId)) && !result.some((e) => e.id === PONTO_SEM_ESCALA_ESCALA_ID)) {
+    result.push({
+      id: PONTO_SEM_ESCALA_ESCALA_ID,
+      nome: 'Ponto (sem escala de plantão)',
+      dataInicio: null,
+      dataFim: null,
+      ativo: true,
+      equipes: [],
+      gradeIds: [],
+      gradeFaixas: [],
+    });
+  }
+  return result;
 }
 
 /** Lista colegas (outros médicos) das mesmas equipes do médico na escala informada, para troca de plantão. */
@@ -619,20 +903,35 @@ export async function listProximosPlantoesService(tenantId: string, medicoId: st
       data: true,
       gradeId: true,
       escalaId: true,
-      escala: { select: { nome: true, contratoAtivo: { select: { permiteTrocaPlantao: true } } } },
+      escala: {
+        select: {
+          nome: true,
+          contratoAtivoId: true,
+          contratoAtivo: { select: { permiteTrocaPlantao: true, usaPonto: true, usaEscala: true } },
+        },
+      },
     },
     orderBy: { data: 'asc' },
     take: limit,
   });
 
-  return plantoes.map((p) => ({
-    id: p.id,
-    data: p.data.toISOString().slice(0, 10),
-    gradeId: p.gradeId,
-    escalaId: p.escalaId,
-    escalaNome: p.escala?.nome ?? null,
-    permiteTrocaPlantao: !!p.escala?.contratoAtivo?.permiteTrocaPlantao,
-  }));
+  const cids = [...new Set(plantoes.map((p) => p.escala?.contratoAtivoId).filter(Boolean) as string[])];
+  const tipoMaps = await loadTiposMapPorContrato(tenantId, cids);
+
+  return plantoes.map((p) => {
+    const cid = p.escala?.contratoAtivoId ?? '';
+    const base = {
+      id: p.id,
+      data: p.data.toISOString().slice(0, 10),
+      gradeId: p.gradeId,
+      escalaId: p.escalaId,
+      escalaNome: p.escala?.nome ?? null,
+      permiteTrocaPlantao: !!p.escala?.contratoAtivo?.permiteTrocaPlantao,
+      usaPonto: !!p.escala?.contratoAtivo?.usaPonto,
+      usaEscala: !!p.escala?.contratoAtivo?.usaEscala,
+    };
+    return enrichPlantaoComTipo(base, cid, tipoMaps);
+  });
 }
 
 /** Plantões do médico em um mês (calendário). Escala ativa. */
@@ -691,6 +990,7 @@ export async function listMeusPlantoesMesCalendarioService(
       escala: {
         select: {
           nome: true,
+          contratoAtivoId: true,
           contratoAtivo: { select: { permiteTrocaPlantao: true } },
         },
       },
@@ -698,14 +998,21 @@ export async function listMeusPlantoesMesCalendarioService(
     orderBy: [{ data: 'asc' }, { gradeId: 'asc' }],
   });
 
-  return plantoes.map((p) => ({
-    id: p.id,
-    data: p.data.toISOString().slice(0, 10),
-    gradeId: p.gradeId,
-    escalaId: p.escalaId,
-    escalaNome: p.escala?.nome ?? null,
-    permiteTrocaPlantao: !!p.escala?.contratoAtivo?.permiteTrocaPlantao,
-  }));
+  const cids = [...new Set(plantoes.map((p) => p.escala?.contratoAtivoId).filter(Boolean) as string[])];
+  const tipoMaps = await loadTiposMapPorContrato(tenantId, cids);
+
+  return plantoes.map((p) => {
+    const cid = p.escala?.contratoAtivoId ?? '';
+    const base = {
+      id: p.id,
+      data: p.data.toISOString().slice(0, 10),
+      gradeId: p.gradeId,
+      escalaId: p.escalaId,
+      escalaNome: p.escala?.nome ?? null,
+      permiteTrocaPlantao: !!p.escala?.contratoAtivo?.permiteTrocaPlantao,
+    };
+    return enrichPlantaoComTipo(base, cid, tipoMaps);
+  });
 }
 
 /** Lista as equipes em que o médico participa (para o filtro do calendário). */
@@ -728,33 +1035,6 @@ export async function listMinhasEquipesCalendarioService(tenantId: string, medic
 }
 
 const MINUTOS_ANTES_INICIO_PARA_TROCA = 10;
-
-const HORARIOS_POR_GRADE: Record<string, string> = {
-  mt: '07h às 19h',
-  sn: '19h às 07h',
-};
-
-function inicioDoPlantaoParaTroca(dataStr: string, gradeId: string): Date {
-  const d = new Date(dataStr + 'T00:00:00');
-  const g = (gradeId || '').toLowerCase();
-  if (g === 'sn') {
-    d.setHours(19, 0, 0, 0);
-    return d;
-  }
-  d.setHours(7, 0, 0, 0);
-  return d;
-}
-
-function dentroDoPrazoTrocaPlantao(dataStr: string, gradeId: string): boolean {
-  const now = new Date();
-  const inicio = inicioDoPlantaoParaTroca(dataStr, gradeId);
-  const limite = new Date(inicio.getTime() - MINUTOS_ANTES_INICIO_PARA_TROCA * 60 * 1000);
-  return now < limite;
-}
-
-function faixaPorGradeLabel(gradeId: string): string {
-  return HORARIOS_POR_GRADE[(gradeId || '').toLowerCase()] ?? '07h às 19h';
-}
 
 /**
  * Registra solicitação de troca: notifica colega e solicitante (não altera escala_plantoes).
@@ -780,6 +1060,7 @@ export async function solicitarTrocaPlantaoService(
         select: {
           nome: true,
           ativo: true,
+          contratoAtivoId: true,
           contratoAtivo: { select: { permiteTrocaPlantao: true } },
         },
       },
@@ -797,9 +1078,16 @@ export async function solicitarTrocaPlantaoService(
   }
 
   const dataStr = plantao.data.toISOString().slice(0, 10);
-  if (!dentroDoPrazoTrocaPlantao(dataStr, plantao.gradeId)) {
+  const tipoMaps = await loadTiposMapPorContrato(tenantId, [plantao.escala.contratoAtivoId]);
+  const tipoMap = tipoMaps.get(plantao.escala.contratoAtivoId);
+  const schedule = scheduleForGradeId(plantao.gradeId, tipoMap);
+  const inicio = inicioPlantaoAsDate(dataStr, schedule);
+  const limiteTroca = new Date(inicio.getTime() - MINUTOS_ANTES_INICIO_PARA_TROCA * 60 * 1000);
+  if (new Date() >= limiteTroca) {
     throw { statusCode: 400, message: 'Período para solicitar troca encerrado' };
   }
+  const tipoRow = tipoMap?.get(plantao.gradeId);
+  const gradeLabel = faixaHorarioLabelExibicao(plantao.gradeId, tipoRow ?? null);
 
   const colegas = await listEquipeColegasService(tenantId, medicoSolicitanteId, plantao.escalaId);
   if (!colegas.some((c) => c.id === medicoDestinoId)) {
@@ -859,7 +1147,7 @@ export async function solicitarTrocaPlantaoService(
       escalaId: plantao.escalaId,
       escalaNome: plantao.escala.nome,
       dataPlantaoIso: dataStr,
-      gradeLabel: faixaPorGradeLabel(plantao.gradeId),
+      gradeLabel,
     });
   } catch (e) {
     console.error('[troca-plantao] Falha ao enviar notificações (registro persistido):', e);
@@ -908,6 +1196,16 @@ export async function getFotoCheckinRegistroForAdmin(tenantId: string, registroI
 }
 
 export async function canCheckInService(tenantId: string, medicoId: string, escalaId: string) {
+  if (isPontoSemEscalaEscalaId(escalaId)) {
+    const ok = await medicoTemContratoSoPonto(tenantId, medicoId);
+    return {
+      allowed: ok,
+      reason: ok
+        ? null
+        : ('Ponto sem escala de plantão não está disponível para o seu vínculo com o contrato.' as const),
+    };
+  }
+
   const escala = await prisma.escala.findFirst({
     where: { id: escalaId, tenantId, ativo: true },
     select: {
@@ -922,17 +1220,9 @@ export async function canCheckInService(tenantId: string, medicoId: string, esca
     return { allowed: false, reason: 'Ponto eletrônico não está habilitado para este contrato' as const };
   }
   if (escala.contratoAtivo?.usaEscala) {
-    const plantaoHoje = await prisma.escalaPlantao.findFirst({
-      where: {
-        tenantId,
-        escalaId,
-        medicoId,
-        data: { gte: startOfToday(), lte: endOfToday() },
-      },
-      select: { id: true },
-    });
-    if (!plantaoHoje) {
-      return { allowed: false, reason: 'Você não possui plantão nesta escala para hoje' as const };
+    const janela = await validarJanelaCheckinPlantaoEscalaHoje(tenantId, medicoId, escalaId);
+    if (!janela.ok) {
+      return { allowed: false, reason: janela.message };
     }
   }
   return { allowed: true, reason: null };

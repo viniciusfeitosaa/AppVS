@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { Fragment, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -11,6 +11,8 @@ type RegistroPontoAdmin = {
   checkInAt: string;
   checkOutAt: string | null;
   duracaoMinutos: number | null;
+  /** Preenchido no checkout (escala+ponto): valor fixo no histórico */
+  repasseValorCongelado?: number | string | null;
   medico: {
     id: string;
     nomeCompleto: string;
@@ -23,6 +25,21 @@ type RegistroPontoAdmin = {
     dataInicio: string;
     dataFim: string;
   } | null;
+};
+
+/** Uma linha do passo-a-passo do valor (debug / auditoria no relatório). */
+type DetalheCalculoRegistroPonto = {
+  registroId: string;
+  checkInAt: string;
+  duracaoMinutos: number;
+  valorAplicado: number | null;
+  metodo:
+    | 'REPASSE_CONGELADO'
+    | 'VALOR_HORA_ALOCACAO_ESCALA'
+    | 'PROPORCIONAL_TURNO'
+    | 'SEM_VALOR';
+  /** Texto curto para exibir na UI */
+  resumo: string;
 };
 
 type AgrupamentoHoras = {
@@ -40,6 +57,8 @@ type AgrupamentoHoras = {
   valorRepasse?: number;
   /** Contrato só ponto: total cobrança (valor hora cobrança × horas) */
   valorCobranca?: number;
+  /** Passo a passo por batida de ponto (contrato escala + ponto) */
+  calculoPorRegistro?: DetalheCalculoRegistroPonto[];
 };
 
 const formatDuration = (minutes: number) => {
@@ -64,6 +83,16 @@ const escapeCsvCell = (value: string | number): string => {
 
 const formatValor = (valor: number) =>
   new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(valor);
+
+/**
+ * Helvetica no jsPDF não cobre vários Unicode (travessão —, espaço estreito em R$, etc.),
+ * o que pode esvaziar ou corromper células do autoTable.
+ */
+const textoSeguroPdf = (s: string) =>
+  String(s)
+    .replace(/\u202f/g, ' ')
+    .replace(/\u00a0/g, ' ')
+    .replace(/\u2013|\u2014|\u2212/g, '-');
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
@@ -121,36 +150,56 @@ const exportHorasPdf = (
 ) => {
   const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
   doc.setFontSize(14);
-  doc.text('Relatório de Horas por médico e escala', 14, 12);
+  doc.text(textoSeguroPdf('Relatório de Horas por médico e escala'), 14, 12);
   doc.setFontSize(10);
-  doc.text(`Período: ${dataInicio} a ${dataFim}`, 14, 18);
+  doc.text(textoSeguroPdf(`Período: ${dataInicio} a ${dataFim}`), 14, 18);
+  const cel = (s: string) => textoSeguroPdf(s);
+  const celValor = (n: number | null | undefined) =>
+    n != null && Number.isFinite(n) ? cel(formatValor(n)) : '-';
   autoTable(doc, {
     startY: 24,
-    head: [
-      apenasPonto
-        ? [['Médico', 'Escala', 'Registros', 'Total (horas)', 'Repasse (R$)', 'Cobrança (R$)']]
-        : [['Médico', 'Escala', 'Registros', 'Total (horas)', 'Valor (R$)']],
-    ],
+    // Uma linha de cabeçalho = [[c1,c2,...]], sem array extra (evita 1 coluna só).
+    head: apenasPonto
+      ? [
+          [
+            cel('Médico'),
+            cel('Escala'),
+            cel('Registros'),
+            cel('Total (horas)'),
+            cel('Repasse (R$)'),
+            cel('Cobrança (R$)'),
+          ],
+        ]
+      : [
+          [
+            cel('Médico'),
+            cel('Escala'),
+            cel('Registros'),
+            cel('Total (horas)'),
+            cel('Valor (R$)'),
+          ],
+        ],
     body: agrupado.map((item) =>
       apenasPonto
         ? [
-            item.medicoNome,
-            item.escalaNome,
+            cel(item.medicoNome),
+            cel(item.escalaNome),
             String(item.totalRegistros),
-            formatDuration(item.totalMinutos),
-            item.valorRepasse != null ? formatValor(item.valorRepasse) : '—',
-            item.valorCobranca != null ? formatValor(item.valorCobranca) : '—',
+            cel(formatDuration(item.totalMinutos)),
+            celValor(item.valorRepasse),
+            celValor(item.valorCobranca),
           ]
         : [
-            item.medicoNome,
-            item.escalaNome,
+            cel(item.medicoNome),
+            cel(item.escalaNome),
             String(item.totalRegistros),
-            formatDuration(item.totalMinutos),
-            item.valorCalculado != null ? formatValor(item.valorCalculado) : '—',
+            cel(formatDuration(item.totalMinutos)),
+            celValor(item.valorCalculado),
           ]
     ),
     styles: { fontSize: 9 },
     headStyles: { fillColor: [22, 163, 74] },
+    margin: { left: 14, right: 14, bottom: 14 },
   });
   doc.save(`relatorio-horas_${dataInicio}_${dataFim}.pdf`);
 };
@@ -165,6 +214,7 @@ const Relatorios = () => {
   const [contratoId, setContratoId] = useState('');
   const [subgrupoId, setSubgrupoId] = useState('');
   const [equipeId, setEquipeId] = useState('');
+  const [mostrarDetalheCalculo, setMostrarDetalheCalculo] = useState(false);
 
   const { data: contratosResp } = useQuery({
     queryKey: ['admin', 'contratos-ativos', 'relatorio-filtros'],
@@ -222,14 +272,15 @@ const Relatorios = () => {
   const apenasPonto = Boolean(contratoSelecionado?.usaPonto && !contratoSelecionado?.usaEscala);
 
   const { data: valoresPlantaoResp } = useQuery({
-    queryKey: ['admin', 'valores-plantao', contratoId, subgrupoId, 'relatorio'],
-    queryFn: () => adminService.getValoresPlantao(contratoId, subgrupoId),
-    enabled: isMaster && usaEscalaEPonto && Boolean(contratoId && subgrupoId),
+    queryKey: ['admin', 'valores-plantao', contratoId, subgrupoId || '__all__', 'relatorio'],
+    queryFn: () => adminService.getValoresPlantao(contratoId, subgrupoId || undefined),
+    enabled: isMaster && usaEscalaEPonto && Boolean(contratoId),
   });
 
   /**
-   * Valor total do plantão (12h) por grade, igual ao cadastro em Valores de plantão.
-   * O valor/hora usado no relatório é (este valor ÷ 12), uma única vez — ver cálculo por registro.
+   * Valor total do turno por grade (campo valorHora em valores_plantao), como no cadastro.
+   * Valor proporcional por registro: valorTurno × (horasTrabalhadas ÷ horasPrevistasTurno).
+   * horasPrevistasTurno vêm do backend por tipo (UUID) ou legado mt/sn (12h).
    */
   const valorPlantao12hPorGrade = useMemo(() => {
     const map = new Map<string, number>();
@@ -239,7 +290,9 @@ const Relatorios = () => {
       if (!gradeId) continue;
       const n = v.valorHora != null && v.valorHora !== '' ? Number(v.valorHora) : NaN;
       if (!Number.isFinite(n) || n <= 0) continue;
-      map.set(gradeId, round2(n));
+      const rounded = round2(n);
+      const prev = map.get(gradeId);
+      map.set(gradeId, prev != null ? Math.max(prev, rounded) : rounded);
     }
     return map;
   }, [valoresPlantaoResp?.data]);
@@ -261,6 +314,18 @@ const Relatorios = () => {
   const valorHoraPorMedicoEscala: Record<string, number> = !Array.isArray(raw) && raw?.valorHoraPorMedicoEscala ? raw.valorHoraPorMedicoEscala : {};
   const plantoesValorHoraPorEscalaDataGrade: Record<string, number> =
     !Array.isArray(raw) && raw?.plantoesValorHoraPorEscalaDataGrade ? raw.plantoesValorHoraPorEscalaDataGrade : {};
+  const valorPlantao12hPorRegistroPontoId: Record<string, number> =
+    !Array.isArray(raw) && raw?.valorPlantao12hPorRegistroPontoId
+      ? raw.valorPlantao12hPorRegistroPontoId
+      : {};
+  const gradeIdPlantaoPorRegistroPontoId: Record<string, string> =
+    !Array.isArray(raw) && raw?.gradeIdPlantaoPorRegistroPontoId
+      ? raw.gradeIdPlantaoPorRegistroPontoId
+      : {};
+  const horasTurnoPorRegistroPontoId: Record<string, number> =
+    !Array.isArray(raw) && raw?.horasTurnoPorRegistroPontoId ? raw.horasTurnoPorRegistroPontoId : {};
+  const horasTurnoPorGradeId: Record<string, number> =
+    !Array.isArray(raw) && raw?.horasTurnoPorGradeId ? raw.horasTurnoPorGradeId : {};
 
   const { agrupado, totalMinutos, totalRegistros } = useMemo(() => {
     const map = new Map<string, AgrupamentoHoras>();
@@ -273,24 +338,163 @@ const Relatorios = () => {
       const medNome = fixMojibake(item.medico?.nomeCompleto || 'Médico não identificado');
       const escNome = fixMojibake(item.escala?.nome || 'Escala não identificada');
       const key = `${medId}::${escId}`;
+      const valorHoraAlocacao =
+        escId !== 'sem-escala' && medId !== 'sem-medico'
+          ? Number(valorHoraPorMedicoEscala[key])
+          : NaN;
+      const temValorHoraAlocacao = Number.isFinite(valorHoraAlocacao) && valorHoraAlocacao > 0;
+
       const gradeIdInferido = inferGradeIdFromCheckIn(item.checkInAt);
       const dateStr = String(item.checkInAt ?? '').slice(0, 10);
-      const valorPlantaoGravado =
+      const gradeResolvido =
+        item.id && gradeIdPlantaoPorRegistroPontoId[item.id]
+          ? String(gradeIdPlantaoPorRegistroPontoId[item.id]).trim().toLowerCase()
+          : null;
+
+      const valorPlantaoGravadoPorGradeResolvido =
+        escId !== 'sem-escala' && dateStr && gradeResolvido
+          ? plantoesValorHoraPorEscalaDataGrade[`${escId}::${dateStr}::${gradeResolvido}`] ?? null
+          : null;
+      const valorPlantaoGravadoInferidoMtSn =
         escId !== 'sem-escala' && dateStr
           ? plantoesValorHoraPorEscalaDataGrade[`${escId}::${dateStr}::${gradeIdInferido}`] ?? null
           : null;
 
-      const total12h =
-        valorPlantaoGravado != null && Number(valorPlantaoGravado) > 0
-          ? Number(valorPlantaoGravado)
-          : valorPlantao12hPorGrade.get(gradeIdInferido) ?? null;
-
-      const valorHoraDerivado =
-        usaEscalaEPonto && contratoId && subgrupoId && total12h != null && total12h > 0
-          ? round2(total12h / 12)
+      const total12hPorRegistro =
+        item.id && escId !== 'sem-escala'
+          ? valorPlantao12hPorRegistroPontoId[item.id] ?? null
           : null;
+
+      const total12hPorCadastroGradeResolvido =
+        gradeResolvido != null ? valorPlantao12hPorGrade.get(gradeResolvido) ?? null : null;
+
+      /**
+       * Cadastro (Valores plantão no subgrupo) antes do valor gravado no slot do dia, para não ficar preso a
+       * snapshot incorreto no plantão; depois mapa por dia/grade, snapshot por registro, fallback mt/sn no cadastro.
+       */
+      let total12h: number | null = null;
+      let fonteValorTurno: string | null = null;
+      if (total12hPorCadastroGradeResolvido != null && total12hPorCadastroGradeResolvido > 0) {
+        total12h = Number(total12hPorCadastroGradeResolvido);
+        fonteValorTurno = `Valores plantão (cadastro), grade ${gradeResolvido ?? '?'}`;
+      } else if (
+        valorPlantaoGravadoPorGradeResolvido != null &&
+        Number(valorPlantaoGravadoPorGradeResolvido) > 0
+      ) {
+        total12h = Number(valorPlantaoGravadoPorGradeResolvido);
+        fonteValorTurno = `Valor no slot do plantão (${dateStr}, grade ${gradeResolvido ?? '?'})`;
+      } else if (
+        valorPlantaoGravadoInferidoMtSn != null &&
+        Number(valorPlantaoGravadoInferidoMtSn) > 0
+      ) {
+        total12h = Number(valorPlantaoGravadoInferidoMtSn);
+        fonteValorTurno = `Valor no slot do plantão (${dateStr}, grade MT/SN inferida pelo check-in)`;
+      } else if (total12hPorRegistro != null && Number(total12hPorRegistro) > 0) {
+        total12h = Number(total12hPorRegistro);
+        fonteValorTurno = 'Valor hora do plantão vinculado ao check-in (backend)';
+      } else {
+        const fallbackCad = valorPlantao12hPorGrade.get(gradeIdInferido);
+        if (fallbackCad != null && fallbackCad > 0) {
+          total12h = fallbackCad;
+          fonteValorTurno = `Valores plantão (cadastro), grade MT/SN inferida (${gradeIdInferido})`;
+        }
+      }
+
+      const fromRegDiv =
+        item.id && horasTurnoPorRegistroPontoId[item.id] != null
+          ? Number(horasTurnoPorRegistroPontoId[item.id])
+          : NaN;
+      let horasDivisor: number;
+      let fonteDivisor: string;
+      if (Number.isFinite(fromRegDiv) && fromRegDiv > 0) {
+        horasDivisor = fromRegDiv;
+        fonteDivisor = 'Horas previstas do turno (plantão / snapshot deste registro)';
+      } else if (gradeResolvido != null) {
+        const h = Number(horasTurnoPorGradeId[gradeResolvido]);
+        if (Number.isFinite(h) && h > 0) {
+          horasDivisor = h;
+          fonteDivisor = `Duração do tipo de plantão (grade ${gradeResolvido})`;
+        } else {
+          const hInf = Number(horasTurnoPorGradeId[gradeIdInferido]);
+          if (Number.isFinite(hInf) && hInf > 0) {
+            horasDivisor = hInf;
+            fonteDivisor = `Duração do tipo (grade inferida ${gradeIdInferido})`;
+          } else {
+            horasDivisor = 12;
+            fonteDivisor = 'Padrão 12 h (sem tipo para a grade)';
+          }
+        }
+      } else {
+        const hInf = Number(horasTurnoPorGradeId[gradeIdInferido]);
+        if (Number.isFinite(hInf) && hInf > 0) {
+          horasDivisor = hInf;
+          fonteDivisor = `Duração do tipo (grade inferida ${gradeIdInferido})`;
+        } else {
+          horasDivisor = 12;
+          fonteDivisor = 'Padrão 12 h';
+        }
+      }
+
+      const horasTrabalhadas = minutos / 60;
+      const rawCongelado = (item as RegistroPontoAdmin).repasseValorCongelado;
+      const repasseCongeladoNum =
+        rawCongelado != null && rawCongelado !== ''
+          ? Number(rawCongelado)
+          : NaN;
+      const temRepasseCongelado =
+        Number.isFinite(repasseCongeladoNum) && repasseCongeladoNum > 0;
+
       const valorRegistro =
-        valorHoraDerivado != null && valorHoraDerivado > 0 ? (minutos / 60) * valorHoraDerivado : null;
+        usaEscalaEPonto && contratoId && temRepasseCongelado
+          ? round2(repasseCongeladoNum)
+          : usaEscalaEPonto && contratoId
+            ? temValorHoraAlocacao
+              ? round2(horasTrabalhadas * valorHoraAlocacao)
+              : total12h != null && total12h > 0 && horasDivisor > 0
+                ? round2(total12h * (horasTrabalhadas / horasDivisor))
+                : null
+            : null;
+
+      const metodoCalculo: DetalheCalculoRegistroPonto['metodo'] =
+        usaEscalaEPonto && contratoId && temRepasseCongelado
+          ? 'REPASSE_CONGELADO'
+          : usaEscalaEPonto && contratoId && temValorHoraAlocacao
+            ? 'VALOR_HORA_ALOCACAO_ESCALA'
+            : usaEscalaEPonto &&
+                contratoId &&
+                total12h != null &&
+                total12h > 0 &&
+                horasDivisor > 0 &&
+                valorRegistro != null
+              ? 'PROPORCIONAL_TURNO'
+              : 'SEM_VALOR';
+
+      const resumoCalculo =
+        usaEscalaEPonto && contratoId && temRepasseCongelado
+          ? `Congelado no checkout: ${formatValor(repasseCongeladoNum)}`
+          : usaEscalaEPonto && contratoId && temValorHoraAlocacao
+            ? `${horasTrabalhadas.toFixed(2)} h × ${formatValor(valorHoraAlocacao)}/h (alocação médico–escala)`
+            : usaEscalaEPonto &&
+                contratoId &&
+                total12h != null &&
+                total12h > 0 &&
+                horasDivisor > 0 &&
+                valorRegistro != null
+              ? `${formatValor(total12h)} × (${horasTrabalhadas.toFixed(2)} h ÷ ${horasDivisor} h) = ${formatValor(
+                  valorRegistro
+                )}. Valor turno: ${fonteValorTurno ?? '—'}. Divisor: ${fonteDivisor}.`
+              : usaEscalaEPonto && contratoId
+                ? 'Sem valor: falta repasse congelado, valor hora na alocação ou base de turno (cadastro/plantão).'
+                : '—';
+
+      const detalheLinha: DetalheCalculoRegistroPonto = {
+        registroId: item.id,
+        checkInAt: item.checkInAt,
+        duracaoMinutos: minutos,
+        valorAplicado: valorRegistro,
+        metodo: metodoCalculo,
+        resumo: resumoCalculo,
+      };
 
       const prev = map.get(key);
       if (prev) {
@@ -299,8 +503,15 @@ const Relatorios = () => {
         if (valorRegistro != null) {
           prev.valorCalculado = round2((prev.valorCalculado ?? 0) + valorRegistro);
         }
+        if (temValorHoraAlocacao) {
+          prev.valorHora = valorHoraAlocacao;
+        }
         if (escNome && escNome !== 'Escala não identificada' && prev.escalaNome === 'Escala não identificada') {
           prev.escalaNome = escNome;
+        }
+        if (usaEscalaEPonto && contratoId) {
+          if (!prev.calculoPorRegistro) prev.calculoPorRegistro = [];
+          prev.calculoPorRegistro.push(detalheLinha);
         }
       } else {
         map.set(key, {
@@ -311,7 +522,10 @@ const Relatorios = () => {
           escalaNome: escNome,
           totalMinutos: minutos,
           totalRegistros: 1,
+          valorHora: temValorHoraAlocacao ? valorHoraAlocacao : undefined,
           valorCalculado: valorRegistro != null ? round2(valorRegistro) : undefined,
+          calculoPorRegistro:
+            usaEscalaEPonto && contratoId ? [detalheLinha] : undefined,
         });
       }
 
@@ -322,20 +536,37 @@ const Relatorios = () => {
 
     const temValorPlantaoGravadoNoPeriodo = Object.keys(plantoesValorHoraPorEscalaDataGrade).length > 0;
     const temValorBaseGrade = valorPlantao12hPorGrade.size > 0;
-    // Fallback antigo: só quando não dá para usar nem valores-plantao nem valor gravado por plantão/dia
+    const temValorPorRegistro = Object.keys(valorPlantao12hPorRegistroPontoId).length > 0;
+    const temGradeResolvido = Object.keys(gradeIdPlantaoPorRegistroPontoId).length > 0;
+    // Fallback: só quando não há base de plantão/grade no período; nunca sobrescreve linha já calculada no loop principal.
     if (
       !usaEscalaEPonto ||
       !contratoId ||
-      !subgrupoId ||
-      (!temValorBaseGrade && !temValorPlantaoGravadoNoPeriodo)
+      (!temValorBaseGrade &&
+        !temValorPlantaoGravadoNoPeriodo &&
+        !temValorPorRegistro &&
+        !temGradeResolvido)
     ) {
       for (const row of rows) {
         const keyMedEsc = `${row.medicoId}::${row.escalaId}`;
         if (row.escalaId !== 'sem-escala') {
+          if (row.valorCalculado != null) continue;
           const vh = valorHoraPorMedicoEscala[keyMedEsc];
           if (vh != null && vh > 0) {
             row.valorHora = vh;
-            row.valorCalculado = (row.totalMinutos / 60) * vh;
+            row.valorCalculado = round2((row.totalMinutos / 60) * vh);
+            row.calculoPorRegistro = [
+              {
+                registroId: '_agrupado',
+                checkInAt: '',
+                duracaoMinutos: row.totalMinutos,
+                valorAplicado: row.valorCalculado,
+                metodo: 'VALOR_HORA_ALOCACAO_ESCALA',
+                resumo: `Fallback (sem plantão/grade no período): ${(row.totalMinutos / 60).toFixed(2)} h × ${formatValor(
+                  vh
+                )}/h na alocação médico–escala.`,
+              },
+            ];
           }
         } else if (row.medicoId !== 'sem-medico') {
           const vh = valorHoraPorMedico[row.medicoId];
@@ -371,6 +602,10 @@ const Relatorios = () => {
     valorHoraCobrancaPorMedico,
     valorHoraPorMedicoEscala,
     plantoesValorHoraPorEscalaDataGrade,
+    valorPlantao12hPorRegistroPontoId,
+    gradeIdPlantaoPorRegistroPontoId,
+    horasTurnoPorRegistroPontoId,
+    horasTurnoPorGradeId,
     apenasPonto,
   ]);
 
@@ -476,6 +711,12 @@ const Relatorios = () => {
                 </option>
               ))}
             </select>
+            {usaEscalaEPonto && contratoId && !subgrupoId && subgruposList.length > 1 && (
+              <p className="text-[11px] text-amber-800 mt-1.5 leading-snug">
+                Vários subgrupos neste contrato: com &quot;Todos&quot;, os valores de plantão do cadastro são unidos por
+                tipo (maior valor por grade). Para cravar um subgrupo, selecione-o no filtro.
+              </p>
+            )}
           </div>
 
           <div>
@@ -537,7 +778,25 @@ const Relatorios = () => {
 
       <div className="card">
         <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
-          <h3 className="text-lg font-bold text-viva-900">Horas por médico e escala</h3>
+          <div>
+            <h3 className="text-lg font-bold text-viva-900">Horas por médico e escala</h3>
+            <p className="text-xs text-gray-600 mt-1 max-w-3xl leading-relaxed">
+              Registros já fechados usam o <strong>valor congelado no checkout</strong> (não muda se você alterar tipos
+              MT/SN ou valores depois). Sem congelado, aplica-se valor hora na alocação ou proporcional ao turno
+              (cadastro / slot / tipo atual). Novos plantões gravam a duração do turno no dia para o histórico.
+            </p>
+            {usaEscalaEPonto && (
+              <label className="mt-3 flex cursor-pointer items-center gap-2 text-sm text-viva-800">
+                <input
+                  type="checkbox"
+                  className="rounded border-viva-300"
+                  checked={mostrarDetalheCalculo}
+                  onChange={(e) => setMostrarDetalheCalculo(e.target.checked)}
+                />
+                Mostrar detalhe do cálculo (cada registro de ponto)
+              </label>
+            )}
+          </div>
           <button
             type="button"
             className="btn btn-secondary inline-flex items-center gap-2"
@@ -581,28 +840,60 @@ const Relatorios = () => {
                 </tr>
               </thead>
               <tbody>
-                {agrupado.map((item) => (
-                  <tr key={item.key} className="border-b last:border-b-0">
-                    <td className="py-2 pr-4 font-medium text-viva-900">{item.medicoNome}</td>
-                    <td className="py-2 pr-4 text-gray-700">{item.escalaNome}</td>
-                    <td className="py-2 pr-4 text-gray-700">{item.totalRegistros}</td>
-                    <td className="py-2 pr-4 font-semibold text-viva-900">{formatDuration(item.totalMinutos)}</td>
-                    {apenasPonto ? (
-                      <>
-                        <td className="py-2 pr-4 text-gray-700">
-                          {item.valorRepasse != null ? formatValor(item.valorRepasse) : '—'}
-                        </td>
-                        <td className="py-2 pr-4 text-gray-700">
-                          {item.valorCobranca != null ? formatValor(item.valorCobranca) : '—'}
-                        </td>
-                      </>
-                    ) : (
-                      <td className="py-2 pr-4 text-gray-700">
-                        {item.valorCalculado != null ? formatValor(item.valorCalculado) : '—'}
-                      </td>
-                    )}
-                  </tr>
-                ))}
+                {agrupado.map((item) => {
+                  const colSpan = apenasPonto ? 6 : 5;
+                  return (
+                    <Fragment key={item.key}>
+                      <tr className="border-b last:border-b-0">
+                        <td className="py-2 pr-4 font-medium text-viva-900">{item.medicoNome}</td>
+                        <td className="py-2 pr-4 text-gray-700">{item.escalaNome}</td>
+                        <td className="py-2 pr-4 text-gray-700">{item.totalRegistros}</td>
+                        <td className="py-2 pr-4 font-semibold text-viva-900">{formatDuration(item.totalMinutos)}</td>
+                        {apenasPonto ? (
+                          <>
+                            <td className="py-2 pr-4 text-gray-700">
+                              {item.valorRepasse != null ? formatValor(item.valorRepasse) : '—'}
+                            </td>
+                            <td className="py-2 pr-4 text-gray-700">
+                              {item.valorCobranca != null ? formatValor(item.valorCobranca) : '—'}
+                            </td>
+                          </>
+                        ) : (
+                          <td className="py-2 pr-4 text-gray-700">
+                            {item.valorCalculado != null ? formatValor(item.valorCalculado) : '—'}
+                          </td>
+                        )}
+                      </tr>
+                      {usaEscalaEPonto &&
+                        mostrarDetalheCalculo &&
+                        item.calculoPorRegistro &&
+                        item.calculoPorRegistro.length > 0 && (
+                          <tr key={`${item.key}-det`} className="border-b bg-viva-50/80 last:border-b-0">
+                            <td colSpan={colSpan} className="py-2 px-2 text-xs text-gray-700">
+                              <p className="mb-1 font-semibold text-viva-800">Como o valor desta linha foi composto</p>
+                              <ul className="list-inside list-disc space-y-1 pl-1">
+                                {item.calculoPorRegistro.map((d, i) => (
+                                  <li key={`${d.registroId}-${i}`}>
+                                    <span className="font-mono text-[11px] text-gray-500">
+                                      {d.registroId !== '_agrupado' ? d.registroId.slice(0, 8) : '—'}…
+                                    </span>{' '}
+                                    {d.checkInAt ? (
+                                      <span className="text-gray-500">
+                                        check-in {d.checkInAt.slice(0, 16).replace('T', ' ')} ·{' '}
+                                      </span>
+                                    ) : null}
+                                    {formatDuration(d.duracaoMinutos)}
+                                    {d.valorAplicado != null ? ` → ${formatValor(d.valorAplicado)}` : ''}
+                                    <span className="mt-0.5 block text-gray-600">{d.resumo}</span>
+                                  </li>
+                                ))}
+                              </ul>
+                            </td>
+                          </tr>
+                        )}
+                    </Fragment>
+                  );
+                })}
               </tbody>
             </table>
           </div>
