@@ -17,6 +17,8 @@ Fluxos com **ler → decidir → escrever** sem trava no banco: dois pedidos par
 | Check-in | Dois check-ins “abertos” | `ponto.service` usa transação e revalidação |
 | Checkout | Fechar o mesmo registro duas vezes | `updateMany` com `checkOutAt: null` |
 | Convite / reset de senha | Token usado duas vezes | Transações em `auth.service` |
+| Vagas — resposta do publicador (`PATCH` status candidato) | Dois `PATCH` paralelos no mesmo interesse `PENDENTE` | `vaga.service`: transação + `updateMany` só com `status: PENDENTE`; segundo pedido → **400** (“já respondido”) |
+| Vagas — demonstrar interesse | Janela entre “vaga válida” e `create` interesse | `registrarInteresseVaga` em `prisma.$transaction`; duplicidade → **409** (unique) |
 
 ### Como testar (ferramentas)
 
@@ -126,7 +128,8 @@ Ordem sugerida de revisão manual:
 1. **Auth** → JWT contém `tenantId` + `role` + `id`; nenhum desses pode ser sobrescrito pelo body.
 2. **Admin** → `requireRole(MASTER)` + `requireModuleAccess`.
 3. **Médico** → `requireModuleAccess` por rota; `req.user.id` como sujeito da ação.
-4. **Ponto** → escala/plantão sempre filtrados por `tenantId` + vínculo do médico.
+4. **Vagas** → `requireModuleAccess(VAGAS)`; todas as queries com `tenantId` do JWT; publicador verificado antes de listar candidatos / alterar status; mutações com rate limit dedicado (`medico.routes.ts`).
+5. **Ponto** → escala/plantão sempre filtrados por `tenantId` + vínculo do médico.
 
 ---
 

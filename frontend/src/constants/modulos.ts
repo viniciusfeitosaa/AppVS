@@ -8,6 +8,7 @@ export type ModuloSistema =
   | 'RELATORIOS'
   | 'PONTO_ELETRONICO'
   | 'ATENDIMENTOS'
+  | 'VAGAS'
   | 'CONFIGURACOES'
   | 'ENVIO_DOCUMENTOS'
   | 'PERFIL';
@@ -22,6 +23,7 @@ export const MODULO_LABEL: Record<ModuloSistema, string> = {
   RELATORIOS: 'Relatórios',
   PONTO_ELETRONICO: 'Ponto Eletrônico',
   ATENDIMENTOS: 'Atendimentos',
+  VAGAS: 'Vagas',
   CONFIGURACOES: 'Configurações',
   ENVIO_DOCUMENTOS: 'Envio de Documentos',
   PERFIL: 'Minha Conta',

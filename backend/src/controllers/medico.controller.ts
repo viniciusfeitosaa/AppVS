@@ -9,6 +9,17 @@ import {
   marcarNotificacaoLidaService,
   marcarTodasNotificacoesLidasService,
 } from '../services/notificacao-medico.service';
+import {
+  atualizarStatusInteresseCandidato,
+  createVagaMedico,
+  excluirVagaPublicada,
+  listarCandidatosVaga,
+  listMinhasVagasPublicadas,
+  listVagasAtivasParaMedico,
+  registrarInteresseVaga,
+  removerInteresseVaga,
+} from '../services/vaga.service';
+import { getDashboardMedicoService } from '../services/dashboard-medico.service';
 
 export const getPerfilController = async (req: Request, res: Response) => {
   try {
@@ -180,6 +191,189 @@ export const marcarTodasNotificacoesLidasMedicoController = async (req: Request,
     return res.status(error.statusCode || 500).json({
       success: false,
       error: error.message || 'Erro ao atualizar notificações',
+    });
+  }
+};
+
+export const listVagasMedicoController = async (req: Request, res: Response) => {
+  try {
+    const medicoId = req.user?.id;
+    const tenantId = req.user?.tenantId;
+    if (!medicoId || !tenantId) {
+      return res.status(401).json({ success: false, error: 'Não autenticado' });
+    }
+    const items = await listVagasAtivasParaMedico(tenantId, medicoId);
+    return res.status(200).json({
+      success: true,
+      data: {
+        items,
+        mensagem:
+          items.length === 0
+            ? 'Nenhuma vaga ativa no momento. Em Anunciar você pode publicar uma oportunidade.'
+            : null,
+      },
+    });
+  } catch (error: any) {
+    return res.status(error.statusCode || 500).json({
+      success: false,
+      error: error.message || 'Erro ao listar vagas',
+    });
+  }
+};
+
+export const getDashboardMedicoController = async (req: Request, res: Response) => {
+  try {
+    const medicoId = req.user?.id;
+    const tenantId = req.user?.tenantId;
+    if (!medicoId || !tenantId) {
+      return res.status(401).json({ success: false, error: 'Não autenticado' });
+    }
+    const data = await getDashboardMedicoService(tenantId, medicoId);
+    return res.status(200).json({ success: true, data });
+  } catch (error: any) {
+    return res.status(error.statusCode || 500).json({
+      success: false,
+      error: error.message || 'Erro ao carregar dashboard',
+    });
+  }
+};
+
+export const listMinhasPublicadasVagasController = async (req: Request, res: Response) => {
+  try {
+    const medicoId = req.user?.id;
+    const tenantId = req.user?.tenantId;
+    if (!medicoId || !tenantId) {
+      return res.status(401).json({ success: false, error: 'Não autenticado' });
+    }
+    const items = await listMinhasVagasPublicadas(tenantId, medicoId);
+    return res.status(200).json({ success: true, data: { items } });
+  } catch (error: any) {
+    return res.status(error.statusCode || 500).json({
+      success: false,
+      error: error.message || 'Erro ao listar suas publicações',
+    });
+  }
+};
+
+export const getCandidatosVagaController = async (req: Request, res: Response) => {
+  try {
+    const medicoId = req.user?.id;
+    const tenantId = req.user?.tenantId;
+    const vagaId = req.params.vagaId;
+    if (!medicoId || !tenantId) {
+      return res.status(401).json({ success: false, error: 'Não autenticado' });
+    }
+    const items = await listarCandidatosVaga(tenantId, medicoId, vagaId);
+    return res.status(200).json({ success: true, data: { items } });
+  } catch (error: any) {
+    return res.status(error.statusCode || 500).json({
+      success: false,
+      error: error.message || 'Erro ao listar candidatos',
+    });
+  }
+};
+
+export const patchStatusCandidatoVagaController = async (req: Request, res: Response) => {
+  try {
+    const medicoId = req.user?.id;
+    const tenantId = req.user?.tenantId;
+    const { vagaId, candidatoMedicoId } = req.params;
+    if (!medicoId || !tenantId) {
+      return res.status(401).json({ success: false, error: 'Não autenticado' });
+    }
+    const status = req.body.status as 'ACEITO' | 'RECUSADO';
+    const data = await atualizarStatusInteresseCandidato(tenantId, medicoId, vagaId, candidatoMedicoId, status);
+    return res.status(200).json({ success: true, data });
+  } catch (error: any) {
+    return res.status(error.statusCode || 500).json({
+      success: false,
+      error: error.message || 'Erro ao atualizar candidato',
+    });
+  }
+};
+
+export const postInteresseVagaController = async (req: Request, res: Response) => {
+  try {
+    const medicoId = req.user?.id;
+    const tenantId = req.user?.tenantId;
+    const vagaId = req.params.vagaId;
+    if (!medicoId || !tenantId) {
+      return res.status(401).json({ success: false, error: 'Não autenticado' });
+    }
+    const data = await registrarInteresseVaga(tenantId, medicoId, vagaId);
+    return res.status(201).json({ success: true, data });
+  } catch (error: any) {
+    return res.status(error.statusCode || 500).json({
+      success: false,
+      error: error.message || 'Erro ao registrar interesse',
+    });
+  }
+};
+
+export const deleteInteresseVagaController = async (req: Request, res: Response) => {
+  try {
+    const medicoId = req.user?.id;
+    const tenantId = req.user?.tenantId;
+    const vagaId = req.params.vagaId;
+    if (!medicoId || !tenantId) {
+      return res.status(401).json({ success: false, error: 'Não autenticado' });
+    }
+    await removerInteresseVaga(tenantId, medicoId, vagaId);
+    return res.status(200).json({ success: true, message: 'Interesse removido' });
+  } catch (error: any) {
+    return res.status(error.statusCode || 500).json({
+      success: false,
+      error: error.message || 'Erro ao remover interesse',
+    });
+  }
+};
+
+export const deleteVagaMedicoController = async (req: Request, res: Response) => {
+  try {
+    const medicoId = req.user?.id;
+    const tenantId = req.user?.tenantId;
+    const vagaId = req.params.vagaId;
+    if (!medicoId || !tenantId) {
+      return res.status(401).json({ success: false, error: 'Não autenticado' });
+    }
+    await excluirVagaPublicada(tenantId, medicoId, vagaId);
+    return res.status(200).json({ success: true, message: 'Vaga excluída' });
+  } catch (error: any) {
+    return res.status(error.statusCode || 500).json({
+      success: false,
+      error: error.message || 'Erro ao excluir vaga',
+    });
+  }
+};
+
+export const createVagaMedicoController = async (req: Request, res: Response) => {
+  try {
+    const medicoId = req.user?.id;
+    const tenantId = req.user?.tenantId;
+    if (!medicoId || !tenantId) {
+      return res.status(401).json({ success: false, error: 'Não autenticado' });
+    }
+    const body = req.body;
+    const valorACombinar = body.valorACombinar === true;
+    const data = await createVagaMedico(tenantId, medicoId, {
+      tipoAtendimento: body.tipoAtendimento,
+      setor: body.setor,
+      valorACombinar,
+      valorCentavos: valorACombinar ? null : body.valorCentavos ?? null,
+      valorLiquidoBruto: valorACombinar ? null : body.valorLiquidoBruto ?? null,
+      pagamento: body.pagamento,
+      quantidadeVagas: Number(body.quantidadeVagas),
+      prazoPublicacaoDias: Number(body.prazoPublicacaoDias),
+      categoriaProfissional: body.categoriaProfissional || 'MEDICO',
+      diasVaga: body.diasVaga,
+      descricao: body.descricao,
+      confirmacaoResponsavel: body.confirmacaoResponsavel === true,
+    });
+    return res.status(201).json({ success: true, data });
+  } catch (error: any) {
+    return res.status(error.statusCode || 500).json({
+      success: false,
+      error: error.message || 'Erro ao publicar vaga',
     });
   }
 };

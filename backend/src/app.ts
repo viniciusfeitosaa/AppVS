@@ -62,6 +62,21 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 // Arquivos em uploads/ não são mais servidos publicamente (ver rotas autenticadas em medico/ponto/admin).
 
+// Observabilidade básica (tempo por request) — habilite com REQUEST_LOG_MS=200 (exemplo).
+const REQUEST_LOG_MS = parseInt(process.env.REQUEST_LOG_MS || '', 10);
+if (Number.isFinite(REQUEST_LOG_MS) && REQUEST_LOG_MS > 0) {
+  app.use((req: Request, res: Response, next: NextFunction) => {
+    const start = Date.now();
+    res.on('finish', () => {
+      const ms = Date.now() - start;
+      if (ms >= REQUEST_LOG_MS) {
+        console.log(`[HTTP] ${req.method} ${req.originalUrl} → ${res.statusCode} (${ms}ms)`);
+      }
+    });
+    next();
+  });
+}
+
 // Garantir que respostas JSON sejam enviadas em UTF-8 (evita mojibake na exibição)
 app.use((_req: Request, res: Response, next: NextFunction) => {
   const originalJson = res.json.bind(res);

@@ -44,9 +44,25 @@ export interface PerfilResponse {
   data: MedicoPerfil;
 }
 
+export interface DashboardMedicoResponse {
+  success: boolean;
+  data: {
+    perfil: MedicoPerfil;
+    meuDia: any;
+    escalas: any[];
+    proximosPlantoes: any[];
+    documentosEnviados: DocumentoEnviadoItem[];
+  };
+}
+
 export const medicoService = {
   getPerfil: async (): Promise<PerfilResponse> => {
     const response = await api.get<PerfilResponse>('/medico/perfil');
+    return response.data;
+  },
+
+  getDashboard: async (): Promise<DashboardMedicoResponse> => {
+    const response = await api.get<DashboardMedicoResponse>('/medico/dashboard');
     return response.data;
   },
 
@@ -138,7 +154,129 @@ export const medicoService = {
   marcarTodasNotificacoesLidas: async (): Promise<void> => {
     await api.post('/medico/notificacoes/marcar-todas-lidas');
   },
+
+  listVagas: async (): Promise<ListVagasMedicoResponse> => {
+    const response = await api.get<ListVagasMedicoResponse>('/medico/vagas');
+    return response.data;
+  },
+
+  createVaga: async (payload: CreateVagaPayload): Promise<{ success: boolean; data: VagaPublicadaItem }> => {
+    const response = await api.post<{ success: boolean; data: VagaPublicadaItem }>('/medico/vagas', payload);
+    return response.data;
+  },
+
+  listMinhasPublicadasVagas: async (): Promise<{ success: boolean; data: { items: MinhaVagaPublicadaItem[] } }> => {
+    const response = await api.get<{ success: boolean; data: { items: MinhaVagaPublicadaItem[] } }>(
+      '/medico/vagas/minhas-publicadas'
+    );
+    return response.data;
+  },
+
+  getCandidatosVaga: async (
+    vagaId: string
+  ): Promise<{ success: boolean; data: { items: CandidatoInteresseItem[] } }> => {
+    const response = await api.get<{ success: boolean; data: { items: CandidatoInteresseItem[] } }>(
+      `/medico/vagas/${vagaId}/candidatos`
+    );
+    return response.data;
+  },
+
+  postInteresseVaga: async (vagaId: string): Promise<{ success: boolean; data: { id: string; status: StatusInteresseVaga } }> => {
+    const response = await api.post(`/medico/vagas/${vagaId}/interesse`);
+    return response.data;
+  },
+
+  deleteInteresseVaga: async (vagaId: string): Promise<void> => {
+    await api.delete(`/medico/vagas/${vagaId}/interesse`);
+  },
+
+  deleteVaga: async (vagaId: string): Promise<void> => {
+    await api.delete(`/medico/vagas/${vagaId}`);
+  },
+
+  patchStatusCandidatoVaga: async (
+    vagaId: string,
+    candidatoMedicoId: string,
+    status: 'ACEITO' | 'RECUSADO'
+  ): Promise<{ success: boolean; data: { id: string; status: StatusInteresseVaga } }> => {
+    const response = await api.patch(`/medico/vagas/${vagaId}/candidatos/${candidatoMedicoId}`, { status });
+    return response.data;
+  },
 };
+
+export type StatusInteresseVaga = 'PENDENTE' | 'ACEITO' | 'RECUSADO';
+
+export interface VagaPublicadaItem {
+  id: string;
+  medicoPublicadorId?: string;
+  tipoAtendimento: string;
+  setor: string;
+  valorACombinar: boolean;
+  valorCentavos: number | null;
+  valorLiquidoBruto: string | null;
+  pagamento: string;
+  quantidadeVagas: number;
+  prazoPublicacaoDias: number;
+  categoriaProfissional: string;
+  diasVaga: string[];
+  descricao: string;
+  createdAt: string;
+  expiresAt: string;
+  publicador: { id: string; nomeCompleto: string; crm: string | null };
+  souPublicador?: boolean;
+  meuInteresse?: { id: string; status: StatusInteresseVaga } | null;
+  totalInteresses?: number;
+}
+
+export interface MinhaVagaPublicadaItem {
+  id: string;
+  tipoAtendimento: string;
+  setor: string;
+  expiresAt: string;
+  ativa: boolean;
+  totalInteresses: number;
+  pendentes: number;
+  createdAt: string;
+}
+
+export interface CandidatoInteresseItem {
+  interesseId: string;
+  status: StatusInteresseVaga;
+  criadoEm: string;
+  candidato: {
+    id: string;
+    nomeCompleto: string;
+    crm: string | null;
+    email: string | null;
+    telefone: string | null;
+    especialidades: string[];
+    profissao: string;
+    whatsappHref: string | null;
+  };
+}
+
+export interface CreateVagaPayload {
+  tipoAtendimento: string;
+  setor: string;
+  valorACombinar: boolean;
+  valorCentavos: number | null;
+  valorLiquidoBruto: 'LIQUIDO' | 'BRUTO' | null;
+  pagamento: 'A_VISTA' | 'COMBINAR';
+  quantidadeVagas: number;
+  prazoPublicacaoDias: number;
+  categoriaProfissional: string;
+  diasVaga: string[];
+  descricao: string;
+  confirmacaoResponsavel: boolean;
+}
+
+export interface ListVagasMedicoResponse {
+  success: boolean;
+  data: {
+    items: VagaPublicadaItem[];
+    mensagem: string | null;
+  };
+}
 
 export interface DocumentoEnviadoItem {
   id: string;

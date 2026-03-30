@@ -23,6 +23,19 @@ const formatClock = (d: Date) => {
   return `${h}:${m}:${s}`;
 };
 
+const LiveClock = ({ tickMs = 1000 }: { tickMs?: number }) => {
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    const t = setInterval(() => setNow(new Date()), tickMs);
+    return () => clearInterval(t);
+  }, [tickMs]);
+  return (
+    <span className="text-3xl md:text-4xl font-mono font-bold text-viva-900 tabular-nums tracking-tight" aria-live="polite">
+      {formatClock(now)}
+    </span>
+  );
+};
+
 type PlantaoHojeMeuDia = {
   id: string;
   escalaId: string;
@@ -84,6 +97,7 @@ const PontoEletronico = () => {
   const [observacao, setObservacao] = useState('');
   const [loadingAction, setLoadingAction] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // “Agora” para lógica (seleção de plantão / janelas) — não precisa atualizar a cada 1s.
   const [agora, setAgora] = useState(() => new Date());
   const [checkinModalOpen, setCheckinModalOpen] = useState(false);
   const [cameraErro, setCameraErro] = useState(false);
@@ -103,22 +117,25 @@ const PontoEletronico = () => {
     queryKey: ['auth', 'modulos-acesso', user?.id],
     queryFn: () => authService.getModulosAcesso(),
     enabled: !!user && isMedico,
+    staleTime: 2 * 60 * 1000,
   });
 
   const { data: escalasResp } = useQuery({
     queryKey: ['ponto', 'minhas-escalas'],
     queryFn: () => pontoService.listMinhasEscalas(),
-    enabled: isMedico,
+    enabled: !!user && isMedico,
+    staleTime: 30 * 1000,
   });
 
   const { data: meuDiaResp, isLoading } = useQuery({
     queryKey: ['ponto', 'meu-dia'],
     queryFn: () => pontoService.getMeuDia(),
-    enabled: isMedico,
+    enabled: !!user && isMedico,
+    staleTime: 15 * 1000,
   });
 
   useEffect(() => {
-    const t = setInterval(() => setAgora(new Date()), 1000);
+    const t = setInterval(() => setAgora(new Date()), 30000);
     return () => clearInterval(t);
   }, []);
 
@@ -180,6 +197,7 @@ const PontoEletronico = () => {
     enabled: isMedico && !!selectedEscalaId && !registroAberto,
     refetchInterval:
       !registroAberto && selectedEscalaId && selectedEscalaId !== PONTO_SEM_ESCALA_ESCALA_ID ? 30000 : false,
+    staleTime: 10 * 1000,
   });
   const canCheckIn = !!canCheckInResp?.data?.allowed;
   const canCheckInReason: string | null = canCheckInResp?.data?.reason ?? null;
@@ -487,12 +505,7 @@ const PontoEletronico = () => {
       {/* Relógio + Ação */}
       <div className="card stagger-2">
         <div className="flex items-center justify-center mb-6 py-6 rounded-2xl bg-gradient-to-br from-viva-50/80 to-viva-100/40 border border-viva-200/50">
-          <span
-            className="text-3xl md:text-4xl font-mono font-bold text-viva-900 tabular-nums tracking-tight"
-            aria-live="polite"
-          >
-            {formatClock(agora)}
-          </span>
+          <LiveClock />
         </div>
 
         <h3 className="text-xs font-semibold uppercase tracking-wider text-viva-600 mb-4 font-display">

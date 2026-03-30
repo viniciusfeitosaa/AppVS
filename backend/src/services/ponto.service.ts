@@ -246,6 +246,35 @@ const endOfWeek = () => {
   return date;
 };
 
+type CacheEntry<T> = { exp: number; value: T };
+const CACHE_TTL_MS = Math.max(0, parseInt(process.env.PONTO_CACHE_TTL_MS || '', 10) || 10_000);
+const meuDiaCache = new Map<string, CacheEntry<unknown>>();
+const minhasEscalasCache = new Map<string, CacheEntry<unknown>>();
+
+function cacheKey(tenantId: string, medicoId: string) {
+  return `${tenantId}:${medicoId}`;
+}
+
+function getCached<T>(m: Map<string, CacheEntry<T>>, key: string): T | null {
+  const hit = m.get(key);
+  if (!hit) return null;
+  if (Date.now() > hit.exp) {
+    m.delete(key);
+    return null;
+  }
+  return hit.value;
+}
+
+function setCached<T>(m: Map<string, CacheEntry<T>>, key: string, value: T) {
+  m.set(key, { exp: Date.now() + CACHE_TTL_MS, value });
+}
+
+function clearPontoCaches(tenantId: string, medicoId: string) {
+  const key = cacheKey(tenantId, medicoId);
+  meuDiaCache.delete(key);
+  minhasEscalasCache.delete(key);
+}
+
 export async function checkInService(
   tenantId: string,
   medicoId: string,
@@ -350,6 +379,7 @@ export async function checkInService(
         },
         tx
       );
+      clearPontoCaches(tenantId, medicoId);
       return registro;
     });
   }
@@ -424,6 +454,7 @@ export async function checkInService(
       tx
     );
 
+    clearPontoCaches(tenantId, medicoId);
     return registro;
   });
 }
@@ -529,11 +560,17 @@ export async function checkOutService(
       tx
     );
 
+    clearPontoCaches(tenantId, medicoId);
     return registro;
   });
 }
 
 export async function getMeuDiaPontoService(tenantId: string, medicoId: string) {
+  if (CACHE_TTL_MS > 0) {
+    const hit = getCached(meuDiaCache, cacheKey(tenantId, medicoId));
+    if (hit) return hit as any;
+  }
+
   const now = new Date();
   const hojeInicio = startOfToday();
   const hojeFim = endOfToday();
@@ -671,7 +708,7 @@ export async function getMeuDiaPontoService(tenantId: string, medicoId: string) 
     return enrichPlantaoComTipo(base, cid, tipoMapsHoje);
   });
 
-  return {
+  const payload = {
     registroAberto: aberto,
     registrosHoje: registros,
     totalMinutosHoje: totalMinutos,
@@ -684,9 +721,18 @@ export async function getMeuDiaPontoService(tenantId: string, medicoId: string) 
     temContratoComEscala,
     plantoesHoje,
   };
+  if (CACHE_TTL_MS > 0) {
+    setCached(meuDiaCache, cacheKey(tenantId, medicoId), payload);
+  }
+  return payload;
 }
 
 export async function listMinhasEscalasService(tenantId: string, medicoId: string) {
+  if (CACHE_TTL_MS > 0) {
+    const hit = getCached(minhasEscalasCache, cacheKey(tenantId, medicoId));
+    if (hit) return hit as any;
+  }
+
   const alocacoes = await prisma.escalaMedico.findMany({
     where: {
       tenantId,
@@ -785,35 +831,70 @@ export async function listMinhasEscalasService(tenantId: string, medicoId: strin
       ? await loadTiposMapPorContrato(tenantId, contratoIdsUnicos)
       : new Map<string, Map<string, TipoPlantao>>();
 
-  for (const escalaId of escalaIds) {
-    const [equipesNaEscala, gradeIdsDoMedico] = await Promise.all([
-      prisma.escalaEquipe.findMany({
-        where: { tenantId, escalaId },
-        select: { equipeId: true },
-      }),
-      prisma.escalaPlantao.findMany({
-        where: { tenantId, escalaId, medicoId },
-        select: { gradeId: true },
-        distinct: ['gradeId'],
-      }),
-    ]);
-    const equipeIds = new Set(equipesNaEscala.map((e) => e.equipeId));
-    const minhasEquipes = await prisma.equipeMedico.findMany({
-      where: { tenantId, medicoId, equipeId: { in: Array.from(equipeIds) } },
-      select: { equipe: { select: { nome: true } } },
-    });
-    const entry = uniqueByEscala.get(escalaId);
-    if (entry) {
-      entry.equipes = minhasEquipes.map((em) => em.equipe.nome);
-      const gids = gradeIdsDoMedico.map((p) => p.gradeId?.toLowerCase()).filter(Boolean) as string[];
-      entry.gradeIds = gids;
-      const cid = contratoPorEscala.get(escalaId);
-      const tmap = cid ? tipoMapsPorContrato.get(cid) : undefined;
-      entry.gradeFaixas = gids.map((gid) => {
-        const t = tmap?.get(gid);
-        return faixaHorarioLabelExibicao(gid, t ?? null);
-      });
+  // Evita N+1: buscar equipes/grades em lote para todas as escalas do médico.
+  const [equipesNaEscalaRows, plantoesGradeRows] = await Promise.all([
+    escalaIds.length > 0
+      ? prisma.escalaEquipe.findMany({
+          where: { tenantId, escalaId: { in: escalaIds } },
+          select: { escalaId: true, equipeId: true },
+        })
+      : Promise.resolve([] as Array<{ escalaId: string; equipeId: string }>),
+    escalaIds.length > 0
+      ? prisma.escalaPlantao.findMany({
+          where: { tenantId, medicoId, escalaId: { in: escalaIds } },
+          select: { escalaId: true, gradeId: true },
+        })
+      : Promise.resolve([] as Array<{ escalaId: string; gradeId: string }>),
+  ]);
+
+  const equipeIdsAll = Array.from(new Set(equipesNaEscalaRows.map((r) => r.equipeId)));
+  const minhasEquipesRows =
+    equipeIdsAll.length > 0
+      ? await prisma.equipeMedico.findMany({
+          where: { tenantId, medicoId, equipeId: { in: equipeIdsAll } },
+          select: { equipeId: true, equipe: { select: { nome: true } } },
+        })
+      : [];
+  const equipeNomePorId = new Map(minhasEquipesRows.map((r) => [r.equipeId, r.equipe.nome]));
+
+  const equipeIdsPorEscala = new Map<string, Set<string>>();
+  for (const row of equipesNaEscalaRows) {
+    let set = equipeIdsPorEscala.get(row.escalaId);
+    if (!set) {
+      set = new Set<string>();
+      equipeIdsPorEscala.set(row.escalaId, set);
     }
+    set.add(row.equipeId);
+  }
+
+  const gradeIdsPorEscala = new Map<string, Set<string>>();
+  for (const row of plantoesGradeRows) {
+    const gid = (row.gradeId || '').toLowerCase().trim();
+    if (!gid) continue;
+    let set = gradeIdsPorEscala.get(row.escalaId);
+    if (!set) {
+      set = new Set<string>();
+      gradeIdsPorEscala.set(row.escalaId, set);
+    }
+    set.add(gid);
+  }
+
+  for (const escalaId of escalaIds) {
+    const entry = uniqueByEscala.get(escalaId);
+    if (!entry) continue;
+
+    const eids = Array.from(equipeIdsPorEscala.get(escalaId) ?? []);
+    entry.equipes = eids.map((id) => equipeNomePorId.get(id)).filter(Boolean);
+
+    const gids = Array.from(gradeIdsPorEscala.get(escalaId) ?? []);
+    entry.gradeIds = gids;
+
+    const cid = contratoPorEscala.get(escalaId);
+    const tmap = cid ? tipoMapsPorContrato.get(cid) : undefined;
+    entry.gradeFaixas = gids.map((gid) => {
+      const t = tmap?.get(gid);
+      return faixaHorarioLabelExibicao(gid, t ?? null);
+    });
   }
 
   const result = Array.from(uniqueByEscala.values());
@@ -828,6 +909,9 @@ export async function listMinhasEscalasService(tenantId: string, medicoId: strin
       gradeIds: [],
       gradeFaixas: [],
     });
+  }
+  if (CACHE_TTL_MS > 0) {
+    setCached(minhasEscalasCache, cacheKey(tenantId, medicoId), result);
   }
   return result;
 }

@@ -39,11 +39,16 @@ Foram adicionadas validações explícitas para entradas críticas e parâmetros
   - `DELETE /api/admin/escalas/:id/medicos/:medicoId`: valida `:id` e `:medicoId`
 - **Admin / Convites**
   - `POST /api/admin/medicos/:id/invite`: valida `:id`
+- **Vagas (médico)**
+  - `POST /api/medico/vagas`: `validateCreateVaga` (strings, booleanos, dias, confirmação obrigatória)
+  - `PATCH /api/medico/vagas/:vagaId/candidatos/:candidatoMedicoId`: `validateUUIDParam` + `validateStatusCandidatoVaga`
+  - Rotas com `:vagaId` / `:candidatoMedicoId`: `validateUUIDParam` quando aplicável
 
 Arquivos principais:
 - `backend/src/middleware/validation.middleware.ts`
 - `backend/src/routes/admin.routes.ts`
 - `backend/src/routes/ponto.routes.ts`
+- `backend/src/routes/medico.routes.ts`
 
 ### 2) Hardening dos controllers (normalização/casting)
 
@@ -51,9 +56,11 @@ Mesmo com validação, controllers foram reforçados para não depender de tipos
 
 - **Escalas**: conversão segura de `ativo` (`true/false` boolean ou string) antes de chamar service.
 - **Alocação**: conversão segura de `valorHora` para `Number(...)` e passagem explícita de campos (evita `...req.body` em fluxos críticos).
+- **Vagas**: `valorACombinar` e `confirmacaoResponsavel` só com `=== true` (após validação); `PATCH` de candidato usa `req.body.status` já validado pelo middleware.
 
 Arquivo:
 - `backend/src/controllers/admin.controller.ts`
+- `backend/src/controllers/medico.controller.ts` (Vagas)
 
 ### 3) Transações Prisma (atomicidade)
 
@@ -74,11 +81,15 @@ Foram aplicadas transações (`prisma.$transaction`) nos fluxos críticos para e
   - Check-in: criação do registro + auditoria (atômico) e **revalidação dentro da transação** para reduzir race condition
   - Checkout: update protegido (`updateMany` com `checkOutAt: null`) + auditoria (atômico)
   - Troca de plantão: persistência em `solicitacoes_troca_plantao` + auditoria (`SOLICITAR_TROCA_PLANTAO`) na mesma transação; notificações ao colega/solicitante fora da transação (I/O externo)
+- **Vagas (médico)**
+  - `POST .../vagas/:vagaId/interesse`: leitura da vaga + `create` do interesse na **mesma transação** (`prisma.$transaction`); duplicidade → **409** (constraint única)
+  - `PATCH .../vagas/:vagaId/candidatos/:candidatoMedicoId`: transação com verificação de publicador + `updateMany` só em `status: PENDENTE` (reduz corrida entre duas respostas simultâneas)
 
 Arquivos:
 - `backend/src/services/auth.service.ts`
 - `backend/src/services/admin.service.ts`
 - `backend/src/services/ponto.service.ts`
+- `backend/src/services/vaga.service.ts`
 
 ### 4) Auditoria transacional (quando desejado)
 
@@ -171,6 +182,7 @@ Padrão mínimo (obrigatório quando houver upload):
 ### I) Privacidade entre profissionais (app médico)
 
 - **Não expor e-mail de colegas** em listagens usadas para troca de plantão ou equipe: o endpoint `GET /api/ponto/equipe-colegas` retorna apenas identificadores e dados públicos (nome, CRM), não `email`.
+- **Vagas**: `GET .../vagas/:vagaId/candidatos` retorna e-mail/telefone só para o **médico publicador** da vaga (finalidade de contato na contratação); demais médicos não acessam esse endpoint para vagas alheias (404 por checagem de publicador + `tenantId`).
 
 ### J) Arquivos em `uploads/` (não públicos)
 
@@ -184,6 +196,7 @@ Padrão mínimo (obrigatório quando houver upload):
   - login
   - reset de senha
   - accept-invite
+  - mutações em **Vagas** (`/api/medico/vagas` — `vagasMutationLimiter` em `medico.routes.ts`, além do limite global)
 
 ### H) Secrets e configuração
 
@@ -217,7 +230,7 @@ Roteiro com técnicas (race condition, upload, IDOR, secrets, authz, RLS): **`do
 ## Referências de implementação (arquivos)
 
 - Validações: `backend/src/middleware/validation.middleware.ts`
-- Rotas: `backend/src/routes/admin.routes.ts`, `backend/src/routes/ponto.routes.ts`
+- Rotas: `backend/src/routes/admin.routes.ts`, `backend/src/routes/ponto.routes.ts`, `backend/src/routes/medico.routes.ts` (Vagas)
 - Services transacionais: `backend/src/services/auth.service.ts`, `backend/src/services/admin.service.ts`, `backend/src/services/ponto.service.ts`
 - Auditoria: `backend/src/services/auditoria.service.ts`
 

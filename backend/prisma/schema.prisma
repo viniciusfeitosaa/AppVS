@@ -43,9 +43,16 @@ enum ModuloSistema {
   RELATORIOS
   PONTO_ELETRONICO
   ATENDIMENTOS
+  VAGAS
   CONFIGURACOES
   ENVIO_DOCUMENTOS
   PERFIL
+}
+
+enum StatusInteresseVaga {
+  PENDENTE
+  ACEITO
+  RECUSADO
 }
 
 model Tenant {
@@ -81,6 +88,8 @@ model Tenant {
   resetSenhaTokens        ResetSenhaToken[]
   notificacoesMedico      NotificacaoMedico[]
   solicitacoesTrocaPlantao SolicitacaoTrocaPlantao[]
+  vagas                   Vaga[]
+  vagaInteresses          VagaInteresse[]
 
   @@map("tenants")
   @@index([slug])
@@ -190,6 +199,8 @@ model Medico {
   notificacoes    NotificacaoMedico[]
   solicitacoesTrocaComoSolicitante SolicitacaoTrocaPlantao[] @relation("SolicitacaoTrocaSolicitante")
   solicitacoesTrocaComoDestino     SolicitacaoTrocaPlantao[] @relation("SolicitacaoTrocaDestino")
+  vagasPublicadas                Vaga[]
+  vagaInteressesComoCandidato    VagaInteresse[] @relation("VagaInteresseCandidato")
 
   @@map("medicos")
   @@unique([tenantId, cpf])
@@ -240,6 +251,57 @@ model DocumentoEnviado {
   @@map("documentos_enviados")
   @@index([tenantId])
   @@index([medicoId])
+}
+
+/// Vaga divulgada por um médico no tenant (módulo Vagas).
+model Vaga {
+  id                     String   @id @default(uuid())
+  tenantId               String   @map("tenant_id")
+  medicoPublicadorId     String   @map("medico_publicador_id")
+  tipoAtendimento        String   @map("tipo_atendimento") @db.VarChar(120)
+  setor                  String   @db.VarChar(200)
+  valorACombinar         Boolean  @map("valor_a_combinar")
+  valorCentavos          Int?     @map("valor_centavos")
+  valorLiquidoBruto      String?  @map("valor_liquido_bruto") @db.VarChar(10)
+  pagamento              String   @db.VarChar(20)
+  quantidadeVagas        Int      @map("quantidade_vagas")
+  prazoPublicacaoDias    Int      @map("prazo_publicacao_dias")
+  categoriaProfissional  String   @default("MEDICO") @map("categoria_profissional") @db.VarChar(40)
+  diasVaga               Json     @map("dias_vaga")
+  descricao              String   @db.Text
+  confirmacaoResponsavel Boolean  @map("confirmacao_responsavel")
+  createdAt              DateTime @default(now()) @map("created_at")
+  expiresAt              DateTime @map("expires_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  medico Medico @relation(fields: [medicoPublicadorId], references: [id], onDelete: Cascade)
+  interesses VagaInteresse[]
+
+  @@map("vagas")
+  @@index([tenantId, expiresAt])
+  @@index([medicoPublicadorId])
+}
+
+/// Interesse de um médico em uma vaga (candidatura).
+model VagaInteresse {
+  id                  String              @id @default(uuid())
+  tenantId            String              @map("tenant_id")
+  vagaId              String              @map("vaga_id")
+  candidatoMedicoId   String              @map("candidato_medico_id")
+  status              StatusInteresseVaga @default(PENDENTE)
+  createdAt           DateTime            @default(now()) @map("created_at")
+  updatedAt           DateTime            @updatedAt @map("updated_at")
+
+  tenant    Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  vaga      Vaga   @relation(fields: [vagaId], references: [id], onDelete: Cascade)
+  candidato Medico @relation("VagaInteresseCandidato", fields: [candidatoMedicoId], references: [id], onDelete: Cascade)
+
+  @@map("vaga_interesses")
+  @@unique([vagaId, candidatoMedicoId])
+  @@index([tenantId])
+  @@index([vagaId])
+  @@index([candidatoMedicoId])
+  @@index([status])
 }
 
 model AcessoModuloPerfil {
@@ -402,6 +464,7 @@ model EquipeMedico {
   @@index([tenantId])
   @@index([equipeId])
   @@index([medicoId])
+  @@index([tenantId, medicoId])
 }
 
 model EscalaSubgrupo {
@@ -438,6 +501,7 @@ model EscalaEquipe {
   @@index([tenantId])
   @@index([escalaId])
   @@index([equipeId])
+  @@index([tenantId, escalaId])
 }
 
 model EscalaMedico {
@@ -460,6 +524,7 @@ model EscalaMedico {
   @@index([tenantId])
   @@index([escalaId])
   @@index([medicoId])
+  @@index([tenantId, medicoId, ativo])
 }
 
 model EscalaPlantao {
@@ -486,6 +551,7 @@ model EscalaPlantao {
   @@index([escalaId])
   @@index([medicoId])
   @@index([data])
+  @@index([tenantId, medicoId, data])
 }
 
 // Registro de pedido de troca de plantão (auditoria; não altera a grade automaticamente).
@@ -598,6 +664,7 @@ model ConfigPontoEletronico {
   @@index([contratoAtivoId])
   @@index([subgrupoId])
   @@index([equipeId])
+  @@index([tenantId, equipeId])
 }
 
 model RegistroPonto {
@@ -626,6 +693,7 @@ model RegistroPonto {
   @@index([escalaId])
   @@index([medicoId])
   @@index([checkInAt])
+  @@index([tenantId, medicoId, checkOutAt, checkInAt])
 }
 
 // Notificações in-app para o profissional (equipe, escala, etc.)

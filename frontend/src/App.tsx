@@ -28,6 +28,7 @@ import MeusDocumentos from './pages/MeusDocumentos';
 import EsqueciSenha from './pages/EsqueciSenha';
 import RedefinirSenha from './pages/RedefinirSenha';
 import AcessoNegado from './pages/AcessoNegado';
+import Vagas from './pages/Vagas';
 
 /** Animação de carregamento. variant white = fundo branco + vídeo (tela de login). */
 const PageLoadingScreen = ({ variant = 'default' }: { variant?: 'default' | 'white' }) => {
@@ -158,6 +159,7 @@ function AppRoutes() {
             />
           }
         />
+        <Route path="/vagas" element={<Vagas />} />
         <Route
           path="/relatorios"
           element={<Relatorios />}

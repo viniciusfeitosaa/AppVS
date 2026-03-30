@@ -622,3 +622,53 @@ export const validateMeusPlantoesCalendarioQuery = [
     }),
   handleValidationErrors,
 ];
+
+/** PATCH /medico/vagas/:vagaId/candidatos/:candidatoMedicoId */
+export const validateStatusCandidatoVaga = [
+  body('status').isIn(['ACEITO', 'RECUSADO']).withMessage('status deve ser ACEITO ou RECUSADO'),
+  handleValidationErrors,
+];
+
+/** POST /medico/vagas — publicar vaga */
+export const validateCreateVaga = [
+  body('tipoAtendimento').trim().notEmpty().isLength({ max: 120 }).withMessage('Tipo de atendimento inválido'),
+  body('setor').trim().notEmpty().isLength({ max: 200 }).withMessage('Setor inválido'),
+  body('valorACombinar').isBoolean().withMessage('valorACombinar deve ser booleano'),
+  body('valorCentavos')
+    .optional({ values: 'null' })
+    .isInt({ min: 0 })
+    .withMessage('Valor inválido'),
+  body('valorLiquidoBruto')
+    .optional({ values: 'null' })
+    .isIn(['LIQUIDO', 'BRUTO'])
+    .withMessage('valorLiquidoBruto inválido'),
+  body('pagamento').isIn(['A_VISTA', 'COMBINAR']).withMessage('Pagamento inválido'),
+  body('quantidadeVagas').isInt({ min: 1, max: 999 }).withMessage('Quantidade de vagas inválida'),
+  body('prazoPublicacaoDias').isInt({ min: 1, max: 365 }).withMessage('Prazo de publicação inválido'),
+  body('categoriaProfissional').optional().isString().isLength({ min: 1, max: 40 }),
+  body('diasVaga')
+    .isArray({ min: 1 })
+    .withMessage('Selecione ao menos um dia')
+    .custom((arr: unknown) => {
+      if (!Array.isArray(arr) || arr.length < 1) {
+        throw new Error('Selecione ao menos um dia');
+      }
+      const re = /^\d{4}-\d{2}-\d{2}$/;
+      for (const d of arr) {
+        if (typeof d !== 'string' || !re.test(d)) {
+          throw new Error('Cada dia deve estar no formato YYYY-MM-DD');
+        }
+      }
+      return true;
+    }),
+  body('descricao').trim().notEmpty().isLength({ max: 8000 }).withMessage('Descrição inválida'),
+  body('confirmacaoResponsavel')
+    .isBoolean()
+    .custom((v) => {
+      if (v !== true) {
+        throw new Error('É necessário confirmar que você é o responsável pelo setor');
+      }
+      return true;
+    }),
+  handleValidationErrors,
+];

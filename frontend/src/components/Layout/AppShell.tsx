@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../../context/AuthContext';
 import { authService } from '../../services/auth.service';
+import { medicoService } from '../../services/medico.service';
 import { pontoService } from '../../services/ponto.service';
 import { ModuloSistema } from '../../constants/modulos';
 import { useInactivityLogout } from '../../hooks/useInactivityLogout';
@@ -72,6 +73,14 @@ const getMobileIcon = (label: string) => {
           <path d="M4 10h16M8 3v4M16 3v4" />
         </svg>
       );
+    case 'Vagas':
+      return (
+        <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
+          <path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+          <rect x="4" y="7" width="16" height="14" rx="2" />
+          <path d="M12 12v4M10 14h4" />
+        </svg>
+      );
     case 'Minha Conta':
     case 'Perfil':
       return (
@@ -94,8 +103,10 @@ const INACTIVITY_LOGOUT_MS = 40 * 60 * 1000;
 
 const AppShell = () => {
   const { user, logout } = useAuth();
+  const queryClient = useQueryClient();
   useInactivityLogout(INACTIVITY_LOGOUT_MS);
   const isMaster = user?.role === 'MASTER';
+  const isMedico = user?.role === 'MEDICO';
   const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
   const [openDesktopGroup, setOpenDesktopGroup] = useState<string | null>(null);
   const { data: modulosAcessoResp } = useQuery({
@@ -116,6 +127,8 @@ const AppShell = () => {
   const hasAccess = (modulo: ModuloSistema) => modulosMap[modulo] ?? true;
 
   const dashboardItem: MenuItem = { to: '/dashboard', label: 'Dashboard' };
+  const vagasNavItem: MenuItem = { to: '/vagas', label: 'Vagas' };
+  const showVagasInNavbar = !isMaster && user?.role === 'MEDICO' && hasAccess('VAGAS');
   const pontoMenuItemsMedico: MenuItem[] = [
     { to: '/ponto-eletronico', label: 'Ponto Eletrônico' },
     ...(mostrarCalendarioEscalasNoMenu ? [{ to: '/meu-calendario-plantoes', label: 'Calendário de escalas' } as MenuItem] : []),
@@ -169,6 +182,7 @@ const AppShell = () => {
     '/ponto-eletronico': 'PONTO_ELETRONICO',
     '/meu-calendario-plantoes': 'PONTO_ELETRONICO',
     '/atendimentos': 'ATENDIMENTOS',
+    '/vagas': 'VAGAS',
   };
 
   const menuGroups: MenuGroup[] = menuGroupsBase
@@ -181,8 +195,19 @@ const AppShell = () => {
   /** No mobile: só Dashboard, Ponto (ou Escalas no master) e o menu "Mais" com o resto. */
   const mobileTabsBase: MenuItem[] = isMaster
     ? [dashboardItem, { to: '/escalas', label: 'Escalas' }]
-    : [dashboardItem, { to: '/ponto-eletronico', label: 'Ponto' }];
+    : [dashboardItem, { to: '/ponto-eletronico', label: 'Ponto' }, vagasNavItem];
   const mobileTabs = mobileTabsBase.filter((item) => hasAccess(moduloByRoute[item.to]));
+
+  // Prefetch do Dashboard (reduz “delay” após login/navegação)
+  useEffect(() => {
+    if (!user || isMaster || !isMedico) return;
+    if (!hasAccess('DASHBOARD')) return;
+    queryClient.prefetchQuery({
+      queryKey: ['medico', 'dashboard', user.id],
+      queryFn: () => medicoService.getDashboard(),
+      staleTime: 30 * 1000,
+    });
+  }, [queryClient, user, isMaster, isMedico, modulosAcessoResp]);
 
   return (
     <div className="app-shell min-h-screen">
@@ -203,6 +228,18 @@ const AppShell = () => {
               >
                 {dashboardItem.label}
               </NavLink>
+
+              {showVagasInNavbar && (
+                <NavLink
+                  to={vagasNavItem.to}
+                  onClick={() => setOpenDesktopGroup(null)}
+                  className={({ isActive }) =>
+                    `nav-pill font-display ${isActive ? 'nav-pill-active' : 'nav-pill-inactive'}`
+                  }
+                >
+                  {vagasNavItem.label}
+                </NavLink>
+              )}
 
               {menuGroups.map((group) => (
                 <div key={group.title} className="relative">

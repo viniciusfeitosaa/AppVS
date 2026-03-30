@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import rateLimit from 'express-rate-limit';
 import {
   getPerfilController,
   updatePerfilController,
@@ -8,15 +9,38 @@ import {
   listNotificacoesMedicoController,
   marcarNotificacaoLidaMedicoController,
   marcarTodasNotificacoesLidasMedicoController,
+  getDashboardMedicoController,
+  listVagasMedicoController,
+  createVagaMedicoController,
+  listMinhasPublicadasVagasController,
+  getCandidatosVagaController,
+  patchStatusCandidatoVagaController,
+  postInteresseVagaController,
+  deleteInteresseVagaController,
+  deleteVagaMedicoController,
 } from '../controllers/medico.controller';
 import { UserRole } from '@prisma/client';
 import { authenticateToken, requireModuleAccess, requireRole } from '../middleware/auth.middleware';
-import { validateUpdatePerfil, validateUUIDParam } from '../middleware/validation.middleware';
+import {
+  validateCreateVaga,
+  validateStatusCandidatoVaga,
+  validateUpdatePerfil,
+  validateUUIDParam,
+} from '../middleware/validation.middleware';
 import { uploadPerfilDocumentos } from '../middleware/upload.middleware';
 import { DOCUMENTOS_PERFIL_FIELDS } from '../constants/documentos.const';
 import { ModuloSistema } from '@prisma/client';
 
 const router = Router();
+
+/** Limite extra em mutações de vagas (além do rate limit global em /api). */
+const vagasMutationLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 45,
+  message: { success: false, error: 'Muitas ações em vagas. Aguarde um instante.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
 
 // Todas as rotas requerem autenticação
 router.use(authenticateToken);
@@ -45,6 +69,76 @@ router.post(
   requireRole([UserRole.MEDICO]),
   marcarTodasNotificacoesLidasMedicoController
 );
+
+router.get(
+  '/dashboard',
+  requireRole([UserRole.MEDICO]),
+  requireModuleAccess(ModuloSistema.DASHBOARD),
+  getDashboardMedicoController
+);
+
+router.get(
+  '/vagas/minhas-publicadas',
+  requireRole([UserRole.MEDICO]),
+  requireModuleAccess(ModuloSistema.VAGAS),
+  listMinhasPublicadasVagasController
+);
+router.get(
+  '/vagas',
+  requireRole([UserRole.MEDICO]),
+  requireModuleAccess(ModuloSistema.VAGAS),
+  listVagasMedicoController
+);
+router.get(
+  '/vagas/:vagaId/candidatos',
+  requireRole([UserRole.MEDICO]),
+  requireModuleAccess(ModuloSistema.VAGAS),
+  validateUUIDParam('vagaId'),
+  getCandidatosVagaController
+);
+router.patch(
+  '/vagas/:vagaId/candidatos/:candidatoMedicoId',
+  requireRole([UserRole.MEDICO]),
+  requireModuleAccess(ModuloSistema.VAGAS),
+  vagasMutationLimiter,
+  validateUUIDParam('vagaId'),
+  validateUUIDParam('candidatoMedicoId'),
+  validateStatusCandidatoVaga,
+  patchStatusCandidatoVagaController
+);
+router.post(
+  '/vagas/:vagaId/interesse',
+  requireRole([UserRole.MEDICO]),
+  requireModuleAccess(ModuloSistema.VAGAS),
+  vagasMutationLimiter,
+  validateUUIDParam('vagaId'),
+  postInteresseVagaController
+);
+router.delete(
+  '/vagas/:vagaId/interesse',
+  requireRole([UserRole.MEDICO]),
+  requireModuleAccess(ModuloSistema.VAGAS),
+  vagasMutationLimiter,
+  validateUUIDParam('vagaId'),
+  deleteInteresseVagaController
+);
+router.delete(
+  '/vagas/:vagaId',
+  requireRole([UserRole.MEDICO]),
+  requireModuleAccess(ModuloSistema.VAGAS),
+  vagasMutationLimiter,
+  validateUUIDParam('vagaId'),
+  deleteVagaMedicoController
+);
+router.post(
+  '/vagas',
+  requireRole([UserRole.MEDICO]),
+  requireModuleAccess(ModuloSistema.VAGAS),
+  vagasMutationLimiter,
+  validateCreateVaga,
+  createVagaMedicoController
+);
+
 const parseEspecialidadesJson = (req: any, _res: any, next: () => void) => {
   if (typeof req.body?.especialidades === 'string') {
     try {

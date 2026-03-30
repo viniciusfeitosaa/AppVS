@@ -101,32 +101,101 @@ const Dashboard = () => {
   const isMaster = user?.role === 'MASTER';
   const isMedico = user?.role === 'MEDICO';
 
-  const { data: perfil, isLoading } = useQuery({
+  const [forceLegacyQueries, setForceLegacyQueries] = useState(false);
+
+  const {
+    data: dashboardResp,
+    isError: isDashboardError,
+    isLoading: isDashboardLoading,
+  } = useQuery({
+    queryKey: ['medico', 'dashboard', user?.id],
+    queryFn: () => medicoService.getDashboard(),
+    enabled: !!user && isMedico && !isMaster && !forceLegacyQueries,
+    staleTime: 30 * 1000,
+    retry: false,
+  });
+
+  // Se o endpoint agregado falhar, cai automaticamente para as queries legadas (mais seguro).
+  useEffect(() => {
+    if (isDashboardError) setForceLegacyQueries(true);
+  }, [isDashboardError]);
+
+  const {
+    data: perfilLegacy,
+    isLoading: isPerfilLegacyLoading,
+  } = useQuery({
     queryKey: ['medico', 'perfil', user?.id],
     queryFn: async () => {
       const response = await medicoService.getPerfil();
       return response.data;
     },
-    enabled: !!user && !isMaster,
+    enabled: !!user && isMedico && !isMaster && forceLegacyQueries,
+    staleTime: 5 * 60 * 1000,
   });
 
-  const { data: meuDiaResp } = useQuery({
+  const { data: meuDiaLegacy } = useQuery({
     queryKey: ['ponto', 'meu-dia'],
     queryFn: () => pontoService.getMeuDia(),
-    enabled: !!user && isMedico,
+    enabled: !!user && isMedico && !isMaster && forceLegacyQueries,
+    staleTime: 30 * 1000,
   });
 
-  const { data: escalasResp } = useQuery({
+  const { data: escalasLegacy } = useQuery({
     queryKey: ['ponto', 'minhas-escalas'],
     queryFn: () => pontoService.listMinhasEscalas(),
-    enabled: !!user && isMedico,
+    enabled: !!user && isMedico && !isMaster && forceLegacyQueries,
+    staleTime: 30 * 1000,
   });
 
-  const { data: docsResp } = useQuery({
+  const { data: proximosLegacy } = useQuery({
+    queryKey: ['ponto', 'proximos-plantoes'],
+    queryFn: () => pontoService.listProximosPlantoes(),
+    enabled: !!user && isMedico && !isMaster && forceLegacyQueries,
+    staleTime: 15 * 1000,
+  });
+
+  const { data: docsLegacy } = useQuery({
     queryKey: ['medico', 'documentos-enviados', user?.id],
     queryFn: () => medicoService.listDocumentosEnviados(),
-    enabled: !!user && !isMaster,
+    enabled: !!user && isMedico && !isMaster && forceLegacyQueries,
+    staleTime: 2 * 60 * 1000,
   });
+
+  const perfil = forceLegacyQueries ? perfilLegacy : dashboardResp?.data?.perfil;
+  const meuDiaResp = forceLegacyQueries
+    ? meuDiaLegacy
+      ? { data: meuDiaLegacy.data ?? meuDiaLegacy }
+      : undefined
+    : dashboardResp
+      ? { data: dashboardResp.data.meuDia }
+      : undefined;
+  const escalasResp = forceLegacyQueries
+    ? escalasLegacy
+      ? { data: (escalasLegacy as any).data ?? escalasLegacy }
+      : undefined
+    : dashboardResp
+      ? { data: dashboardResp.data.escalas }
+      : undefined;
+  const proximosResp = forceLegacyQueries
+    ? proximosLegacy
+      ? { data: (proximosLegacy as any).data ?? proximosLegacy }
+      : undefined
+    : dashboardResp
+      ? { data: dashboardResp.data.proximosPlantoes }
+      : undefined;
+  const docsResp = forceLegacyQueries
+    ? docsLegacy
+      ? { data: (docsLegacy as any).data ?? docsLegacy }
+      : undefined
+    : dashboardResp
+      ? { data: dashboardResp.data.documentosEnviados }
+      : undefined;
+
+  // Loading “seguro”: só bloqueia se não tiver nada para renderizar ainda (nem user/perfil).
+  const shouldBlock =
+    (!!user && isMedico && !isMaster) &&
+    ((isDashboardLoading && !forceLegacyQueries && !perfil) ||
+      (forceLegacyQueries && isPerfilLegacyLoading && !perfil));
 
   const documentosDisponiveis = docsResp?.data ?? [];
   const displayUser = isMaster ? user : perfil || user;
@@ -174,11 +243,6 @@ const Dashboard = () => {
     configHorario?.horarioEntrada ?? null,
     configHorario?.horarioSaida ?? null
   );
-  const { data: proximosResp } = useQuery({
-    queryKey: ['ponto', 'proximos-plantoes'],
-    queryFn: () => pontoService.listProximosPlantoes(),
-    enabled: !!user && isMedico,
-  });
   type PlantaoProximo = PlantaoAgendaInput & {
     id: string;
     data: string;
@@ -261,7 +325,7 @@ const Dashboard = () => {
   const faixaPorPlantao = (p: PlantaoProximo | null) =>
     p ? faixaExibicaoPlantao(p) : '07h às 19h';
 
-  if (isLoading) {
+  if (shouldBlock) {
     return (
       <div className="min-h-[60vh] flex items-center justify-center">
         <div className="text-center">
@@ -627,7 +691,7 @@ const Dashboard = () => {
           </div>
           {documentosDisponiveis.length > 0 && (
             <ul className="space-y-1 rounded-xl overflow-hidden">
-              {documentosDisponiveis.map((doc) => (
+              {documentosDisponiveis.map((doc: { id: string; titulo?: string | null; nomeArquivo: string; createdAt: string }) => (
                 <li key={doc.id}>
                   <button
                     type="button"

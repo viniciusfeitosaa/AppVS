@@ -1,10 +1,12 @@
 import { PrismaClient } from '@prisma/client';
 
-/** connection_limit por instância: 10 em produção (vários usuários), 3 em dev. Override via DATABASE_POOL_SIZE. */
+/** connection_limit por instância: 10 em produção (vários usuários), 8 em dev. Override via DATABASE_POOL_SIZE. */
 const CONNECTION_LIMIT = Math.min(
-  Math.max(1, parseInt(process.env.DATABASE_POOL_SIZE || '', 10) || (process.env.NODE_ENV === 'production' ? 10 : 3)),
+  Math.max(1, parseInt(process.env.DATABASE_POOL_SIZE || '', 10) || (process.env.NODE_ENV === 'production' ? 10 : 8)),
   20
 );
+
+const SLOW_QUERY_MS = Math.max(1, parseInt(process.env.PRISMA_SLOW_QUERY_MS || '', 10) || 250);
 
 /** Garante connection_limit e pool_timeout na URL (Supabase + Render). Sobrescreve se a URL já tiver. */
 function getDatabaseUrl(): string {
@@ -20,10 +22,28 @@ function getDatabaseUrl(): string {
 
 // Singleton do Prisma Client
 const prismaClientSingleton = () => {
-  return new PrismaClient({
+  const client = new PrismaClient({
     datasources: { db: { url: getDatabaseUrl() } },
     log: process.env.NODE_ENV === 'development' ? ['query', 'error', 'warn'] : ['error'],
   });
+
+  // Logar queries lentas (instrumentação para reduzir “delay” percebido no app).
+  if (process.env.PRISMA_LOG_SLOW_QUERIES === '1') {
+    client.$use(async (params, next) => {
+      const start = Date.now();
+      try {
+        return await next(params);
+      } finally {
+        const ms = Date.now() - start;
+        if (ms >= SLOW_QUERY_MS) {
+          // Não loga args/values (pode conter dados sensíveis). Só modelo/ação/tempo.
+          console.warn(`[Prisma] Slow query ${ms}ms`, { model: params.model, action: params.action });
+        }
+      }
+    });
+  }
+
+  return client;
 };
 
 declare const globalThis: {
