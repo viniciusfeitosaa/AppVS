@@ -6,15 +6,118 @@ import { generateTokens } from '../utils/jwt.util';
 import { createAuditLog } from './auditoria.service';
 import { UserRole } from '@prisma/client';
 import crypto from 'crypto';
+import tls from 'tls';
 import nodemailer from 'nodemailer';
 import { Resend } from 'resend';
 import twilio from 'twilio';
 
-const RESET_EMAIL_SUBJECT = 'Redefinição de senha – Viva Saúde';
-const RESET_EMAIL_HTML = (resetLink: string) =>
-  `<div style="font-family:sans-serif;max-width:480px"><p style="color:#14532d;font-weight:600">Viva Saúde</p><p>Olá,</p><p>Você solicitou a redefinição de senha. Clique no link abaixo (válido por 1 hora):</p><p><a href="${resetLink}" style="display:inline-block;padding:12px 24px;background:#166534;color:#fff;text-decoration:none;border-radius:12px;font-weight:600">Redefinir senha</a></p><p style="color:#666;font-size:0.9em">Se não foi você, ignore este e-mail.</p><p style="color:#999;font-size:0.85em">— Viva Saúde</p></div>`;
-const RESET_EMAIL_TEXT = (resetLink: string) =>
-  `Olá,\n\nVocê solicitou a redefinição de senha. Clique no link abaixo (válido por 1 hora):\n\n${resetLink}\n\nSe não foi você, ignore este e-mail.\n\n— Viva Saúde`;
+const RESET_EMAIL_SUBJECT = 'Redefinir sua senha — Viva Saúde';
+
+function escapeHtmlAttr(value: string): string {
+  return value.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+}
+
+/** Logo nos e-mails: EMAIL_LOGO_URL ou FRONTEND_URL + /assets/logo-horizontal.png (PNG costuma abrir melhor que AVIF). */
+function getResetEmailLogoUrl(): string {
+  const custom = process.env.EMAIL_LOGO_URL?.trim();
+  if (custom) return custom;
+  const base = (process.env.FRONTEND_URL || 'https://sejavivasaude.com.br').replace(/\/$/, '');
+  const prefix = (process.env.FRONTEND_ASSET_PREFIX || '').replace(/\/$/, '');
+  return `${base}${prefix}/assets/logo-horizontal.png`;
+}
+
+function buildResetPasswordEmailHtml(resetLink: string): string {
+  const href = escapeHtmlAttr(resetLink);
+  const logoSrc = escapeHtmlAttr(getResetEmailLogoUrl());
+  const year = new Date().getFullYear();
+  const linkDisplay = resetLink.replace(/&/g, '&amp;');
+  return `<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="x-ua-compatible" content="ie=edge">
+<title>Redefinir senha — Viva Saúde</title>
+</head>
+<body style="margin:0;padding:0;background-color:#ecfdf5;">
+<!-- Pré-visualização em alguns clientes de e-mail -->
+<div style="display:none;max-height:0;overflow:hidden;mso-hide:all;">Use o link seguro para criar uma nova senha na Viva Saúde. Válido por 1 hora.</div>
+<table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="background-color:#ecfdf5;">
+  <tr>
+    <td align="center" style="padding:28px 14px 40px;">
+      <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="max-width:520px;background-color:#ffffff;border-radius:20px;overflow:hidden;border:1px solid #bbf7d0;box-shadow:0 12px 40px rgba(20,83,45,0.1);">
+        <tr>
+          <td bgcolor="#ecfdf5" style="padding:32px 28px 24px;text-align:center;background:linear-gradient(180deg,#ecfdf5 0%,#ffffff 55%);border-bottom:1px solid #d1fae5;">
+            <img src="${logoSrc}" alt="Viva Saúde" width="220" height="auto" style="display:block;margin:0 auto 12px;max-width:220px;height:auto;border:0;outline:none;text-decoration:none;">
+            <p style="margin:0;font-size:13px;letter-spacing:0.02em;color:#15803d;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;">Cuidado que conecta profissionais e instituições</p>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:32px 32px 26px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;">
+            <p style="margin:0 0 6px;font-size:15px;line-height:1.5;color:#374151;">Olá,</p>
+            <h1 style="margin:0 0 18px;font-size:23px;font-weight:700;line-height:1.3;color:#14532d;letter-spacing:-0.02em;">Redefinir sua senha de acesso</h1>
+            <p style="margin:0 0 16px;font-size:15px;line-height:1.65;color:#4b5563;">Recebemos um pedido para <strong style="color:#166534;font-weight:600;">criar uma nova senha</strong> para a sua conta na plataforma <strong style="color:#14532d;">Viva Saúde</strong>.</p>
+            <p style="margin:0 0 26px;font-size:15px;line-height:1.65;color:#4b5563;">Para continuar com segurança, toque no botão abaixo. O link é <strong style="color:#14532d;">válido por 1 hora</strong> e só pode ser usado uma vez.</p>
+            <table role="presentation" cellpadding="0" cellspacing="0" align="center" style="margin:0 auto 26px;">
+              <tr>
+                <td style="border-radius:14px;background-color:#166534;box-shadow:0 4px 14px rgba(22,101,52,0.35);">
+                  <a href="${href}" target="_blank" rel="noopener noreferrer" style="display:inline-block;padding:15px 40px;font-size:15px;font-weight:600;color:#ffffff;text-decoration:none;border-radius:14px;">Criar nova senha</a>
+                </td>
+              </tr>
+            </table>
+            <p style="margin:0 0 10px;font-size:13px;line-height:1.5;color:#6b7280;">O botão não abre? Copie e cole este endereço no navegador:</p>
+            <p style="margin:0 0 26px;padding:12px 14px;background-color:#f9fafb;border-radius:10px;border:1px solid #e5e7eb;font-size:12px;line-height:1.55;color:#166534;word-break:break-all;font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;">${linkDisplay}</p>
+            <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="margin:0 0 8px;">
+              <tr>
+                <td style="width:4px;background-color:#22c55e;border-radius:2px;"></td>
+                <td style="padding-left:14px;">
+                  <p style="margin:0;font-size:14px;line-height:1.6;color:#6b7280;"><strong style="color:#374151;">Não foi você?</strong> Ignore este e-mail com tranquilidade — a sua senha atual continua válida e nada será alterado.</p>
+                </td>
+              </tr>
+            </table>
+            <p style="margin:22px 0 0;padding-top:20px;border-top:1px solid #e5e7eb;font-size:14px;line-height:1.55;color:#4b5563;">Com os melhores cumprimentos,<br><strong style="color:#166534;">Equipe Viva Saúde</strong></p>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:18px 24px 22px;background-color:#f0fdf4;text-align:center;font-size:11px;line-height:1.55;color:#86a89a;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;">
+            © ${year} Viva Saúde. Este e-mail foi enviado automaticamente; não é necessário responder.<br>
+            Dúvidas? Fale connosco pelo canal de suporte da sua instituição ou pelo e-mail de contato oficial.
+          </td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+</table>
+</body>
+</html>`;
+}
+
+function buildResetPasswordEmailText(resetLink: string): string {
+  const line = '─'.repeat(44);
+  return [
+    'VIVA SAÚDE — Redefinição de senha',
+    line,
+    '',
+    'Olá,',
+    '',
+    'Recebemos um pedido para criar uma nova senha para a sua conta na plataforma Viva Saúde.',
+    '',
+    'Para continuar com segurança, abra o link abaixo no navegador. Ele é válido por 1 hora e só pode ser usado uma vez:',
+    '',
+    resetLink,
+    '',
+    '—',
+    '',
+    'Não foi você?',
+    'Pode ignorar este e-mail com tranquilidade — a sua senha atual continua válida e nada será alterado.',
+    '',
+    'Com os melhores cumprimentos,',
+    'Equipe Viva Saúde',
+    '',
+    line,
+    'Mensagem automática. Por favor, não responda a este e-mail.',
+  ].join('\n');
+}
 
 function hasResendConfig(): boolean {
   return !!process.env.RESEND_API_KEY;
@@ -49,7 +152,7 @@ function normalizePhoneForWhatsApp(telefone: string | null | undefined): string 
 }
 
 const RESET_WHATSAPP_BODY = (resetLink: string) =>
-  `Viva Saúde – Redefinição de senha\n\nClique no link para redefinir sua senha (válido por 1 hora):\n${resetLink}\n\nSe não foi você, ignore esta mensagem.`;
+  `*Viva Saúde* — Redefinição de senha\n\nPara criar uma nova senha, abra o link abaixo (válido por 1 hora):\n${resetLink}\n\nSe não foi você, ignore esta mensagem — a sua senha permanece a mesma.`;
 
 async function sendResetPasswordWhatsApp(toPhoneE164: string, resetLink: string): Promise<void> {
   const number = toPhoneE164.replace(/^\++/, '');
@@ -93,8 +196,8 @@ async function sendResetPasswordEmailResend(to: string, resetLink: string): Prom
     from,
     to,
     subject: RESET_EMAIL_SUBJECT,
-    html: RESET_EMAIL_HTML(resetLink),
-    text: RESET_EMAIL_TEXT(resetLink),
+    html: buildResetPasswordEmailHtml(resetLink),
+    text: buildResetPasswordEmailText(resetLink),
   });
   if (error) {
     console.error('[esqueci-senha] Resend API error:', JSON.stringify(error));
@@ -110,19 +213,35 @@ async function sendResetPasswordEmailSmtp(to: string, resetLink: string): Promis
   const pass = process.env.SMTP_PASS!;
   const port = parseInt(process.env.SMTP_PORT || '587', 10);
   const secure = process.env.SMTP_SECURE === 'true';
+  // Com SMTP_HOST=maddy ou 127.0.0.1 o cert do servidor é para mail.* — o Node precisa do nome certo para TLS/SNI.
+  const tlsServername =
+    process.env.SMTP_TLS_SERVERNAME?.trim() ||
+    (['maddy', '127.0.0.1', 'localhost'].includes(host) ? 'mail.vivasaude.cloud' : host);
+  // Ligação ao hostname Docker (ex.: maddy) mas certificado emitido para mail.* — validar contra tlsServername.
+  const tlsOptions: tls.ConnectionOptions = {
+    servername: tlsServername,
+    ...(host !== tlsServername
+      ? {
+          checkServerIdentity: (_hostname: string, cert: tls.PeerCertificate) =>
+            tls.checkServerIdentity(tlsServername, cert),
+        }
+      : {}),
+  };
   const transporter = nodemailer.createTransport({
     host,
     port,
     secure,
     auth: { user, pass },
+    requireTLS: !secure && port === 587,
+    tls: tlsOptions,
   });
   const from = process.env.SMTP_FROM || user;
   await transporter.sendMail({
     from: from ? `Viva Saúde <${from}>` : user,
     to,
     subject: RESET_EMAIL_SUBJECT,
-    text: RESET_EMAIL_TEXT(resetLink),
-    html: RESET_EMAIL_HTML(resetLink),
+    text: buildResetPasswordEmailText(resetLink),
+    html: buildResetPasswordEmailHtml(resetLink),
   });
 }
 
