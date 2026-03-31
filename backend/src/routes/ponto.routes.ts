@@ -25,6 +25,9 @@ import {
   listMeusPlantoesCalendarioController,
   listMinhasEquipesCalendarioController,
   solicitarTrocaPlantaoController,
+  listTrocasPlantaoPendentesController,
+  aceitarTrocaPlantaoController,
+  recusarTrocaPlantaoController,
   canCheckInController,
 } from '../controllers/ponto.controller';
 
@@ -55,6 +58,9 @@ router.get(
 );
 router.get('/minhas-equipes-calendario', listMinhasEquipesCalendarioController);
 router.post('/solicitar-troca-plantao', validateSolicitarTrocaPlantao, solicitarTrocaPlantaoController);
+router.get('/trocas-plantao-pendentes', listTrocasPlantaoPendentesController);
+router.post('/trocas-plantao/:id/aceitar', validateUUIDParam('id'), aceitarTrocaPlantaoController);
+router.post('/trocas-plantao/:id/recusar', validateUUIDParam('id'), recusarTrocaPlantaoController);
 router.get('/can-checkin', validateEscalaIdQueryPonto, canCheckInController);
 router.get('/registros/:id/foto-checkin', validateUUIDParam('id'), downloadFotoCheckinMedicoController);
 

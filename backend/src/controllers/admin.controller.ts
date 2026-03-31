@@ -607,7 +607,9 @@ export const listEquipePlantoesController = async (req: Request, res: Response) 
     }
     const dataInicio = req.query.dataInicio ? String(req.query.dataInicio) : undefined;
     const dataFim = req.query.dataFim ? String(req.query.dataFim) : undefined;
-    const data = await listEquipePlantoesService(req.user.tenantId, req.params.id, { dataInicio, dataFim });
+    const modoRaw = req.query.modo ? String(req.query.modo).toLowerCase() : undefined;
+    const modo = modoRaw === 'fixa' || modoRaw === 'dinamica' ? modoRaw : undefined;
+    const data = await listEquipePlantoesService(req.user.tenantId, req.params.id, { dataInicio, dataFim, modo });
     return res.status(200).json({ success: true, data });
   } catch (error: any) {
     const statusCode = error.statusCode || 500;

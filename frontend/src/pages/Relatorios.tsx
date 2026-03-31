@@ -2,6 +2,7 @@ import { Fragment, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import * as XLSX from 'xlsx';
 import { useAuth } from '../context/AuthContext';
 import { adminService } from '../services/admin.service';
 import { fixMojibake } from '../utils/validation.util';
@@ -75,12 +76,6 @@ const formatDateInput = (date: Date) => {
   return `${y}-${m}-${d}`;
 };
 
-const escapeCsvCell = (value: string | number): string => {
-  const s = String(value);
-  if (/[",\n\r]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
-  return s;
-};
-
 const formatValor = (valor: number) =>
   new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(valor);
 
@@ -125,43 +120,37 @@ const diaKeyFromIso = (iso: string): DiaKey => {
   }
 };
 
-const exportHorasCsv = (
+const exportHorasExcel = (
   agrupado: AgrupamentoHoras[],
   dataInicio: string,
   dataFim: string,
   mostrarRepasseECobranca: boolean
 ) => {
-  const header = mostrarRepasseECobranca
-    ? ['Médico', 'Escala', 'Registros', 'Total (min)', 'Total (horas)', 'Repasse (R$)', 'Cobrança (R$)']
-    : ['Médico', 'Escala', 'Registros', 'Total (min)', 'Total (horas)', 'Valor (R$)'];
   const rows = agrupado.map((item) =>
     mostrarRepasseECobranca
-      ? [
-          escapeCsvCell(item.medicoNome),
-          escapeCsvCell(item.escalaNome),
-          escapeCsvCell(item.totalRegistros),
-          escapeCsvCell(item.totalMinutos),
-          escapeCsvCell(formatDuration(item.totalMinutos)),
-          escapeCsvCell(item.valorRepasse != null ? formatValor(item.valorRepasse) : ''),
-          escapeCsvCell(item.valorCobranca != null ? formatValor(item.valorCobranca) : ''),
-        ]
-      : [
-          escapeCsvCell(item.medicoNome),
-          escapeCsvCell(item.escalaNome),
-          escapeCsvCell(item.totalRegistros),
-          escapeCsvCell(item.totalMinutos),
-          escapeCsvCell(formatDuration(item.totalMinutos)),
-          escapeCsvCell(item.valorRepasse != null ? formatValor(item.valorRepasse) : ''),
-        ]
+      ? {
+          Medico: item.medicoNome,
+          Escala: item.escalaNome,
+          Registros: item.totalRegistros,
+          'Total (min)': item.totalMinutos,
+          'Total (horas)': formatDuration(item.totalMinutos),
+          'Repasse (R$)': item.valorRepasse != null ? formatValor(item.valorRepasse) : '',
+          'Cobranca (R$)': item.valorCobranca != null ? formatValor(item.valorCobranca) : '',
+        }
+      : {
+          Medico: item.medicoNome,
+          Escala: item.escalaNome,
+          Registros: item.totalRegistros,
+          'Total (min)': item.totalMinutos,
+          'Total (horas)': formatDuration(item.totalMinutos),
+          'Valor (R$)': item.valorRepasse != null ? formatValor(item.valorRepasse) : '',
+        }
   );
-  const csv = [header.join(','), ...rows.map((r) => r.join(','))].join('\r\n');
-  const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `relatorio-horas_${dataInicio}_${dataFim}.csv`;
-  a.click();
-  URL.revokeObjectURL(url);
+
+  const ws = XLSX.utils.json_to_sheet(rows);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Relatorio');
+  XLSX.writeFile(wb, `relatorio-horas_${dataInicio}_${dataFim}.xlsx`);
 };
 
 const exportHorasPdf = (
@@ -834,10 +823,10 @@ const Relatorios = () => {
             type="button"
             className="btn btn-secondary inline-flex items-center gap-2"
             disabled={isLoading || agrupado.length === 0}
-            onClick={() => exportHorasCsv(agrupado, dataInicio, dataFim, mostrarRepasseECobranca)}
+            onClick={() => exportHorasExcel(agrupado, dataInicio, dataFim, mostrarRepasseECobranca)}
           >
             <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clipRule="evenodd" /></svg>
-            Exportar CSV
+            Exportar Excel
           </button>
           <button
             type="button"

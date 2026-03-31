@@ -562,6 +562,8 @@ model SolicitacaoTrocaPlantao {
   escalaPlantaoId     String   @map("escala_plantao_id")
   medicoSolicitanteId String   @map("medico_solicitante_id")
   medicoDestinoId     String   @map("medico_destino_id")
+  status              String   @default("PENDENTE") @db.VarChar(20)
+  respondidaEm        DateTime? @map("respondida_em")
   createdAt           DateTime @default(now()) @map("created_at")
 
   tenant      Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
@@ -571,6 +573,7 @@ model SolicitacaoTrocaPlantao {
 
   @@map("solicitacoes_troca_plantao")
   @@index([tenantId, medicoSolicitanteId])
+  @@index([tenantId, medicoDestinoId, status])
   @@index([escalaPlantaoId])
 }
 

@@ -22,6 +22,18 @@ interface CheckOutPayload {
   longitude?: number;
 }
 
+export interface TrocaPlantaoPendenteItem {
+  id: string;
+  createdAt: string;
+  plantaoId: string;
+  dataPlantao: string;
+  escalaId: string;
+  escalaNome: string | null;
+  gradeId: string;
+  solicitante: { id: string; nomeCompleto: string };
+  destino: { id: string; nomeCompleto: string };
+}
+
 export const pontoService = {
   checkIn: async (payload: CheckInPayload) => {
     const formData = new FormData();
@@ -102,5 +114,23 @@ export const pontoService = {
   solicitarTrocaPlantao: async (payload: { plantaoId: string; medicoDestinoId: string }) => {
     const response = await api.post('/ponto/solicitar-troca-plantao', payload);
     return response.data as { success: boolean; message?: string; data?: unknown };
+  },
+
+  listTrocasPlantaoPendentes: async () => {
+    const response = await api.get('/ponto/trocas-plantao-pendentes');
+    return response.data as {
+      success: boolean;
+      data: { recebidas: TrocaPlantaoPendenteItem[]; enviadas: TrocaPlantaoPendenteItem[] };
+    };
+  },
+
+  aceitarTrocaPlantao: async (solicitacaoId: string) => {
+    const response = await api.post(`/ponto/trocas-plantao/${solicitacaoId}/aceitar`);
+    return response.data as { success: boolean; message?: string };
+  },
+
+  recusarTrocaPlantao: async (solicitacaoId: string) => {
+    const response = await api.post(`/ponto/trocas-plantao/${solicitacaoId}/recusar`);
+    return response.data as { success: boolean; message?: string };
   },
 };

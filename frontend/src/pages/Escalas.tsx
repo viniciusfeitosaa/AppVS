@@ -330,11 +330,12 @@ const Escalas = () => {
   };
 
   const { data: equipePlantoesDiaResp } = useQuery({
-    queryKey: ['admin', 'equipes', selectedEquipeId ?? '', 'plantoes', plantoesDiaDateStr],
+    queryKey: ['admin', 'equipes', selectedEquipeId ?? '', 'plantoes', plantoesDiaDateStr, plantaoViewMode],
     queryFn: () =>
       adminService.listEquipePlantoes(selectedEquipeId!, {
         dataInicio: plantoesDiaDateStr,
         dataFim: plantoesDiaDateStr,
+        modo: plantaoViewMode,
       }),
     enabled: isMaster && !!selectedEquipeId && !!plantoesDiaDateStr,
   });

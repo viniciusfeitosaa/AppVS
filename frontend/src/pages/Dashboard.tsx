@@ -322,6 +322,47 @@ const Dashboard = () => {
   const colegasList = (colegasResp?.data ?? colegasResp ?? []) as Array<{ id: string; nomeCompleto: string; crm?: string | null }>;
   const selectedColega = selectedColegaId ? colegasList.find((c) => c.id === selectedColegaId) : null;
 
+  const { data: trocasPendentesResp } = useQuery({
+    queryKey: ['ponto', 'trocas-plantao-pendentes'],
+    queryFn: () => pontoService.listTrocasPlantaoPendentes(),
+    enabled: !!user && isMedico && !isMaster,
+    staleTime: 10 * 1000,
+  });
+  const trocasRecebidas = trocasPendentesResp?.data?.recebidas ?? [];
+  const trocasEnviadas = trocasPendentesResp?.data?.enviadas ?? [];
+
+  const aceitarTrocaMutation = useMutation({
+    mutationFn: (id: string) => pontoService.aceitarTrocaPlantao(id),
+    onSuccess: () => {
+      notify({ kind: 'success', title: 'Troca aceita', message: 'Plantão transferido com sucesso.', source: 'ponto' });
+      queryClient.invalidateQueries({ queryKey: ['ponto', 'trocas-plantao-pendentes'] });
+      queryClient.invalidateQueries({ queryKey: ['ponto', 'proximos-plantoes'] });
+      queryClient.invalidateQueries({ queryKey: ['medico', 'dashboard'] });
+    },
+    onError: (err: unknown) => {
+      const msg =
+        err && typeof err === 'object' && 'response' in err
+          ? (err as { response?: { data?: { error?: string } } }).response?.data?.error
+          : undefined;
+      notify({ kind: 'error', title: 'Não foi possível aceitar', message: msg ?? 'Tente novamente.', source: 'ponto' });
+    },
+  });
+
+  const recusarTrocaMutation = useMutation({
+    mutationFn: (id: string) => pontoService.recusarTrocaPlantao(id),
+    onSuccess: () => {
+      notify({ kind: 'success', title: 'Troca recusada', message: 'A solicitação foi recusada.', source: 'ponto' });
+      queryClient.invalidateQueries({ queryKey: ['ponto', 'trocas-plantao-pendentes'] });
+    },
+    onError: (err: unknown) => {
+      const msg =
+        err && typeof err === 'object' && 'response' in err
+          ? (err as { response?: { data?: { error?: string } } }).response?.data?.error
+          : undefined;
+      notify({ kind: 'error', title: 'Não foi possível recusar', message: msg ?? 'Tente novamente.', source: 'ponto' });
+    },
+  });
+
   const faixaPorPlantao = (p: PlantaoProximo | null) =>
     p ? faixaExibicaoPlantao(p) : '07h às 19h';
 
@@ -481,6 +522,48 @@ const Dashboard = () => {
               </div>
             </div>
           )}
+        </div>
+      )}
+
+      {isMedico && !isMaster && (trocasRecebidas.length > 0 || trocasEnviadas.length > 0) && (
+        <div className="card col-span-full stagger-2 border-l-4 border-l-amber-500 bg-gradient-to-r from-amber-50 to-orange-50/40">
+          <h3 className="text-sm font-semibold text-amber-900 font-display mb-3">Trocas de plantão pendentes</h3>
+          <div className="space-y-3">
+            {trocasRecebidas.map((t) => (
+              <div key={t.id} className="rounded-xl border border-amber-200 bg-amber-50/40 p-3 flex flex-wrap items-center justify-between gap-3">
+                <p className="text-sm text-amber-950">
+                  <strong>{fixMojibake(t.solicitante.nomeCompleto)}</strong> solicitou troca em{' '}
+                  <strong>{formatDataCurta(String(t.dataPlantao).slice(0, 10))}</strong> ({faixaExibicaoPlantao({ gradeId: t.gradeId })}).
+                </p>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    className="btn btn-secondary text-sm"
+                    disabled={aceitarTrocaMutation.isPending || recusarTrocaMutation.isPending}
+                    onClick={() => recusarTrocaMutation.mutate(t.id)}
+                  >
+                    Recusar
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-primary text-sm"
+                    disabled={aceitarTrocaMutation.isPending || recusarTrocaMutation.isPending}
+                    onClick={() => aceitarTrocaMutation.mutate(t.id)}
+                  >
+                    Aceitar
+                  </button>
+                </div>
+              </div>
+            ))}
+            {trocasEnviadas.map((t) => (
+              <div key={t.id} className="rounded-xl border border-viva-200/70 bg-viva-50/40 p-3">
+                <p className="text-sm text-viva-800">
+                  Solicitação enviada para <strong>{fixMojibake(t.destino.nomeCompleto)}</strong> em{' '}
+                  <strong>{formatDataCurta(String(t.dataPlantao).slice(0, 10))}</strong> ({faixaExibicaoPlantao({ gradeId: t.gradeId })}).
+                </p>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 

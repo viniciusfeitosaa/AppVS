@@ -13,6 +13,9 @@ import {
   listMeusPlantoesMesCalendarioService,
   listMinhasEquipesCalendarioService,
   solicitarTrocaPlantaoService,
+  listTrocasPlantaoPendentesService,
+  aceitarTrocaPlantaoService,
+  recusarTrocaPlantaoService,
   canCheckInService,
 } from '../services/ponto.service';
 
@@ -287,6 +290,53 @@ export const solicitarTrocaPlantaoController = async (req: Request, res: Respons
     return res.status(error.statusCode || 500).json({
       success: false,
       error: error.message || 'Erro ao solicitar troca de plantão',
+    });
+  }
+};
+
+export const listTrocasPlantaoPendentesController = async (req: Request, res: Response) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ success: false, error: 'Não autenticado' });
+    }
+    const data = await listTrocasPlantaoPendentesService(req.user.tenantId, req.user.id);
+    return res.status(200).json({ success: true, data });
+  } catch (error: any) {
+    return res.status(error.statusCode || 500).json({
+      success: false,
+      error: error.message || 'Erro ao listar trocas pendentes',
+    });
+  }
+};
+
+export const aceitarTrocaPlantaoController = async (req: Request, res: Response) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ success: false, error: 'Não autenticado' });
+    }
+    const solicitacaoId = String(req.params.id);
+    const data = await aceitarTrocaPlantaoService(req.user.tenantId, req.user.id, solicitacaoId);
+    return res.status(200).json({ success: true, data, message: 'Troca aceita com sucesso' });
+  } catch (error: any) {
+    return res.status(error.statusCode || 500).json({
+      success: false,
+      error: error.message || 'Erro ao aceitar troca de plantão',
+    });
+  }
+};
+
+export const recusarTrocaPlantaoController = async (req: Request, res: Response) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ success: false, error: 'Não autenticado' });
+    }
+    const solicitacaoId = String(req.params.id);
+    const data = await recusarTrocaPlantaoService(req.user.tenantId, req.user.id, solicitacaoId);
+    return res.status(200).json({ success: true, data, message: 'Troca recusada' });
+  } catch (error: any) {
+    return res.status(error.statusCode || 500).json({
+      success: false,
+      error: error.message || 'Erro ao recusar troca de plantão',
     });
   }
 };

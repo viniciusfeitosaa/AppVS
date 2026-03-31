@@ -370,7 +370,7 @@ export const adminService = {
 
   listEquipePlantoes: async (
     equipeId: string,
-    params?: { dataInicio?: string; dataFim?: string }
+    params?: { dataInicio?: string; dataFim?: string; modo?: 'fixa' | 'dinamica' }
   ): Promise<{ success: boolean; data: EscalaPlantao[] }> => {
     const response = await api.get(`/admin/equipes/${equipeId}/plantoes`, { params });
     return response.data;

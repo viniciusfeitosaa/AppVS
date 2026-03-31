@@ -1484,7 +1484,7 @@ export async function listEscalaPlantoesService(
 export async function listEquipePlantoesService(
   tenantId: string,
   equipeId: string,
-  filters: { dataInicio?: string; dataFim?: string }
+  filters: { dataInicio?: string; dataFim?: string; modo?: 'fixa' | 'dinamica' }
 ) {
   const dataInicio = filters.dataInicio ? new Date(filters.dataInicio) : undefined;
   const dataFim = filters.dataFim ? new Date(filters.dataFim) : undefined;
@@ -1508,7 +1508,7 @@ export async function listEquipePlantoesService(
     if (dataFim) where.data.lte = dataFim;
   }
 
-  return prisma.escalaPlantao.findMany({
+  const plantoes = await prisma.escalaPlantao.findMany({
     where,
     include: {
       medico: {
@@ -1516,6 +1516,55 @@ export async function listEquipePlantoesService(
       },
     },
     orderBy: [{ data: 'asc' }, { gradeId: 'asc' }],
+  });
+
+  if (plantoes.length === 0) return [];
+
+  // "Dinâmica" = médico atualmente no plantão (pós-trocas aceitas).
+  if (filters.modo !== 'fixa') {
+    return plantoes;
+  }
+
+  // "Fixa" = médico originalmente definido pelo master.
+  // Se houve troca aceita, usamos o solicitante da primeira troca aceita desse plantão
+  // (origem da cadeia de trocas). Sem troca aceita, cai no médico atual.
+  const plantaoIds = plantoes.map((p) => p.id);
+  const trocasAceitas = await prisma.solicitacaoTrocaPlantao.findMany({
+    where: {
+      tenantId,
+      escalaPlantaoId: { in: plantaoIds },
+      status: 'ACEITA',
+    },
+    select: {
+      escalaPlantaoId: true,
+      medicoSolicitanteId: true,
+      respondidaEm: true,
+      createdAt: true,
+    },
+    orderBy: [{ respondidaEm: 'asc' }, { createdAt: 'asc' }],
+  });
+
+  const medicoFixoPorPlantaoId = new Map<string, string>();
+  for (const t of trocasAceitas) {
+    if (!medicoFixoPorPlantaoId.has(t.escalaPlantaoId)) {
+      medicoFixoPorPlantaoId.set(t.escalaPlantaoId, t.medicoSolicitanteId);
+    }
+  }
+
+  const medicoIdsFixos = [...new Set(plantoes.map((p) => medicoFixoPorPlantaoId.get(p.id) ?? p.medicoId))];
+  const medicosFixos = await prisma.medico.findMany({
+    where: { tenantId, id: { in: medicoIdsFixos } },
+    select: { id: true, nomeCompleto: true, crm: true, email: true, telefone: true },
+  });
+  const medicoById = new Map(medicosFixos.map((m) => [m.id, m]));
+
+  return plantoes.map((p) => {
+    const medicoFixoId = medicoFixoPorPlantaoId.get(p.id) ?? p.medicoId;
+    return {
+      ...p,
+      medicoId: medicoFixoId,
+      medico: medicoById.get(medicoFixoId) ?? p.medico,
+    };
   });
 }
 
