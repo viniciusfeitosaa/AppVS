@@ -19,14 +19,19 @@ function escapeHtmlAttr(value: string): string {
 
 /** Logo nos e-mails: EMAIL_LOGO_URL ou origin do frontend + /assets/logo.png. */
 function getResetEmailLogoUrl(): string {
-  const custom = process.env.EMAIL_LOGO_URL?.trim();
-  if (custom) return custom;
   const raw = (process.env.FRONTEND_URL || process.env.FRONTEND_APP_URL || 'https://sejavivasaude.com.br').trim();
   let origin = raw;
   try {
     origin = new URL(raw).origin;
   } catch {
     origin = raw.replace(/\/$/, '');
+  }
+  const custom = process.env.EMAIL_LOGO_URL?.trim();
+  if (custom) {
+    // Permite EMAIL_LOGO_URL relativo (ex.: assets/logo.png ou /assets/logo.png).
+    if (/^https?:\/\//i.test(custom)) return custom;
+    const normalizedPath = custom.startsWith('/') ? custom : `/${custom}`;
+    return `${origin}${normalizedPath}`;
   }
   const prefix = (process.env.FRONTEND_ASSET_PREFIX || '').replace(/\/$/, '');
   return `${origin}${prefix}/assets/logo.png`;
