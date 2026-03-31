@@ -5,6 +5,7 @@ import {
   loginByEmailService,
   loginMasterService,
   loginMedicoService,
+  previewResetPasswordEmailHtmlService,
   redefinirSenhaService,
   registerPublicMedicoService,
 } from '../services/auth.service';
@@ -148,5 +149,23 @@ export const redefinirSenhaController = async (req: Request, res: Response) => {
       success: false,
       error: error.message || 'Erro ao redefinir senha',
     });
+  }
+};
+
+export const previewResetEmailController = async (req: Request, res: Response) => {
+  try {
+    if (process.env.NODE_ENV !== 'development') {
+      return res.status(404).send('Not found');
+    }
+    const token = typeof req.query.token === 'string' ? req.query.token : undefined;
+    const html = previewResetPasswordEmailHtmlService(token);
+    // No preview web, permitir estilos inline (padrão de e-mail HTML) e logo externa sem quebrar CSP global.
+    res.setHeader(
+      'Content-Security-Policy',
+      "default-src 'self'; img-src 'self' data: https://sejavivasaude.com.br; style-src 'self' 'unsafe-inline';"
+    );
+    return res.status(200).type('html').send(html);
+  } catch (error: any) {
+    return res.status(500).send(error?.message || 'Erro ao gerar preview');
   }
 };

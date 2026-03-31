@@ -79,6 +79,11 @@ export interface ValorPlantaoConfig {
   subgrupoId?: string;
   gradeId: string;
   valorHora: string | null;
+  valorHoraCobranca?: string | null;
+  /** Valores por dia da semana (seg-dom) para repasse (R$/h). */
+  valorHoraPorDia?: Record<string, number | null> | null;
+  /** Valores por dia da semana (seg-dom) para cobrança (R$/h). */
+  valorHoraCobrancaPorDia?: Record<string, number | null> | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -105,6 +110,9 @@ export interface ConfigPontoEletronico {
   horasPrevistasMes: number | null;
   valorHora: string | null;
   valorHoraCobranca: string | null;
+  /** Ponto sem escala: valores por dia (seg-dom). Ausente → usa valorHora global. */
+  valorHoraPorDia?: Record<string, number | null> | null;
+  valorHoraCobrancaPorDia?: Record<string, number | null> | null;
   horarioEntrada: string | null;
   horarioSaida: string | null;
   toleranciaMinutos: number | null;
@@ -419,7 +427,9 @@ export const adminService = {
     data: {
       contratos: { id: string; nome: string }[];
       subgrupos: { id: string; nome: string; ativo: boolean }[];
+      equipes: { id: string; nome: string; ativo: boolean; subgrupoId: string | null }[];
       contratoSubgrupos: { contratoAtivoId: string; subgrupoId: string }[];
+      contratoEquipes: { contratoAtivoId: string; equipeId: string }[];
     };
   }> => {
     const response = await api.get('/admin/valores-plantao/opcoes');
@@ -428,25 +438,34 @@ export const adminService = {
 
   getValoresPlantao: async (
     contratoId: string,
-    subgrupoId?: string
+    subgrupoId?: string,
+    equipeId?: string
   ): Promise<{ success: boolean; data: ValorPlantaoConfig[] }> => {
-    const response = await api.get('/admin/valores-plantao', {
-      params: subgrupoId ? { contratoId, subgrupoId } : { contratoId },
-    });
+    const params: Record<string, string> = { contratoId };
+    if (subgrupoId) params.subgrupoId = subgrupoId;
+    if (equipeId) params.equipeId = equipeId;
+    const response = await api.get('/admin/valores-plantao', { params });
     return response.data;
   },
 
   setValorPlantao: async (
     contratoId: string,
     subgrupoId: string,
+    equipeId: string,
     gradeId: string,
-    valorHora: number | null
+    payload: {
+      valorHora: number | null;
+      valorHoraCobranca?: number | null;
+      valorHoraPorDia?: Record<string, number | null> | null;
+      valorHoraCobrancaPorDia?: Record<string, number | null> | null;
+    }
   ) => {
     const response = await api.put('/admin/valores-plantao', {
       contratoId,
       subgrupoId,
+      equipeId,
       gradeId,
-      valorHora,
+      ...payload,
     });
     return response.data;
   },
@@ -516,6 +535,8 @@ export const adminService = {
       horasPrevistasMes: number | null;
       valorHora: number | null;
       valorHoraCobranca: number | null;
+      valorHoraPorDia?: Record<string, number | null> | null;
+      valorHoraCobrancaPorDia?: Record<string, number | null> | null;
       horarioEntrada?: string | null;
       horarioSaida?: string | null;
       toleranciaMinutos?: number | null;

@@ -387,6 +387,7 @@ model Equipe {
   escalaEquipes          EscalaEquipe[]
   configPontoEletronico  ConfigPontoEletronico[]
   contratoEquipes        ContratoEquipe[]
+  valoresPlantao         ValorPlantao[]
 
   @@map("equipes")
   @@unique([tenantId, subgrupoId, nome])
@@ -597,20 +598,30 @@ model ValorPlantao {
   tenantId         String   @map("tenant_id")
   contratoAtivoId  String   @map("contrato_ativo_id")
   subgrupoId       String   @map("subgrupo_id")
+  /// Quando null, valor padrão do subgrupo (legado). Quando preenchido, valor específico da equipe.
+  equipeId         String?  @map("equipe_id")
   gradeId          String   @map("grade_id") @db.VarChar(36)
   valorHora        Decimal? @map("valor_hora") @db.Decimal(10, 2)
+  /// Cobrança (R$/h) do tipo, quando aplicável (repasse ao profissional usa valorHora).
+  valorHoraCobranca Decimal? @map("valor_hora_cobranca") @db.Decimal(10, 2)
+  /// Valores por dia da semana (seg-dom) para repasse (R$/h). Dias ausentes → fallback em valorHora.
+  valorHoraPorDia   Json?    @map("valor_hora_por_dia")
+  /// Valores por dia da semana (seg-dom) para cobrança (R$/h). Dias ausentes → fallback em valorHoraCobranca.
+  valorHoraCobrancaPorDia Json? @map("valor_hora_cobranca_por_dia")
   createdAt        DateTime @default(now()) @map("created_at")
   updatedAt        DateTime @updatedAt @map("updated_at")
 
   tenant        Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   contratoAtivo ContratoAtivo @relation(fields: [contratoAtivoId], references: [id], onDelete: Cascade)
   subgrupo      Subgrupo      @relation(fields: [subgrupoId], references: [id], onDelete: Cascade)
+  equipe        Equipe?       @relation(fields: [equipeId], references: [id], onDelete: Cascade)
 
   @@map("valores_plantao")
-  @@unique([tenantId, contratoAtivoId, subgrupoId, gradeId])
   @@index([tenantId])
   @@index([contratoAtivoId])
   @@index([subgrupoId])
+  @@index([equipeId])
+  @@index([tenantId, contratoAtivoId, subgrupoId, gradeId, equipeId])
 }
 
 model AdicionalPlantaoData {
@@ -643,6 +654,9 @@ model ConfigPontoEletronico {
   valorHora         Decimal? @map("valor_hora") @db.Decimal(10, 2)
   // valor/hora cobrança (só ponto); repasse ao profissional em valorHora
   valorHoraCobranca Decimal? @map("valor_hora_cobranca") @db.Decimal(10, 2)
+  /// Valores por dia da semana (seg-dom) para ponto sem escala. Dias ausentes → fallback em valorHora/valorHoraCobranca.
+  valorHoraPorDia   Json?    @map("valor_hora_por_dia")
+  valorHoraCobrancaPorDia Json? @map("valor_hora_cobranca_por_dia")
   horarioEntrada    String?   @map("horario_entrada") @db.VarChar(5)
   horarioSaida      String?   @map("horario_saida") @db.VarChar(5)
   toleranciaMinutos Int?      @map("tolerancia_minutos")

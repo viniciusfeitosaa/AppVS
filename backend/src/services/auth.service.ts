@@ -17,20 +17,33 @@ function escapeHtmlAttr(value: string): string {
   return value.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
 }
 
-/** Logo nos e-mails: EMAIL_LOGO_URL ou FRONTEND_URL + /assets/logo-horizontal.png (PNG costuma abrir melhor que AVIF). */
+/** Logo nos e-mails: EMAIL_LOGO_URL ou origin do frontend + /assets/logo.png. */
 function getResetEmailLogoUrl(): string {
   const custom = process.env.EMAIL_LOGO_URL?.trim();
   if (custom) return custom;
-  const base = (process.env.FRONTEND_URL || 'https://sejavivasaude.com.br').replace(/\/$/, '');
+  const raw = (process.env.FRONTEND_URL || process.env.FRONTEND_APP_URL || 'https://sejavivasaude.com.br').trim();
+  let origin = raw;
+  try {
+    origin = new URL(raw).origin;
+  } catch {
+    origin = raw.replace(/\/$/, '');
+  }
   const prefix = (process.env.FRONTEND_ASSET_PREFIX || '').replace(/\/$/, '');
-  return `${base}${prefix}/assets/logo-horizontal.png`;
+  return `${origin}${prefix}/assets/logo.png`;
+}
+
+/** Base do app para links de redefinição (prefira FRONTEND_APP_URL em produção). */
+function getResetPasswordAppBaseUrl(): string {
+  const appUrl = process.env.FRONTEND_APP_URL?.trim();
+  if (appUrl) return appUrl.replace(/\/$/, '');
+  const fallback = (process.env.FRONTEND_URL || 'http://localhost:3000').trim().replace(/\/$/, '');
+  return fallback;
 }
 
 function buildResetPasswordEmailHtml(resetLink: string): string {
   const href = escapeHtmlAttr(resetLink);
   const logoSrc = escapeHtmlAttr(getResetEmailLogoUrl());
   const year = new Date().getFullYear();
-  const linkDisplay = resetLink.replace(/&/g, '&amp;');
   return `<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -39,34 +52,32 @@ function buildResetPasswordEmailHtml(resetLink: string): string {
 <meta http-equiv="x-ua-compatible" content="ie=edge">
 <title>Redefinir senha — Viva Saúde</title>
 </head>
-<body style="margin:0;padding:0;background-color:#ecfdf5;">
+<body style="margin:0;padding:0;background-color:#f5f7fb;">
 <!-- Pré-visualização em alguns clientes de e-mail -->
 <div style="display:none;max-height:0;overflow:hidden;mso-hide:all;">Use o link seguro para criar uma nova senha na Viva Saúde. Válido por 1 hora.</div>
-<table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="background-color:#ecfdf5;">
+<table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="background-color:#f5f7fb;">
   <tr>
     <td align="center" style="padding:28px 14px 40px;">
-      <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="max-width:520px;background-color:#ffffff;border-radius:20px;overflow:hidden;border:1px solid #bbf7d0;box-shadow:0 12px 40px rgba(20,83,45,0.1);">
+      <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="max-width:520px;background-color:#ffffff;border-radius:20px;overflow:hidden;border:1px solid #e5e7eb;box-shadow:0 12px 40px rgba(15,23,42,0.08);">
         <tr>
-          <td bgcolor="#ecfdf5" style="padding:32px 28px 24px;text-align:center;background:linear-gradient(180deg,#ecfdf5 0%,#ffffff 55%);border-bottom:1px solid #d1fae5;">
+          <td bgcolor="#f8fafc" style="padding:32px 28px 24px;text-align:center;background:linear-gradient(180deg,#f8fafc 0%,#ffffff 60%);border-bottom:1px solid #e5e7eb;">
             <img src="${logoSrc}" alt="Viva Saúde" width="220" height="auto" style="display:block;margin:0 auto 12px;max-width:220px;height:auto;border:0;outline:none;text-decoration:none;">
-            <p style="margin:0;font-size:13px;letter-spacing:0.02em;color:#15803d;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;">Cuidado que conecta profissionais e instituições</p>
+            <p style="margin:0;font-size:13px;letter-spacing:0.02em;color:#64748b;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;">Cuidado que conecta profissionais e instituições</p>
           </td>
         </tr>
         <tr>
           <td style="padding:32px 32px 26px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;">
             <p style="margin:0 0 6px;font-size:15px;line-height:1.5;color:#374151;">Olá,</p>
-            <h1 style="margin:0 0 18px;font-size:23px;font-weight:700;line-height:1.3;color:#14532d;letter-spacing:-0.02em;">Redefinir sua senha de acesso</h1>
-            <p style="margin:0 0 16px;font-size:15px;line-height:1.65;color:#4b5563;">Recebemos um pedido para <strong style="color:#166534;font-weight:600;">criar uma nova senha</strong> para a sua conta na plataforma <strong style="color:#14532d;">Viva Saúde</strong>.</p>
-            <p style="margin:0 0 26px;font-size:15px;line-height:1.65;color:#4b5563;">Para continuar com segurança, toque no botão abaixo. O link é <strong style="color:#14532d;">válido por 1 hora</strong> e só pode ser usado uma vez.</p>
+            <h1 style="margin:0 0 18px;font-size:23px;font-weight:700;line-height:1.3;color:#0f172a;letter-spacing:-0.02em;">Redefinir sua senha de acesso</h1>
+            <p style="margin:0 0 16px;font-size:15px;line-height:1.65;color:#4b5563;">Recebemos um pedido para <strong style="color:#0f172a;font-weight:600;">criar uma nova senha</strong> para a sua conta na plataforma <strong style="color:#0f172a;">Viva Saúde</strong>.</p>
+            <p style="margin:0 0 26px;font-size:15px;line-height:1.65;color:#4b5563;">Para continuar com segurança, toque no botão abaixo. O link é <strong style="color:#0f172a;">válido por 1 hora</strong> e só pode ser usado uma vez.</p>
             <table role="presentation" cellpadding="0" cellspacing="0" align="center" style="margin:0 auto 26px;">
               <tr>
-                <td style="border-radius:14px;background-color:#166534;box-shadow:0 4px 14px rgba(22,101,52,0.35);">
+                <td style="border-radius:14px;background-color:#166534;box-shadow:0 4px 14px rgba(22,101,52,0.22);">
                   <a href="${href}" target="_blank" rel="noopener noreferrer" style="display:inline-block;padding:15px 40px;font-size:15px;font-weight:600;color:#ffffff;text-decoration:none;border-radius:14px;">Criar nova senha</a>
                 </td>
               </tr>
             </table>
-            <p style="margin:0 0 10px;font-size:13px;line-height:1.5;color:#6b7280;">O botão não abre? Copie e cole este endereço no navegador:</p>
-            <p style="margin:0 0 26px;padding:12px 14px;background-color:#f9fafb;border-radius:10px;border:1px solid #e5e7eb;font-size:12px;line-height:1.55;color:#166534;word-break:break-all;font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;">${linkDisplay}</p>
             <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="margin:0 0 8px;">
               <tr>
                 <td style="width:4px;background-color:#22c55e;border-radius:2px;"></td>
@@ -79,7 +90,7 @@ function buildResetPasswordEmailHtml(resetLink: string): string {
           </td>
         </tr>
         <tr>
-          <td style="padding:18px 24px 22px;background-color:#f0fdf4;text-align:center;font-size:11px;line-height:1.55;color:#86a89a;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;">
+          <td style="padding:18px 24px 22px;background-color:#f8fafc;text-align:center;font-size:11px;line-height:1.55;color:#94a3b8;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;">
             © ${year} Viva Saúde. Este e-mail foi enviado automaticamente; não é necessário responder.<br>
             Dúvidas? Fale connosco pelo canal de suporte da sua instituição ou pelo e-mail de contato oficial.
           </td>
@@ -90,6 +101,13 @@ function buildResetPasswordEmailHtml(resetLink: string): string {
 </table>
 </body>
 </html>`;
+}
+
+export function previewResetPasswordEmailHtmlService(token?: string): string {
+  const frontendUrl = getResetPasswordAppBaseUrl();
+  const safeToken = (token && token.trim()) || 'preview-token-123';
+  const resetLink = `${frontendUrl}/redefinir-senha?token=${safeToken}`;
+  return buildResetPasswordEmailHtml(resetLink);
 }
 
 function buildResetPasswordEmailText(resetLink: string): string {
@@ -783,7 +801,7 @@ export async function esqueciSenhaService(email: string): Promise<{
     });
   });
 
-  const frontendUrl = (process.env.FRONTEND_URL || 'http://localhost:3000').replace(/\/$/, '');
+  const frontendUrl = getResetPasswordAppBaseUrl();
   const resetLink = `${frontendUrl}/redefinir-senha?token=${token}`;
 
   const whatsAppPhone = medico?.telefone ? normalizePhoneForWhatsApp(medico.telefone) : null;

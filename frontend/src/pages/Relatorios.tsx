@@ -32,11 +32,12 @@ type DetalheCalculoRegistroPonto = {
   registroId: string;
   checkInAt: string;
   duracaoMinutos: number;
-  valorAplicado: number | null;
+  valorRepasseAplicado: number | null;
+  valorCobrancaAplicado: number | null;
   metodo:
     | 'REPASSE_CONGELADO'
     | 'VALOR_HORA_ALOCACAO_ESCALA'
-    | 'PROPORCIONAL_TURNO'
+    | 'VALOR_HORA_PLANTAO'
     | 'SEM_VALOR';
   /** Texto curto para exibir na UI */
   resumo: string;
@@ -52,7 +53,6 @@ type AgrupamentoHoras = {
   totalRegistros: number;
   /** Valor/h (R$) usado no cálculo quando aplicável */
   valorHora?: number;
-  valorCalculado?: number;
   /** Contrato só ponto: total repasse (valor hora repasse × horas) */
   valorRepasse?: number;
   /** Contrato só ponto: total cobrança (valor hora cobrança × horas) */
@@ -103,17 +103,39 @@ const inferGradeIdFromCheckIn = (checkInAtIso: string): 'mt' | 'sn' => {
   return h >= 7 && h < 19 ? 'mt' : 'sn';
 };
 
+type DiaKey = 'seg' | 'ter' | 'qua' | 'qui' | 'sex' | 'sab' | 'dom';
+const diaKeyFromIso = (iso: string): DiaKey => {
+  const d = new Date(iso);
+  // JS: 0=Dom ... 6=Sáb
+  switch (d.getDay()) {
+    case 0:
+      return 'dom';
+    case 1:
+      return 'seg';
+    case 2:
+      return 'ter';
+    case 3:
+      return 'qua';
+    case 4:
+      return 'qui';
+    case 5:
+      return 'sex';
+    default:
+      return 'sab';
+  }
+};
+
 const exportHorasCsv = (
   agrupado: AgrupamentoHoras[],
   dataInicio: string,
   dataFim: string,
-  apenasPonto: boolean
+  mostrarRepasseECobranca: boolean
 ) => {
-  const header = apenasPonto
+  const header = mostrarRepasseECobranca
     ? ['Médico', 'Escala', 'Registros', 'Total (min)', 'Total (horas)', 'Repasse (R$)', 'Cobrança (R$)']
     : ['Médico', 'Escala', 'Registros', 'Total (min)', 'Total (horas)', 'Valor (R$)'];
   const rows = agrupado.map((item) =>
-    apenasPonto
+    mostrarRepasseECobranca
       ? [
           escapeCsvCell(item.medicoNome),
           escapeCsvCell(item.escalaNome),
@@ -129,7 +151,7 @@ const exportHorasCsv = (
           escapeCsvCell(item.totalRegistros),
           escapeCsvCell(item.totalMinutos),
           escapeCsvCell(formatDuration(item.totalMinutos)),
-          escapeCsvCell(item.valorCalculado != null ? formatValor(item.valorCalculado) : ''),
+          escapeCsvCell(item.valorRepasse != null ? formatValor(item.valorRepasse) : ''),
         ]
   );
   const csv = [header.join(','), ...rows.map((r) => r.join(','))].join('\r\n');
@@ -146,7 +168,7 @@ const exportHorasPdf = (
   agrupado: AgrupamentoHoras[],
   dataInicio: string,
   dataFim: string,
-  apenasPonto: boolean
+  mostrarRepasseECobranca: boolean
 ) => {
   const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
   doc.setFontSize(14);
@@ -159,7 +181,7 @@ const exportHorasPdf = (
   autoTable(doc, {
     startY: 24,
     // Uma linha de cabeçalho = [[c1,c2,...]], sem array extra (evita 1 coluna só).
-    head: apenasPonto
+    head: mostrarRepasseECobranca
       ? [
           [
             cel('Médico'),
@@ -180,7 +202,7 @@ const exportHorasPdf = (
           ],
         ],
     body: agrupado.map((item) =>
-      apenasPonto
+      mostrarRepasseECobranca
         ? [
             cel(item.medicoNome),
             cel(item.escalaNome),
@@ -194,7 +216,7 @@ const exportHorasPdf = (
             cel(item.escalaNome),
             String(item.totalRegistros),
             cel(formatDuration(item.totalMinutos)),
-            celValor(item.valorCalculado),
+            celValor(item.valorRepasse),
           ]
     ),
     styles: { fontSize: 9 },
@@ -272,30 +294,69 @@ const Relatorios = () => {
   const apenasPonto = Boolean(contratoSelecionado?.usaPonto && !contratoSelecionado?.usaEscala);
 
   const { data: valoresPlantaoResp } = useQuery({
-    queryKey: ['admin', 'valores-plantao', contratoId, subgrupoId || '__all__', 'relatorio'],
-    queryFn: () => adminService.getValoresPlantao(contratoId, subgrupoId || undefined),
+    queryKey: ['admin', 'valores-plantao', contratoId, subgrupoId || '__all__', equipeId || '__none__', 'relatorio'],
+    queryFn: () => adminService.getValoresPlantao(contratoId, subgrupoId || undefined, equipeId || undefined),
     enabled: isMaster && usaEscalaEPonto && Boolean(contratoId),
   });
+  const { data: adicionaisResp } = useQuery({
+    queryKey: ['admin', 'adicionais-plantao', contratoId, dataInicio, dataFim],
+    queryFn: () =>
+      adminService.listAdicionaisPlantao({
+        contratoAtivoId: contratoId,
+        dataInicio,
+        dataFim,
+      }),
+    enabled: isMaster && usaEscalaEPonto && Boolean(contratoId && dataInicio && dataFim),
+  });
 
-  /**
-   * Valor total do turno por grade (campo valorHora em valores_plantao), como no cadastro.
-   * Valor proporcional por registro: valorTurno × (horasTrabalhadas ÷ horasPrevistasTurno).
-   * horasPrevistasTurno vêm do backend por tipo (UUID) ou legado mt/sn (12h).
-   */
-  const valorPlantao12hPorGrade = useMemo(() => {
-    const map = new Map<string, number>();
+  const mostrarRepasseECobranca = Boolean(contratoSelecionado?.usaPonto);
+
+  const valoresPlantaoPorGrade = useMemo(() => {
+    const map = new Map<
+      string,
+      {
+        repasseGlobal: number | null;
+        repassePorDia: Partial<Record<DiaKey, number | null>>;
+        cobrancaGlobal: number | null;
+        cobrancaPorDia: Partial<Record<DiaKey, number | null>>;
+      }
+    >();
     const rows = valoresPlantaoResp?.data ?? [];
     for (const v of rows as any[]) {
       const gradeId = String(v.gradeId ?? '').trim().toLowerCase();
       if (!gradeId) continue;
-      const n = v.valorHora != null && v.valorHora !== '' ? Number(v.valorHora) : NaN;
-      if (!Number.isFinite(n) || n <= 0) continue;
-      const rounded = round2(n);
-      const prev = map.get(gradeId);
-      map.set(gradeId, prev != null ? Math.max(prev, rounded) : rounded);
+
+      const repasseGlobal =
+        v.valorHora != null && v.valorHora !== '' && Number.isFinite(Number(v.valorHora))
+          ? Number(v.valorHora)
+          : null;
+      const cobrancaGlobal =
+        v.valorHoraCobranca != null && v.valorHoraCobranca !== '' && Number.isFinite(Number(v.valorHoraCobranca))
+          ? Number(v.valorHoraCobranca)
+          : null;
+
+      map.set(gradeId, {
+        repasseGlobal,
+        repassePorDia: (v.valorHoraPorDia ?? {}) as any,
+        cobrancaGlobal,
+        cobrancaPorDia: (v.valorHoraCobrancaPorDia ?? {}) as any,
+      });
     }
     return map;
   }, [valoresPlantaoResp?.data]);
+
+  const adicionaisPorDataGrade = useMemo(() => {
+    const map = new Map<string, number>();
+    const rows = adicionaisResp?.data ?? [];
+    for (const row of rows as any[]) {
+      const gradeId = String(row?.gradeId ?? '').trim().toLowerCase();
+      const data = String(row?.data ?? '').slice(0, 10);
+      const percentual = Number(row?.percentual ?? 0);
+      if (!gradeId || !data || !Number.isFinite(percentual) || percentual <= 0) continue;
+      map.set(`${data}::${gradeId}`, percentual);
+    }
+    return map;
+  }, [adicionaisResp?.data]);
 
   if (!isMaster) {
     return (
@@ -311,6 +372,10 @@ const Relatorios = () => {
   const valorHoraPorMedico: Record<string, number> = !Array.isArray(raw) && raw?.valorHoraPorMedico ? raw.valorHoraPorMedico : {};
   const valorHoraCobrancaPorMedico: Record<string, number> =
     !Array.isArray(raw) && raw?.valorHoraCobrancaPorMedico ? raw.valorHoraCobrancaPorMedico : {};
+  const valorHoraPorRegistroPontoId: Record<string, number> =
+    !Array.isArray(raw) && raw?.valorHoraPorRegistroPontoId ? raw.valorHoraPorRegistroPontoId : {};
+  const valorHoraCobrancaPorRegistroPontoId: Record<string, number> =
+    !Array.isArray(raw) && raw?.valorHoraCobrancaPorRegistroPontoId ? raw.valorHoraCobrancaPorRegistroPontoId : {};
   const valorHoraPorMedicoEscala: Record<string, number> = !Array.isArray(raw) && raw?.valorHoraPorMedicoEscala ? raw.valorHoraPorMedicoEscala : {};
   const plantoesValorHoraPorEscalaDataGrade: Record<string, number> =
     !Array.isArray(raw) && raw?.plantoesValorHoraPorEscalaDataGrade ? raw.plantoesValorHoraPorEscalaDataGrade : {};
@@ -351,90 +416,6 @@ const Relatorios = () => {
           ? String(gradeIdPlantaoPorRegistroPontoId[item.id]).trim().toLowerCase()
           : null;
 
-      const valorPlantaoGravadoPorGradeResolvido =
-        escId !== 'sem-escala' && dateStr && gradeResolvido
-          ? plantoesValorHoraPorEscalaDataGrade[`${escId}::${dateStr}::${gradeResolvido}`] ?? null
-          : null;
-      const valorPlantaoGravadoInferidoMtSn =
-        escId !== 'sem-escala' && dateStr
-          ? plantoesValorHoraPorEscalaDataGrade[`${escId}::${dateStr}::${gradeIdInferido}`] ?? null
-          : null;
-
-      const total12hPorRegistro =
-        item.id && escId !== 'sem-escala'
-          ? valorPlantao12hPorRegistroPontoId[item.id] ?? null
-          : null;
-
-      const total12hPorCadastroGradeResolvido =
-        gradeResolvido != null ? valorPlantao12hPorGrade.get(gradeResolvido) ?? null : null;
-
-      /**
-       * Cadastro (Valores plantão no subgrupo) antes do valor gravado no slot do dia, para não ficar preso a
-       * snapshot incorreto no plantão; depois mapa por dia/grade, snapshot por registro, fallback mt/sn no cadastro.
-       */
-      let total12h: number | null = null;
-      let fonteValorTurno: string | null = null;
-      if (total12hPorCadastroGradeResolvido != null && total12hPorCadastroGradeResolvido > 0) {
-        total12h = Number(total12hPorCadastroGradeResolvido);
-        fonteValorTurno = `Valores plantão (cadastro), grade ${gradeResolvido ?? '?'}`;
-      } else if (
-        valorPlantaoGravadoPorGradeResolvido != null &&
-        Number(valorPlantaoGravadoPorGradeResolvido) > 0
-      ) {
-        total12h = Number(valorPlantaoGravadoPorGradeResolvido);
-        fonteValorTurno = `Valor no slot do plantão (${dateStr}, grade ${gradeResolvido ?? '?'})`;
-      } else if (
-        valorPlantaoGravadoInferidoMtSn != null &&
-        Number(valorPlantaoGravadoInferidoMtSn) > 0
-      ) {
-        total12h = Number(valorPlantaoGravadoInferidoMtSn);
-        fonteValorTurno = `Valor no slot do plantão (${dateStr}, grade MT/SN inferida pelo check-in)`;
-      } else if (total12hPorRegistro != null && Number(total12hPorRegistro) > 0) {
-        total12h = Number(total12hPorRegistro);
-        fonteValorTurno = 'Valor hora do plantão vinculado ao check-in (backend)';
-      } else {
-        const fallbackCad = valorPlantao12hPorGrade.get(gradeIdInferido);
-        if (fallbackCad != null && fallbackCad > 0) {
-          total12h = fallbackCad;
-          fonteValorTurno = `Valores plantão (cadastro), grade MT/SN inferida (${gradeIdInferido})`;
-        }
-      }
-
-      const fromRegDiv =
-        item.id && horasTurnoPorRegistroPontoId[item.id] != null
-          ? Number(horasTurnoPorRegistroPontoId[item.id])
-          : NaN;
-      let horasDivisor: number;
-      let fonteDivisor: string;
-      if (Number.isFinite(fromRegDiv) && fromRegDiv > 0) {
-        horasDivisor = fromRegDiv;
-        fonteDivisor = 'Horas previstas do turno (plantão / snapshot deste registro)';
-      } else if (gradeResolvido != null) {
-        const h = Number(horasTurnoPorGradeId[gradeResolvido]);
-        if (Number.isFinite(h) && h > 0) {
-          horasDivisor = h;
-          fonteDivisor = `Duração do tipo de plantão (grade ${gradeResolvido})`;
-        } else {
-          const hInf = Number(horasTurnoPorGradeId[gradeIdInferido]);
-          if (Number.isFinite(hInf) && hInf > 0) {
-            horasDivisor = hInf;
-            fonteDivisor = `Duração do tipo (grade inferida ${gradeIdInferido})`;
-          } else {
-            horasDivisor = 12;
-            fonteDivisor = 'Padrão 12 h (sem tipo para a grade)';
-          }
-        }
-      } else {
-        const hInf = Number(horasTurnoPorGradeId[gradeIdInferido]);
-        if (Number.isFinite(hInf) && hInf > 0) {
-          horasDivisor = hInf;
-          fonteDivisor = `Duração do tipo (grade inferida ${gradeIdInferido})`;
-        } else {
-          horasDivisor = 12;
-          fonteDivisor = 'Padrão 12 h';
-        }
-      }
-
       const horasTrabalhadas = minutos / 60;
       const rawCongelado = (item as RegistroPontoAdmin).repasseValorCongelado;
       const repasseCongeladoNum =
@@ -443,55 +424,84 @@ const Relatorios = () => {
           : NaN;
       const temRepasseCongelado =
         Number.isFinite(repasseCongeladoNum) && repasseCongeladoNum > 0;
+      const diaKey = diaKeyFromIso(item.checkInAt);
+      const gradeKey = gradeResolvido != null ? String(gradeResolvido).trim().toLowerCase() : '';
+      const cadResolvido = gradeKey ? valoresPlantaoPorGrade.get(gradeKey) ?? null : null;
+      const cadInferido = valoresPlantaoPorGrade.get(gradeIdInferido) ?? null;
 
-      const valorRegistro =
+      const pickRate = (
+        byDay: Partial<Record<DiaKey, number | null>>,
+        dia: DiaKey,
+        fallbackGlobal: number | null
+      ): number | null => {
+        const v = byDay?.[dia];
+        const n = v != null ? Number(v) : NaN;
+        if (Number.isFinite(n) && n > 0) return n;
+        return fallbackGlobal != null && Number.isFinite(Number(fallbackGlobal)) && Number(fallbackGlobal) > 0
+          ? Number(fallbackGlobal)
+          : null;
+      };
+
+      const repasseRateCad = cadResolvido
+        ? pickRate(cadResolvido.repassePorDia, diaKey, cadResolvido.repasseGlobal)
+        : cadInferido
+          ? pickRate(cadInferido.repassePorDia, diaKey, cadInferido.repasseGlobal)
+          : null;
+      const cobrancaRateCad = cadResolvido
+        ? pickRate(cadResolvido.cobrancaPorDia, diaKey, cadResolvido.cobrancaGlobal)
+        : cadInferido
+          ? pickRate(cadInferido.cobrancaPorDia, diaKey, cadInferido.cobrancaGlobal)
+          : null;
+
+      const repasseRate = temValorHoraAlocacao ? valorHoraAlocacao : repasseRateCad;
+      const repasseRegistro =
         usaEscalaEPonto && contratoId && temRepasseCongelado
           ? round2(repasseCongeladoNum)
-          : usaEscalaEPonto && contratoId
-            ? temValorHoraAlocacao
-              ? round2(horasTrabalhadas * valorHoraAlocacao)
-              : total12h != null && total12h > 0 && horasDivisor > 0
-                ? round2(total12h * (horasTrabalhadas / horasDivisor))
-                : null
+          : usaEscalaEPonto && contratoId && repasseRate != null && repasseRate > 0
+            ? round2(horasTrabalhadas * repasseRate)
             : null;
+
+      const cobrancaRegistro =
+        usaEscalaEPonto && contratoId && cobrancaRateCad != null && cobrancaRateCad > 0
+          ? round2(horasTrabalhadas * cobrancaRateCad)
+          : null;
+
+      const adicionalPercentual =
+        gradeResolvido && dateStr ? adicionaisPorDataGrade.get(`${dateStr}::${gradeResolvido}`) ?? 0 : 0;
+      const fatorAdicional = 1 + adicionalPercentual / 100;
+      const repasseComAdicional =
+        repasseRegistro != null ? round2(repasseRegistro * fatorAdicional) : null;
+      const cobrancaComAdicional =
+        cobrancaRegistro != null ? round2(cobrancaRegistro * fatorAdicional) : null;
 
       const metodoCalculo: DetalheCalculoRegistroPonto['metodo'] =
         usaEscalaEPonto && contratoId && temRepasseCongelado
           ? 'REPASSE_CONGELADO'
           : usaEscalaEPonto && contratoId && temValorHoraAlocacao
             ? 'VALOR_HORA_ALOCACAO_ESCALA'
-            : usaEscalaEPonto &&
-                contratoId &&
-                total12h != null &&
-                total12h > 0 &&
-                horasDivisor > 0 &&
-                valorRegistro != null
-              ? 'PROPORCIONAL_TURNO'
+            : usaEscalaEPonto && contratoId && repasseRegistro != null
+              ? 'VALOR_HORA_PLANTAO'
               : 'SEM_VALOR';
 
       const resumoCalculo =
         usaEscalaEPonto && contratoId && temRepasseCongelado
           ? `Congelado no checkout: ${formatValor(repasseCongeladoNum)}`
           : usaEscalaEPonto && contratoId && temValorHoraAlocacao
-            ? `${horasTrabalhadas.toFixed(2)} h × ${formatValor(valorHoraAlocacao)}/h (alocação médico–escala)`
-            : usaEscalaEPonto &&
-                contratoId &&
-                total12h != null &&
-                total12h > 0 &&
-                horasDivisor > 0 &&
-                valorRegistro != null
-              ? `${formatValor(total12h)} × (${horasTrabalhadas.toFixed(2)} h ÷ ${horasDivisor} h) = ${formatValor(
-                  valorRegistro
-                )}. Valor turno: ${fonteValorTurno ?? '—'}. Divisor: ${fonteDivisor}.`
+            ? `Repasse: ${horasTrabalhadas.toFixed(2)} h × ${formatValor(valorHoraAlocacao)}/h = ${repasseRegistro != null ? formatValor(repasseRegistro) : '—'}. ` +
+              `Cobrança: ${horasTrabalhadas.toFixed(2)} h × ${cobrancaRateCad != null ? `${formatValor(cobrancaRateCad)}/h` : '—'} = ${cobrancaRegistro != null ? formatValor(cobrancaRegistro) : '—'}.` +
+              (adicionalPercentual > 0 ? ` Adicional +${adicionalPercentual}% aplicado.` : '')
               : usaEscalaEPonto && contratoId
-                ? 'Sem valor: falta repasse congelado, valor hora na alocação ou base de turno (cadastro/plantão).'
+                ? `Repasse: ${horasTrabalhadas.toFixed(2)} h × ${repasseRateCad != null ? `${formatValor(repasseRateCad)}/h` : '—'} = ${repasseRegistro != null ? formatValor(repasseRegistro) : '—'}. ` +
+                  `Cobrança: ${horasTrabalhadas.toFixed(2)} h × ${cobrancaRateCad != null ? `${formatValor(cobrancaRateCad)}/h` : '—'} = ${cobrancaRegistro != null ? formatValor(cobrancaRegistro) : '—'}.` +
+                  (adicionalPercentual > 0 ? ` Adicional +${adicionalPercentual}% aplicado.` : '')
                 : '—';
 
       const detalheLinha: DetalheCalculoRegistroPonto = {
         registroId: item.id,
         checkInAt: item.checkInAt,
         duracaoMinutos: minutos,
-        valorAplicado: valorRegistro,
+        valorRepasseAplicado: repasseComAdicional,
+        valorCobrancaAplicado: cobrancaComAdicional,
         metodo: metodoCalculo,
         resumo: resumoCalculo,
       };
@@ -500,8 +510,11 @@ const Relatorios = () => {
       if (prev) {
         prev.totalMinutos += minutos;
         prev.totalRegistros += 1;
-        if (valorRegistro != null) {
-          prev.valorCalculado = round2((prev.valorCalculado ?? 0) + valorRegistro);
+        if (repasseComAdicional != null) {
+          prev.valorRepasse = round2((prev.valorRepasse ?? 0) + repasseComAdicional);
+        }
+        if (cobrancaComAdicional != null) {
+          prev.valorCobranca = round2((prev.valorCobranca ?? 0) + cobrancaComAdicional);
         }
         if (temValorHoraAlocacao) {
           prev.valorHora = valorHoraAlocacao;
@@ -523,7 +536,8 @@ const Relatorios = () => {
           totalMinutos: minutos,
           totalRegistros: 1,
           valorHora: temValorHoraAlocacao ? valorHoraAlocacao : undefined,
-          valorCalculado: valorRegistro != null ? round2(valorRegistro) : undefined,
+          valorRepasse: repasseComAdicional != null ? round2(repasseComAdicional) : undefined,
+          valorCobranca: cobrancaComAdicional != null ? round2(cobrancaComAdicional) : undefined,
           calculoPorRegistro:
             usaEscalaEPonto && contratoId ? [detalheLinha] : undefined,
         });
@@ -535,7 +549,7 @@ const Relatorios = () => {
     const rows = Array.from(map.values()).sort((a, b) => b.totalMinutos - a.totalMinutos);
 
     const temValorPlantaoGravadoNoPeriodo = Object.keys(plantoesValorHoraPorEscalaDataGrade).length > 0;
-    const temValorBaseGrade = valorPlantao12hPorGrade.size > 0;
+    const temValorBaseGrade = valoresPlantaoPorGrade.size > 0;
     const temValorPorRegistro = Object.keys(valorPlantao12hPorRegistroPontoId).length > 0;
     const temGradeResolvido = Object.keys(gradeIdPlantaoPorRegistroPontoId).length > 0;
     // Fallback: só quando não há base de plantão/grade no período; nunca sobrescreve linha já calculada no loop principal.
@@ -550,17 +564,18 @@ const Relatorios = () => {
       for (const row of rows) {
         const keyMedEsc = `${row.medicoId}::${row.escalaId}`;
         if (row.escalaId !== 'sem-escala') {
-          if (row.valorCalculado != null) continue;
+          if (row.valorRepasse != null) continue;
           const vh = valorHoraPorMedicoEscala[keyMedEsc];
           if (vh != null && vh > 0) {
             row.valorHora = vh;
-            row.valorCalculado = round2((row.totalMinutos / 60) * vh);
+            row.valorRepasse = round2((row.totalMinutos / 60) * vh);
             row.calculoPorRegistro = [
               {
                 registroId: '_agrupado',
                 checkInAt: '',
                 duracaoMinutos: row.totalMinutos,
-                valorAplicado: row.valorCalculado,
+                valorRepasseAplicado: row.valorRepasse,
+                valorCobrancaAplicado: null,
                 metodo: 'VALOR_HORA_ALOCACAO_ESCALA',
                 resumo: `Fallback (sem plantão/grade no período): ${(row.totalMinutos / 60).toFixed(2)} h × ${formatValor(
                   vh
@@ -569,18 +584,32 @@ const Relatorios = () => {
             ];
           }
         } else if (row.medicoId !== 'sem-medico') {
-          const vh = valorHoraPorMedico[row.medicoId];
-          const vhCob = valorHoraCobrancaPorMedico[row.medicoId];
+          const vhLegado = valorHoraPorMedico[row.medicoId];
           if (apenasPonto) {
-            if (vh != null && vh > 0) {
-              row.valorRepasse = round2((row.totalMinutos / 60) * vh);
+            // Com valor por dia da semana, o valor/h pode variar dentro do período.
+            // Preferir resolução por registro (backend). Fallback para mapa por médico (legado).
+            let rep: number | null = null;
+            let cob: number | null = null;
+            for (const reg of registros.filter((r) => r.escala == null && r.medico?.id === row.medicoId)) {
+              const mins = Number(reg.duracaoMinutos ?? 0);
+              if (!mins || mins <= 0) continue;
+              const vh = reg.id && valorHoraPorRegistroPontoId[reg.id] != null ? Number(valorHoraPorRegistroPontoId[reg.id]) : valorHoraPorMedico[row.medicoId];
+              const vhCob =
+                reg.id && valorHoraCobrancaPorRegistroPontoId[reg.id] != null
+                  ? Number(valorHoraCobrancaPorRegistroPontoId[reg.id])
+                  : valorHoraCobrancaPorMedico[row.medicoId];
+              if (vh != null && Number.isFinite(vh) && vh > 0) {
+                rep = (rep ?? 0) + (mins / 60) * vh;
+              }
+              if (vhCob != null && Number.isFinite(vhCob) && vhCob > 0) {
+                cob = (cob ?? 0) + (mins / 60) * vhCob;
+              }
             }
-            if (vhCob != null && vhCob > 0) {
-              row.valorCobranca = round2((row.totalMinutos / 60) * vhCob);
-            }
-          } else if (vh != null && vh > 0) {
-            row.valorHora = vh;
-            row.valorCalculado = (row.totalMinutos / 60) * vh;
+            row.valorRepasse = rep != null ? round2(rep) : undefined;
+            row.valorCobranca = cob != null ? round2(cob) : undefined;
+          } else if (vhLegado != null && vhLegado > 0) {
+            row.valorHora = vhLegado;
+            row.valorRepasse = round2((row.totalMinutos / 60) * vhLegado);
           }
         }
       }
@@ -597,9 +626,11 @@ const Relatorios = () => {
     registros,
     subgrupoId,
     usaEscalaEPonto,
-    valorPlantao12hPorGrade,
+    valoresPlantaoPorGrade,
     valorHoraPorMedico,
     valorHoraCobrancaPorMedico,
+    valorHoraPorRegistroPontoId,
+    valorHoraCobrancaPorRegistroPontoId,
     valorHoraPorMedicoEscala,
     plantoesValorHoraPorEscalaDataGrade,
     valorPlantao12hPorRegistroPontoId,
@@ -607,10 +638,11 @@ const Relatorios = () => {
     horasTurnoPorRegistroPontoId,
     horasTurnoPorGradeId,
     apenasPonto,
+    adicionaisPorDataGrade,
   ]);
 
   const totaisRepasseCobranca = useMemo(() => {
-    if (!apenasPonto) return { repasse: null as number | null, cobranca: null as number | null };
+    if (!mostrarRepasseECobranca) return { repasse: null as number | null, cobranca: null as number | null };
     let rep = 0;
     let cob = 0;
     let temRep = false;
@@ -629,7 +661,7 @@ const Relatorios = () => {
       repasse: temRep ? round2(rep) : null,
       cobranca: temCob ? round2(cob) : null,
     };
-  }, [agrupado, apenasPonto]);
+  }, [agrupado, mostrarRepasseECobranca]);
 
   return (
     <div className="space-y-6">
@@ -745,7 +777,9 @@ const Relatorios = () => {
         </div>
       </div>
 
-      <div className={`grid grid-cols-1 gap-4 ${apenasPonto ? 'md:grid-cols-2 xl:grid-cols-5' : 'md:grid-cols-3'}`}>
+      <div
+        className={`grid grid-cols-1 gap-4 ${mostrarRepasseECobranca ? 'md:grid-cols-2 xl:grid-cols-5' : 'md:grid-cols-3'}`}
+      >
         <div className="card">
           <p className="text-xs uppercase tracking-wide text-viva-600">Total de horas</p>
           <p className="text-2xl font-bold text-viva-900 mt-1">{formatDuration(totalMinutos)}</p>
@@ -758,7 +792,7 @@ const Relatorios = () => {
           <p className="text-xs uppercase tracking-wide text-viva-600">Agrupamentos</p>
           <p className="text-2xl font-bold text-viva-900 mt-1">{agrupado.length}</p>
         </div>
-        {apenasPonto && (
+        {mostrarRepasseECobranca && (
           <>
             <div className="card border-l-4 border-viva-500">
               <p className="text-xs uppercase tracking-wide text-viva-600">Total repasse</p>
@@ -781,9 +815,8 @@ const Relatorios = () => {
           <div>
             <h3 className="text-lg font-bold text-viva-900">Horas por médico e escala</h3>
             <p className="text-xs text-gray-600 mt-1 max-w-3xl leading-relaxed">
-              Registros já fechados usam o <strong>valor congelado no checkout</strong> (não muda se você alterar tipos
-              MT/SN ou valores depois). Sem congelado, aplica-se valor hora na alocação ou proporcional ao turno
-              (cadastro / slot / tipo atual). Novos plantões gravam a duração do turno no dia para o histórico.
+              Registros já fechados usam o <strong>valor congelado no checkout</strong> (repasse). Sem congelado, o
+              cálculo usa <strong>valor/h × horas</strong> (alocação médico–escala ou valores de plantão por dia).
             </p>
             {usaEscalaEPonto && (
               <label className="mt-3 flex cursor-pointer items-center gap-2 text-sm text-viva-800">
@@ -801,7 +834,7 @@ const Relatorios = () => {
             type="button"
             className="btn btn-secondary inline-flex items-center gap-2"
             disabled={isLoading || agrupado.length === 0}
-            onClick={() => exportHorasCsv(agrupado, dataInicio, dataFim, apenasPonto)}
+            onClick={() => exportHorasCsv(agrupado, dataInicio, dataFim, mostrarRepasseECobranca)}
           >
             <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clipRule="evenodd" /></svg>
             Exportar CSV
@@ -810,7 +843,7 @@ const Relatorios = () => {
             type="button"
             className="btn btn-secondary inline-flex items-center gap-2"
             disabled={isLoading || agrupado.length === 0}
-            onClick={() => exportHorasPdf(agrupado, dataInicio, dataFim, apenasPonto)}
+            onClick={() => exportHorasPdf(agrupado, dataInicio, dataFim, mostrarRepasseECobranca)}
           >
             <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z" clipRule="evenodd" /></svg>
             Exportar PDF
@@ -829,7 +862,7 @@ const Relatorios = () => {
                   <th className="py-2 pr-4">Escala</th>
                   <th className="py-2 pr-4">Registros</th>
                   <th className="py-2 pr-4">Total de horas</th>
-                  {apenasPonto ? (
+                  {mostrarRepasseECobranca ? (
                     <>
                       <th className="py-2 pr-4">Repasse (R$)</th>
                       <th className="py-2 pr-4">Cobrança (R$)</th>
@@ -841,7 +874,7 @@ const Relatorios = () => {
               </thead>
               <tbody>
                 {agrupado.map((item) => {
-                  const colSpan = apenasPonto ? 6 : 5;
+                  const colSpan = mostrarRepasseECobranca ? 6 : 5;
                   return (
                     <Fragment key={item.key}>
                       <tr className="border-b last:border-b-0">
@@ -849,7 +882,7 @@ const Relatorios = () => {
                         <td className="py-2 pr-4 text-gray-700">{item.escalaNome}</td>
                         <td className="py-2 pr-4 text-gray-700">{item.totalRegistros}</td>
                         <td className="py-2 pr-4 font-semibold text-viva-900">{formatDuration(item.totalMinutos)}</td>
-                        {apenasPonto ? (
+                        {mostrarRepasseECobranca ? (
                           <>
                             <td className="py-2 pr-4 text-gray-700">
                               {item.valorRepasse != null ? formatValor(item.valorRepasse) : '—'}
@@ -860,7 +893,7 @@ const Relatorios = () => {
                           </>
                         ) : (
                           <td className="py-2 pr-4 text-gray-700">
-                            {item.valorCalculado != null ? formatValor(item.valorCalculado) : '—'}
+                            {item.valorRepasse != null ? formatValor(item.valorRepasse) : '—'}
                           </td>
                         )}
                       </tr>
@@ -883,7 +916,8 @@ const Relatorios = () => {
                                       </span>
                                     ) : null}
                                     {formatDuration(d.duracaoMinutos)}
-                                    {d.valorAplicado != null ? ` → ${formatValor(d.valorAplicado)}` : ''}
+                                    {d.valorRepasseAplicado != null ? ` → Repasse ${formatValor(d.valorRepasseAplicado)}` : ''}
+                                    {d.valorCobrancaAplicado != null ? ` · Cobrança ${formatValor(d.valorCobrancaAplicado)}` : ''}
                                     <span className="mt-0.5 block text-gray-600">{d.resumo}</span>
                                   </li>
                                 ))}

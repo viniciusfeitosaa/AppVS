@@ -86,6 +86,12 @@ export async function ensureCriticalPontoSchemaPatches(): Promise<void> {
     await prisma.$executeRawUnsafe(
       `ALTER TABLE "registros_ponto" ADD COLUMN IF NOT EXISTS "repasse_valor_congelado" DECIMAL(12,2)`
     );
+    await prisma.$executeRawUnsafe(
+      `ALTER TABLE "config_ponto_eletronico" ADD COLUMN IF NOT EXISTS "valor_hora_por_dia" JSONB`
+    );
+    await prisma.$executeRawUnsafe(
+      `ALTER TABLE "config_ponto_eletronico" ADD COLUMN IF NOT EXISTS "valor_hora_cobranca_por_dia" JSONB`
+    );
     if (process.env.NODE_ENV === 'development') {
       console.log('[DB] Colunas críticas ponto/repasse alinhadas ao schema.');
     }

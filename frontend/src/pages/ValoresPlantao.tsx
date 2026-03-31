@@ -17,16 +17,55 @@ function parseValorInput(s: string): number | null {
   return Number.isNaN(n) ? null : n;
 }
 
+const DIAS_SEMANA = [
+  { key: 'seg', label: 'Seg' },
+  { key: 'ter', label: 'Ter' },
+  { key: 'qua', label: 'Qua' },
+  { key: 'qui', label: 'Qui' },
+  { key: 'sex', label: 'Sex' },
+  { key: 'sab', label: 'Sáb' },
+  { key: 'dom', label: 'Dom' },
+] as const;
+
+type DiaKey = (typeof DIAS_SEMANA)[number]['key'];
+
+function buildMapaValorPorDiaComFallback(draft: Record<string, string>): {
+  map: Record<string, number | null>;
+  fallbackGlobal: number | null;
+} {
+  const map: Record<string, number | null> = {};
+  let fallbackGlobal: number | null = null;
+  for (const { key } of DIAS_SEMANA) {
+    const raw = draft[key] ?? '';
+    if (raw.trim() === '') {
+      map[key] = null;
+    } else {
+      const n = parseValorInput(raw);
+      const rounded = n != null ? Math.round(n * 100) / 100 : null;
+      map[key] = rounded;
+      if (fallbackGlobal == null && rounded != null) fallbackGlobal = rounded;
+    }
+  }
+  return { map, fallbackGlobal };
+}
+
 const ValoresPlantao = () => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const isMaster = user?.role === 'MASTER';
   const [contratoId, setContratoId] = useState<string>('');
   const [subgrupoId, setSubgrupoId] = useState<string>('');
+  const [equipeId, setEquipeId] = useState<string>('');
   const [saving, setSaving] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [draft, setDraft] = useState<Record<string, string>>({});
+  const [draftValorHoraPorDia, setDraftValorHoraPorDia] = useState<
+    Record<string, Partial<Record<(typeof DIAS_SEMANA)[number]['key'], string>>>
+  >({});
+  const [draftValorHoraCobrancaPorDia, setDraftValorHoraCobrancaPorDia] = useState<
+    Record<string, Partial<Record<(typeof DIAS_SEMANA)[number]['key'], string>>>
+  >({});
   const [draftEndereco, setDraftEndereco] = useState('');
   const [draftLatitude, setDraftLatitude] = useState('');
   const [draftLongitude, setDraftLongitude] = useState('');
@@ -58,8 +97,24 @@ const ValoresPlantao = () => {
   const opcoes = opcoesResp?.data;
   const contratos = useMemo(() => opcoes?.contratos ?? [], [opcoes]);
   const subgrupos = useMemo(() => opcoes?.subgrupos ?? [], [opcoes]);
+  const equipes = useMemo(() => opcoes?.equipes ?? [], [opcoes]);
   const contratoSubgrupos = useMemo(() => opcoes?.contratoSubgrupos ?? [], [opcoes]);
-  const temContratoESubgrupo = !!contratoId && !!subgrupoId;
+  const contratoEquipes = useMemo(() => opcoes?.contratoEquipes ?? [], [opcoes]);
+  const temEscopoCompleto = !!contratoId && !!subgrupoId && !!equipeId;
+
+  const equipeIdsNoContrato = useMemo(() => {
+    if (!contratoId) return new Set<string>();
+    return new Set(
+      contratoEquipes.filter((ce) => ce.contratoAtivoId === contratoId).map((ce) => ce.equipeId)
+    );
+  }, [contratoId, contratoEquipes]);
+
+  const equipesFiltradas = useMemo(() => {
+    if (!subgrupoId) return [];
+    const noSub = equipes.filter((e) => e.subgrupoId === subgrupoId && e.ativo !== false);
+    if (equipeIdsNoContrato.size === 0) return noSub;
+    return noSub.filter((e) => equipeIdsNoContrato.has(e.id));
+  }, [equipes, subgrupoId, equipeIdsNoContrato]);
 
   const allowedSubgrupoIds = useMemo(() => {
     if (!contratoId) return new Set<string>();
@@ -85,20 +140,20 @@ const ValoresPlantao = () => {
   const { data: tiposResp, isLoading: loadingTipos } = useQuery({
     queryKey: ['admin', 'tipos-plantao', contratoId],
     queryFn: () => adminService.listTiposPlantao(contratoId),
-    enabled: !!user && isMaster && temContratoESubgrupo,
+    enabled: !!user && isMaster && temEscopoCompleto,
   });
   const tiposPlantao = tiposResp?.data ?? [];
 
   const { data: resp, isLoading: loadingValores } = useQuery({
-    queryKey: ['admin', 'valores-plantao', contratoId, subgrupoId],
-    queryFn: () => adminService.getValoresPlantao(contratoId, subgrupoId),
-    enabled: !!user && isMaster && temContratoESubgrupo,
+    queryKey: ['admin', 'valores-plantao', contratoId, subgrupoId, equipeId],
+    queryFn: () => adminService.getValoresPlantao(contratoId, subgrupoId, equipeId),
+    enabled: !!user && isMaster && temEscopoCompleto,
   });
 
   const { data: configPontoResp, isLoading: loadingConfigPonto } = useQuery({
-    queryKey: ['admin', 'config-ponto', contratoId, subgrupoId, null],
-    queryFn: () => adminService.getConfigPonto(contratoId, subgrupoId, null),
-    enabled: !!user && isMaster && temContratoESubgrupo,
+    queryKey: ['admin', 'config-ponto', contratoId, subgrupoId, equipeId || null],
+    queryFn: () => adminService.getConfigPonto(contratoId, subgrupoId, equipeId || null),
+    enabled: !!user && isMaster && temEscopoCompleto,
   });
 
   const valores = resp?.data ?? [];
@@ -162,25 +217,110 @@ const ValoresPlantao = () => {
     return '';
   };
 
-  const handleSave = async (gradeId: string) => {
-    if (!contratoId || !subgrupoId) return;
-    setSaving(gradeId);
+  const getValorHoraForGradeDia = (gradeId: string, diaKey: DiaKey): string => {
+    const byGrade = draftValorHoraPorDia[gradeId];
+    const v = byGrade?.[diaKey];
+    if (v !== undefined) return v;
+    const row = valores.find((x: ValorPlantaoConfig) => x.gradeId === gradeId);
+    const fromApi = row?.valorHoraPorDia?.[diaKey];
+    if (fromApi != null && String(fromApi).trim() !== '') return formatValor(fromApi);
+    return getValorForGrade(gradeId);
+  };
+
+  const getValorCobrancaForGrade = (gradeId: string): string => {
+    // Por enquanto, não temos um draft global de cobrança separado; usa o que vier do backend.
+    const row = valores.find((v: ValorPlantaoConfig) => v.gradeId === gradeId);
+    if (row?.valorHoraCobranca != null) return formatValor(row.valorHoraCobranca);
+    return '';
+  };
+
+  const getValorHoraCobrancaForGradeDia = (gradeId: string, diaKey: DiaKey): string => {
+    const byGrade = draftValorHoraCobrancaPorDia[gradeId];
+    const v = byGrade?.[diaKey];
+    if (v !== undefined) return v;
+    const row = valores.find((x: ValorPlantaoConfig) => x.gradeId === gradeId);
+    const fromApi = row?.valorHoraCobrancaPorDia?.[diaKey];
+    if (fromApi != null && String(fromApi).trim() !== '') return formatValor(fromApi);
+    return getValorCobrancaForGrade(gradeId);
+  };
+
+  const replicarRepasseSegParaSemana = (gradeId: string) => {
+    const segVal = getValorHoraForGradeDia(gradeId, 'seg');
+    setDraftValorHoraPorDia((prev) => ({
+      ...prev,
+      [gradeId]: {
+        ...(prev[gradeId] ?? {}),
+        ter: segVal,
+        qua: segVal,
+        qui: segVal,
+        sex: segVal,
+        sab: segVal,
+        dom: segVal,
+      },
+    }));
+  };
+
+  const replicarCobrancaSegParaSemana = (gradeId: string) => {
+    const segVal = getValorHoraCobrancaForGradeDia(gradeId, 'seg');
+    setDraftValorHoraCobrancaPorDia((prev) => ({
+      ...prev,
+      [gradeId]: {
+        ...(prev[gradeId] ?? {}),
+        ter: segVal,
+        qua: segVal,
+        qui: segVal,
+        sex: segVal,
+        sab: segVal,
+        dom: segVal,
+      },
+    }));
+  };
+
+  const handleSaveSemana = async (grade: { id: string; nome: string }) => {
+    if (!contratoId || !subgrupoId || !equipeId) return;
+    setSaving(grade.id);
     setError(null);
     setSuccess(null);
     try {
-      const valorStr = getValorForGrade(gradeId);
-      const valor = parseValorInput(valorStr);
-      await adminService.setValorPlantao(contratoId, subgrupoId, gradeId, valor);
+      const repDraft: Record<string, string> = Object.fromEntries(
+        DIAS_SEMANA.map(({ key }) => [key, getValorHoraForGradeDia(grade.id, key)])
+      );
+      const cobDraft: Record<string, string> = Object.fromEntries(
+        DIAS_SEMANA.map(({ key }) => [key, getValorHoraCobrancaForGradeDia(grade.id, key)])
+      );
+
+      const { map: valorHoraPorDia, fallbackGlobal: valorHora } = buildMapaValorPorDiaComFallback(repDraft);
+      const { map: valorHoraCobrancaPorDia, fallbackGlobal: valorHoraCobranca } =
+        buildMapaValorPorDiaComFallback(cobDraft);
+
+      await adminService.setValorPlantao(contratoId, subgrupoId, equipeId, grade.id, {
+        valorHora,
+        valorHoraCobranca,
+        valorHoraPorDia,
+        valorHoraCobrancaPorDia,
+      });
       await queryClient.invalidateQueries({
-        queryKey: ['admin', 'valores-plantao', contratoId, subgrupoId],
+        queryKey: ['admin', 'valores-plantao', contratoId, subgrupoId, equipeId],
       });
       setDraft((prev) => {
+        if (prev[grade.id] === undefined) return prev;
         const next = { ...prev };
-        delete next[gradeId];
+        delete next[grade.id];
         return next;
       });
-      const nomeTipo = tiposPlantao.find((t) => t.id === gradeId)?.nome;
-      setSuccess(`Valor do plantão ${nomeTipo ?? 'atualizado'} salvo.`);
+      setDraftValorHoraPorDia((prev) => {
+        if (!prev[grade.id]) return prev;
+        const next = { ...prev };
+        delete next[grade.id];
+        return next;
+      });
+      setDraftValorHoraCobrancaPorDia((prev) => {
+        if (!prev[grade.id]) return prev;
+        const next = { ...prev };
+        delete next[grade.id];
+        return next;
+      });
+      setSuccess(`Valores da semana (seg–dom) de ${grade.nome} salvos.`);
     } catch (err: any) {
       setError(err.response?.data?.error || 'Erro ao salvar valor');
     } finally {
@@ -201,7 +341,10 @@ const ValoresPlantao = () => {
   const onContratoChange = (id: string) => {
     setContratoId(id);
     setSubgrupoId('');
+    setEquipeId('');
     setDraft({});
+    setDraftValorHoraPorDia({});
+    setDraftValorHoraCobrancaPorDia({});
     limparRascunhosGeo();
     setNovoTipoNome('');
     setNovoTipoHi('08:00');
@@ -211,7 +354,10 @@ const ValoresPlantao = () => {
 
   const onSubgrupoChange = (id: string) => {
     setSubgrupoId(id);
+    setEquipeId('');
     setDraft({});
+    setDraftValorHoraPorDia({});
+    setDraftValorHoraCobrancaPorDia({});
     limparRascunhosGeo();
   };
 
@@ -268,7 +414,7 @@ const ValoresPlantao = () => {
   };
 
   const handleSaveGeo = async () => {
-    if (!contratoId || !subgrupoId) return;
+    if (!contratoId || !subgrupoId || !equipeId) return;
     setSavingGeo(true);
     setError(null);
     setSuccess(null);
@@ -300,7 +446,7 @@ const ValoresPlantao = () => {
         draftRaioMetros !== '' ? parseInt(draftRaioMetros, 10) : cfg?.raioMetros ?? null;
       const raioMetros = raio != null && !Number.isNaN(raio) && raio >= 0 ? raio : null;
 
-      await adminService.setConfigPonto(contratoId, subgrupoId, null, {
+      await adminService.setConfigPonto(contratoId, subgrupoId, equipeId, {
         horasPrevistasMes: horas ?? null,
         valorHora: valor,
         valorHoraCobranca: valorCobranca,
@@ -312,7 +458,9 @@ const ValoresPlantao = () => {
         raioMetros,
         enderecoPonto: enderecoSalvar,
       });
-      await queryClient.invalidateQueries({ queryKey: ['admin', 'config-ponto', contratoId, subgrupoId, null] });
+      await queryClient.invalidateQueries({
+        queryKey: ['admin', 'config-ponto', contratoId, subgrupoId, equipeId || null],
+      });
       limparRascunhosGeo();
       setSuccess('Localização do ponto salva com sucesso.');
       setSavedGeo(true);
@@ -337,9 +485,9 @@ const ValoresPlantao = () => {
       <div className="card border-l-4 border-viva-500">
         <h2 className="text-2xl font-bold text-viva-900 mb-1">Valores Hora/Plantão</h2>
         <p className="text-gray-600">
-          Escolha contrato e subgrupo abaixo. Em seguida aparecem os tipos de plantão do contrato e o{' '}
-          <strong>valor total de cada turno</strong> (por tipo) neste subgrupo; o relatório converte em valor/hora
-          usando a duração do horário do tipo. Opcional: local do ponto.
+          Escolha <strong>contrato</strong>, <strong>subgrupo</strong> e <strong>equipe</strong>. Os valores por tipo
+          valem para essa equipe no contrato; o relatório converte em valor/hora usando a duração do turno. Opcional:
+          local do ponto (mesmo escopo da equipe).
         </p>
       </div>
 
@@ -355,7 +503,7 @@ const ValoresPlantao = () => {
       )}
 
       <div className="card">
-        <h3 className="text-lg font-bold text-viva-900 mb-4">Contrato e subgrupo</h3>
+        <h3 className="text-lg font-bold text-viva-900 mb-4">Contrato, subgrupo e equipe</h3>
         {loadingOpcoes ? (
           <p className="text-sm text-gray-600">Carregando opções...</p>
         ) : (
@@ -391,11 +539,35 @@ const ValoresPlantao = () => {
                 ))}
               </select>
             </div>
+            <div className="min-w-[200px]">
+              <label className="block text-sm font-semibold text-viva-800 mb-1">Equipe</label>
+              <select
+                className="input w-full"
+                value={equipeId}
+                onChange={(e) => {
+                  setEquipeId(e.target.value);
+                  setDraft({});
+                  setDraftValorHoraPorDia({});
+                  setDraftValorHoraCobrancaPorDia({});
+                  limparRascunhosGeo();
+                }}
+                disabled={!subgrupoId}
+              >
+                <option value="">
+                  {subgrupoId ? 'Selecione a equipe' : 'Selecione o subgrupo primeiro'}
+                </option>
+                {equipesFiltradas.map((e) => (
+                  <option key={e.id} value={e.id}>
+                    {e.nome}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
         )}
       </div>
 
-      {temContratoESubgrupo && (
+      {temEscopoCompleto && (
         <div className="card">
           <h3 className="text-lg font-bold text-viva-900 mb-4">Tipos de plantão (contrato)</h3>
           <p className="text-sm text-viva-700 mb-4">
@@ -516,9 +688,9 @@ const ValoresPlantao = () => {
         </div>
       )}
 
-      {temContratoESubgrupo && (
+      {temEscopoCompleto && (
         <div className="card">
-          <h3 className="text-lg font-bold text-viva-900 mb-4">Valor por tipo de plantão</h3>
+          <h3 className="text-lg font-bold text-viva-900 mb-4">Valor por tipo (R$/h)</h3>
           {loadingValores ? (
             <p className="text-sm text-gray-600">Carregando valores...</p>
           ) : tiposPlantao.length === 0 ? (
@@ -528,32 +700,115 @@ const ValoresPlantao = () => {
               {tiposPlantao.map((grade) => (
                 <div
                   key={grade.id}
-                  className="flex flex-wrap items-end gap-4 p-4 rounded-xl border border-viva-200 bg-viva-50/30"
+                  className="p-4 rounded-xl border border-viva-200 bg-white space-y-4"
                 >
-                  <div className="min-w-[200px]">
-                    <label className="block text-sm font-semibold text-viva-800 mb-1">
+                  <div>
+                    <p className="text-sm font-semibold text-viva-900">
                       {grade.nome}{' '}
                       <span className="font-normal text-viva-600">
                         ({grade.horaInicio.slice(0, 5)}–{grade.horaFim.slice(0, 5)})
                       </span>
-                    </label>
-                    <input
-                      type="text"
-                      inputMode="decimal"
-                      className="input w-full max-w-[180px]"
-                      placeholder="Ex: 150,00"
-                      value={getValorForGrade(grade.id)}
-                      onChange={(e) => setDraft((prev) => ({ ...prev, [grade.id]: e.target.value }))}
-                    />
+                    </p>
+                    <p className="text-xs text-gray-600 mt-1">
+                      Use → na segunda para copiar o valor para ter–dom. Um único salvar grava repasse e cobrança da semana (seg–dom).
+                    </p>
                   </div>
-                  <button
-                    type="button"
-                    className="btn btn-primary"
-                    onClick={() => handleSave(grade.id)}
-                    disabled={saving === grade.id}
-                  >
-                    {saving === grade.id ? 'Salvando...' : 'Salvar'}
-                  </button>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                    {DIAS_SEMANA.map(({ key, label }) => (
+                      <div
+                        key={key}
+                        className="flex flex-wrap items-end gap-2 p-4 rounded-xl border border-viva-200 bg-viva-50/30"
+                      >
+                        <div className="min-w-[200px] flex-1">
+                          <label className="block text-sm font-semibold text-viva-800 mb-1">
+                            {label} <span className="font-normal text-viva-600">(Repasse R$/h)</span>
+                          </label>
+                          <input
+                            type="text"
+                            inputMode="decimal"
+                            className="input w-full max-w-[180px]"
+                            placeholder="Ex: 150,00"
+                            value={getValorHoraForGradeDia(grade.id, key)}
+                            onChange={(e) =>
+                              setDraftValorHoraPorDia((prev) => ({
+                                ...prev,
+                                [grade.id]: {
+                                  ...(prev[grade.id] ?? {}),
+                                  [key]: e.target.value,
+                                },
+                              }))
+                            }
+                          />
+                        </div>
+                        {key === 'seg' && (
+                          <button
+                            type="button"
+                            className="btn btn-secondary shrink-0 px-2 min-w-[2.25rem]"
+                            title="Replicar valor da segunda para ter–dom"
+                            onClick={() => replicarRepasseSegParaSemana(grade.id)}
+                          >
+                            →
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="pt-2">
+                    <p className="text-sm font-semibold text-viva-800 mb-2">Cobrança (R$/h)</p>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                      {DIAS_SEMANA.map(({ key, label }) => (
+                        <div
+                          key={key}
+                          className="flex flex-wrap items-end gap-2 p-4 rounded-xl border border-viva-200 bg-viva-50/30"
+                        >
+                          <div className="min-w-[200px] flex-1">
+                            <label className="block text-sm font-semibold text-viva-800 mb-1">
+                              {label} <span className="font-normal text-viva-600">(Cobrança R$/h)</span>
+                            </label>
+                            <input
+                              type="text"
+                              inputMode="decimal"
+                              className="input w-full max-w-[180px]"
+                              placeholder="Ex: 150,00"
+                              value={getValorHoraCobrancaForGradeDia(grade.id, key)}
+                              onChange={(e) =>
+                                setDraftValorHoraCobrancaPorDia((prev) => ({
+                                  ...prev,
+                                  [grade.id]: {
+                                    ...(prev[grade.id] ?? {}),
+                                    [key]: e.target.value,
+                                  },
+                                }))
+                              }
+                            />
+                          </div>
+                          {key === 'seg' && (
+                            <button
+                              type="button"
+                              className="btn btn-secondary shrink-0 px-2 min-w-[2.25rem]"
+                              title="Replicar valor da segunda para ter–dom"
+                              onClick={() => replicarCobrancaSegParaSemana(grade.id)}
+                            >
+                              →
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="flex justify-end pt-2">
+                    <button
+                      type="button"
+                      className="btn btn-primary"
+                      onClick={() => handleSaveSemana(grade)}
+                      disabled={saving === grade.id}
+                    >
+                      {saving === grade.id ? 'Salvando...' : 'Salvar semana (seg–dom)'}
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>
@@ -561,7 +816,7 @@ const ValoresPlantao = () => {
         </div>
       )}
 
-      {temContratoESubgrupo && (
+      {temEscopoCompleto && (
         <div className="card">
           <h3 className="text-lg font-bold text-viva-900 mb-4">Localização do ponto (opcional)</h3>
           {loadingConfigPonto ? (

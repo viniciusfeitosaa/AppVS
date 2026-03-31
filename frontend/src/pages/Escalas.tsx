@@ -636,9 +636,19 @@ const Escalas = () => {
   }, [escalaSubgruposResp?.data]);
 
   const { data: valoresPlantaoResp } = useQuery({
-    queryKey: ['admin', 'valores-plantao', selectedEscala?.contratoAtivoId ?? '', firstSubgrupoId],
+    queryKey: [
+      'admin',
+      'valores-plantao',
+      selectedEscala?.contratoAtivoId ?? '',
+      firstSubgrupoId,
+      equipeIdParaGrade || '__none__',
+    ],
     queryFn: () =>
-      adminService.getValoresPlantao(selectedEscala!.contratoAtivoId, firstSubgrupoId),
+      adminService.getValoresPlantao(
+        selectedEscala!.contratoAtivoId,
+        firstSubgrupoId,
+        equipeIdParaGrade || undefined
+      ),
     enabled:
       isMaster &&
       !!selectedEscala?.contratoAtivoId &&

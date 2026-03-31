@@ -73,7 +73,7 @@ import {
 import { authenticateToken, requireAnyModuleAccess, requireModuleAccess, requireRole } from '../middleware/auth.middleware';
 import { uploadDocumentoEnviado } from '../middleware/upload.middleware';
 import { ModuloSistema, UserRole } from '@prisma/client';
-import { validateUUIDParam, validateCreateEscala, validateUpdateEscala, validateCreateEscalaPlantao, validateAlocarMedicoEscala, validateUpsertAdicionalPlantao, validateListAdicionaisPlantao, validateRemoverAdicionalPlantao, validateCreateTipoPlantao, validateUpdateTipoPlantao } from '../middleware/validation.middleware';
+import { validateUUIDParam, validateCreateEscala, validateUpdateEscala, validateCreateEscalaPlantao, validateAlocarMedicoEscala, validateUpsertAdicionalPlantao, validateListAdicionaisPlantao, validateRemoverAdicionalPlantao, validateCreateTipoPlantao, validateUpdateTipoPlantao, validateSetConfigPonto } from '../middleware/validation.middleware';
 
 const router = Router();
 
@@ -155,7 +155,7 @@ router.delete('/adicionais-plantao', requireModuleAccess(ModuloSistema.VALORES_P
 
 router.get('/config-ponto/opcoes', requireModuleAccess(ModuloSistema.PONTO_ELETRONICO), getConfigPontoOpcoesController);
 router.get('/config-ponto', requireModuleAccess(ModuloSistema.PONTO_ELETRONICO), getConfigPontoController);
-router.put('/config-ponto', requireModuleAccess(ModuloSistema.PONTO_ELETRONICO), setConfigPontoController);
+router.put('/config-ponto', requireModuleAccess(ModuloSistema.PONTO_ELETRONICO), validateSetConfigPonto, setConfigPontoController);
 
 router.get('/registros-ponto', requireModuleAccess(ModuloSistema.RELATORIOS), listRegistrosPontoAdminController);
 router.get(

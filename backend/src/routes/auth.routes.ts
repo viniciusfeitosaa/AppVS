@@ -6,6 +6,7 @@ import {
   loginController,
   loginMasterController,
   loginMedicoController,
+  previewResetEmailController,
   redefinirSenhaController,
   registerPublicController,
 } from '../controllers/auth.controller';
@@ -29,6 +30,7 @@ router.post('/login-master', validateMasterLogin, loginMasterController);
 router.post('/accept-invite', validateAcceptInvite, acceptInviteController);
 router.post('/esqueci-senha', validateEsqueciSenha, esqueciSenhaController);
 router.post('/redefinir-senha', validateRedefinirSenha, redefinirSenhaController);
+router.get('/preview-reset-email', previewResetEmailController);
 router.post('/register', validateRegisterMedico, registerPublicController);
 router.get('/modulos-acesso', authenticateToken, getMeModulosAcessoController);
 

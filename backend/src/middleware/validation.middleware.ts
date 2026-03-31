@@ -577,6 +577,58 @@ export const validateListAdicionaisPlantao = [
   handleValidationErrors,
 ];
 
+/** PUT /admin/config-ponto — configurar ponto eletrônico (valores + geo + horários). */
+export const validateSetConfigPonto = [
+  body('contratoId').notEmpty().isUUID().withMessage('contratoId inválido'),
+  body('subgrupoId').notEmpty().isUUID().withMessage('subgrupoId inválido'),
+  body('equipeId').optional({ values: 'null' }).isUUID().withMessage('equipeId inválido'),
+  body('horasPrevistasMes').optional({ values: 'null' }).isInt({ min: 0, max: 1000 }).withMessage('horasPrevistasMes inválido'),
+  body('valorHora').optional({ values: 'null' }).isFloat({ min: 0 }).withMessage('valorHora inválido'),
+  body('valorHoraCobranca').optional({ values: 'null' }).isFloat({ min: 0 }).withMessage('valorHoraCobranca inválido'),
+  body('valorHoraPorDia')
+    .optional({ values: 'null' })
+    .custom((v) => {
+      if (v == null) return true;
+      if (typeof v !== 'object' || Array.isArray(v)) throw new Error('valorHoraPorDia deve ser um objeto');
+      const allowed = new Set(['seg', 'ter', 'qua', 'qui', 'sex', 'sab', 'dom']);
+      for (const [k, raw] of Object.entries(v as Record<string, unknown>)) {
+        if (!allowed.has(k)) throw new Error(`Chave inválida em valorHoraPorDia: ${k}`);
+        if (raw == null || raw === '') continue;
+        const n = typeof raw === 'string' ? parseFloat(raw.replace(',', '.')) : Number(raw);
+        if (!Number.isFinite(n) || n < 0) throw new Error(`Valor inválido em valorHoraPorDia.${k}`);
+      }
+      return true;
+    }),
+  body('valorHoraCobrancaPorDia')
+    .optional({ values: 'null' })
+    .custom((v) => {
+      if (v == null) return true;
+      if (typeof v !== 'object' || Array.isArray(v)) throw new Error('valorHoraCobrancaPorDia deve ser um objeto');
+      const allowed = new Set(['seg', 'ter', 'qua', 'qui', 'sex', 'sab', 'dom']);
+      for (const [k, raw] of Object.entries(v as Record<string, unknown>)) {
+        if (!allowed.has(k)) throw new Error(`Chave inválida em valorHoraCobrancaPorDia: ${k}`);
+        if (raw == null || raw === '') continue;
+        const n = typeof raw === 'string' ? parseFloat(raw.replace(',', '.')) : Number(raw);
+        if (!Number.isFinite(n) || n < 0) throw new Error(`Valor inválido em valorHoraCobrancaPorDia.${k}`);
+      }
+      return true;
+    }),
+  body('horarioEntrada')
+    .optional({ values: 'null' })
+    .matches(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/)
+    .withMessage('horarioEntrada inválido (use HH:mm)'),
+  body('horarioSaida')
+    .optional({ values: 'null' })
+    .matches(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/)
+    .withMessage('horarioSaida inválido (use HH:mm)'),
+  body('toleranciaMinutos').optional({ values: 'null' }).isInt({ min: 0, max: 120 }).withMessage('toleranciaMinutos inválido'),
+  body('latitude').optional({ values: 'null' }).isFloat({ min: -90, max: 90 }).withMessage('latitude inválida'),
+  body('longitude').optional({ values: 'null' }).isFloat({ min: -180, max: 180 }).withMessage('longitude inválida'),
+  body('raioMetros').optional({ values: 'null' }).isInt({ min: 0, max: 10000 }).withMessage('raioMetros inválido'),
+  body('enderecoPonto').optional({ values: 'null' }).isString().isLength({ max: 500 }).withMessage('enderecoPonto inválido'),
+  handleValidationErrors,
+];
+
 /**
  * Remove adicional do plantão (DELETE /admin/adicionais-plantao)
  */

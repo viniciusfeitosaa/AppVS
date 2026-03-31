@@ -34,6 +34,40 @@ function parseValorInput(s: string): number | null {
   return Number.isNaN(n) ? null : n;
 }
 
+const DIAS_SEMANA = [
+  { key: 'seg', label: 'Seg' },
+  { key: 'ter', label: 'Ter' },
+  { key: 'qua', label: 'Qua' },
+  { key: 'qui', label: 'Qui' },
+  { key: 'sex', label: 'Sex' },
+  { key: 'sab', label: 'Sáb' },
+  { key: 'dom', label: 'Dom' },
+] as const;
+
+const mapaVazioPorDia = (): Record<string, string> =>
+  Object.fromEntries(DIAS_SEMANA.map(({ key }) => [key, ''])) as Record<string, string>;
+
+/** Monta mapa numérico seg→dom + primeiro valor não nulo (fallback global no backend). */
+function buildMapaValorPorDiaComFallback(draft: Record<string, string>): {
+  map: Record<string, number | null>;
+  fallbackGlobal: number | null;
+} {
+  const map: Record<string, number | null> = {};
+  let fallbackGlobal: number | null = null;
+  for (const { key } of DIAS_SEMANA) {
+    const raw = draft[key] ?? '';
+    if (raw.trim() === '') {
+      map[key] = null;
+    } else {
+      const n = parseValorInput(raw);
+      const rounded = n != null ? Math.round(n * 100) / 100 : null;
+      map[key] = rounded;
+      if (fallbackGlobal == null && rounded != null) fallbackGlobal = rounded;
+    }
+  }
+  return { map, fallbackGlobal };
+}
+
 const ValoresPonto = () => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
@@ -44,8 +78,8 @@ const ValoresPonto = () => {
   const [mes, setMes] = useState<number>(() => new Date().getMonth() + 1);
   const [ano, setAno] = useState<number>(() => new Date().getFullYear());
   const [draftHoras, setDraftHoras] = useState<string>('');
-  const [draftValor, setDraftValor] = useState<string>('');
-  const [draftValorCobranca, setDraftValorCobranca] = useState<string>('');
+  const [draftValorPorDia, setDraftValorPorDia] = useState<Record<string, string>>({});
+  const [draftValorCobrancaPorDia, setDraftValorCobrancaPorDia] = useState<Record<string, string>>({});
   const [draftHorarioEntrada, setDraftHorarioEntrada] = useState<string>('');
   const [draftHorarioSaida, setDraftHorarioSaida] = useState<string>('');
   const [draftTolerancia, setDraftTolerancia] = useState<string>('');
@@ -153,10 +187,51 @@ const ValoresPonto = () => {
 
   const config: ConfigPontoEletronico | null = configResp?.data ?? null;
 
+  useEffect(() => {
+    if (!temContratoESubgrupo) {
+      setDraftValorPorDia({});
+      setDraftValorCobrancaPorDia({});
+      return;
+    }
+    if (loadingConfig) return;
+
+    if (!config) {
+      const z = mapaVazioPorDia();
+      setDraftValorPorDia(z);
+      setDraftValorCobrancaPorDia({ ...z });
+      return;
+    }
+
+    const rep: Record<string, string> = {};
+    const cob: Record<string, string> = {};
+    const baseRep = config.valorHora != null ? parseFloat(String(config.valorHora)) : NaN;
+    const baseCob = config.valorHoraCobranca != null ? parseFloat(String(config.valorHoraCobranca)) : NaN;
+    for (const { key } of DIAS_SEMANA) {
+      const mk = config.valorHoraPorDia?.[key];
+      let nRep: number | null = null;
+      if (mk != null && String(mk).trim() !== '') {
+        const n = Number(mk);
+        if (Number.isFinite(n)) nRep = n;
+      } else if (Number.isFinite(baseRep)) {
+        nRep = baseRep;
+      }
+      rep[key] = nRep != null ? formatValor(nRep) : '';
+
+      const ck = config.valorHoraCobrancaPorDia?.[key];
+      let nCob: number | null = null;
+      if (ck != null && String(ck).trim() !== '') {
+        const n = Number(ck);
+        if (Number.isFinite(n)) nCob = n;
+      } else if (Number.isFinite(baseCob)) {
+        nCob = baseCob;
+      }
+      cob[key] = nCob != null ? formatValor(nCob) : '';
+    }
+    setDraftValorPorDia(rep);
+    setDraftValorCobrancaPorDia(cob);
+  }, [temContratoESubgrupo, loadingConfig, config, contratoId, subgrupoId, equipeId]);
+
   const horasPrevistasDisplay = draftHoras !== '' ? draftHoras : (config?.horasPrevistasMes != null ? String(config.horasPrevistasMes) : '');
-  const valorHoraDisplay = draftValor !== '' ? draftValor : (config?.valorHora != null ? formatValor(config.valorHora) : '');
-  const valorHoraCobrancaDisplay =
-    draftValorCobranca !== '' ? draftValorCobranca : (config?.valorHoraCobranca != null ? formatValor(config.valorHoraCobranca) : '');
   const horarioEntradaDisplay = draftHorarioEntrada !== '' ? draftHorarioEntrada : (config?.horarioEntrada ?? '');
   const horarioSaidaDisplay = draftHorarioSaida !== '' ? draftHorarioSaida : (config?.horarioSaida ?? '');
   const toleranciaDisplay = draftTolerancia !== '' ? draftTolerancia : (config?.toleranciaMinutos != null ? String(config.toleranciaMinutos) : '');
@@ -225,8 +300,8 @@ const ValoresPonto = () => {
     setSubgrupoId('');
     setEquipeId('');
     setDraftHoras('');
-    setDraftValor('');
-    setDraftValorCobranca('');
+    setDraftValorPorDia({});
+    setDraftValorCobrancaPorDia({});
     setDraftHorarioEntrada('');
     setDraftHorarioSaida('');
     setDraftTolerancia('');
@@ -240,8 +315,8 @@ const ValoresPonto = () => {
     setSubgrupoId(id);
     setEquipeId('');
     setDraftHoras('');
-    setDraftValor('');
-    setDraftValorCobranca('');
+    setDraftValorPorDia({});
+    setDraftValorCobrancaPorDia({});
     setDraftHorarioEntrada('');
     setDraftHorarioSaida('');
     setDraftTolerancia('');
@@ -254,8 +329,8 @@ const ValoresPonto = () => {
   const onEquipeChange = (id: string) => {
     setEquipeId(id);
     setDraftHoras('');
-    setDraftValor('');
-    setDraftValorCobranca('');
+    setDraftValorPorDia({});
+    setDraftValorCobrancaPorDia({});
     setDraftHorarioEntrada('');
     setDraftHorarioSaida('');
     setDraftTolerancia('');
@@ -272,16 +347,33 @@ const ValoresPonto = () => {
     setSuccess(null);
     try {
       const horas = draftHoras !== '' ? parseInt(draftHoras, 10) : (config?.horasPrevistasMes ?? null);
-      const valor = draftValor !== '' ? parseValorInput(draftValor) : (config?.valorHora != null ? parseFloat(String(config.valorHora)) : null);
-      const valorCobranca =
-        draftValorCobranca !== ''
-          ? parseValorInput(draftValorCobranca)
-          : config?.valorHoraCobranca != null
-            ? parseFloat(String(config.valorHoraCobranca))
-            : null;
       if (horas !== null && (Number.isNaN(horas) || horas < 0)) {
         throw new Error('Horas previstas deve ser um número válido.');
       }
+
+      const gradeRepassePronta = DIAS_SEMANA.every(({ key }) => draftValorPorDia[key] !== undefined);
+      const gradeCobrancaPronta = DIAS_SEMANA.every(({ key }) => draftValorCobrancaPorDia[key] !== undefined);
+
+      const { map: mapRepasse, fallbackGlobal: valorRepasseGlobal } = gradeRepassePronta
+        ? buildMapaValorPorDiaComFallback(draftValorPorDia)
+        : { map: {} as Record<string, number | null>, fallbackGlobal: null as number | null };
+      const { map: mapCobranca, fallbackGlobal: valorCobrancaGlobal } = gradeCobrancaPronta
+        ? buildMapaValorPorDiaComFallback(draftValorCobrancaPorDia)
+        : { map: {} as Record<string, number | null>, fallbackGlobal: null as number | null };
+
+      const valorHora =
+        gradeRepassePronta
+          ? valorRepasseGlobal
+          : config?.valorHora != null
+            ? parseFloat(String(config.valorHora))
+            : null;
+      const valorHoraCobranca =
+        gradeCobrancaPronta
+          ? valorCobrancaGlobal
+          : config?.valorHoraCobranca != null
+            ? parseFloat(String(config.valorHoraCobranca))
+            : null;
+
       const horarioEntrada = draftHorarioEntrada !== '' ? draftHorarioEntrada : (config?.horarioEntrada ?? null);
       const horarioSaida = draftHorarioSaida !== '' ? draftHorarioSaida : (config?.horarioSaida ?? null);
       const tolerancia = draftTolerancia !== '' ? parseInt(draftTolerancia, 10) : (config?.toleranciaMinutos ?? null);
@@ -294,8 +386,10 @@ const ValoresPonto = () => {
 
       await adminService.setConfigPonto(contratoId, subgrupoId, equipeId || null, {
         horasPrevistasMes: horas ?? null,
-        valorHora: valor,
-        valorHoraCobranca: valorCobranca,
+        valorHora,
+        valorHoraCobranca,
+        ...(gradeRepassePronta ? { valorHoraPorDia: mapRepasse } : {}),
+        ...(gradeCobrancaPronta ? { valorHoraCobrancaPorDia: mapCobranca } : {}),
         horarioEntrada: horarioEntrada || null,
         horarioSaida: horarioSaida || null,
         toleranciaMinutos,
@@ -306,8 +400,6 @@ const ValoresPonto = () => {
       });
       await queryClient.invalidateQueries({ queryKey: ['admin', 'config-ponto', contratoId, subgrupoId, equipeId || null] });
       setDraftHoras('');
-      setDraftValor('');
-      setDraftValorCobranca('');
       setDraftHorarioEntrada('');
       setDraftHorarioSaida('');
       setDraftTolerancia('');
@@ -450,51 +542,114 @@ const ValoresPonto = () => {
           ) : (
             <div className="space-y-6">
               <p className="text-sm text-gray-600 mb-3">
-                Para contratos que usam <strong>só ponto</strong> (sem escala), o <strong>valor hora repasse</strong> multiplica as horas trabalhadas para o total repassado ao profissional; o <strong>valor hora cobrança</strong> multiplica as mesmas horas para o total faturado. Ambos aparecem no Relatório de Horas quando o contrato selecionado for desse tipo.
+                Contratos <strong>só ponto</strong> (sem escala): defina <strong>repasse</strong> e <strong>cobrança</strong> por dia da semana (Seg–Dom). No{' '}
+                <strong>Relatório de Horas</strong>, cada batida <strong>sem escala</strong> usa o valor do <strong>dia do check-in</strong>. Dia em branco usa o
+                primeiro valor preenchido da semana (seg → dom) como fallback no sistema.
               </p>
-              <div className="flex flex-wrap items-end gap-4 p-4 rounded-xl border border-viva-200 bg-viva-50/30">
-                <div className="min-w-[200px]">
-                  <label className="block text-sm font-semibold text-viva-800 mb-1">Horas previstas no mês</label>
-                  <input
-                    type="number"
-                    min={0}
-                    step={1}
-                    className="input w-full max-w-[180px]"
-                    placeholder="Ex: 160"
-                    value={horasPrevistasDisplay}
-                    onChange={(e) => setDraftHoras(e.target.value)}
-                  />
+              <div className="p-4 rounded-xl border border-viva-200 bg-white space-y-5">
+                <div className="flex flex-wrap items-end gap-4">
+                  <div className="min-w-[200px]">
+                    <label className="block text-sm font-semibold text-viva-800 mb-1">Horas previstas no mês</label>
+                    <input
+                      type="number"
+                      min={0}
+                      step={1}
+                      className="input w-full max-w-[180px]"
+                      placeholder="Ex: 160"
+                      value={horasPrevistasDisplay}
+                      onChange={(e) => setDraftHoras(e.target.value)}
+                    />
+                  </div>
                 </div>
-                <div className="min-w-[220px]">
-                  <label className="block text-sm font-semibold text-viva-800 mb-1">Valor hora repasse (R$)</label>
-                  <input
-                    type="text"
-                    inputMode="decimal"
-                    className="input w-full max-w-[200px]"
-                    placeholder="Ex: 85,00"
-                    value={valorHoraDisplay}
-                    onChange={(e) => setDraftValor(e.target.value)}
-                  />
+
+                <div className="border-t border-viva-100 pt-4">
+                  <h4 className="text-base font-bold text-viva-900 mb-1">Valor hora por dia (ponto sem escala)</h4>
+                  <p className="text-sm text-gray-600 mb-4">
+                    Preencha cada dia em reais por hora. Configurações antigas com um único valor aparecem repetidas em todos os dias até você ajustar.
+                  </p>
+
+                  <div className="space-y-6">
+                    <div>
+                      <p className="text-sm font-semibold text-viva-800 mb-2">Repasse (R$/h)</p>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                        {DIAS_SEMANA.map(({ key, label }) => (
+                          <div
+                            key={key}
+                            className="flex flex-wrap items-end gap-4 p-4 rounded-xl border border-viva-200 bg-viva-50/30"
+                          >
+                            <div className="min-w-[200px] flex-1">
+                              <label className="block text-sm font-semibold text-viva-800 mb-1">
+                                {label}{' '}
+                                <span className="font-normal text-viva-600">(R$/h)</span>
+                              </label>
+                              <input
+                                type="text"
+                                inputMode="decimal"
+                                className="input w-full max-w-[180px]"
+                                placeholder="Ex: 150,00"
+                                value={draftValorPorDia[key] ?? ''}
+                                onChange={(e) =>
+                                  setDraftValorPorDia((prev) => ({
+                                    ...prev,
+                                    [key]: e.target.value,
+                                  }))
+                                }
+                              />
+                            </div>
+                            <button
+                              type="button"
+                              className={`btn btn-primary`}
+                              onClick={handleSave}
+                              disabled={saving}
+                            >
+                              {saving ? 'Salvando...' : saved ? 'Salvo!' : 'Salvar'}
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div>
+                      <p className="text-sm font-semibold text-viva-800 mb-2">Cobrança (R$/h)</p>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                        {DIAS_SEMANA.map(({ key, label }) => (
+                          <div
+                            key={key}
+                            className="flex flex-wrap items-end gap-4 p-4 rounded-xl border border-viva-200 bg-viva-50/30"
+                          >
+                            <div className="min-w-[200px] flex-1">
+                              <label className="block text-sm font-semibold text-viva-800 mb-1">
+                                {label}{' '}
+                                <span className="font-normal text-viva-600">(R$/h)</span>
+                              </label>
+                              <input
+                                type="text"
+                                inputMode="decimal"
+                                className="input w-full max-w-[180px]"
+                                placeholder="Ex: 150,00"
+                                value={draftValorCobrancaPorDia[key] ?? ''}
+                                onChange={(e) =>
+                                  setDraftValorCobrancaPorDia((prev) => ({
+                                    ...prev,
+                                    [key]: e.target.value,
+                                  }))
+                                }
+                              />
+                            </div>
+                            <button
+                              type="button"
+                              className={`btn btn-primary`}
+                              onClick={handleSave}
+                              disabled={saving}
+                            >
+                              {saving ? 'Salvando...' : saved ? 'Salvo!' : 'Salvar'}
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
                 </div>
-                <div className="min-w-[220px]">
-                  <label className="block text-sm font-semibold text-viva-800 mb-1">Valor hora cobrança (R$)</label>
-                  <input
-                    type="text"
-                    inputMode="decimal"
-                    className="input w-full max-w-[200px]"
-                    placeholder="Ex: 120,00"
-                    value={valorHoraCobrancaDisplay}
-                    onChange={(e) => setDraftValorCobranca(e.target.value)}
-                  />
-                </div>
-                <button
-                  type="button"
-                  className={`btn ${saved ? 'bg-green-600 hover:bg-green-700 border-green-700' : 'btn-primary'}`}
-                  onClick={handleSave}
-                  disabled={saving}
-                >
-                  {saving ? 'Salvando...' : saved ? 'Salvo!' : 'Salvar'}
-                </button>
               </div>
 
               <div className="border-t border-viva-200 pt-4">

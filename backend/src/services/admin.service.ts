@@ -16,6 +16,7 @@ import {
 } from '../utils/plantao-horario';
 import { isMissingDatabaseColumnError } from '../utils/prisma-column-error';
 import crypto from 'crypto';
+import { Prisma } from '@prisma/client';
 
 interface ListMedicosParams {
   tenantId: string;
@@ -1132,6 +1133,28 @@ export async function listRegistrosPontoAdminService(
   ];
   const valorHoraPorMedico: Record<string, number> = {};
   const valorHoraCobrancaPorMedico: Record<string, number> = {};
+  const valorHoraPorRegistroPontoId: Record<string, number> = {};
+  const valorHoraCobrancaPorRegistroPontoId: Record<string, number> = {};
+
+  const diaKeyFromDate = (d: Date): 'seg' | 'ter' | 'qua' | 'qui' | 'sex' | 'sab' | 'dom' => {
+    // JS: 0=dom,1=seg,...6=sab
+    switch (d.getDay()) {
+      case 1:
+        return 'seg';
+      case 2:
+        return 'ter';
+      case 3:
+        return 'qua';
+      case 4:
+        return 'qui';
+      case 5:
+        return 'sex';
+      case 6:
+        return 'sab';
+      default:
+        return 'dom';
+    }
+  };
 
   for (const medicoId of medicoIdsSemEscala) {
     const equipeIds = await prisma.equipeMedico
@@ -1143,21 +1166,78 @@ export async function listRegistrosPontoAdminService(
 
     if (equipeIds.length === 0) continue;
 
-    const config = await prisma.configPontoEletronico.findFirst({
-      where: {
-        tenantId,
-        equipeId: { in: equipeIds },
-        OR: [{ valorHora: { not: null } }, { valorHoraCobranca: { not: null } }],
-      },
-      select: { valorHora: true, valorHoraCobranca: true },
-      orderBy: { createdAt: 'asc' },
-    });
+    let config: {
+      valorHora: unknown;
+      valorHoraCobranca: unknown;
+      valorHoraPorDia?: unknown;
+      valorHoraCobrancaPorDia?: unknown;
+    } | null;
+    try {
+      config = await prisma.configPontoEletronico.findFirst({
+        where: {
+          tenantId,
+          equipeId: { in: equipeIds },
+          OR: [
+            { valorHora: { not: null } },
+            { valorHoraCobranca: { not: null } },
+            { valorHoraPorDia: { not: Prisma.DbNull } },
+            { valorHoraCobrancaPorDia: { not: Prisma.DbNull } },
+          ],
+        },
+        select: {
+          valorHora: true,
+          valorHoraCobranca: true,
+          valorHoraPorDia: true,
+          valorHoraCobrancaPorDia: true,
+        },
+        orderBy: { createdAt: 'asc' },
+      });
+    } catch (e) {
+      // DB sem colunas JSON ainda (migração não aplicada) → mesmo comportamento de antes (só globais).
+      if (
+        isMissingDatabaseColumnError(e, 'valor_hora_por_dia') ||
+        isMissingDatabaseColumnError(e, 'valor_hora_cobranca_por_dia')
+      ) {
+        config = await prisma.configPontoEletronico.findFirst({
+          where: {
+            tenantId,
+            equipeId: { in: equipeIds },
+            OR: [{ valorHora: { not: null } }, { valorHoraCobranca: { not: null } }],
+          },
+          select: { valorHora: true, valorHoraCobranca: true },
+          orderBy: { createdAt: 'asc' },
+        });
+      } else {
+        throw e;
+      }
+    }
 
     if (config?.valorHora != null) {
       valorHoraPorMedico[medicoId] = Number(config.valorHora);
     }
     if (config?.valorHoraCobranca != null) {
       valorHoraCobrancaPorMedico[medicoId] = Number(config.valorHoraCobranca);
+    }
+
+    // Valores por dia da semana (ponto sem escala): resolve por registro.
+    const registrosDoMedicoSemEscala = (registrosComEscalaNome as any[]).filter(
+      (r) => r.medicoId === medicoId && r.escalaId == null
+    ) as Array<{ id: string; checkInAt: Date | string | null }>;
+    for (const r of registrosDoMedicoSemEscala) {
+      const dt = r.checkInAt ? (r.checkInAt instanceof Date ? r.checkInAt : new Date(r.checkInAt)) : null;
+      if (!dt || Number.isNaN(dt.getTime())) continue;
+      const dk = diaKeyFromDate(dt);
+      const vhDia = (config?.valorHoraPorDia as any)?.[dk];
+      const vhCobDia = (config?.valorHoraCobrancaPorDia as any)?.[dk];
+      const vhResolved = vhDia != null ? Number(vhDia) : config?.valorHora != null ? Number(config.valorHora) : null;
+      const vhCobResolved =
+        vhCobDia != null ? Number(vhCobDia) : config?.valorHoraCobranca != null ? Number(config.valorHoraCobranca) : null;
+      if (vhResolved != null && Number.isFinite(vhResolved) && vhResolved >= 0) {
+        valorHoraPorRegistroPontoId[r.id] = vhResolved;
+      }
+      if (vhCobResolved != null && Number.isFinite(vhCobResolved) && vhCobResolved >= 0) {
+        valorHoraCobrancaPorRegistroPontoId[r.id] = vhCobResolved;
+      }
     }
   }
 
@@ -1345,6 +1425,8 @@ export async function listRegistrosPontoAdminService(
       data: registrosComFotoDisponivel,
       valorHoraPorMedico,
       valorHoraCobrancaPorMedico,
+      valorHoraPorRegistroPontoId,
+      valorHoraCobrancaPorRegistroPontoId,
       valorHoraPorMedicoEscala,
       plantoesValorHoraPorEscalaDataGrade,
       valorPlantao12hPorRegistroPontoId,
@@ -1358,6 +1440,8 @@ export async function listRegistrosPontoAdminService(
     data: registrosComFotoDisponivel,
     valorHoraPorMedico,
     valorHoraCobrancaPorMedico,
+    valorHoraPorRegistroPontoId,
+    valorHoraCobrancaPorRegistroPontoId,
     valorHoraPorMedicoEscala,
     plantoesValorHoraPorEscalaDataGrade,
     valorPlantao12hPorRegistroPontoId: {} as Record<string, number>,
@@ -1600,20 +1684,50 @@ export async function removerEscalaPlantaoService(
 export async function getValoresPlantaoService(
   tenantId: string,
   contratoAtivoId: string,
-  subgrupoId?: string | null
+  subgrupoId?: string | null,
+  equipeId?: string | null
 ) {
   await ensureTiposLegadoMigrados(tenantId, contratoAtivoId);
-  const where: { tenantId: string; contratoAtivoId: string; subgrupoId?: string } = {
-    tenantId,
-    contratoAtivoId,
-  };
   const sg = subgrupoId?.trim();
-  if (sg) where.subgrupoId = sg;
+  if (!sg) {
+    const rows = await prisma.valorPlantao.findMany({
+      where: { tenantId, contratoAtivoId },
+      orderBy: [{ subgrupoId: 'asc' }, { gradeId: 'asc' }],
+    });
+    return rows;
+  }
+
+  const eq = equipeId?.trim();
+  if (!eq) {
+    const rows = await prisma.valorPlantao.findMany({
+      where: { tenantId, contratoAtivoId, subgrupoId: sg, equipeId: null },
+      orderBy: [{ gradeId: 'asc' }],
+    });
+    return rows;
+  }
+
   const rows = await prisma.valorPlantao.findMany({
-    where,
-    orderBy: [{ subgrupoId: 'asc' }, { gradeId: 'asc' }],
+    where: {
+      tenantId,
+      contratoAtivoId,
+      subgrupoId: sg,
+      OR: [{ equipeId: eq }, { equipeId: null }],
+    },
+    orderBy: [{ gradeId: 'asc' }],
   });
-  return rows;
+
+  const byGrade = new Map<string, (typeof rows)[0]>();
+  for (const r of rows) {
+    if (r.equipeId != null && r.equipeId === eq) {
+      byGrade.set(r.gradeId, r);
+    }
+  }
+  for (const r of rows) {
+    if (r.equipeId == null && !byGrade.has(r.gradeId)) {
+      byGrade.set(r.gradeId, r);
+    }
+  }
+  return Array.from(byGrade.values()).sort((a, b) => a.gradeId.localeCompare(b.gradeId));
 }
 
 export async function listAdicionaisPlantaoService(input: {
@@ -1740,33 +1854,116 @@ export async function setValorPlantaoService(input: {
   masterId: string;
   contratoAtivoId: string;
   subgrupoId: string;
+  equipeId: string;
   gradeId: string;
   valorHora: number | null;
+  valorHoraCobranca?: number | null;
+  valorHoraPorDia?: unknown;
+  valorHoraCobrancaPorDia?: unknown;
 }) {
   const gradeId = await resolveGradeIdParaContrato(
     input.tenantId,
     input.contratoAtivoId,
     input.gradeId
   );
-  const valorHora = input.valorHora != null ? Number(input.valorHora) : null;
-  const row = await prisma.valorPlantao.upsert({
+  const equipeId = input.equipeId.trim();
+
+  const contratoTemSubgrupo = await prisma.contratoSubgrupo.findFirst({
     where: {
-      tenantId_contratoAtivoId_subgrupoId_gradeId: {
-        tenantId: input.tenantId,
-        contratoAtivoId: input.contratoAtivoId,
-        subgrupoId: input.subgrupoId,
-        gradeId,
-      },
+      tenantId: input.tenantId,
+      contratoAtivoId: input.contratoAtivoId,
+      subgrupoId: input.subgrupoId,
     },
-    update: { valorHora },
-    create: {
+    select: { id: true },
+  });
+  if (!contratoTemSubgrupo) {
+    throw { statusCode: 400, message: 'Subgrupo não vinculado a este contrato' };
+  }
+
+  const equipe = await prisma.equipe.findFirst({
+    where: { id: equipeId, tenantId: input.tenantId },
+  });
+  if (!equipe) {
+    throw { statusCode: 400, message: 'Equipe não encontrada' };
+  }
+  if (equipe.subgrupoId !== input.subgrupoId) {
+    throw { statusCode: 400, message: 'Equipe não pertence ao subgrupo selecionado' };
+  }
+  if (equipe.ativo === false) {
+    throw { statusCode: 400, message: 'Equipe inativa' };
+  }
+
+  const valorHora = input.valorHora != null ? Number(input.valorHora) : null;
+
+  const DIAS = ['seg', 'ter', 'qua', 'qui', 'sex', 'sab', 'dom'] as const;
+  type DiaKey = (typeof DIAS)[number];
+  const parseDiaMap = (
+    raw: unknown
+  ): Prisma.InputJsonValue | Prisma.NullableJsonNullValueInput | undefined => {
+    // Se vier null explicitamente, limpar no banco (NULL).
+    if (raw === null) return Prisma.DbNull;
+    if (raw === undefined) return undefined;
+    if (typeof raw !== 'object' || Array.isArray(raw)) return undefined;
+    const inputObj = raw as Record<string, unknown>;
+    const out: Record<DiaKey, number | null> = {
+      seg: null,
+      ter: null,
+      qua: null,
+      qui: null,
+      sex: null,
+      sab: null,
+      dom: null,
+    };
+    let hasAny = false;
+    for (const k of DIAS) {
+      const v = inputObj[k];
+      if (v == null || v === '') continue;
+      const n = typeof v === 'string' ? parseFloat(v.replace(',', '.')) : Number(v);
+      if (!Number.isFinite(n) || n < 0) continue;
+      out[k] = Math.round(n * 100) / 100;
+      hasAny = true;
+    }
+    // Se não tem nenhum valor, tratar como "limpar" quando o cliente mandou objeto vazio.
+    return hasAny ? out : Prisma.DbNull;
+  };
+
+  const valorHoraCobranca = input.valorHoraCobranca != null ? Number(input.valorHoraCobranca) : null;
+  const valorHoraPorDia = parseDiaMap(input.valorHoraPorDia);
+  const valorHoraCobrancaPorDia = parseDiaMap(input.valorHoraCobrancaPorDia);
+
+  const data: any = {
+    valorHora,
+    valorHoraCobranca,
+    ...(valorHoraPorDia !== undefined ? { valorHoraPorDia } : {}),
+    ...(valorHoraCobrancaPorDia !== undefined ? { valorHoraCobrancaPorDia } : {}),
+  };
+
+  const existing = await prisma.valorPlantao.findFirst({
+    where: {
       tenantId: input.tenantId,
       contratoAtivoId: input.contratoAtivoId,
       subgrupoId: input.subgrupoId,
       gradeId,
-      valorHora,
+      equipeId,
     },
   });
+
+  const row = existing
+    ? await prisma.valorPlantao.update({
+        where: { id: existing.id },
+        data,
+      })
+    : await prisma.valorPlantao.create({
+        data: {
+          tenantId: input.tenantId,
+          contratoAtivoId: input.contratoAtivoId,
+          subgrupoId: input.subgrupoId,
+          equipeId,
+          gradeId,
+          ...data,
+        },
+      });
+
   await createAuditLog({
     acao: 'CONFIGURAR_VALOR_PLANTAO',
     tenantId: input.tenantId,
@@ -1774,8 +1971,12 @@ export async function setValorPlantaoService(input: {
     detalhes: {
       contratoAtivoId: input.contratoAtivoId,
       subgrupoId: input.subgrupoId,
+      equipeId,
       gradeId,
       valorHora,
+      valorHoraCobranca,
+      ...(valorHoraPorDia !== undefined ? { valorHoraPorDia } : {}),
+      ...(valorHoraCobrancaPorDia !== undefined ? { valorHoraCobrancaPorDia } : {}),
     },
   });
   return row;
@@ -1837,6 +2038,8 @@ export async function setConfigPontoService(input: {
   horasPrevistasMes: number | null;
   valorHora: number | null;
   valorHoraCobranca: number | null;
+  valorHoraPorDia?: unknown;
+  valorHoraCobrancaPorDia?: unknown;
   horarioEntrada?: string | null;
   horarioSaida?: string | null;
   toleranciaMinutos?: number | null;
@@ -1869,10 +2072,45 @@ export async function setConfigPontoService(input: {
       ? input.enderecoPonto.trim().slice(0, 500) || null
       : null;
 
+  const DIAS = ['seg', 'ter', 'qua', 'qui', 'sex', 'sab', 'dom'] as const;
+  type DiaKey = (typeof DIAS)[number];
+  const parseDiaMap = (raw: unknown): Prisma.InputJsonValue | Prisma.NullableJsonNullValueInput | undefined => {
+    // Se vier null explicitamente, limpar no banco (NULL).
+    if (raw === null) return Prisma.DbNull;
+    if (raw === undefined) return undefined;
+    if (typeof raw !== 'object' || Array.isArray(raw)) return undefined;
+    const inputObj = raw as Record<string, unknown>;
+    const out: Record<DiaKey, number | null> = {
+      seg: null,
+      ter: null,
+      qua: null,
+      qui: null,
+      sex: null,
+      sab: null,
+      dom: null,
+    };
+    let hasAny = false;
+    for (const k of DIAS) {
+      const v = inputObj[k];
+      if (v == null || v === '') continue;
+      const n = typeof v === 'string' ? parseFloat(v.replace(',', '.')) : Number(v);
+      if (!Number.isFinite(n) || n < 0) continue;
+      out[k] = n;
+      hasAny = true;
+    }
+    // Se não tem nenhum valor, tratar como "limpar" quando o cliente mandou objeto vazio.
+    return hasAny ? out : Prisma.DbNull;
+  };
+
+  const valorHoraPorDia = parseDiaMap(input.valorHoraPorDia);
+  const valorHoraCobrancaPorDia = parseDiaMap(input.valorHoraCobrancaPorDia);
+
   const data = {
     horasPrevistasMes,
     valorHora,
     valorHoraCobranca,
+    valorHoraPorDia,
+    valorHoraCobrancaPorDia,
     horarioEntrada,
     horarioSaida,
     toleranciaMinutos,

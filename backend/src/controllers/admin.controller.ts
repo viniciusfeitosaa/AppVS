@@ -682,12 +682,17 @@ export const getValoresPlantaoOpcoesController = async (req: Request, res: Respo
       return res.status(401).json({ success: false, error: 'Não autenticado' });
     }
     const tenantId = req.user.tenantId;
-    const [contratosResult, subgrupos, contratoSubgrupos] = await Promise.all([
+    const [contratosResult, subgrupos, equipes, contratoSubgrupos, contratoEquipes] = await Promise.all([
       listContratosAtivosService({ tenantId, page: 1, limit: 500 }),
       listSubgruposService(tenantId),
+      listEquipesService(tenantId, null),
       prisma.contratoSubgrupo.findMany({
         where: { tenantId },
         select: { contratoAtivoId: true, subgrupoId: true },
+      }),
+      prisma.contratoEquipe.findMany({
+        where: { tenantId },
+        select: { contratoAtivoId: true, equipeId: true },
       }),
     ]);
     return res.status(200).json({
@@ -695,7 +700,14 @@ export const getValoresPlantaoOpcoesController = async (req: Request, res: Respo
       data: {
         contratos: contratosResult.items,
         subgrupos: subgrupos.map((s) => ({ id: s.id, nome: s.nome, ativo: s.ativo })),
+        equipes: equipes.map((e) => ({
+          id: e.id,
+          nome: e.nome,
+          ativo: e.ativo,
+          subgrupoId: e.subgrupoId ?? null,
+        })),
         contratoSubgrupos,
+        contratoEquipes,
       },
     });
   } catch (error: any) {
@@ -713,6 +725,7 @@ export const getValoresPlantaoController = async (req: Request, res: Response) =
     }
     const contratoId = (req.query.contratoId as string)?.trim();
     const subgrupoId = (req.query.subgrupoId as string)?.trim();
+    const equipeId = (req.query.equipeId as string)?.trim();
     if (!contratoId) {
       return res.status(400).json({
         success: false,
@@ -722,7 +735,8 @@ export const getValoresPlantaoController = async (req: Request, res: Response) =
     const data = await getValoresPlantaoService(
       req.user.tenantId,
       contratoId,
-      subgrupoId || undefined
+      subgrupoId || undefined,
+      equipeId || undefined
     );
     return res.status(200).json({ success: true, data });
   } catch (error: any) {
@@ -987,6 +1001,8 @@ export const setConfigPontoController = async (req: Request, res: Response) => {
       horasPrevistasMes,
       valorHora,
       valorHoraCobranca,
+      valorHoraPorDia,
+      valorHoraCobrancaPorDia,
       horarioEntrada,
       horarioSaida,
       toleranciaMinutos,
@@ -1011,6 +1027,8 @@ export const setConfigPontoController = async (req: Request, res: Response) => {
       horasPrevistasMes: horasPrevistasMes != null ? Number(horasPrevistasMes) : null,
       valorHora: valorHora != null ? Number(valorHora) : null,
       valorHoraCobranca: valorHoraCobranca != null ? Number(valorHoraCobranca) : null,
+      valorHoraPorDia: valorHoraPorDia ?? null,
+      valorHoraCobrancaPorDia: valorHoraCobrancaPorDia ?? null,
       horarioEntrada: horarioEntrada != null && typeof horarioEntrada === 'string' ? horarioEntrada.trim() || null : null,
       horarioSaida: horarioSaida != null && typeof horarioSaida === 'string' ? horarioSaida.trim() || null : null,
       toleranciaMinutos: toleranciaMinutos != null ? Number(toleranciaMinutos) : null,
@@ -1033,12 +1051,24 @@ export const setValorPlantaoController = async (req: Request, res: Response) => 
     if (!req.user) {
       return res.status(401).json({ success: false, error: 'Não autenticado' });
     }
-    const { contratoId, subgrupoId, gradeId, valorHora } = req.body;
+    const {
+      contratoId,
+      subgrupoId,
+      equipeId,
+      gradeId,
+      valorHora,
+      valorHoraCobranca,
+      valorHoraPorDia,
+      valorHoraCobrancaPorDia,
+    } = req.body;
     if (!contratoId || typeof contratoId !== 'string') {
       return res.status(400).json({ success: false, error: 'contratoId é obrigatório' });
     }
     if (!subgrupoId || typeof subgrupoId !== 'string') {
       return res.status(400).json({ success: false, error: 'subgrupoId é obrigatório' });
+    }
+    if (!equipeId || typeof equipeId !== 'string' || !equipeId.trim()) {
+      return res.status(400).json({ success: false, error: 'equipeId é obrigatório' });
     }
     if (!gradeId || typeof gradeId !== 'string') {
       return res.status(400).json({ success: false, error: 'gradeId é obrigatório' });
@@ -1048,8 +1078,12 @@ export const setValorPlantaoController = async (req: Request, res: Response) => 
       masterId: req.user.id,
       contratoAtivoId: contratoId.trim(),
       subgrupoId: subgrupoId.trim(),
+      equipeId: equipeId.trim(),
       gradeId: gradeId.trim(),
       valorHora: valorHora != null ? Number(valorHora) : null,
+      valorHoraCobranca: valorHoraCobranca != null ? Number(valorHoraCobranca) : null,
+      valorHoraPorDia: valorHoraPorDia ?? undefined,
+      valorHoraCobrancaPorDia: valorHoraCobrancaPorDia ?? undefined,
     });
     return res.status(200).json({ success: true, data, message: 'Valor atualizado' });
   } catch (error: any) {
