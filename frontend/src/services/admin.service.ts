@@ -140,6 +140,18 @@ export interface EscalaPlantao {
   };
 }
 
+export interface HistoricoTrocaPlantaoEscala {
+  id: string;
+  status: string;
+  respondidaEm: string;
+  createdAt: string;
+  plantaoId: string;
+  dataPlantao: string;
+  gradeId: string;
+  solicitante: { id: string; nomeCompleto: string; crm: string | null };
+  destino: { id: string; nomeCompleto: string; crm: string | null };
+}
+
 export interface AdicionalPlantaoData {
   id: string;
   tenantId: string;
@@ -365,6 +377,13 @@ export const adminService = {
     params?: { dataInicio?: string; dataFim?: string }
   ): Promise<{ success: boolean; data: EscalaPlantao[] }> => {
     const response = await api.get(`/admin/escalas/${escalaId}/plantoes`, { params });
+    return response.data;
+  },
+
+  listHistoricoTrocasPlantaoEscala: async (
+    escalaId: string
+  ): Promise<{ success: boolean; data: HistoricoTrocaPlantaoEscala[] }> => {
+    const response = await api.get(`/admin/escalas/${escalaId}/trocas-plantao-historico`);
     return response.data;
   },
 

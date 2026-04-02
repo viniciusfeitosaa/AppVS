@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { authService, LoginCredentials } from '../services/auth.service';
+import { queryClient } from '../lib/queryClient';
 import { decodeJwtPayloadUnsafe } from '../utils/jwtPayload';
 
 /** Alinha role ao access token (fonte de verdade na sessão) e normaliza strings legadas. */
@@ -96,6 +97,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         localStorage.setItem('refreshToken', response.data.refreshToken);
         const merged = mergeRoleFromAccessToken(userData as User);
         localStorage.setItem('user', JSON.stringify(merged));
+        // Evita flash de dados do usuário anterior (React Query cache)
+        queryClient.clear();
         setUser(merged);
       }
     } catch (error) {
@@ -104,6 +107,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   };
 
   const logout = () => {
+    queryClient.clear();
     localStorage.removeItem('user');
     localStorage.removeItem('accessToken');
     localStorage.removeItem('refreshToken');

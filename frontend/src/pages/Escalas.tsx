@@ -2,7 +2,13 @@ import { useMemo, useState, useRef, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../context/AuthContext';
-import { adminService, Escala, type TipoPlantaoConfig } from '../services/admin.service';
+import {
+  adminService,
+  Escala,
+  type EscalaPlantao,
+  type HistoricoTrocaPlantaoEscala,
+  type TipoPlantaoConfig,
+} from '../services/admin.service';
 import { fixMojibake } from '../utils/validation.util';
 
 interface EscalaFormState {
@@ -94,6 +100,16 @@ function formatDayShort(d: Date): string {
   return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit' });
 }
 
+/** Chave estável YYYY-MM e título legível (ex.: "Abril de 2026") para agrupar o histórico. */
+function monthKeyAndLabel(d: Date): { key: string; label: string } {
+  const y = d.getFullYear();
+  const m = d.getMonth() + 1;
+  const key = `${y}-${String(m).padStart(2, '0')}`;
+  const raw = d.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+  const label = raw.charAt(0).toUpperCase() + raw.slice(1);
+  return { key, label };
+}
+
 function formatDayName(d: Date): string {
   const i = d.getDay();
   const names = ['Domingo', 'Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado'];
@@ -179,6 +195,12 @@ const Escalas = () => {
   const [editarEscalaYear, setEditarEscalaYear] = useState(() => new Date().getFullYear());
   /** Busca por profissional na grade da escala (filtra linhas da tabela). */
   const [gradeBuscaProfissional, setGradeBuscaProfissional] = useState('');
+  /**
+   * Escala publicada (`ativo`): abre em somente leitura; o usuário clica em "Editar escala" na barra inferior
+   * para alterar células e então "Publicar" para confirmar e voltar ao modo leitura.
+   * Rascunho: edição liberada por padrão.
+   */
+  const [gradeEdicaoLiberada, setGradeEdicaoLiberada] = useState(true);
 
   type CellModalState = {
     open: boolean;
@@ -346,6 +368,54 @@ const Escalas = () => {
     enabled: isMaster && !!selectedEquipeId,
   });
 
+  const equipeEscalasForHistorico = useMemo(
+    () => (equipeEscalasResp?.data ?? []) as Escala[],
+    [equipeEscalasResp?.data]
+  );
+
+  /**
+   * Aba Histórico no drawer da equipe: a escala não vem do seletor da tela principal.
+   * Usa a escala selecionada na grade se ela pertencer à equipe; senão, a primeira escala vinculada à equipe.
+   */
+  const escalaIdParaHistoricoDrawer = useMemo(() => {
+    if (!selectedEquipeId || equipeEscalasForHistorico.length === 0) return '';
+    if (selectedEscalaId && equipeEscalasForHistorico.some((e) => e.id === selectedEscalaId)) {
+      return selectedEscalaId;
+    }
+    return equipeEscalasForHistorico[0].id;
+  }, [selectedEquipeId, selectedEscalaId, equipeEscalasForHistorico]);
+
+  const historicoDrawerDadosEnabled =
+    isMaster && equipePanelTab === 'historico' && !!escalaIdParaHistoricoDrawer;
+
+  /** Plantões de todas as escalas da equipe no ano (aba Gerenciamento de escalas — status por mês). */
+  const { data: equipePlantoesAnoGerenciamentoResp, isLoading: loadingPlantoesAnoGerenciamento } = useQuery({
+    queryKey: ['admin', 'equipes', selectedEquipeId, 'plantoes', 'year-range', editarEscalaYear],
+    queryFn: () =>
+      adminService.listEquipePlantoes(selectedEquipeId!, {
+        dataInicio: `${editarEscalaYear}-01-01`,
+        dataFim: `${editarEscalaYear}-12-31`,
+        modo: 'dinamica',
+      }),
+    enabled: isMaster && !!selectedEquipeId && equipePanelTab === 'editar',
+  });
+
+  const plantaoCountByEscalaMonthGerenciamento = useMemo(() => {
+    const map = new Map<string, number>();
+    const raw = equipePlantoesAnoGerenciamentoResp?.data;
+    const items: EscalaPlantao[] = Array.isArray(raw) ? raw : [];
+    for (const p of items) {
+      const ymd = toDateInput(p.data);
+      const parts = ymd.split('-').map(Number);
+      const y = parts[0];
+      const m = parts[1];
+      if (!y || !m || y !== editarEscalaYear) continue;
+      const key = `${p.escalaId}|${m}`;
+      map.set(key, (map.get(key) ?? 0) + 1);
+    }
+    return map;
+  }, [equipePlantoesAnoGerenciamentoResp?.data, editarEscalaYear]);
+
   const periodoRegistrosEquipeRelatorio = useMemo(() => {
     const list = (equipeEscalasResp?.data ?? []) as Escala[];
     if (list.length === 0) return null;
@@ -481,6 +551,35 @@ const Escalas = () => {
     enabled: isMaster && !!selectedEscalaId,
   });
 
+  const { data: historicoDrawerMedicosResp, isLoading: loadingHistoricoDrawerMedicos } = useQuery({
+    queryKey: ['admin', 'escalas', escalaIdParaHistoricoDrawer, 'medicos'],
+    queryFn: () => adminService.listEscalaMedicos(escalaIdParaHistoricoDrawer),
+    enabled: historicoDrawerDadosEnabled,
+  });
+
+  const { data: historicoDrawerPlantoesMonthResp, isLoading: loadingHistoricoDrawerPlantoes } = useQuery({
+    queryKey: [
+      'admin',
+      'escalas',
+      escalaIdParaHistoricoDrawer,
+      'plantoes-month',
+      dateToInput(gradeMonthStart),
+      dateToInput(gradeMonthEnd),
+    ],
+    queryFn: () =>
+      adminService.listEscalaPlantoes(escalaIdParaHistoricoDrawer, {
+        dataInicio: dateToInput(gradeMonthStart),
+        dataFim: dateToInput(gradeMonthEnd),
+      }),
+    enabled: historicoDrawerDadosEnabled,
+  });
+
+  const { data: trocasHistoricoResp, isLoading: loadingTrocasHistorico } = useQuery({
+    queryKey: ['admin', 'escalas', escalaIdParaHistoricoDrawer, 'trocas-plantao-historico'],
+    queryFn: () => adminService.listHistoricoTrocasPlantaoEscala(escalaIdParaHistoricoDrawer),
+    enabled: historicoDrawerDadosEnabled,
+  });
+
   const { data: escalaSubgruposResp } = useQuery({
     queryKey: ['admin', 'escalas', selectedEscalaId, 'subgrupos'],
     queryFn: () => adminService.listEscalaSubgrupos(selectedEscalaId),
@@ -490,6 +589,20 @@ const Escalas = () => {
   const selectedEscala = useMemo(
     () => (escalasResp?.data || []).find((e: Escala) => e.id === selectedEscalaId),
     [escalasResp?.data, selectedEscalaId]
+  );
+
+  useEffect(() => {
+    if (!selectedEscalaId) {
+      setGradeEdicaoLiberada(true);
+      return;
+    }
+    if (!selectedEscala) return;
+    setGradeEdicaoLiberada(!selectedEscala.ativo);
+  }, [selectedEscalaId, selectedEscala?.id, selectedEscala?.ativo]);
+
+  const gradeSomenteLeitura = useMemo(
+    () => selectedEscala?.ativo === true && !gradeEdicaoLiberada,
+    [selectedEscala?.ativo, gradeEdicaoLiberada]
   );
 
   /** Calendário da equipe não define selectedEscalaId; tipos vinham vazios e a UI caía só em MT/SN fixos. */
@@ -521,6 +634,7 @@ const Escalas = () => {
       ...(plantoesResp?.data ?? []),
       ...(plantoesMonthResp?.data ?? []),
       ...(equipePlantoesDiaResp?.data ?? []),
+      ...(equipePanelTab === 'historico' ? (historicoDrawerPlantoesMonthResp?.data ?? []) : []),
     ];
     for (const p of plantoesUnion) {
       const gid = String(p.gradeId);
@@ -540,7 +654,14 @@ const Escalas = () => {
       }
     }
     return Array.from(byId.values());
-  }, [tiposPlantaoEscalResp?.data, plantoesResp?.data, plantoesMonthResp?.data, equipePlantoesDiaResp?.data]);
+  }, [
+    tiposPlantaoEscalResp?.data,
+    plantoesResp?.data,
+    plantoesMonthResp?.data,
+    equipePlantoesDiaResp?.data,
+    equipePanelTab,
+    historicoDrawerPlantoesMonthResp?.data,
+  ]);
 
   /**
    * Colunas do painel "Plantões do dia" respeitam a data clicada: só tipos já criados até aquele dia
@@ -828,12 +949,19 @@ const Escalas = () => {
   };
 
   const invalidatePlantoes = () => {
-    queryClient.invalidateQueries({
-      queryKey: ['admin', 'escalas', selectedEscalaId, 'plantoes'],
-    });
-    queryClient.invalidateQueries({
-      queryKey: ['admin', 'escalas', selectedEscalaId, 'plantoes-month'],
-    });
+    const escalaIds = new Set<string>();
+    if (selectedEscalaId) escalaIds.add(selectedEscalaId);
+    if (escalaIdParaHistoricoDrawer) escalaIds.add(escalaIdParaHistoricoDrawer);
+    for (const eid of escalaIds) {
+      queryClient.invalidateQueries({ queryKey: ['admin', 'escalas', eid, 'plantoes'] });
+      queryClient.invalidateQueries({ queryKey: ['admin', 'escalas', eid, 'plantoes-month'] });
+      queryClient.invalidateQueries({ queryKey: ['admin', 'escalas', eid, 'trocas-plantao-historico'] });
+    }
+    if (selectedEquipeId) {
+      queryClient.invalidateQueries({
+        queryKey: ['admin', 'equipes', selectedEquipeId, 'plantoes', 'year-range'],
+      });
+    }
   };
 
   const resetForm = () => {
@@ -1379,16 +1507,24 @@ const Escalas = () => {
                 const equipeEscalas = equipeEscalasResp?.data ?? [];
                 const monthNames = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
                 const getEscalaForMonth = (year: number, month1Based: number): Escala | null => {
-                  // Considera que uma escala vale para o intervalo entre dataInicio e dataFim.
-                  // Se esse intervalo inclui qualquer dia do mês em questão, ela é a escala daquele mês.
+                  // Várias escalas podem cobrir o mesmo mês (ex.: uma anual + recortes mensais).
+                  // Usamos a de menor duração que ainda intersecta o mês — é a mais específica e
+                  // reflete melhor o status (rascunho/publicada) daquele período.
                   const firstDay = new Date(year, month1Based - 1, 1);
                   const lastDay = new Date(year, month1Based, 0);
-                  for (const e of equipeEscalas) {
+                  const candidates = equipeEscalas.filter((e) => {
                     const inicio = new Date(e.dataInicio);
                     const fim = new Date(e.dataFim);
-                    if (inicio <= lastDay && fim >= firstDay) return e;
-                  }
-                  return null;
+                    return inicio <= lastDay && fim >= firstDay;
+                  });
+                  if (candidates.length === 0) return null;
+                  if (candidates.length === 1) return candidates[0];
+                  return [...candidates].sort((a, b) => {
+                    const spanA = new Date(a.dataFim).getTime() - new Date(a.dataInicio).getTime();
+                    const spanB = new Date(b.dataFim).getTime() - new Date(b.dataInicio).getTime();
+                    if (spanA !== spanB) return spanA - spanB;
+                    return new Date(b.dataInicio).getTime() - new Date(a.dataInicio).getTime();
+                  })[0];
                 };
                 return (
                   <div className="flex flex-col flex-1 overflow-hidden min-h-0">
@@ -1415,23 +1551,28 @@ const Escalas = () => {
                     <div className="flex-1 overflow-y-auto min-h-0">
                       {[12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1].map((month1Based) => {
                         const escala = getEscalaForMonth(editarEscalaYear, month1Based);
+                        const plantoesNoMes = escala
+                          ? plantaoCountByEscalaMonthGerenciamento.get(`${escala.id}|${month1Based}`) ?? 0
+                          : 0;
 
-                        // Regra de status:
-                        // - Sem escala: nenhuma escala cobre este mês
-                        // - Publicada: existe escala ATIVA e este mês é o mês atualmente aberto na grade (gradeMonthStart)
-                        // - Em rascunho: existe escala mas ainda não foi publicada para este mês
-                        let status: 'Sem escala' | 'Em rascunho' | 'Publicada' = 'Sem escala';
+                        // Publicada só se a escala está publicada (ativo) e há plantão na grade naquele mês.
+                        // Uma escala anual publicada não implica todos os meses “publicados”.
+                        let status: 'Sem escala' | 'Em rascunho' | 'Publicada' | 'Sem plantões' | 'Carregando…' =
+                          'Sem escala';
                         let statusColor = 'text-gray-500';
-                        if (escala) {
-                          const isMesGradeAtual =
-                            gradeMonthStart.getFullYear() === editarEscalaYear &&
-                            gradeMonthStart.getMonth() === month1Based - 1;
-                          if (escala.ativo && isMesGradeAtual) {
+                        if (loadingPlantoesAnoGerenciamento && escala) {
+                          status = 'Carregando…';
+                          statusColor = 'text-gray-400';
+                        } else if (escala) {
+                          if (!escala.ativo) {
+                            status = 'Em rascunho';
+                            statusColor = 'text-amber-600';
+                          } else if (plantoesNoMes > 0) {
                             status = 'Publicada';
                             statusColor = 'text-viva-600';
                           } else {
-                            status = 'Em rascunho';
-                            statusColor = 'text-amber-600';
+                            status = 'Sem plantões';
+                            statusColor = 'text-gray-500';
                           }
                         }
                         const now = new Date();
@@ -1458,14 +1599,12 @@ const Escalas = () => {
                                 if (escala) {
                                   setSelectedEscalaId(escala.id);
                                 } else {
-                                  // Nenhuma escala para este mês ainda: apenas abrimos a view de escalas
-                                  // com o mês correto selecionado; o usuário pode criar uma nova escala.
                                   setSelectedEscalaId('');
                                 }
                               }}
                               className="btn btn-secondary text-sm shrink-0"
                             >
-                              Editar escala
+                              {escala ? (escala.ativo ? 'Ver escala' : 'Editar escala') : 'Abrir mês'}
                             </button>
                           </div>
                         );
@@ -1510,33 +1649,76 @@ const Escalas = () => {
                 );
               })()}
               {equipePanelTab === 'historico' && (() => {
+                if (!selectedEquipeId) {
+                  return (
+                    <p className="text-sm text-gray-500 text-center py-8">Selecione uma equipe para ver o histórico.</p>
+                  );
+                }
+                if (equipeEscalasResp === undefined) {
+                  return (
+                    <div className="flex flex-col items-center justify-center py-12 text-viva-700">
+                      <p className="text-sm">Carregando escalas da equipe…</p>
+                    </div>
+                  );
+                }
+                if (equipeEscalasForHistorico.length === 0) {
+                  return (
+                    <div className="text-center py-8 text-viva-700 px-2">
+                      <p className="font-medium mb-1">Histórico da escala</p>
+                      <p className="text-sm">Nenhuma escala vinculada a esta equipe. Vincule uma escala para ver alocações, plantões e trocas.</p>
+                    </div>
+                  );
+                }
+
+                if (
+                  historicoDrawerDadosEnabled &&
+                  (loadingHistoricoDrawerMedicos || loadingHistoricoDrawerPlantoes || loadingTrocasHistorico)
+                ) {
+                  return (
+                    <div className="flex flex-col items-center justify-center py-12 text-viva-700">
+                      <p className="text-sm">Carregando histórico…</p>
+                    </div>
+                  );
+                }
+
+                const trocasRows = (trocasHistoricoResp?.data ?? []) as HistoricoTrocaPlantaoEscala[];
+                const alocacoesHistoricoDrawer = (historicoDrawerMedicosResp?.data ?? []) as {
+                  id: string;
+                  medicoId: string;
+                  medico: { nomeCompleto: string; crm: string | null };
+                  createdAt?: string;
+                }[];
+                const plantoesHistoricoDrawer = (historicoDrawerPlantoesMonthResp?.data ?? []) as {
+                  id: string;
+                  data: string;
+                  gradeId: string;
+                  medico: { nomeCompleto: string; crm: string };
+                }[];
+
+                const escalaHistoricoMeta = equipeEscalasForHistorico.find((e) => e.id === escalaIdParaHistoricoDrawer);
+
                 const historico: {
                   id: string;
                   data: Date;
-                  tipo: 'alocacao' | 'plantao';
+                  tipo: 'alocacao' | 'plantao' | 'troca';
                   titulo: string;
                   descricao: string;
                 }[] = [];
 
                 // Alocações na escala (médicos vinculados à escala)
-                for (const a of alocacoes as { id: string; medicoId: string; medico: { nomeCompleto: string; crm: string | null }; createdAt?: string }[]) {
+                for (const a of alocacoesHistoricoDrawer) {
                   if (!a.createdAt) continue;
                   historico.push({
                     id: `aloc-${a.id}`,
                     data: new Date(a.createdAt),
                     tipo: 'alocacao',
                     titulo: `Médico alocado na escala`,
-                    descricao: `${a.medico.nomeCompleto} (${a.medico.crm ?? 'CRM não informado'})`,
+                    descricao: `${fixMojibake(a.medico.nomeCompleto)} (${a.medico.crm ?? 'CRM não informado'})`,
                   });
                 }
 
-                // Plantões do mês (escala x dia x turno)
-                for (const p of plantoesMonth as {
-                  id: string;
-                  data: string;
-                  gradeId: string;
-                  medico: { nomeCompleto: string; crm: string };
-                }[]) {
+                // Plantões do mês visível na grade principal (mesmo recorte de datas)
+                for (const p of plantoesHistoricoDrawer) {
                   const d = new Date(p.data);
                   const grade = gradesForGrid.find((g) => g.id === p.gradeId);
                   historico.push({
@@ -1544,7 +1726,26 @@ const Escalas = () => {
                     data: d,
                     tipo: 'plantao',
                     titulo: `Plantão ${grade?.label ?? ''} atribuído`,
-                    descricao: `${p.medico.nomeCompleto} (${p.medico.crm}) · ${formatDayShort(d)} · ${grade?.horario ?? ''}`,
+                    descricao: `${fixMojibake(p.medico.nomeCompleto)} (${p.medico.crm}) · ${formatDayShort(d)} · ${grade?.horario ?? ''}`,
+                  });
+                }
+
+                for (const t of trocasRows) {
+                  const dPlantao = new Date(t.dataPlantao + 'T12:00:00');
+                  const grade = gradesForGrid.find((g) => g.id === t.gradeId);
+                  const sol = fixMojibake(t.solicitante.nomeCompleto);
+                  const dst = fixMojibake(t.destino.nomeCompleto);
+                  const crmS = t.solicitante.crm ?? '—';
+                  const crmD = t.destino.crm ?? '—';
+                  const aceita = t.status === 'ACEITA';
+                  historico.push({
+                    id: `troca-${t.id}`,
+                    data: new Date(t.respondidaEm),
+                    tipo: 'troca',
+                    titulo: aceita ? 'Troca de plantão realizada' : 'Troca de plantão recusada',
+                    descricao: aceita
+                      ? `${sol} (${crmS}) cedeu o plantão a ${dst} (${crmD}) · ${formatDayShort(dPlantao)} · ${grade?.label ?? 'Turno'} ${grade?.horario ? `· ${grade.horario}` : ''}`
+                      : `${sol} (${crmS}) solicitou troca com ${dst} (${crmD}) — recusada · ${formatDayShort(dPlantao)} · ${grade?.label ?? 'Turno'} ${grade?.horario ? `· ${grade.horario}` : ''}`,
                   });
                 }
 
@@ -1559,34 +1760,85 @@ const Escalas = () => {
                   );
                 }
 
+                const porMes = new Map<string, { label: string; itens: typeof historico }>();
+                for (const item of historico) {
+                  const { key, label } = monthKeyAndLabel(item.data);
+                  const bucket = porMes.get(key);
+                  if (bucket) {
+                    bucket.itens.push(item);
+                  } else {
+                    porMes.set(key, { label, itens: [item] });
+                  }
+                }
+                const mesesOrdenados = [...porMes.entries()].sort(([ka], [kb]) => kb.localeCompare(ka));
+
                 return (
                   <div className="py-2">
-                    <p className="text-xs font-semibold uppercase tracking-wider text-viva-600 font-display mb-4">
+                    <p className="text-xs font-semibold uppercase tracking-wider text-viva-600 font-display mb-1">
                       Histórico da escala
                     </p>
-                    <ul className="space-y-3">
-                      {historico.map((item) => (
-                        <li
-                          key={item.id}
-                          className="flex items-start gap-3 rounded-xl border border-viva-200/70 bg-viva-50/40 px-3 py-2.5"
-                        >
-                          <span className="mt-0.5 inline-flex h-7 w-7 items-center justify-center rounded-full bg-viva-200 text-viva-800 text-xs font-display">
-                            {item.tipo === 'alocacao' ? 'AL' : 'PL'}
+                    {escalaHistoricoMeta && (
+                      <p className="text-xs text-viva-600 font-serif mb-1">
+                        Escala: <span className="font-medium text-viva-800">{escalaHistoricoMeta.nome}</span>
+                        {equipeEscalasForHistorico.length > 1 && (
+                          <span className="block mt-1 text-viva-500">
+                            Esta equipe tem várias escalas. Ajuste a escala na tela &quot;Escalas e grades&quot; para ver outra.
                           </span>
-                          <div className="flex-1 min-w-0">
-                            <p className="text-[11px] text-viva-600 font-serif">
-                              {item.data.toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' })}
-                            </p>
-                            <p className="text-sm font-medium text-viva-900 font-display leading-tight">
-                              {item.titulo}
-                            </p>
-                            <p className="text-xs text-viva-700 font-serif mt-0.5">
-                              {item.descricao}
-                            </p>
-                          </div>
-                        </li>
-                      ))}
-                    </ul>
+                        )}
+                      </p>
+                    )}
+                    <p className="text-[11px] text-viva-500 font-serif mb-4">
+                      Plantões listados conforme o mês da grade principal ({formatDayShort(gradeMonthStart)} –{' '}
+                      {formatDayShort(gradeMonthEnd)}). Trocas incluem todo o período desta escala.
+                    </p>
+                    <div className="space-y-6">
+                      {mesesOrdenados.map(([mesKey, { label, itens }]) => {
+                        const trocasNoMes = itens.filter((i) => i.tipo === 'troca');
+                        return (
+                          <section key={mesKey} className="space-y-2">
+                            <div className="sticky top-0 z-[1] bg-gradient-to-b from-white to-transparent pb-1 pt-0.5">
+                              <h3 className="text-sm font-semibold text-viva-800 font-display border-b border-viva-200 pb-2">
+                                {label}
+                              </h3>
+                              {trocasNoMes.length > 0 && (
+                                <p className="text-[11px] text-viva-600 font-serif mt-1.5">
+                                  {trocasNoMes.length === 1
+                                    ? '1 troca de plantão neste mês.'
+                                    : `${trocasNoMes.length} trocas de plantão neste mês.`}
+                                </p>
+                              )}
+                            </div>
+                            <ul className="space-y-3">
+                              {itens.map((item) => (
+                                <li
+                                  key={item.id}
+                                  className="flex items-start gap-3 rounded-xl border border-viva-200/70 bg-viva-50/40 px-3 py-2.5"
+                                >
+                                  <span className="mt-0.5 inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-viva-200 text-viva-800 text-[10px] font-display leading-tight text-center px-0.5">
+                                    {item.tipo === 'alocacao' ? 'AL' : item.tipo === 'plantao' ? 'PL' : 'TR'}
+                                  </span>
+                                  <div className="flex-1 min-w-0">
+                                    <p className="text-[11px] text-viva-600 font-serif">
+                                      {item.data.toLocaleString('pt-BR', {
+                                        day: '2-digit',
+                                        month: '2-digit',
+                                        year: '2-digit',
+                                        hour: '2-digit',
+                                        minute: '2-digit',
+                                      })}
+                                    </p>
+                                    <p className="text-sm font-medium text-viva-900 font-display leading-tight">
+                                      {item.titulo}
+                                    </p>
+                                    <p className="text-xs text-viva-700 font-serif mt-0.5">{item.descricao}</p>
+                                  </div>
+                                </li>
+                              ))}
+                            </ul>
+                          </section>
+                        );
+                      })}
+                    </div>
                   </div>
                 );
               })()}
@@ -2019,9 +2271,35 @@ const Escalas = () => {
               </div>
           </div>
               </div>
-              <div className="overflow-hidden p-3 flex-1 flex min-h-0">
+              <div
+                className={`overflow-hidden p-3 flex-1 flex min-h-0 transition-colors ${
+                  gradeSomenteLeitura ? 'bg-gradient-to-b from-viva-100/35 via-white to-viva-50/20' : ''
+                }`}
+              >
                 <div className="relative flex-1 flex flex-col overflow-y-auto overflow-x-auto min-w-0">
-                  <table className="w-full border-separate border-spacing-0 text-sm">
+                  {gradeSomenteLeitura && (
+                    <div
+                      className="sticky top-0 z-20 mb-2 shrink-0 flex items-start gap-2 rounded-xl border border-viva-300/60 bg-white/90 px-3 py-2.5 shadow-sm backdrop-blur-md"
+                      role="status"
+                    >
+                      <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-viva-600/10 text-viva-800" aria-hidden>
+                        <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                        </svg>
+                      </span>
+                      <p className="min-w-0 text-sm leading-snug text-viva-900">
+                        <span className="font-semibold font-display">Escala publicada</span>
+                        <span className="text-viva-700"> — visualização com leve desfoque. Para editar plantões, use </span>
+                        <span className="font-semibold text-viva-900">Editar escala</span>
+                        <span className="text-viva-700"> na barra inferior.</span>
+                      </p>
+                    </div>
+                  )}
+                  <table
+                    className={`w-full border-separate border-spacing-0 text-sm transition-[filter] duration-200 ${
+                      gradeSomenteLeitura ? 'blur-[1.25px] contrast-[0.98]' : ''
+                    }`}
+                  >
                     <thead className="sticky top-0 z-10 bg-white">
                       <tr>
                         <th className="text-center border border-viva-200 p-1.5 font-semibold text-viva-800 font-display w-0 whitespace-nowrap">Nome</th>
@@ -2098,8 +2376,10 @@ const Escalas = () => {
                                 return (
                                   <td
                                     key={day}
-                                    className={`border p-0 cursor-pointer min-w-[32px] ${isWeekend ? 'bg-viva-200/40 border-viva-300' : 'border-viva-200'}`}
+                                    title={gradeSomenteLeitura ? 'Somente leitura — use Editar escala abaixo' : undefined}
+                                    className={`border p-0 min-w-[32px] ${gradeSomenteLeitura ? 'cursor-default' : 'cursor-pointer'} ${isWeekend ? 'bg-viva-200/40 border-viva-300' : 'border-viva-200'}`}
                                     onClick={async () => {
+                                      if (gradeSomenteLeitura) return;
                                       // Plantão Vago: abre modal para definir vagas
                                       if (row.medicoId === '') {
                                         const currentVagas = plantaoVagoSlots[key] ?? 0;
@@ -2209,23 +2489,57 @@ const Escalas = () => {
                   />
                 </div>
                 <p className={`text-sm whitespace-nowrap font-medium ${!selectedEscala ? 'text-gray-500' : selectedEscala.ativo ? 'text-viva-600' : 'text-amber-600'}`}>
-                  {!selectedEscala ? 'Sem escala' : selectedEscala.ativo ? 'Publicada' : 'Em rascunho'}
+                  {!selectedEscala
+                    ? 'Sem escala'
+                    : selectedEscala.ativo
+                      ? gradeEdicaoLiberada
+                        ? 'Publicada · em edição'
+                        : 'Publicada'
+                      : 'Em rascunho'}
                 </p>
                 <div className="flex gap-2 items-center flex-wrap">
                   <button type="button" className="btn btn-secondary text-sm">Imprimir</button>
                   <button type="button" className="btn btn-secondary text-sm">Revisar</button>
                   <button type="button" className="btn btn-secondary text-sm">Replicar</button>
+                  {selectedEscala?.ativo && !gradeEdicaoLiberada && (
+                    <button
+                      type="button"
+                      className="btn btn-secondary text-sm"
+                      onClick={() => {
+                        setCellModal((m) => ({ ...m, open: false }));
+                        setGradeEdicaoLiberada(true);
+                      }}
+                    >
+                      Editar escala
+                    </button>
+                  )}
+                  {selectedEscala?.ativo && gradeEdicaoLiberada && (
+                    <button
+                      type="button"
+                      className="btn btn-secondary text-sm"
+                      onClick={() => {
+                        setCellModal((m) => ({ ...m, open: false }));
+                        setGradeEdicaoLiberada(false);
+                      }}
+                    >
+                      Cancelar edição
+                    </button>
+                  )}
                   <button
                     type="button"
                     className="btn btn-primary text-sm"
-                    disabled={!selectedEscala || selectedEscala.ativo || loadingAction}
+                    disabled={
+                      !selectedEscala || loadingAction || (selectedEscala.ativo === true && !gradeEdicaoLiberada)
+                    }
                     onClick={async () => {
-                      if (!selectedEscala?.id || selectedEscala.ativo) return;
+                      if (!selectedEscala?.id) return;
+                      if (selectedEscala.ativo && !gradeEdicaoLiberada) return;
                       setLoadingAction(true);
                       try {
                         await adminService.updateEscala(selectedEscala.id, { ativo: true });
                         await invalidateEscalas();
                         await queryClient.invalidateQueries({ queryKey: ['admin', 'equipes'] });
+                        setGradeEdicaoLiberada(false);
                       } finally {
                         setLoadingAction(false);
                       }

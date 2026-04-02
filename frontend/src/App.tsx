@@ -137,15 +137,6 @@ function AppRoutes() {
         <Route path="/escalas" element={<Escalas />} />
         <Route path="/subgrupos-equipes" element={<SubgruposEquipes />} />
         <Route
-          path="/convites"
-          element={
-            <FeaturePlaceholder
-              title="Convites"
-              description="Gerencie os convites de ativação e acompanhe o status de envio/aceite."
-            />
-          }
-        />
-        <Route
           path="/ponto-eletronico"
           element={<PontoEletronico />}
         />

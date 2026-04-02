@@ -4,7 +4,6 @@ export type ModuloSistema =
   | 'CONTRATOS_ATIVOS'
   | 'ESCALAS'
   | 'VALORES_PLANTAO'
-  | 'CONVITES'
   | 'RELATORIOS'
   | 'PONTO_ELETRONICO'
   | 'ATENDIMENTOS'
@@ -19,7 +18,6 @@ export const MODULO_LABEL: Record<ModuloSistema, string> = {
   CONTRATOS_ATIVOS: 'Contratos Ativos',
   ESCALAS: 'Escalas',
   VALORES_PLANTAO: 'Valores Hora/Plantão',
-  CONVITES: 'Convites',
   RELATORIOS: 'Relatórios',
   PONTO_ELETRONICO: 'Ponto Eletrônico',
   ATENDIMENTOS: 'Atendimentos',

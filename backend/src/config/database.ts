@@ -1,10 +1,22 @@
 import { PrismaClient } from '@prisma/client';
 
-/** connection_limit por instância: 10 em produção (vários usuários), 8 em dev. Override via DATABASE_POOL_SIZE. */
-const CONNECTION_LIMIT = Math.min(
-  Math.max(1, parseInt(process.env.DATABASE_POOL_SIZE || '', 10) || (process.env.NODE_ENV === 'production' ? 10 : 8)),
-  20
-);
+/**
+ * connection_limit do Prisma por processo Node.
+ * Supabase Session pooler: em dev forçamos no máx. 1 (evita MaxClientsInSessionMode), mesmo se DATABASE_POOL_SIZE estiver alto.
+ */
+const isSupabasePooler = /pooler\.supabase\.com/i.test(process.env.DATABASE_URL || '');
+const explicitPool = parseInt(process.env.DATABASE_POOL_SIZE || '', 10);
+let resolvedPool = Number.isFinite(explicitPool) && explicitPool > 0
+  ? explicitPool
+  : process.env.NODE_ENV === 'production'
+    ? 10
+    : isSupabasePooler
+      ? 1
+      : 3;
+if (isSupabasePooler && process.env.NODE_ENV !== 'production') {
+  resolvedPool = Math.min(resolvedPool, 1);
+}
+const CONNECTION_LIMIT = Math.min(Math.max(1, resolvedPool), 20);
 
 const SLOW_QUERY_MS = Math.max(1, parseInt(process.env.PRISMA_SLOW_QUERY_MS || '', 10) || 250);
 
@@ -41,6 +53,10 @@ const prismaClientSingleton = () => {
         }
       }
     });
+  }
+
+  if (process.env.NODE_ENV === 'development') {
+    console.log(`[DB] Prisma connection_limit=${CONNECTION_LIMIT} (Supabase pooler: prefira 1; defina DATABASE_POOL_SIZE se necessário)`);
   }
 
   return client;

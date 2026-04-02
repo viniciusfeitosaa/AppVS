@@ -149,29 +149,28 @@ export async function listMedicosService(params: ListMedicosParams) {
     ...(params.ativo !== undefined ? { ativo: params.ativo } : {}),
   };
 
-  const [items, total] = await Promise.all([
-    prisma.medico.findMany({
-      where,
-      select: {
-        id: true,
-        nomeCompleto: true,
-        cpf: true,
-        profissao: true,
-        crm: true,
-        email: true,
-        especialidades: true,
-        vinculo: true,
-        telefone: true,
-        ativo: true,
-        createdAt: true,
-        updatedAt: true,
-      },
-      orderBy: { nomeCompleto: 'asc' },
-      skip,
-      take: limit,
-    }),
-    prisma.medico.count({ where }),
-  ]);
+  // Sequencial (evita 2 queries paralelas competindo por 1 conexão no pooler Supabase Session)
+  const total = await prisma.medico.count({ where });
+  const items = await prisma.medico.findMany({
+    where,
+    select: {
+      id: true,
+      nomeCompleto: true,
+      cpf: true,
+      profissao: true,
+      crm: true,
+      email: true,
+      especialidades: true,
+      vinculo: true,
+      telefone: true,
+      ativo: true,
+      createdAt: true,
+      updatedAt: true,
+    },
+    orderBy: { nomeCompleto: 'asc' },
+    skip,
+    take: limit,
+  });
 
   return {
     items,
@@ -436,15 +435,13 @@ export async function listContratosAtivosService(params: ListContratosAtivosPara
       : {}),
   };
 
-  const [items, total] = await Promise.all([
-    prisma.contratoAtivo.findMany({
-      where,
-      orderBy: [{ ativo: 'desc' }, { dataInicio: 'desc' }],
-      skip,
-      take: limit,
-    }),
-    prisma.contratoAtivo.count({ where }),
-  ]);
+  const total = await prisma.contratoAtivo.count({ where });
+  const items = await prisma.contratoAtivo.findMany({
+    where,
+    orderBy: [{ ativo: 'desc' }, { dataInicio: 'desc' }],
+    skip,
+    take: limit,
+  });
 
   return {
     items,
@@ -720,23 +717,21 @@ export async function listEscalasService(params: ListEscalasParams) {
       : {}),
   };
 
-  const [items, total] = await Promise.all([
-    prisma.escala.findMany({
-      where,
-      include: {
-        contratoAtivo: {
-          select: { id: true, nome: true, ativo: true },
-        },
-        _count: {
-          select: { alocacoes: true },
-        },
+  const total = await prisma.escala.count({ where });
+  const items = await prisma.escala.findMany({
+    where,
+    include: {
+      contratoAtivo: {
+        select: { id: true, nome: true, ativo: true },
       },
-      orderBy: [{ ativo: 'desc' }, { dataInicio: 'desc' }],
-      skip,
-      take: limit,
-    }),
-    prisma.escala.count({ where }),
-  ]);
+      _count: {
+        select: { alocacoes: true },
+      },
+    },
+    orderBy: [{ ativo: 'desc' }, { dataInicio: 'desc' }],
+    skip,
+    take: limit,
+  });
 
   return {
     items,
@@ -1583,6 +1578,53 @@ export async function listEquipeEscalasService(tenantId: string, equipeId: strin
       contratoAtivo: { select: { id: true, nome: true, ativo: true } },
     },
   });
+}
+
+const TROCA_PLANTAO_STATUS_HISTORICO = ['ACEITA', 'RECUSADA'] as const;
+
+/** Solicitações de troca já respondidas vinculadas a plantões desta escala (auditoria no painel master). */
+export async function listHistoricoTrocasPlantaoEscalaService(tenantId: string, escalaId: string) {
+  const escala = await prisma.escala.findFirst({
+    where: { id: escalaId, tenantId },
+    select: { id: true },
+  });
+  if (!escala) {
+    throw { statusCode: 404, message: 'Escala não encontrada' };
+  }
+
+  const rows = await prisma.solicitacaoTrocaPlantao.findMany({
+    where: {
+      tenantId,
+      status: { in: [...TROCA_PLANTAO_STATUS_HISTORICO] },
+      plantao: { escalaId, tenantId },
+    },
+    orderBy: [{ respondidaEm: 'desc' }, { createdAt: 'desc' }],
+    include: {
+      solicitante: { select: { id: true, nomeCompleto: true, crm: true } },
+      destino: { select: { id: true, nomeCompleto: true, crm: true } },
+      plantao: { select: { id: true, data: true, gradeId: true } },
+    },
+  });
+
+  return rows.map((r) => ({
+    id: r.id,
+    status: r.status,
+    respondidaEm: (r.respondidaEm ?? r.createdAt).toISOString(),
+    createdAt: r.createdAt.toISOString(),
+    plantaoId: r.plantao.id,
+    dataPlantao: r.plantao.data.toISOString().slice(0, 10),
+    gradeId: r.plantao.gradeId,
+    solicitante: {
+      id: r.solicitante.id,
+      nomeCompleto: r.solicitante.nomeCompleto,
+      crm: r.solicitante.crm,
+    },
+    destino: {
+      id: r.destino.id,
+      nomeCompleto: r.destino.nomeCompleto,
+      crm: r.destino.crm,
+    },
+  }));
 }
 
 export async function createEscalaPlantaoService(input: {

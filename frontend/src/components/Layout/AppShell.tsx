@@ -135,7 +135,7 @@ const AppShell = () => {
   ];
   const menuGroupsBase: MenuGroup[] = isMaster
     ? [
-        { title: 'Escalas', items: [{ to: '/escalas', label: 'Escalas' }, { to: '/subgrupos-equipes', label: 'Subgrupos e Equipes' }, { to: '/convites', label: 'Convites' }] },
+        { title: 'Escalas', items: [{ to: '/escalas', label: 'Escalas' }, { to: '/subgrupos-equipes', label: 'Subgrupos e Equipes' }] },
         { title: 'Corpo Clínico', items: [{ to: '/medicos', label: 'Médicos' }] },
         { title: 'Relatórios', items: [{ to: '/relatorios', label: 'Relatórios' }] },
         {
@@ -169,7 +169,6 @@ const AppShell = () => {
     '/dashboard': 'DASHBOARD',
     '/escalas': 'ESCALAS',
     '/subgrupos-equipes': 'ESCALAS',
-    '/convites': 'CONVITES',
     '/medicos': 'MEDICOS',
     '/relatorios': 'RELATORIOS',
     '/contratos-ativos': 'CONTRATOS_ATIVOS',

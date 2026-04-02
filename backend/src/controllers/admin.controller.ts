@@ -25,6 +25,7 @@ import {
   listContratoSubgruposService,
   listEscalaMedicosService,
   listEscalaPlantoesService,
+  listHistoricoTrocasPlantaoEscalaService,
   listEquipePlantoesService,
   listEquipeEscalasService,
   listEscalasService,
@@ -593,6 +594,24 @@ export const listEscalaPlantoesController = async (req: Request, res: Response) 
     const statusCode = error.statusCode || 500;
     const message = error.message || 'Erro ao listar plantões da escala';
     if (statusCode === 500) console.error('[listEscalaPlantoes]', error);
+    return res.status(statusCode).json({
+      success: false,
+      error: message,
+    });
+  }
+};
+
+export const listHistoricoTrocasPlantaoEscalaController = async (req: Request, res: Response) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ success: false, error: 'Não autenticado' });
+    }
+    const data = await listHistoricoTrocasPlantaoEscalaService(req.user.tenantId, req.params.id);
+    return res.status(200).json({ success: true, data });
+  } catch (error: any) {
+    const statusCode = error.statusCode || 500;
+    const message = error.message || 'Erro ao listar histórico de trocas de plantão';
+    if (statusCode === 500) console.error('[listHistoricoTrocasPlantaoEscala]', error);
     return res.status(statusCode).json({
       success: false,
       error: message,

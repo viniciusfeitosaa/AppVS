@@ -23,6 +23,7 @@ import {
   listContratoSubgruposController,
   listEscalaMedicosController,
   listEscalaPlantoesController,
+  listHistoricoTrocasPlantaoEscalaController,
   listEquipePlantoesController,
   listEquipeEscalasController,
   listEscalasController,
@@ -84,7 +85,7 @@ router.get('/medicos', requireModuleAccess(ModuloSistema.MEDICOS), listMedicosCo
 router.post('/medicos', requireModuleAccess(ModuloSistema.MEDICOS), createMedicoController);
 router.put('/medicos/:id', requireModuleAccess(ModuloSistema.MEDICOS), updateMedicoController);
 router.patch('/medicos/:id/ativo', requireModuleAccess(ModuloSistema.MEDICOS), toggleMedicoAtivoController);
-router.post('/medicos/:id/invite', requireModuleAccess(ModuloSistema.CONVITES), validateUUIDParam('id'), inviteMedicoController);
+router.post('/medicos/:id/invite', requireModuleAccess(ModuloSistema.MEDICOS), validateUUIDParam('id'), inviteMedicoController);
 
 router.get('/contratos-ativos', requireModuleAccess(ModuloSistema.CONTRATOS_ATIVOS), listContratosAtivosController);
 router.post('/contratos-ativos', requireModuleAccess(ModuloSistema.CONTRATOS_ATIVOS), createContratoAtivoController);
@@ -117,6 +118,12 @@ router.delete(
   removerMedicoEscalaController
 );
 router.get('/escalas/:id/plantoes', requireModuleAccess(ModuloSistema.ESCALAS), listEscalaPlantoesController);
+router.get(
+  '/escalas/:id/trocas-plantao-historico',
+  requireModuleAccess(ModuloSistema.ESCALAS),
+  validateUUIDParam('id'),
+  listHistoricoTrocasPlantaoEscalaController
+);
 router.post('/escalas/:id/plantoes', requireModuleAccess(ModuloSistema.ESCALAS), validateUUIDParam('id'), validateCreateEscalaPlantao, createEscalaPlantaoController);
 router.delete('/escalas/:id/plantoes/:plantaoId', requireModuleAccess(ModuloSistema.ESCALAS), validateUUIDParam('id'), validateUUIDParam('plantaoId'), removerEscalaPlantaoController);
 

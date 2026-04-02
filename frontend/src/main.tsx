@@ -1,26 +1,10 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { QueryClientProvider } from '@tanstack/react-query';
 import { ErrorBoundary } from './components/Layout/ErrorBoundary';
 import App from './App';
+import { queryClient } from './lib/queryClient';
 import './index.css';
-
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      refetchOnWindowFocus: false,
-      // Evita “delay” ao navegar entre telas: cache curto + dados considerados frescos por alguns segundos.
-      staleTime: 30 * 1000,
-      gcTime: 5 * 60 * 1000,
-      retry: (failureCount, error: any) => {
-        // Não retentar em 401/403: redireciona no interceptor
-        const status = error?.response?.status;
-        if (status === 401 || status === 403) return false;
-        return failureCount < 1;
-      },
-    },
-  },
-});
 
 const rootEl = document.getElementById('root');
 if (!rootEl) throw new Error('Elemento #root não encontrado');

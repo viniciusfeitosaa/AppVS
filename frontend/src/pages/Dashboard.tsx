@@ -338,6 +338,7 @@ const Dashboard = () => {
       queryClient.invalidateQueries({ queryKey: ['ponto', 'trocas-plantao-pendentes'] });
       queryClient.invalidateQueries({ queryKey: ['ponto', 'proximos-plantoes'] });
       queryClient.invalidateQueries({ queryKey: ['medico', 'dashboard'] });
+      queryClient.invalidateQueries({ queryKey: ['admin', 'escalas'] });
     },
     onError: (err: unknown) => {
       const msg =
@@ -353,6 +354,7 @@ const Dashboard = () => {
     onSuccess: () => {
       notify({ kind: 'success', title: 'Troca recusada', message: 'A solicitação foi recusada.', source: 'ponto' });
       queryClient.invalidateQueries({ queryKey: ['ponto', 'trocas-plantao-pendentes'] });
+      queryClient.invalidateQueries({ queryKey: ['admin', 'escalas'] });
     },
     onError: (err: unknown) => {
       const msg =

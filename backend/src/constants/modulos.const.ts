@@ -6,7 +6,6 @@ export const MODULOS_SISTEMA: ModuloSistema[] = [
   ModuloSistema.CONTRATOS_ATIVOS,
   ModuloSistema.ESCALAS,
   ModuloSistema.VALORES_PLANTAO,
-  ModuloSistema.CONVITES,
   ModuloSistema.RELATORIOS,
   ModuloSistema.PONTO_ELETRONICO,
   ModuloSistema.ATENDIMENTOS,
