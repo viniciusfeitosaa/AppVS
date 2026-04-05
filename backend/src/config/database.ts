@@ -6,6 +6,12 @@ import { PrismaClient } from '@prisma/client';
  */
 const isSupabasePooler = /pooler\.supabase\.com/i.test(process.env.DATABASE_URL || '');
 const explicitPool = parseInt(process.env.DATABASE_POOL_SIZE || '', 10);
+/** Session pooler (5432): um client por conexão; multi-conexão exige Transaction pooler (6543) ou URL direta. */
+const supabaseDevMultiConn =
+  process.env.SUPABASE_PRISMA_MULTI_CONN === '1' &&
+  Number.isFinite(explicitPool) &&
+  explicitPool > 1;
+
 let resolvedPool = Number.isFinite(explicitPool) && explicitPool > 0
   ? explicitPool
   : process.env.NODE_ENV === 'production'
@@ -13,7 +19,7 @@ let resolvedPool = Number.isFinite(explicitPool) && explicitPool > 0
     : isSupabasePooler
       ? 1
       : 3;
-if (isSupabasePooler && process.env.NODE_ENV !== 'production') {
+if (isSupabasePooler && process.env.NODE_ENV !== 'production' && !supabaseDevMultiConn) {
   resolvedPool = Math.min(resolvedPool, 1);
 }
 const CONNECTION_LIMIT = Math.min(Math.max(1, resolvedPool), 20);
@@ -36,7 +42,13 @@ function getDatabaseUrl(): string {
 const prismaClientSingleton = () => {
   const client = new PrismaClient({
     datasources: { db: { url: getDatabaseUrl() } },
-    log: process.env.NODE_ENV === 'development' ? ['query', 'error', 'warn'] : ['error'],
+    // Log de cada SQL no terminal deixa o dev 5–20× mais lento; use PRISMA_LOG_QUERIES=1 só ao depurar.
+    log:
+      process.env.PRISMA_LOG_QUERIES === '1'
+        ? ['query', 'error', 'warn']
+        : process.env.NODE_ENV === 'development'
+          ? ['error', 'warn']
+          : ['error'],
   });
 
   // Logar queries lentas (instrumentação para reduzir “delay” percebido no app).
@@ -56,7 +68,14 @@ const prismaClientSingleton = () => {
   }
 
   if (process.env.NODE_ENV === 'development') {
-    console.log(`[DB] Prisma connection_limit=${CONNECTION_LIMIT} (Supabase pooler: prefira 1; defina DATABASE_POOL_SIZE se necessário)`);
+    console.log(
+      `[DB] Prisma connection_limit=${CONNECTION_LIMIT}` +
+        (isSupabasePooler
+          ? supabaseDevMultiConn
+            ? ' (Supabase: multi-conexão ativa — use Transaction pooler :6543; Session :5432 = 1 conexão)'
+            : ' (Supabase Session pooler: limite 1 em dev; para paralelizar: Transaction pooler + DATABASE_POOL_SIZE + SUPABASE_PRISMA_MULTI_CONN=1)'
+          : '')
+    );
   }
 
   return client;

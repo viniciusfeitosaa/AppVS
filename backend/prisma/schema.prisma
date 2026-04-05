@@ -209,6 +209,8 @@ model Medico {
   @@index([tenantId, cpf])
   @@index([tenantId, crm])
   @@index([tenantId, email])
+  @@index([tenantId, nomeCompleto])
+  @@index([tenantId, ativo])
 }
 
 model MedicoDocumento {
@@ -347,6 +349,7 @@ model Escala {
   @@index([contratoAtivoId])
   @@index([ativo])
   @@index([dataInicio])
+  @@index([tenantId, ativo, dataInicio])
 }
 
 model Subgrupo {
@@ -553,6 +556,7 @@ model EscalaPlantao {
   @@index([medicoId])
   @@index([data])
   @@index([tenantId, medicoId, data])
+  @@index([escalaId, data])
 }
 
 // Registro de pedido de troca de plantão (auditoria; não altera a grade automaticamente).
@@ -711,6 +715,8 @@ model RegistroPonto {
   @@index([medicoId])
   @@index([checkInAt])
   @@index([tenantId, medicoId, checkOutAt, checkInAt])
+  /// Listagens por médico + intervalo de data (hoje / semana no ponto).
+  @@index([tenantId, medicoId, checkInAt])
 }
 
 // Notificações in-app para o profissional (equipe, escala, etc.)

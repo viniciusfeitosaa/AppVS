@@ -64,6 +64,15 @@ export const pontoService = {
     return response.data;
   },
 
+  /** Meu dia + escalas em um request (tela Ponto Eletrônico). */
+  getPainelInicial: async () => {
+    const response = await api.get('/ponto/painel-inicial');
+    return response.data as {
+      success: boolean;
+      data: { meuDia: Record<string, unknown>; escalas: Array<{ id: string; nome: string }> };
+    };
+  },
+
   listMinhasEscalas: async () => {
     const response = await api.get('/ponto/minhas-escalas');
     return response.data;

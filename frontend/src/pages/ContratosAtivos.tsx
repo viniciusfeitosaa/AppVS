@@ -395,7 +395,7 @@ const ContratosAtivos = () => {
           <div className="md:col-span-2 space-y-2">
             <p className="text-sm font-semibold text-viva-800">Estilo de produção</p>
             <p className="text-xs text-gray-600">
-              Escalas: controle de plantões por dia/turno. Ponto: registro de entrada e saída. Você pode usar os dois, só escalas ou só ponto.
+              Você pode usar escala + ponto ou somente ponto.
             </p>
             <div className="flex flex-wrap gap-6">
               <label className="flex items-center gap-2 text-sm text-viva-900">

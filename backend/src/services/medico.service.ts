@@ -11,26 +11,42 @@ interface UpdatePerfilInput {
   chavePix?: string;
 }
 
+const perfilSelectSemDocumentos = {
+  id: true,
+  tenantId: true,
+  nomeCompleto: true,
+  profissao: true,
+  crm: true,
+  email: true,
+  especialidades: true,
+  vinculo: true,
+  telefone: true,
+  estadoCivil: true,
+  enderecoResidencial: true,
+  dadosBancarios: true,
+  chavePix: true,
+  ativo: true,
+  createdAt: true,
+  updatedAt: true,
+} as const;
+
+/** Perfil sem join em documentos (dashboard — documentos vêm de outra query). */
+export const getPerfilResumoDashboardService = async (medicoId: string, tenantId: string) => {
+  const medico = await prisma.medico.findFirst({
+    where: { id: medicoId, tenantId },
+    select: perfilSelectSemDocumentos,
+  });
+  if (!medico) {
+    throw { statusCode: 404, message: 'Médico não encontrado' };
+  }
+  return { ...medico, documentos: [] as never[] };
+};
+
 export const getPerfilService = async (medicoId: string, tenantId: string) => {
   const medico = await prisma.medico.findFirst({
     where: { id: medicoId, tenantId },
     select: {
-      id: true,
-      tenantId: true,
-      nomeCompleto: true,
-      profissao: true,
-      crm: true,
-      email: true,
-      especialidades: true,
-      vinculo: true,
-      telefone: true,
-      estadoCivil: true,
-      enderecoResidencial: true,
-      dadosBancarios: true,
-      chavePix: true,
-      ativo: true,
-      createdAt: true,
-      updatedAt: true,
+      ...perfilSelectSemDocumentos,
       documentos: {
         select: {
           id: true,

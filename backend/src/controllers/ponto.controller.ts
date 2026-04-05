@@ -17,6 +17,7 @@ import {
   aceitarTrocaPlantaoService,
   recusarTrocaPlantaoService,
   canCheckInService,
+  getPainelPontoEletronicoInicialService,
 } from '../services/ponto.service';
 
 export const checkInController = async (req: Request, res: Response) => {
@@ -154,6 +155,24 @@ export const listMinhasEscalasController = async (req: Request, res: Response) =
     return res.status(error.statusCode || 500).json({
       success: false,
       error: error.message || 'Erro ao listar escalas do médico',
+    });
+  }
+};
+
+/** Meu dia + minhas escalas em um único GET (menos latência na tela de ponto). */
+export const getPainelPontoInicialController = async (req: Request, res: Response) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ success: false, error: 'Não autenticado' });
+    }
+    const data = await getPainelPontoEletronicoInicialService(req.user.tenantId, req.user.id);
+    return res.status(200).json({ success: true, data });
+  } catch (error: any) {
+    console.error('[ponto/painel-inicial] Erro:', error?.message ?? error);
+    if (error?.stack) console.error(error.stack);
+    return res.status(error.statusCode || 500).json({
+      success: false,
+      error: error.message || 'Erro ao carregar ponto',
     });
   }
 };

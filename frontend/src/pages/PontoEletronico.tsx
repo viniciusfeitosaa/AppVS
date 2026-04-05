@@ -47,6 +47,31 @@ type PlantaoHojeMeuDia = {
   cruzaMeiaNoite?: boolean | null;
 };
 
+/** Formato de `GET /ponto/meu-dia` / `painel-inicial.data.meuDia` (tipagem local para a UI). */
+type MeuDiaPontoApi = {
+  registroAberto?: {
+    checkInAt?: string;
+    escalaId?: string | null;
+    escala?: { nome?: string } | null;
+  } | null;
+  registrosHoje?: Array<{
+    id: string;
+    checkInAt: string;
+    checkOutAt?: string | null;
+    duracaoMinutos?: number | null;
+    escalaId?: string | null;
+    escala?: { nome?: string } | null;
+  }>;
+  totalMinutosHoje?: number;
+  totalMinutosSemana?: number;
+  ultimoRegistroPonto?: { checkInAt?: string } | null;
+  equipeDoDia?: string[];
+  minhasEquipes?: string[];
+  plantoesHoje?: PlantaoHojeMeuDia[];
+  configHorario?: { horarioEntrada?: string | null; horarioSaida?: string | null };
+  exigeGeolocalizacao?: boolean;
+};
+
 /** Um plantão: em andamento agora, senão o próximo, senão o que acabou mais tarde hoje. */
 function escolherPlantaoMaisRelevante(lista: PlantaoHojeMeuDia[], at: Date): PlantaoHojeMeuDia | null {
   if (lista.length === 0) return null;
@@ -120,18 +145,38 @@ const PontoEletronico = () => {
     staleTime: 2 * 60 * 1000,
   });
 
-  const { data: escalasResp } = useQuery({
-    queryKey: ['ponto', 'minhas-escalas'],
-    queryFn: () => pontoService.listMinhasEscalas(),
+  const { data: painelResp, isLoading: loadingPainel } = useQuery({
+    queryKey: ['ponto', 'painel-inicial'],
+    queryFn: () => pontoService.getPainelInicial(),
     enabled: !!user && isMedico,
-    staleTime: 30 * 1000,
+    staleTime: 25 * 1000,
   });
 
-  const { data: meuDiaResp, isLoading } = useQuery({
-    queryKey: ['ponto', 'meu-dia'],
-    queryFn: () => pontoService.getMeuDia(),
-    enabled: !!user && isMedico,
-    staleTime: 15 * 1000,
+  const meuDiaPayload = painelResp?.data?.meuDia as MeuDiaPontoApi | undefined;
+  const meuDiaResp =
+    painelResp != null && meuDiaPayload != null
+      ? { success: painelResp.success, data: meuDiaPayload }
+      : undefined;
+  const listaEscalas = painelResp?.data?.escalas ?? [];
+  const registroAbertoPainel = meuDiaPayload?.registroAberto;
+
+  const { data: canCheckInResp } = useQuery({
+    queryKey: ['ponto', 'can-checkin', selectedEscalaId],
+    queryFn: () => pontoService.canCheckIn(selectedEscalaId!),
+    enabled:
+      !!user &&
+      isMedico &&
+      !!selectedEscalaId &&
+      painelResp != null &&
+      !registroAbertoPainel,
+    refetchInterval:
+      painelResp != null &&
+      !registroAbertoPainel &&
+      selectedEscalaId &&
+      selectedEscalaId !== PONTO_SEM_ESCALA_ESCALA_ID
+        ? 30000
+        : false,
+    staleTime: 10 * 1000,
   });
 
   useEffect(() => {
@@ -139,7 +184,6 @@ const PontoEletronico = () => {
     return () => clearInterval(t);
   }, []);
 
-  const listaEscalas = escalasResp?.data || [];
   useEffect(() => {
     if (listaEscalas.length > 0 && !selectedEscalaId) {
       setSelectedEscalaId(listaEscalas[0].id);
@@ -191,18 +235,11 @@ const PontoEletronico = () => {
   const configHorario: { horarioEntrada?: string | null; horarioSaida?: string | null } = meuDiaResp?.data?.configHorario || {};
   const exigeGeolocalizacao = !!meuDiaResp?.data?.exigeGeolocalizacao;
 
-  const { data: canCheckInResp } = useQuery({
-    queryKey: ['ponto', 'can-checkin', selectedEscalaId],
-    queryFn: () => pontoService.canCheckIn(selectedEscalaId!),
-    enabled: isMedico && !!selectedEscalaId && !registroAberto,
-    refetchInterval:
-      !registroAberto && selectedEscalaId && selectedEscalaId !== PONTO_SEM_ESCALA_ESCALA_ID ? 30000 : false,
-    staleTime: 10 * 1000,
-  });
   const canCheckIn = !!canCheckInResp?.data?.allowed;
   const canCheckInReason: string | null = canCheckInResp?.data?.reason ?? null;
 
   const refresh = async () => {
+    await queryClient.invalidateQueries({ queryKey: ['ponto', 'painel-inicial'] });
     await queryClient.invalidateQueries({ queryKey: ['ponto', 'meu-dia'] });
   };
 
@@ -593,7 +630,7 @@ const PontoEletronico = () => {
         <h3 className="text-xs font-semibold uppercase tracking-wider text-viva-600 mb-4 font-display">
           Status de hoje
         </h3>
-        {isLoading ? (
+        {loadingPainel ? (
           <p className="text-xs text-viva-600 font-serif">Carregando status...</p>
         ) : (
           <>
@@ -601,9 +638,11 @@ const PontoEletronico = () => {
               <div className="flex items-center justify-between p-4 rounded-xl bg-viva-50/60 border border-viva-200/50">
                 <p className="text-xs font-medium text-viva-700">Ponto atual</p>
                 <span className="text-xs font-bold text-viva-900">
-                  {registroAberto
+                  {registroAberto?.checkInAt
                     ? `Em aberto desde ${new Date(registroAberto.checkInAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}`
-                    : 'Fechado'}
+                    : registroAberto
+                      ? 'Em aberto'
+                      : 'Fechado'}
                 </span>
               </div>
               <div className="flex items-center justify-between p-4 rounded-xl bg-viva-50/60 border border-viva-200/50">

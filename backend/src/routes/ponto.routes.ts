@@ -18,6 +18,7 @@ import {
   checkInSemFotoController,
   checkOutController,
   getMeuDiaPontoController,
+  getPainelPontoInicialController,
   downloadFotoCheckinMedicoController,
   listMinhasEscalasController,
   listEquipeColegasController,
@@ -48,6 +49,7 @@ router.post(
 router.post('/checkin-sem-foto', validateCheckinSemFoto, checkInSemFotoController);
 router.post('/checkout', validateCheckout, checkOutController);
 router.get('/meu-dia', getMeuDiaPontoController);
+router.get('/painel-inicial', getPainelPontoInicialController);
 router.get('/minhas-escalas', listMinhasEscalasController);
 router.get('/equipe-colegas', validateUUIDQuery('escalaId'), listEquipeColegasController);
 router.get('/proximos-plantoes', listProximosPlantoesController);

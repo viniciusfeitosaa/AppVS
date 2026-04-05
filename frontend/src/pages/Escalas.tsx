@@ -2,9 +2,11 @@ import { useMemo, useState, useRef, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../context/AuthContext';
+import { useDebouncedValue } from '../hooks/useDebouncedValue';
 import {
   adminService,
   Escala,
+  type AdminMedico,
   type EscalaPlantao,
   type HistoricoTrocaPlantaoEscala,
   type TipoPlantaoConfig,
@@ -175,6 +177,8 @@ const Escalas = () => {
   const [medicoAllocateCellSearch, setMedicoAllocateCellSearch] = useState('');
   const [medicoAllocateCellOpen, setMedicoAllocateCellOpen] = useState(false);
   const medicoAllocateCellRef = useRef<HTMLDivElement>(null);
+  /** Rótulos de médicos escolhidos na busca (ID pode não estar mais na página atual da API). */
+  const [medicoPickLabels, setMedicoPickLabels] = useState<Record<string, { nomeCompleto: string; crm: string }>>({});
 
   /** 'grupos' = primeira tela (Lista de subgrupos e equipes); 'escalas' = escalas + grade */
   const [viewEscalas, setViewEscalas] = useState<'grupos' | 'escalas'>('grupos');
@@ -246,33 +250,64 @@ const Escalas = () => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [medicoAllocateCellOpen]);
 
+  const debouncedMedicoAllocateSearch = useDebouncedValue(medicoAllocateSearch, 320);
+  const debouncedMedicoCellSearch = useDebouncedValue(medicoAllocateCellSearch, 320);
+
+  /** Contratos e escalas só ao entrar em "Escalas e grades" — evita requests pesadas na lista de grupos. Médicos na alocação: busca sob demanda (debounce). */
+  const precisaDadosEscalasGrade = isMaster && viewEscalas === 'escalas';
+
+  const medicoSuggestSearchTrimmed = medicoAllocateCellOpen
+    ? debouncedMedicoCellSearch.trim()
+    : debouncedMedicoAllocateSearch.trim();
+  const medicosSuggestBranch = medicoAllocateCellOpen ? 'cell' : 'alloc';
+  const medicosSuggestEnabled =
+    precisaDadosEscalasGrade && (medicoAllocateOpen || medicoAllocateCellOpen);
+
+  const { data: medicosSuggestResp, isFetching: loadingMedicosSuggest } = useQuery({
+    queryKey: ['admin', 'medicos', 'for-escalas-suggest', medicosSuggestBranch, medicoSuggestSearchTrimmed],
+    queryFn: () =>
+      adminService.listMedicos({
+        page: 1,
+        limit: 80,
+        search: medicoSuggestSearchTrimmed || undefined,
+        ativo: true,
+      }),
+    enabled: medicosSuggestEnabled,
+    staleTime: 60 * 1000,
+  });
+
+  const rememberMedicoLabel = (m: AdminMedico) => {
+    setMedicoPickLabels((prev) => ({
+      ...prev,
+      [m.id]: { nomeCompleto: m.nomeCompleto, crm: m.crm ?? '' },
+    }));
+  };
+
   const { data: contratosResp } = useQuery({
     queryKey: ['admin', 'contratos-ativos', 'for-escalas'],
     queryFn: () => adminService.listContratosAtivos({ page: 1, limit: 200 }),
-    enabled: isMaster,
+    enabled: precisaDadosEscalasGrade,
+    staleTime: 3 * 60 * 1000,
   });
 
   const { data: escalasResp, isLoading: loadingEscalas } = useQuery({
     queryKey: ['admin', 'escalas'],
     queryFn: () => adminService.listEscalas({ page: 1, limit: 200 }),
-    enabled: isMaster,
-  });
-
-  const { data: medicosResp } = useQuery({
-    queryKey: ['admin', 'medicos', 'for-escalas'],
-    queryFn: () => adminService.listMedicos({ page: 1, limit: 2000 }),
-    enabled: isMaster,
+    enabled: precisaDadosEscalasGrade,
+    staleTime: 3 * 60 * 1000,
   });
 
   const { data: subgruposResp } = useQuery({
     queryKey: ['admin', 'subgrupos'],
     queryFn: () => adminService.listSubgrupos(),
     enabled: isMaster,
+    staleTime: 3 * 60 * 1000,
   });
   const { data: equipesResp } = useQuery({
     queryKey: ['admin', 'equipes', 'todos'],
     queryFn: () => adminService.listEquipes(),
     enabled: isMaster,
+    staleTime: 3 * 60 * 1000,
   });
 
   const plantoesDiaDateStr = useMemo(() => {
@@ -808,7 +843,7 @@ const Escalas = () => {
     setSelectedEscalaId(escalas[0].id);
   }, [viewEscalas, escalas, selectedEscalaId]);
 
-  const medicos = useMemo(() => medicosResp?.data || [], [medicosResp]);
+  const medicos = useMemo(() => medicosSuggestResp?.data ?? [], [medicosSuggestResp]);
   const subgrupos = useMemo(() => subgruposResp?.data || [], [subgruposResp]);
   const equipes = useMemo(() => equipesResp?.data || [], [equipesResp]);
 
@@ -2589,14 +2624,16 @@ const Escalas = () => {
                 className="input w-full"
                 placeholder="Digite para pesquisar ou selecione um médico"
                 value={
-                  medicoIdToAllocate && medicos.length > 0
-                    ? medicoAllocateOpen
-                      ? medicoAllocateSearch
-                      : (medicos.find((m) => m.id === medicoIdToAllocate)?.nomeCompleto ?? '') +
-                        ' (' +
-                        (medicos.find((m) => m.id === medicoIdToAllocate)?.crm ?? '') +
-                        ')'
-                    : medicoAllocateSearch
+                  medicoAllocateOpen
+                    ? medicoAllocateSearch
+                    : medicoIdToAllocate
+                      ? (() => {
+                          const m = medicos.find((x) => x.id === medicoIdToAllocate);
+                          if (m) return `${m.nomeCompleto} (${m.crm})`;
+                          const lb = medicoPickLabels[medicoIdToAllocate];
+                          return lb ? `${lb.nomeCompleto} (${lb.crm})` : '';
+                        })()
+                      : medicoAllocateSearch
                 }
                 onChange={(e) => {
                   setMedicoAllocateSearch(e.target.value);
@@ -2609,14 +2646,12 @@ const Escalas = () => {
                 <ul className="absolute z-10 mt-1 w-full max-h-56 overflow-auto rounded-lg border border-viva-200 bg-white shadow-lg py-1">
                   {(() => {
                     const allocatedIds = new Set(alocacoes.map((a) => a.medicoId));
-                    const searchLower = medicoAllocateSearch.trim().toLowerCase();
-                    const filtered = medicos.filter((m) => {
-                      if (allocatedIds.has(m.id)) return false;
-                      if (!searchLower) return true;
-                      const nome = (m.nomeCompleto ?? '').toLowerCase();
-                      const crm = (m.crm ?? '').toLowerCase();
-                      return nome.includes(searchLower) || crm.includes(searchLower);
-                    });
+                    const filtered = medicos.filter((m) => !allocatedIds.has(m.id));
+                    if (loadingMedicosSuggest && filtered.length === 0) {
+                      return (
+                        <li className="px-3 py-2 text-sm text-viva-600 font-serif">Buscando médicos...</li>
+                      );
+                    }
                     return filtered.length === 0 ? (
                       <li className="px-3 py-2 text-sm text-viva-600 font-serif">Nenhum médico encontrado</li>
                     ) : (
@@ -2625,6 +2660,7 @@ const Escalas = () => {
                           key={m.id}
                           className="px-3 py-2 text-sm cursor-pointer hover:bg-viva-100 text-viva-900"
                           onClick={() => {
+                            rememberMedicoLabel(m);
                             setMedicoIdToAllocate(m.id);
                             setMedicoAllocateSearch('');
                             setMedicoAllocateOpen(false);
@@ -2874,11 +2910,20 @@ const Escalas = () => {
                       className="input w-full"
                       placeholder="Pesquisar por nome ou CRM..."
                       value={
-                        medicoIdToAllocateCell && medicos.length > 0
-                          ? medicoAllocateCellOpen
-                            ? medicoAllocateCellSearch
-                            : (medicos.find((m) => m.id === medicoIdToAllocateCell)?.nomeCompleto ?? '') + ' (' + (medicos.find((m) => m.id === medicoIdToAllocateCell)?.crm ?? '') + ')'
-                          : medicoAllocateCellSearch
+                        medicoAllocateCellOpen
+                          ? medicoAllocateCellSearch
+                          : medicoIdToAllocateCell
+                            ? (() => {
+                                const m = medicos.find((x) => x.id === medicoIdToAllocateCell);
+                                if (m) return `${m.nomeCompleto} (${m.crm})`;
+                                const lb = medicoPickLabels[medicoIdToAllocateCell];
+                                if (lb) return `${lb.nomeCompleto} (${lb.crm})`;
+                                if (cellModal.medico?.id === medicoIdToAllocateCell) {
+                                  return `${cellModal.medico.nomeCompleto} (${cellModal.medico.crm})`;
+                                }
+                                return '';
+                              })()
+                            : medicoAllocateCellSearch
                       }
                       onChange={(e) => {
                         setMedicoAllocateCellSearch(e.target.value);
@@ -2889,32 +2934,26 @@ const Escalas = () => {
                     />
                     {medicoAllocateCellOpen && (
                       <ul className="absolute z-10 mt-1 w-full max-h-64 overflow-y-auto rounded-xl border border-viva-200 bg-white shadow-lg py-1">
-                        {(() => {
-                          const searchLower = medicoAllocateCellSearch.trim().toLowerCase();
-                          const filtered = medicos.filter((m) => {
-                            if (!searchLower) return true;
-                            const nome = (m.nomeCompleto ?? '').toLowerCase();
-                            const crm = (m.crm ?? '').toLowerCase();
-                            return nome.includes(searchLower) || crm.includes(searchLower);
-                          });
-                          return filtered.length === 0 ? (
-                            <li className="px-3 py-2 text-sm text-viva-600 font-serif">Nenhum médico encontrado</li>
-                          ) : (
-                            filtered.map((m) => (
-                              <li
-                                key={m.id}
-                                className="px-3 py-2 text-sm cursor-pointer hover:bg-viva-100 text-viva-900 font-display"
-                                onClick={() => {
-                                  setMedicoIdToAllocateCell(m.id);
-                                  setMedicoAllocateCellSearch('');
-                                  setMedicoAllocateCellOpen(false);
-                                }}
-                              >
-                                {m.nomeCompleto} ({m.crm})
-                              </li>
-                            ))
-                          );
-                        })()}
+                        {loadingMedicosSuggest && medicos.length === 0 ? (
+                          <li className="px-3 py-2 text-sm text-viva-600 font-serif">Buscando médicos...</li>
+                        ) : medicos.length === 0 ? (
+                          <li className="px-3 py-2 text-sm text-viva-600 font-serif">Nenhum médico encontrado</li>
+                        ) : (
+                          medicos.map((m) => (
+                            <li
+                              key={m.id}
+                              className="px-3 py-2 text-sm cursor-pointer hover:bg-viva-100 text-viva-900 font-display"
+                              onClick={() => {
+                                rememberMedicoLabel(m);
+                                setMedicoIdToAllocateCell(m.id);
+                                setMedicoAllocateCellSearch('');
+                                setMedicoAllocateCellOpen(false);
+                              }}
+                            >
+                              {m.nomeCompleto} ({m.crm})
+                            </li>
+                          ))
+                        )}
                       </ul>
                     )}
                   </div>
@@ -2940,7 +2979,13 @@ const Escalas = () => {
                 <div className="pt-4 mt-4 border-t border-viva-200">
                   <h3 className="text-xs font-semibold uppercase tracking-wider text-viva-700 font-display mb-2">Repetir para outros dias</h3>
                   <p className="text-xs text-viva-600 font-serif mb-3">
-                    Aplica o médico {cellModal.medico ? cellModal.medico.nomeCompleto : (medicos.find((m) => m.id === medicoIdToAllocateCell)?.nomeCompleto ?? 'selecionado')} e o valor no turno {cellModal.grade.label} nos 7 dias desta semana.
+                    Aplica o médico{' '}
+                    {cellModal.medico
+                      ? cellModal.medico.nomeCompleto
+                      : medicos.find((m) => m.id === medicoIdToAllocateCell)?.nomeCompleto ??
+                        medicoPickLabels[medicoIdToAllocateCell]?.nomeCompleto ??
+                        'selecionado'}{' '}
+                    e o valor no turno {cellModal.grade.label} nos 7 dias desta semana.
                     </p>
                     <button
                       type="button"

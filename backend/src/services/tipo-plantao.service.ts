@@ -41,16 +41,70 @@ function tiposPlantaoAdvisoryKeys(tenantId: string, contratoAtivoId: string): [n
   return [fold(tenantId, 0x9e3779b9), fold(contratoAtivoId, 0x85ebca6b)];
 }
 
+/** Evita reabrir transação + advisory lock em toda leitura de plantão (dashboard / meu-dia). */
+const ENSURE_TIPOS_WARM_MS = Math.max(
+  0,
+  parseInt(process.env.TIPOS_ENSURE_WARM_MS || '', 10) || 120_000
+);
+const ensureTiposWarmUntil = new Map<string, number>();
+
+export function invalidateEnsureTiposWarmCache(tenantId: string, contratoAtivoId: string) {
+  ensureTiposWarmUntil.delete(`${tenantId}:${contratoAtivoId}`);
+}
+
 /**
  * Garante tipos padrão MT/SN e migra grade_id legado (mt/sn) para UUIDs do contrato.
  * Idempotente: seguro chamar antes de listar valores ou plantões.
+ *
+ * Caminho rápido: se já existem tipos e não há grade legada (mt/sn), não abre transação.
+ * Cache em memória por contrato reduz trabalho em leituras repetidas (ex.: dashboard).
  */
 export async function ensureTiposLegadoMigrados(tenantId: string, contratoAtivoId: string): Promise<void> {
+  const cacheKey = `${tenantId}:${contratoAtivoId}`;
+  const warmUntil = ensureTiposWarmUntil.get(cacheKey);
+  if (warmUntil != null && warmUntil > Date.now()) {
+    return;
+  }
+
   const contrato = await prisma.contratoAtivo.findFirst({
     where: { id: contratoAtivoId, tenantId },
     select: { id: true },
   });
   if (!contrato) return;
+
+  const legacyGrades = ['mt', 'sn', 'MT', 'SN'] as const;
+
+  const [tiposCount, nValLeg, nAdLeg] = await Promise.all([
+    prisma.tipoPlantao.count({ where: { tenantId, contratoAtivoId } }),
+    prisma.valorPlantao.count({
+      where: { tenantId, contratoAtivoId, gradeId: { in: [...legacyGrades] } },
+    }),
+    prisma.adicionalPlantaoData.count({
+      where: { tenantId, contratoAtivoId, gradeId: { in: [...legacyGrades] } },
+    }),
+  ]);
+
+  let nPlLeg = 0;
+  if (tiposCount > 0 && nValLeg === 0 && nAdLeg === 0) {
+    const escalaIds = await prisma.escala.findMany({
+      where: { tenantId, contratoAtivoId },
+      select: { id: true },
+    });
+    if (escalaIds.length > 0) {
+      nPlLeg = await prisma.escalaPlantao.count({
+        where: {
+          tenantId,
+          escalaId: { in: escalaIds.map((e) => e.id) },
+          gradeId: { in: [...legacyGrades] },
+        },
+      });
+    }
+  }
+
+  if (tiposCount > 0 && nValLeg === 0 && nAdLeg === 0 && nPlLeg === 0) {
+    ensureTiposWarmUntil.set(cacheKey, Date.now() + ENSURE_TIPOS_WARM_MS);
+    return;
+  }
 
   await prisma.$transaction(
     async (tx) => {
@@ -66,27 +120,27 @@ export async function ensureTiposLegadoMigrados(tenantId: string, contratoAtivoI
       orderBy: [{ ordem: 'asc' }, { createdAt: 'asc' }],
     });
 
-    const legacyGrades = ['mt', 'sn', 'MT', 'SN'] as const;
+    const legacyGradesTx = ['mt', 'sn', 'MT', 'SN'] as const;
     const escalasContrato = await tx.escala.findMany({
       where: { tenantId, contratoAtivoId },
       select: { id: true },
     });
     const escalaIds = escalasContrato.map((e) => e.id);
 
-    const [nValLeg, nAdLeg, nPlLeg] = await Promise.all([
+    const [nValLegTx, nAdLegTx, nPlLegTx] = await Promise.all([
       tx.valorPlantao.count({
-        where: { tenantId, contratoAtivoId, gradeId: { in: [...legacyGrades] } },
+        where: { tenantId, contratoAtivoId, gradeId: { in: [...legacyGradesTx] } },
       }),
       tx.adicionalPlantaoData.count({
-        where: { tenantId, contratoAtivoId, gradeId: { in: [...legacyGrades] } },
+        where: { tenantId, contratoAtivoId, gradeId: { in: [...legacyGradesTx] } },
       }),
       escalaIds.length
         ? tx.escalaPlantao.count({
-            where: { tenantId, escalaId: { in: escalaIds }, gradeId: { in: [...legacyGrades] } },
+            where: { tenantId, escalaId: { in: escalaIds }, gradeId: { in: [...legacyGradesTx] } },
           })
         : Promise.resolve(0),
     ]);
-    const aindaTemLegado = nValLeg + nAdLeg + nPlLeg > 0;
+    const aindaTemLegado = nValLegTx + nAdLegTx + nPlLegTx > 0;
 
     if (tipos.length === 0) {
       const [mt, sn] = await Promise.all([
@@ -222,6 +276,8 @@ export async function ensureTiposLegadoMigrados(tenantId: string, contratoAtivoI
       timeout: 120_000,
     }
   );
+
+  ensureTiposWarmUntil.set(cacheKey, Date.now() + ENSURE_TIPOS_WARM_MS);
 }
 
 export async function listTiposPlantaoService(tenantId: string, contratoAtivoId: string): Promise<TipoPlantao[]> {
@@ -400,6 +456,7 @@ export async function deleteTipoPlantaoService(tenantId: string, masterId: strin
     },
   });
 
+  invalidateEnsureTiposWarmCache(tenantId, existing.contratoAtivoId);
   return { ok: true as const };
 }
 
@@ -410,9 +467,32 @@ export async function loadTiposMapPorContrato(
   const ids = [...new Set(contratoAtivoIds.filter(Boolean))];
   if (ids.length === 0) return new Map();
 
-  for (const cid of ids) {
-    await ensureTiposLegadoMigrados(tenantId, cid);
+  await Promise.all(ids.map((cid) => ensureTiposLegadoMigrados(tenantId, cid)));
+
+  const tipos = await prisma.tipoPlantao.findMany({
+    where: { tenantId, contratoAtivoId: { in: ids } },
+  });
+
+  const out = new Map<string, Map<string, TipoPlantao>>();
+  for (const t of tipos) {
+    if (!out.has(t.contratoAtivoId)) {
+      out.set(t.contratoAtivoId, new Map());
+    }
+    out.get(t.contratoAtivoId)!.set(t.id, t);
   }
+  return out;
+}
+
+/**
+ * Só leitura: um `findMany` de tipos, **sem** ensure/migração (admin e jobs continuam usando `loadTiposMapPorContrato`).
+ * Rotas do médico (ponto/dashboard) — evita dezenas de queries e transações por request.
+ */
+export async function loadTiposMapPorContratoLeitura(
+  tenantId: string,
+  contratoAtivoIds: string[]
+): Promise<Map<string, Map<string, TipoPlantao>>> {
+  const ids = [...new Set(contratoAtivoIds.filter(Boolean))];
+  if (ids.length === 0) return new Map();
 
   const tipos = await prisma.tipoPlantao.findMany({
     where: { tenantId, contratoAtivoId: { in: ids } },

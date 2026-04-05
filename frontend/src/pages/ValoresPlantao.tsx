@@ -1,6 +1,8 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../context/AuthContext';
+import { PontoEnderecoMapaBlock } from '../components/PontoEnderecoMapaBlock';
+import { usePontoEnderecoMapa } from '../hooks/usePontoEnderecoMapa';
 import { adminService, ConfigPontoEletronico, TipoPlantaoConfig, ValorPlantaoConfig } from '../services/admin.service';
 
 function formatValor(valor: string | number | null | undefined): string {
@@ -66,16 +68,6 @@ const ValoresPlantao = () => {
   const [draftValorHoraCobrancaPorDia, setDraftValorHoraCobrancaPorDia] = useState<
     Record<string, Partial<Record<(typeof DIAS_SEMANA)[number]['key'], string>>>
   >({});
-  const [draftEndereco, setDraftEndereco] = useState('');
-  const [draftLatitude, setDraftLatitude] = useState('');
-  const [draftLongitude, setDraftLongitude] = useState('');
-  const [draftRaioMetros, setDraftRaioMetros] = useState('');
-  const [geocodeError, setGeocodeError] = useState<string | null>(null);
-  const [geocoding, setGeocoding] = useState(false);
-  const [enderecoSugestoes, setEnderecoSugestoes] = useState<{ display_name: string; lat: string; lon: string }[]>([]);
-  const [enderecoDropdownOpen, setEnderecoDropdownOpen] = useState(false);
-  const [enderecoBuscando, setEnderecoBuscando] = useState(false);
-  const enderecoContainerRef = useRef<HTMLDivElement>(null);
   const [savingGeo, setSavingGeo] = useState(false);
   const [savedGeo, setSavedGeo] = useState(false);
   const [novoTipoNome, setNovoTipoNome] = useState('');
@@ -158,57 +150,13 @@ const ValoresPlantao = () => {
 
   const valores = resp?.data ?? [];
   const configPonto: ConfigPontoEletronico | null = configPontoResp?.data ?? null;
+  const geo = usePontoEnderecoMapa(configPonto);
 
   useEffect(() => {
     if (!savedGeo) return;
     const t = setTimeout(() => setSavedGeo(false), 2500);
     return () => clearTimeout(t);
   }, [savedGeo]);
-
-  useEffect(() => {
-    const query = draftEndereco.trim();
-    if (query.length < 3) {
-      setEnderecoSugestoes([]);
-      setEnderecoDropdownOpen(false);
-      return;
-    }
-    const t = setTimeout(async () => {
-      setEnderecoBuscando(true);
-      try {
-        const res = await fetch(
-          `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&addressdetails=1&limit=5`,
-          { headers: { 'Accept-Language': 'pt-BR', 'User-Agent': 'GymApp-Ponto/1.0' } }
-        );
-        const data = await res.json();
-        setEnderecoSugestoes(Array.isArray(data) ? data : []);
-        setEnderecoDropdownOpen(true);
-      } catch {
-        setEnderecoSugestoes([]);
-      } finally {
-        setEnderecoBuscando(false);
-      }
-    }, 800);
-    return () => clearTimeout(t);
-  }, [draftEndereco]);
-
-  useEffect(() => {
-    const onOutside = (e: MouseEvent) => {
-      if (enderecoContainerRef.current && !enderecoContainerRef.current.contains(e.target as Node)) {
-        setEnderecoDropdownOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', onOutside);
-    return () => document.removeEventListener('mousedown', onOutside);
-  }, []);
-
-  const enderecoDisplay = draftEndereco !== '' ? draftEndereco : (configPonto?.enderecoPonto ?? '');
-  const latitudeDisplay =
-    draftLatitude !== '' ? draftLatitude : configPonto?.latitude != null && configPonto?.latitude !== '' ? String(configPonto.latitude) : '';
-  const longitudeDisplay =
-    draftLongitude !== '' ? draftLongitude : configPonto?.longitude != null && configPonto?.longitude !== '' ? String(configPonto.longitude) : '';
-  const raioMetrosDisplay =
-    draftRaioMetros !== '' ? draftRaioMetros : configPonto?.raioMetros != null ? String(configPonto.raioMetros) : '';
-  const temCoordenadas = latitudeDisplay !== '' && longitudeDisplay !== '';
 
   const getValorForGrade = (gradeId: string): string => {
     if (draft[gradeId] !== undefined) return draft[gradeId];
@@ -329,13 +277,7 @@ const ValoresPlantao = () => {
   };
 
   const limparRascunhosGeo = () => {
-    setDraftEndereco('');
-    setDraftLatitude('');
-    setDraftLongitude('');
-    setDraftRaioMetros('');
-    setGeocodeError(null);
-    setEnderecoSugestoes([]);
-    setEnderecoDropdownOpen(false);
+    geo.resetLocalizacao();
   };
 
   const onContratoChange = (id: string) => {
@@ -361,58 +303,6 @@ const ValoresPlantao = () => {
     limparRascunhosGeo();
   };
 
-  const buscarCoordenadas = async () => {
-    const endereco = (draftEndereco !== '' ? draftEndereco : configPonto?.enderecoPonto ?? '').trim();
-    if (!endereco) {
-      setGeocodeError('Digite um endereço.');
-      return;
-    }
-    setGeocoding(true);
-    setGeocodeError(null);
-    try {
-      const res = await fetch(
-        `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(endereco)}&format=json&limit=1`,
-        { headers: { 'Accept-Language': 'pt-BR', 'User-Agent': 'GymApp-Ponto/1.0' } }
-      );
-      const data = await res.json();
-      if (!Array.isArray(data) || data.length === 0) {
-        setGeocodeError('Endereço não encontrado. Tente ser mais específico (cidade, estado).');
-        return;
-      }
-      const { lat, lon } = data[0];
-      setDraftLatitude(String(Number(lat).toFixed(6)));
-      setDraftLongitude(String(Number(lon).toFixed(6)));
-    } catch {
-      setGeocodeError('Erro ao buscar coordenadas. Tente novamente.');
-    } finally {
-      setGeocoding(false);
-    }
-  };
-
-  const usarMinhaLocalizacao = () => {
-    if (!navigator.geolocation) {
-      setGeocodeError('Geolocalização não é suportada neste navegador.');
-      return;
-    }
-    setGeocodeError(null);
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        setDraftLatitude(pos.coords.latitude.toFixed(6));
-        setDraftLongitude(pos.coords.longitude.toFixed(6));
-      },
-      () => setGeocodeError('Não foi possível obter sua localização. Verifique as permissões do navegador.')
-    );
-  };
-
-  const selecionarEndereco = (item: { display_name: string; lat: string; lon: string }) => {
-    setDraftEndereco(item.display_name);
-    setDraftLatitude(String(Number(item.lat).toFixed(6)));
-    setDraftLongitude(String(Number(item.lon).toFixed(6)));
-    setEnderecoSugestoes([]);
-    setEnderecoDropdownOpen(false);
-    setGeocodeError(null);
-  };
-
   const handleSaveGeo = async () => {
     if (!contratoId || !subgrupoId || !equipeId) return;
     setSavingGeo(true);
@@ -429,21 +319,23 @@ const ValoresPlantao = () => {
       const toleranciaMinutos = cfg?.toleranciaMinutos ?? null;
 
       const enderecoSalvar =
-        draftEndereco !== '' ? draftEndereco.trim() || null : cfg?.enderecoPonto?.trim() || null;
+        geo.draftEndereco.trim() !== ''
+          ? geo.draftEndereco.trim() || null
+          : cfg?.enderecoPonto?.trim() || null;
       const lat =
-        draftLatitude !== ''
-          ? parseFloat(draftLatitude.replace(',', '.'))
+        geo.draftLatitude !== ''
+          ? parseFloat(geo.draftLatitude.replace(',', '.'))
           : cfg?.latitude != null && cfg?.latitude !== ''
             ? parseFloat(String(cfg.latitude))
             : null;
       const lng =
-        draftLongitude !== ''
-          ? parseFloat(draftLongitude.replace(',', '.'))
+        geo.draftLongitude !== ''
+          ? parseFloat(geo.draftLongitude.replace(',', '.'))
           : cfg?.longitude != null && cfg?.longitude !== ''
             ? parseFloat(String(cfg.longitude))
             : null;
       const raio =
-        draftRaioMetros !== '' ? parseInt(draftRaioMetros, 10) : cfg?.raioMetros ?? null;
+        geo.draftRaioMetros !== '' ? parseInt(geo.draftRaioMetros, 10) : cfg?.raioMetros ?? null;
       const raioMetros = raio != null && !Number.isNaN(raio) && raio >= 0 ? raio : null;
 
       await adminService.setConfigPonto(contratoId, subgrupoId, equipeId, {
@@ -823,50 +715,16 @@ const ValoresPlantao = () => {
             <p className="text-sm text-gray-600">Carregando configuração de ponto...</p>
           ) : (
             <>
-              <div className="flex flex-wrap items-end gap-4 p-4 rounded-xl border border-viva-200 bg-viva-50/30">
-                <div className="min-w-[280px] flex-1 relative" ref={enderecoContainerRef}>
-                  <label className="block text-sm font-semibold text-viva-800 mb-1">Endereço</label>
-                  <input
-                    type="text"
-                    className="input w-full"
-                    placeholder="Digite para buscar (ex.: Rua X, 123 - Fortaleza/CE)"
-                    value={enderecoDisplay}
-                    onChange={(e) => {
-                      setDraftEndereco(e.target.value);
-                      setGeocodeError(null);
-                    }}
-                    onFocus={() => enderecoSugestoes.length > 0 && setEnderecoDropdownOpen(true)}
-                    autoComplete="off"
-                  />
-                  {enderecoBuscando && <p className="text-xs text-viva-600 mt-1">Buscando endereços...</p>}
-                  {enderecoDropdownOpen && enderecoSugestoes.length > 0 && (
-                    <ul className="absolute z-50 left-0 right-0 mt-1 py-1 bg-white border border-viva-200 rounded-lg shadow-lg max-h-48 overflow-auto">
-                      {enderecoSugestoes.map((item, i) => (
-                        <li
-                          key={`${item.lat}-${item.lon}-${i}`}
-                          role="option"
-                          className="px-3 py-2 text-sm text-viva-800 cursor-pointer hover:bg-viva-100 truncate"
-                          onClick={() => selecionarEndereco(item)}
-                        >
-                          {item.display_name}
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
-                <button type="button" className="btn btn-secondary" onClick={buscarCoordenadas} disabled={geocoding}>
-                  {geocoding ? 'Buscando...' : 'Buscar coordenadas'}
-                </button>
-                <button type="button" className="btn btn-secondary" onClick={usarMinhaLocalizacao}>
-                  Usar minha localização atual
-                </button>
-              </div>
-              {geocodeError && <p className="text-sm text-red-600 mt-2">{geocodeError}</p>}
-              {temCoordenadas && (
-                <p className="text-sm text-viva-700 mt-2">
-                  Coordenadas definidas: {latitudeDisplay}, {longitudeDisplay}
-                </p>
-              )}
+              <PontoEnderecoMapaBlock
+                geo={geo}
+                intro={
+                  <p className="text-sm text-gray-600 mb-4">
+                    Mesmo fluxo da tela <strong>Horas e valor – Ponto</strong>: pesquise o endereço, use o mapa
+                    OpenStreetMap e defina o raio. Depois clique em <strong>Salvar</strong> para gravar só a localização
+                    desta equipe (demais dados de ponto continuam na configuração existente).
+                  </p>
+                }
+              />
               <div className="flex flex-wrap items-end gap-4 p-4 rounded-xl border border-viva-200 bg-viva-50/30 mt-3">
                 <div className="min-w-[140px]">
                   <label className="block text-sm font-semibold text-viva-800 mb-1">Raio (metros)</label>
@@ -877,8 +735,8 @@ const ValoresPlantao = () => {
                     step={10}
                     className="input w-full max-w-[120px]"
                     placeholder="Ex: 200"
-                    value={raioMetrosDisplay}
-                    onChange={(e) => setDraftRaioMetros(e.target.value)}
+                    value={geo.raioMetrosDisplay}
+                    onChange={(e) => geo.setDraftRaioMetros(e.target.value)}
                   />
                 </div>
                 <button

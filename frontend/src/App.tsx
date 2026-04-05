@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { NotificationProvider } from './context/NotificationContext';
@@ -15,7 +15,7 @@ import AcceptInvite from './pages/AcceptInvite';
 import Medicos from './pages/Medicos';
 import FeaturePlaceholder from './pages/FeaturePlaceholder';
 import ContratosAtivos from './pages/ContratosAtivos';
-import Escalas from './pages/Escalas';
+const Escalas = lazy(() => import('./pages/Escalas'));
 import SubgruposEquipes from './pages/SubgruposEquipes';
 import ValoresPlantao from './pages/ValoresPlantao';
 import ValoresPonto from './pages/ValoresPonto';
@@ -134,7 +134,14 @@ function AppRoutes() {
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/acesso-negado" element={<AcessoNegado />} />
         <Route path="/medicos" element={<Medicos />} />
-        <Route path="/escalas" element={<Escalas />} />
+        <Route
+          path="/escalas"
+          element={
+            <Suspense fallback={<PageLoadingScreen />}>
+              <Escalas />
+            </Suspense>
+          }
+        />
         <Route path="/subgrupos-equipes" element={<SubgruposEquipes />} />
         <Route
           path="/ponto-eletronico"

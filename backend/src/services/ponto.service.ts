@@ -7,11 +7,16 @@ import { fimPlantaoAsDate, inicioPlantaoAsDate } from '../utils/plantao-horario'
 import {
   enrichPlantaoComTipo,
   faixaHorarioLabelExibicao,
-  loadTiposMapPorContrato,
+  loadTiposMapPorContratoLeitura,
   scheduleForGradeId,
 } from './tipo-plantao.service';
 import { calcularRepasseCongeladoCheckout } from './repasse-registro-ponto.service';
 import { isMissingDatabaseColumnError } from '../utils/prisma-column-error';
+import {
+  pickGeoConfigParaEscala,
+  pickGeoConfigSemEscala,
+  type MedicoEquipeGeoLinha,
+} from '../utils/ponto-geo-config.util';
 
 function isPontoSemEscalaEscalaId(escalaId: string) {
   return escalaId === PONTO_SEM_ESCALA_ESCALA_ID;
@@ -19,61 +24,38 @@ function isPontoSemEscalaEscalaId(escalaId: string) {
 
 /** Contrato com usaPonto e sem usaEscala (ponto sem grade de plantão). */
 export async function medicoTemContratoSoPonto(tenantId: string, medicoId: string): Promise<boolean> {
-  const rows = await prisma.equipeMedico.findMany({
-    where: { tenantId, medicoId },
-    select: {
+  const row = await prisma.equipeMedico.findFirst({
+    where: {
+      tenantId,
+      medicoId,
       equipe: {
-        select: {
-          subgrupo: {
-            select: {
-              contratoSubgrupos: {
-                select: {
-                  contratoAtivo: { select: { usaPonto: true, usaEscala: true } },
-                },
-              },
-            },
+        subgrupo: {
+          contratoSubgrupos: {
+            some: { contratoAtivo: { usaPonto: true, usaEscala: false } },
           },
         },
       },
     },
+    select: { id: true },
   });
-  for (const row of rows) {
-    const css = row.equipe?.subgrupo?.contratoSubgrupos ?? [];
-    for (const cs of css) {
-      const c = cs.contratoAtivo;
-      if (c?.usaPonto && c?.usaEscala === false) return true;
-    }
-  }
-  return false;
+  return !!row;
 }
 
 /** Pelo menos um contrato vinculado às equipes do médico usa escala de plantão. */
 export async function medicoTemContratoComEscala(tenantId: string, medicoId: string): Promise<boolean> {
-  const rows = await prisma.equipeMedico.findMany({
-    where: { tenantId, medicoId },
-    select: {
+  const row = await prisma.equipeMedico.findFirst({
+    where: {
+      tenantId,
+      medicoId,
       equipe: {
-        select: {
-          subgrupo: {
-            select: {
-              contratoSubgrupos: {
-                select: {
-                  contratoAtivo: { select: { usaEscala: true } },
-                },
-              },
-            },
-          },
+        subgrupo: {
+          contratoSubgrupos: { some: { contratoAtivo: { usaEscala: true } } },
         },
       },
     },
+    select: { id: true },
   });
-  for (const row of rows) {
-    const css = row.equipe?.subgrupo?.contratoSubgrupos ?? [];
-    for (const cs of css) {
-      if (cs.contratoAtivo?.usaEscala === true) return true;
-    }
-  }
-  return false;
+  return !!row;
 }
 
 /** Distância em metros entre dois pontos (fórmula de Haversine). */
@@ -96,75 +78,85 @@ function distanciaMetros(
   return R * c;
 }
 
+type PreloadedMedicoEquipesGeo = MedicoEquipeGeoLinha[];
+
 /** Retorna a config de ponto (com geolocalização) que se aplica ao médico, ou null. */
 async function getConfigPontoParaMedico(
   tenantId: string,
   medicoId: string,
-  escalaId: string | null
+  escalaId: string | null,
+  preloadedMedicoEquipes?: PreloadedMedicoEquipesGeo
 ): Promise<{ latitude: number; longitude: number; raioMetros: number } | null> {
-  const medicoEquipes = await prisma.equipeMedico.findMany({
-    where: { tenantId, medicoId },
-    select: { equipeId: true, equipe: { select: { subgrupoId: true } } },
-  });
+  const medicoEquipes: MedicoEquipeGeoLinha[] =
+    preloadedMedicoEquipes ??
+    (
+      await prisma.equipeMedico.findMany({
+        where: { tenantId, medicoId },
+        select: { equipeId: true, equipe: { select: { subgrupoId: true } } },
+      })
+    ).map((r) => ({ equipeId: r.equipeId, subgrupoId: r.equipe.subgrupoId ?? null }));
+
   if (medicoEquipes.length === 0) return null;
 
-  let config: { latitude: unknown; longitude: unknown; raioMetros: number | null } | null = null;
-
   if (escalaId) {
-    const escala = await prisma.escala.findFirst({
-      where: { id: escalaId, tenantId },
-      select: { contratoAtivoId: true },
-    });
-    if (!escala) return null;
-    const equipesNaEscala = await prisma.escalaEquipe.findMany({
-      where: { tenantId, escalaId },
-      select: { equipeId: true },
-    });
+    const [escala, equipesNaEscala] = await Promise.all([
+      prisma.escala.findFirst({
+        where: { id: escalaId, tenantId },
+        select: { contratoAtivoId: true },
+      }),
+      prisma.escalaEquipe.findMany({
+        where: { tenantId, escalaId },
+        select: { equipeId: true },
+      }),
+    ]);
+    if (!escala?.contratoAtivoId) return null;
     const equipeIdsEscala = new Set(equipesNaEscala.map((e) => e.equipeId));
-    for (const em of medicoEquipes) {
-      if (!equipeIdsEscala.has(em.equipeId) || !em.equipe.subgrupoId) continue;
-      const c = await prisma.configPontoEletronico.findFirst({
-        where: {
-          tenantId,
-          contratoAtivoId: escala.contratoAtivoId,
-          subgrupoId: em.equipe.subgrupoId,
+    const candidatos = medicoEquipes.filter(
+      (em) => equipeIdsEscala.has(em.equipeId) && em.subgrupoId
+    );
+    if (candidatos.length === 0) return null;
+
+    const configs = await prisma.configPontoEletronico.findMany({
+      where: {
+        tenantId,
+        contratoAtivoId: escala.contratoAtivoId,
+        OR: candidatos.map((em) => ({
           equipeId: em.equipeId,
-          latitude: { not: null },
-          longitude: { not: null },
-          raioMetros: { not: null },
-        },
-        select: { latitude: true, longitude: true, raioMetros: true },
-      });
-      if (c?.latitude != null && c?.longitude != null && c?.raioMetros != null) {
-        config = c;
-        break;
-      }
-    }
-  } else {
-    for (const em of medicoEquipes) {
-      const c = await prisma.configPontoEletronico.findFirst({
-        where: {
-          tenantId,
-          equipeId: em.equipeId,
-          latitude: { not: null },
-          longitude: { not: null },
-          raioMetros: { not: null },
-        },
-        select: { latitude: true, longitude: true, raioMetros: true },
-      });
-      if (c?.latitude != null && c?.longitude != null && c?.raioMetros != null) {
-        config = c;
-        break;
-      }
-    }
+          subgrupoId: em.subgrupoId!,
+        })),
+        latitude: { not: null },
+        longitude: { not: null },
+        raioMetros: { not: null },
+      },
+      select: {
+        equipeId: true,
+        subgrupoId: true,
+        latitude: true,
+        longitude: true,
+        raioMetros: true,
+      },
+    });
+    return pickGeoConfigParaEscala(candidatos, configs);
   }
 
-  if (!config) return null;
-  const lat = Number(config.latitude);
-  const lon = Number(config.longitude);
-  const raio = config.raioMetros ?? 0;
-  if (Number.isNaN(lat) || Number.isNaN(lon) || raio <= 0) return null;
-  return { latitude: lat, longitude: lon, raioMetros: raio };
+  const equipeIdsList = medicoEquipes.map((e) => e.equipeId);
+  const configs = await prisma.configPontoEletronico.findMany({
+    where: {
+      tenantId,
+      equipeId: { in: equipeIdsList },
+      latitude: { not: null },
+      longitude: { not: null },
+      raioMetros: { not: null },
+    },
+    select: {
+      equipeId: true,
+      subgrupoId: true,
+      latitude: true,
+      longitude: true,
+      raioMetros: true,
+    },
+  });
+  return pickGeoConfigSemEscala(medicoEquipes, configs);
 }
 
 const startOfToday = () => {
@@ -184,12 +176,55 @@ const MINUTOS_ANTES_INICIO_CHECKIN_PONTO_ESCALA = 10;
 
 type ResultadoJanelaCheckinEscala = { ok: true } | { ok: false; message: string };
 
+type LinhaPlantaoJanelaCheckin = {
+  id: string;
+  data: Date;
+  gradeId: string;
+  escala: { contratoAtivoId: string | null };
+};
+
+/**
+ * Mesma prioridade que `escolherPlantaoMaisRelevante` no app (em andamento → próximo → último que acabou).
+ * Evita `findFirst` sem ordem quando há mais de um grade no mesmo dia na escala.
+ */
+function escolherPlantaoParaJanelaCheckinHoje(
+  lista: LinhaPlantaoJanelaCheckin[],
+  tipoMaps: Awaited<ReturnType<typeof loadTiposMapPorContratoLeitura>>,
+  at: Date
+): LinhaPlantaoJanelaCheckin | null {
+  if (lista.length === 0) return null;
+  if (lista.length === 1) return lista[0];
+
+  const scored = lista.map((p) => {
+    const cid = p.escala?.contratoAtivoId ?? '';
+    const schedule = scheduleForGradeId(p.gradeId, tipoMaps.get(cid));
+    const dataStr = p.data.toISOString().slice(0, 10);
+    const inicio = inicioPlantaoAsDate(dataStr, schedule);
+    const fim = fimPlantaoAsDate(dataStr, schedule);
+    return { p, inicio, fim };
+  });
+
+  const t = at.getTime();
+  const emAndamento = scored.find((s) => t >= s.inicio.getTime() && t <= s.fim.getTime());
+  if (emAndamento) return emAndamento.p;
+
+  const futuros = scored
+    .filter((s) => s.inicio.getTime() > t)
+    .sort((a, b) => a.inicio.getTime() - b.inicio.getTime());
+  if (futuros.length > 0) return futuros[0].p;
+
+  const passados = scored
+    .filter((s) => s.fim.getTime() < t)
+    .sort((a, b) => b.fim.getTime() - a.fim.getTime());
+  return passados[0]?.p ?? lista[0];
+}
+
 async function validarJanelaCheckinPlantaoEscalaHoje(
   tenantId: string,
   medicoId: string,
   escalaId: string
 ): Promise<ResultadoJanelaCheckinEscala> {
-  const plantaoHoje = await prisma.escalaPlantao.findFirst({
+  const plantoesHoje = await prisma.escalaPlantao.findMany({
     where: {
       tenantId,
       escalaId,
@@ -203,14 +238,18 @@ async function validarJanelaCheckinPlantaoEscalaHoje(
       escala: { select: { contratoAtivoId: true } },
     },
   });
-  if (!plantaoHoje) {
+  if (!plantoesHoje.length) {
     return { ok: false, message: 'Você não possui plantão nesta escala para hoje' };
   }
-  const cid = plantaoHoje.escala?.contratoAtivoId;
+  const cid = plantoesHoje[0].escala?.contratoAtivoId;
   if (!cid) {
     return { ok: false, message: 'Escala sem contrato vinculado para calcular o horário do plantão.' };
   }
-  const tipoMaps = await loadTiposMapPorContrato(tenantId, [cid]);
+  const tipoMaps = await loadTiposMapPorContratoLeitura(tenantId, [cid]);
+  const plantaoHoje = escolherPlantaoParaJanelaCheckinHoje(plantoesHoje, tipoMaps, new Date());
+  if (!plantaoHoje) {
+    return { ok: false, message: 'Você não possui plantão nesta escala para hoje' };
+  }
   const schedule = scheduleForGradeId(plantaoHoje.gradeId, tipoMaps.get(cid));
   const dataStr = plantaoHoje.data.toISOString().slice(0, 10);
   const inicio = inicioPlantaoAsDate(dataStr, schedule);
@@ -577,23 +616,9 @@ export async function getMeuDiaPontoService(tenantId: string, medicoId: string) 
   const semanaInicio = startOfWeek();
   const semanaFim = endOfWeek();
 
-  const [aberto, registros, registrosSemana, ultimoRegistro, temContratoComEscala] = await Promise.all([
+  const [aberto, registrosSemanaCompletos, ultimoRegistro, temContratoComEscala] = await Promise.all([
     prisma.registroPonto.findFirst({
       where: { tenantId, medicoId, checkOutAt: null },
-      include: {
-        escala: { select: { id: true, nome: true } },
-      },
-      orderBy: { checkInAt: 'desc' },
-    }),
-    prisma.registroPonto.findMany({
-      where: {
-        tenantId,
-        medicoId,
-        checkInAt: {
-          gte: hojeInicio,
-          lte: hojeFim,
-        },
-      },
       include: {
         escala: { select: { id: true, nome: true } },
       },
@@ -608,12 +633,10 @@ export async function getMeuDiaPontoService(tenantId: string, medicoId: string) 
           lte: semanaFim,
         },
       },
-      select: {
-        id: true,
-        checkInAt: true,
-        checkOutAt: true,
-        duracaoMinutos: true,
+      include: {
+        escala: { select: { id: true, nome: true } },
       },
+      orderBy: { checkInAt: 'desc' },
     }),
     prisma.registroPonto.findFirst({
       where: { tenantId, medicoId },
@@ -622,6 +645,16 @@ export async function getMeuDiaPontoService(tenantId: string, medicoId: string) 
     }),
     medicoTemContratoComEscala(tenantId, medicoId),
   ]);
+
+  const registros = registrosSemanaCompletos.filter(
+    (r) => r.checkInAt >= hojeInicio && r.checkInAt <= hojeFim
+  );
+  const registrosSemana = registrosSemanaCompletos.map((r) => ({
+    id: r.id,
+    checkInAt: r.checkInAt,
+    checkOutAt: r.checkOutAt,
+    duracaoMinutos: r.duracaoMinutos,
+  }));
 
   const totalMinutosHojeFechado = registros.reduce((acc, item) => acc + (item.duracaoMinutos || 0), 0);
   const minutosEmAbertoHoje =
@@ -641,46 +674,23 @@ export async function getMeuDiaPontoService(tenantId: string, medicoId: string) 
     : 0;
   const totalMinutosSemana = totalSemanaFechado + minutosEmAbertoSemana;
 
-  let equipeDoDia: string[] = [];
-  if (aberto?.escalaId) {
-    const equipesNaEscala = await prisma.escalaEquipe.findMany({
-      where: { tenantId, escalaId: aberto.escalaId },
-      select: { equipeId: true },
-    });
-    const equipeIdsNaEscala = new Set(equipesNaEscala.map((e) => e.equipeId));
-    const minhasEquipesNaEscala = await prisma.equipeMedico.findMany({
-      where: { tenantId, medicoId, equipeId: { in: Array.from(equipeIdsNaEscala) } },
-      select: { equipe: { select: { nome: true } } },
-    });
-    equipeDoDia = minhasEquipesNaEscala.map((em) => em.equipe.nome);
-  }
+  const escalaEquipeDoDiaP = aberto?.escalaId
+    ? prisma.escalaEquipe.findMany({
+        where: { tenantId, escalaId: aberto.escalaId },
+        select: { equipeId: true },
+      })
+    : Promise.resolve([] as Array<{ equipeId: string }>);
 
-  const minhasEquipes = await prisma.equipeMedico.findMany({
+  const minhasEquipesP = prisma.equipeMedico.findMany({
     where: { tenantId, medicoId },
-    select: { equipeId: true, equipe: { select: { nome: true } } },
+    select: {
+      equipeId: true,
+      equipe: { select: { nome: true, subgrupoId: true } },
+    },
     orderBy: { equipe: { nome: 'asc' } },
   });
-  const minhasEquipesNomes = minhasEquipes.map((em) => em.equipe.nome);
-  const equipeIds = minhasEquipes.map((em) => em.equipeId);
 
-  let configHorario: { horarioEntrada: string | null; horarioSaida: string | null } = { horarioEntrada: null, horarioSaida: null };
-  if (equipeIds.length > 0) {
-    const config = await prisma.configPontoEletronico.findFirst({
-      where: { tenantId, equipeId: { in: equipeIds } },
-      select: { horarioEntrada: true, horarioSaida: true },
-    });
-    if (config) {
-      configHorario = {
-        horarioEntrada: config.horarioEntrada ?? null,
-        horarioSaida: config.horarioSaida ?? null,
-      };
-    }
-  }
-
-  const configGeo = await getConfigPontoParaMedico(tenantId, medicoId, aberto?.escalaId ?? null);
-  const exigeGeolocalizacao = configGeo != null;
-
-  const plantoesHojeRows = await prisma.escalaPlantao.findMany({
+  const plantoesHojeRowsP = prisma.escalaPlantao.findMany({
     where: {
       tenantId,
       medicoId,
@@ -695,8 +705,57 @@ export async function getMeuDiaPontoService(tenantId: string, medicoId: string) 
       escala: { select: { contratoAtivoId: true } },
     },
   });
+
+  const [equipesNaEscalaRows, minhasEquipes, plantoesHojeRows] = await Promise.all([
+    escalaEquipeDoDiaP,
+    minhasEquipesP,
+    plantoesHojeRowsP,
+  ]);
+
+  const equipeIdsNaEscala = new Set(equipesNaEscalaRows.map((e) => e.equipeId));
+  const equipeDoDia: string[] =
+    aberto?.escalaId != null
+      ? minhasEquipes.filter((em) => equipeIdsNaEscala.has(em.equipeId)).map((em) => em.equipe.nome)
+      : [];
+
+  const minhasEquipesNomes = minhasEquipes.map((em) => em.equipe.nome);
+  const equipeIds = minhasEquipes.map((em) => em.equipeId);
+  const medicoEquipesGeo: MedicoEquipeGeoLinha[] = minhasEquipes.map((em) => ({
+    equipeId: em.equipeId,
+    subgrupoId: em.equipe.subgrupoId ?? null,
+  }));
+
+  const configHorarioP =
+    equipeIds.length > 0
+      ? prisma.configPontoEletronico.findFirst({
+          where: { tenantId, equipeId: { in: equipeIds } },
+          select: { horarioEntrada: true, horarioSaida: true },
+        })
+      : Promise.resolve(null);
+
+  const configGeoP = getConfigPontoParaMedico(
+    tenantId,
+    medicoId,
+    aberto?.escalaId ?? null,
+    medicoEquipesGeo
+  );
+
+  const [configRow, configGeo] = await Promise.all([configHorarioP, configGeoP]);
+
+  let configHorario: { horarioEntrada: string | null; horarioSaida: string | null } = {
+    horarioEntrada: null,
+    horarioSaida: null,
+  };
+  if (configRow) {
+    configHorario = {
+      horarioEntrada: configRow.horarioEntrada ?? null,
+      horarioSaida: configRow.horarioSaida ?? null,
+    };
+  }
+
+  const exigeGeolocalizacao = configGeo != null;
   const cidsHoje = [...new Set(plantoesHojeRows.map((p) => p.escala?.contratoAtivoId).filter(Boolean) as string[])];
-  const tipoMapsHoje = await loadTiposMapPorContrato(tenantId, cidsHoje);
+  const tipoMapsHoje = await loadTiposMapPorContratoLeitura(tenantId, cidsHoje);
   const plantoesHoje = plantoesHojeRows.map((p) => {
     const cid = p.escala?.contratoAtivoId ?? '';
     const base = {
@@ -733,7 +792,7 @@ export async function listMinhasEscalasService(tenantId: string, medicoId: strin
     if (hit) return hit as any;
   }
 
-  const alocacoes = await prisma.escalaMedico.findMany({
+  const alocacoesP = prisma.escalaMedico.findMany({
     where: {
       tenantId,
       medicoId,
@@ -758,6 +817,29 @@ export async function listMinhasEscalasService(tenantId: string, medicoId: strin
     },
   });
 
+  const plantoesDoMedicoP = prisma.escalaPlantao.findMany({
+    where: { tenantId, medicoId },
+    select: {
+      escalaId: true,
+      escala: { select: { id: true, nome: true, dataInicio: true, dataFim: true, ativo: true } },
+    },
+    distinct: ['escalaId'],
+  });
+
+  const equipesDoMedicoP = prisma.equipeMedico.findMany({
+    where: { tenantId, medicoId },
+    select: { equipeId: true },
+  });
+
+  const temSoPontoP = medicoTemContratoSoPonto(tenantId, medicoId);
+
+  const [alocacoes, plantoesDoMedico, equipesDoMedico, temContratoSoPontoFlag] = await Promise.all([
+    alocacoesP,
+    plantoesDoMedicoP,
+    equipesDoMedicoP,
+    temSoPontoP,
+  ]);
+
   const uniqueByEscala = new Map<string, any>();
   for (const item of alocacoes) {
     if (!uniqueByEscala.has(item.escala.id)) {
@@ -765,24 +847,12 @@ export async function listMinhasEscalasService(tenantId: string, medicoId: strin
     }
   }
 
-  // Incluir escalas em que o médico tem plantão mas não tem EscalaMedico (ex.: foi alocado só na grade)
-  const plantoesDoMedico = await prisma.escalaPlantao.findMany({
-    where: { tenantId, medicoId },
-    select: { escalaId: true, escala: { select: { id: true, nome: true, dataInicio: true, dataFim: true, ativo: true } } },
-    distinct: ['escalaId'],
-  });
   for (const p of plantoesDoMedico) {
     if (p.escala?.ativo && !uniqueByEscala.has(p.escala.id)) {
       uniqueByEscala.set(p.escala.id, { ...p.escala, equipes: [] as string[] });
     }
   }
 
-  // Escalas em que o médico participa via equipe (EscalaEquipe + EquipeMedico), sem estar em EscalaMedico
-  // — necessário para contratos só com ponto ou quando o vínculo é só pela equipe.
-  const equipesDoMedico = await prisma.equipeMedico.findMany({
-    where: { tenantId, medicoId },
-    select: { equipeId: true },
-  });
   const meuEquipeIds = [...new Set(equipesDoMedico.map((e) => e.equipeId))];
   if (meuEquipeIds.length > 0) {
     const escalasPorEquipe = await prisma.escalaEquipe.findMany({
@@ -828,7 +898,7 @@ export async function listMinhasEscalasService(tenantId: string, medicoId: strin
   const contratoIdsUnicos = [...new Set(escalasMeta.map((e) => e.contratoAtivoId))];
   const tipoMapsPorContrato =
     contratoIdsUnicos.length > 0
-      ? await loadTiposMapPorContrato(tenantId, contratoIdsUnicos)
+      ? await loadTiposMapPorContratoLeitura(tenantId, contratoIdsUnicos)
       : new Map<string, Map<string, TipoPlantao>>();
 
   // Evita N+1: buscar equipes/grades em lote para todas as escalas do médico.
@@ -898,7 +968,7 @@ export async function listMinhasEscalasService(tenantId: string, medicoId: strin
   }
 
   const result = Array.from(uniqueByEscala.values());
-  if ((await medicoTemContratoSoPonto(tenantId, medicoId)) && !result.some((e) => e.id === PONTO_SEM_ESCALA_ESCALA_ID)) {
+  if (temContratoSoPontoFlag && !result.some((e) => e.id === PONTO_SEM_ESCALA_ESCALA_ID)) {
     result.push({
       id: PONTO_SEM_ESCALA_ESCALA_ID,
       nome: 'Ponto (sem escala de plantão)',
@@ -914,6 +984,18 @@ export async function listMinhasEscalasService(tenantId: string, medicoId: strin
     setCached(minhasEscalasCache, cacheKey(tenantId, medicoId), result);
   }
   return result;
+}
+
+/**
+ * Uma ida ao banco em paralelo: dados do dia + escalas (tela Ponto Eletrônico).
+ * Reduz round-trips HTTP quando o cliente usa um único GET.
+ */
+export async function getPainelPontoEletronicoInicialService(tenantId: string, medicoId: string) {
+  const [meuDia, escalas] = await Promise.all([
+    getMeuDiaPontoService(tenantId, medicoId),
+    listMinhasEscalasService(tenantId, medicoId),
+  ]);
+  return { meuDia, escalas };
 }
 
 /** Lista colegas (outros médicos) das mesmas equipes do médico na escala informada, para troca de plantão. */
@@ -1000,7 +1082,7 @@ export async function listProximosPlantoesService(tenantId: string, medicoId: st
   });
 
   const cids = [...new Set(plantoes.map((p) => p.escala?.contratoAtivoId).filter(Boolean) as string[])];
-  const tipoMaps = await loadTiposMapPorContrato(tenantId, cids);
+  const tipoMaps = await loadTiposMapPorContratoLeitura(tenantId, cids);
 
   return plantoes.map((p) => {
     const cid = p.escala?.contratoAtivoId ?? '';
@@ -1083,7 +1165,7 @@ export async function listMeusPlantoesMesCalendarioService(
   });
 
   const cids = [...new Set(plantoes.map((p) => p.escala?.contratoAtivoId).filter(Boolean) as string[])];
-  const tipoMaps = await loadTiposMapPorContrato(tenantId, cids);
+  const tipoMaps = await loadTiposMapPorContratoLeitura(tenantId, cids);
 
   return plantoes.map((p) => {
     const cid = p.escala?.contratoAtivoId ?? '';
@@ -1165,7 +1247,7 @@ export async function solicitarTrocaPlantaoService(
   }
 
   const dataStr = plantao.data.toISOString().slice(0, 10);
-  const tipoMaps = await loadTiposMapPorContrato(tenantId, [plantao.escala.contratoAtivoId]);
+  const tipoMaps = await loadTiposMapPorContratoLeitura(tenantId, [plantao.escala.contratoAtivoId]);
   const tipoMap = tipoMaps.get(plantao.escala.contratoAtivoId);
   const schedule = scheduleForGradeId(plantao.gradeId, tipoMap);
   const inicio = inicioPlantaoAsDate(dataStr, schedule);
@@ -1297,7 +1379,7 @@ export async function aceitarTrocaPlantaoService(tenantId: string, medicoId: str
       throw { statusCode: 400, message: 'Solicitação já respondida' };
     }
 
-    const tipoMaps = await loadTiposMapPorContrato(tenantId, [solic.plantao.escala.contratoAtivoId]);
+    const tipoMaps = await loadTiposMapPorContratoLeitura(tenantId, [solic.plantao.escala.contratoAtivoId]);
     const schedule = scheduleForGradeId(
       solic.plantao.gradeId,
       tipoMaps.get(solic.plantao.escala.contratoAtivoId)

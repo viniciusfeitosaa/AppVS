@@ -1,6 +1,8 @@
-import { useState, useMemo, useEffect, useRef } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../context/AuthContext';
+import { PontoEnderecoMapaBlock } from '../components/PontoEnderecoMapaBlock';
+import { usePontoEnderecoMapa } from '../hooks/usePontoEnderecoMapa';
 import { adminService, ConfigPontoEletronico } from '../services/admin.service';
 
 const MESES = [
@@ -83,16 +85,6 @@ const ValoresPonto = () => {
   const [draftHorarioEntrada, setDraftHorarioEntrada] = useState<string>('');
   const [draftHorarioSaida, setDraftHorarioSaida] = useState<string>('');
   const [draftTolerancia, setDraftTolerancia] = useState<string>('');
-  const [draftEndereco, setDraftEndereco] = useState<string>('');
-  const [draftLatitude, setDraftLatitude] = useState<string>('');
-  const [draftLongitude, setDraftLongitude] = useState<string>('');
-  const [draftRaioMetros, setDraftRaioMetros] = useState<string>('');
-  const [geocodeError, setGeocodeError] = useState<string | null>(null);
-  const [geocoding, setGeocoding] = useState(false);
-  const [enderecoSugestoes, setEnderecoSugestoes] = useState<{ display_name: string; lat: string; lon: string }[]>([]);
-  const [enderecoDropdownOpen, setEnderecoDropdownOpen] = useState(false);
-  const [enderecoBuscando, setEnderecoBuscando] = useState(false);
-  const enderecoContainerRef = useRef<HTMLDivElement>(null);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -103,42 +95,6 @@ const ValoresPonto = () => {
     const t = setTimeout(() => setSaved(false), 2500);
     return () => clearTimeout(t);
   }, [saved]);
-
-  useEffect(() => {
-    const query = draftEndereco.trim();
-    if (query.length < 3) {
-      setEnderecoSugestoes([]);
-      setEnderecoDropdownOpen(false);
-      return;
-    }
-    const t = setTimeout(async () => {
-      setEnderecoBuscando(true);
-      try {
-        const res = await fetch(
-          `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&addressdetails=1&limit=5`,
-          { headers: { 'Accept-Language': 'pt-BR', 'User-Agent': 'GymApp-Ponto/1.0' } }
-        );
-        const data = await res.json();
-        setEnderecoSugestoes(Array.isArray(data) ? data : []);
-        setEnderecoDropdownOpen(true);
-      } catch {
-        setEnderecoSugestoes([]);
-      } finally {
-        setEnderecoBuscando(false);
-      }
-    }, 800);
-    return () => clearTimeout(t);
-  }, [draftEndereco]);
-
-  useEffect(() => {
-    const onOutside = (e: MouseEvent) => {
-      if (enderecoContainerRef.current && !enderecoContainerRef.current.contains(e.target as Node)) {
-        setEnderecoDropdownOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', onOutside);
-    return () => document.removeEventListener('mousedown', onOutside);
-  }, []);
 
   const { data: opcoesResp, isLoading: loadingOpcoes } = useQuery({
     queryKey: ['admin', 'config-ponto', 'opcoes'],
@@ -186,6 +142,7 @@ const ValoresPonto = () => {
   });
 
   const config: ConfigPontoEletronico | null = configResp?.data ?? null;
+  const geo = usePontoEnderecoMapa(config);
 
   useEffect(() => {
     if (!temContratoESubgrupo) {
@@ -235,65 +192,8 @@ const ValoresPonto = () => {
   const horarioEntradaDisplay = draftHorarioEntrada !== '' ? draftHorarioEntrada : (config?.horarioEntrada ?? '');
   const horarioSaidaDisplay = draftHorarioSaida !== '' ? draftHorarioSaida : (config?.horarioSaida ?? '');
   const toleranciaDisplay = draftTolerancia !== '' ? draftTolerancia : (config?.toleranciaMinutos != null ? String(config.toleranciaMinutos) : '');
-  const latitudeDisplay = draftLatitude !== '' ? draftLatitude : (config?.latitude != null && config?.latitude !== '' ? String(config.latitude) : '');
-  const longitudeDisplay = draftLongitude !== '' ? draftLongitude : (config?.longitude != null && config?.longitude !== '' ? String(config.longitude) : '');
-  const raioMetrosDisplay = draftRaioMetros !== '' ? draftRaioMetros : (config?.raioMetros != null ? String(config.raioMetros) : '');
-  const temCoordenadas = latitudeDisplay !== '' && longitudeDisplay !== '';
-  const enderecoDisplay = draftEndereco !== '' ? draftEndereco : (config?.enderecoPonto ?? '');
 
   const diasUteis = useMemo(() => getDiasUteis(ano, mes), [ano, mes]);
-
-  const buscarCoordenadas = async () => {
-    const endereco = draftEndereco.trim();
-    if (!endereco) {
-      setGeocodeError('Digite um endereço.');
-      return;
-    }
-    setGeocoding(true);
-    setGeocodeError(null);
-    try {
-      const res = await fetch(
-        `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(endereco)}&format=json&limit=1`,
-        { headers: { 'Accept-Language': 'pt-BR', 'User-Agent': 'GymApp-Ponto/1.0' } }
-      );
-      const data = await res.json();
-      if (!Array.isArray(data) || data.length === 0) {
-        setGeocodeError('Endereço não encontrado. Tente ser mais específico (cidade, estado).');
-        return;
-      }
-      const { lat, lon } = data[0];
-      setDraftLatitude(String(Number(lat).toFixed(6)));
-      setDraftLongitude(String(Number(lon).toFixed(6)));
-    } catch {
-      setGeocodeError('Erro ao buscar coordenadas. Tente novamente.');
-    } finally {
-      setGeocoding(false);
-    }
-  };
-
-  const selecionarEndereco = (item: { display_name: string; lat: string; lon: string }) => {
-    setDraftEndereco(item.display_name);
-    setDraftLatitude(String(Number(item.lat).toFixed(6)));
-    setDraftLongitude(String(Number(item.lon).toFixed(6)));
-    setEnderecoSugestoes([]);
-    setEnderecoDropdownOpen(false);
-    setGeocodeError(null);
-  };
-
-  const usarMinhaLocalizacao = () => {
-    if (!navigator.geolocation) {
-      setGeocodeError('Geolocalização não é suportada neste navegador.');
-      return;
-    }
-    setGeocodeError(null);
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        setDraftLatitude(pos.coords.latitude.toFixed(6));
-        setDraftLongitude(pos.coords.longitude.toFixed(6));
-      },
-      () => setGeocodeError('Não foi possível obter sua localização. Verifique as permissões do navegador.')
-    );
-  };
 
   const onContratoChange = (id: string) => {
     setContratoId(id);
@@ -305,10 +205,7 @@ const ValoresPonto = () => {
     setDraftHorarioEntrada('');
     setDraftHorarioSaida('');
     setDraftTolerancia('');
-    setDraftEndereco('');
-    setDraftLatitude('');
-    setDraftLongitude('');
-    setDraftRaioMetros('');
+    geo.resetLocalizacao();
   };
 
   const onSubgrupoChange = (id: string) => {
@@ -320,10 +217,7 @@ const ValoresPonto = () => {
     setDraftHorarioEntrada('');
     setDraftHorarioSaida('');
     setDraftTolerancia('');
-    setDraftEndereco('');
-    setDraftLatitude('');
-    setDraftLongitude('');
-    setDraftRaioMetros('');
+    geo.resetLocalizacao();
   };
 
   const onEquipeChange = (id: string) => {
@@ -334,10 +228,27 @@ const ValoresPonto = () => {
     setDraftHorarioEntrada('');
     setDraftHorarioSaida('');
     setDraftTolerancia('');
-    setDraftEndereco('');
-    setDraftLatitude('');
-    setDraftLongitude('');
-    setDraftRaioMetros('');
+    geo.resetLocalizacao();
+  };
+
+  const DIAS_APOS_SEG = ['ter', 'qua', 'qui', 'sex', 'sab', 'dom'] as const;
+
+  const replicarSegParaRestanteRepasse = () => {
+    const v = draftValorPorDia.seg ?? '';
+    setDraftValorPorDia((prev) => {
+      const next = { ...prev };
+      for (const k of DIAS_APOS_SEG) next[k] = v;
+      return next;
+    });
+  };
+
+  const replicarSegParaRestanteCobranca = () => {
+    const v = draftValorCobrancaPorDia.seg ?? '';
+    setDraftValorCobrancaPorDia((prev) => {
+      const next = { ...prev };
+      for (const k of DIAS_APOS_SEG) next[k] = v;
+      return next;
+    });
   };
 
   const handleSave = async () => {
@@ -379,10 +290,26 @@ const ValoresPonto = () => {
       const tolerancia = draftTolerancia !== '' ? parseInt(draftTolerancia, 10) : (config?.toleranciaMinutos ?? null);
       const toleranciaMinutos = tolerancia != null && !Number.isNaN(tolerancia) && tolerancia >= 0 ? tolerancia : null;
 
-      const lat = draftLatitude !== '' ? parseFloat(draftLatitude.replace(',', '.')) : (config?.latitude != null && config?.latitude !== '' ? parseFloat(String(config.latitude)) : null);
-      const lng = draftLongitude !== '' ? parseFloat(draftLongitude.replace(',', '.')) : (config?.longitude != null && config?.longitude !== '' ? parseFloat(String(config.longitude)) : null);
-      const raio = draftRaioMetros !== '' ? parseInt(draftRaioMetros, 10) : (config?.raioMetros ?? null);
+      const lat =
+        geo.draftLatitude !== ''
+          ? parseFloat(geo.draftLatitude.replace(',', '.'))
+          : config?.latitude != null && config?.latitude !== ''
+            ? parseFloat(String(config.latitude))
+            : null;
+      const lng =
+        geo.draftLongitude !== ''
+          ? parseFloat(geo.draftLongitude.replace(',', '.'))
+          : config?.longitude != null && config?.longitude !== ''
+            ? parseFloat(String(config.longitude))
+            : null;
+      const raio =
+        geo.draftRaioMetros !== '' ? parseInt(geo.draftRaioMetros, 10) : (config?.raioMetros ?? null);
       const raioMetros = raio != null && !Number.isNaN(raio) && raio >= 0 ? raio : null;
+
+      const enderecoPonto =
+        geo.draftEndereco.trim() !== ''
+          ? geo.draftEndereco.trim() || null
+          : config?.enderecoPonto?.trim() || null;
 
       await adminService.setConfigPonto(contratoId, subgrupoId, equipeId || null, {
         horasPrevistasMes: horas ?? null,
@@ -396,17 +323,14 @@ const ValoresPonto = () => {
         latitude: lat != null && !Number.isNaN(lat) ? lat : null,
         longitude: lng != null && !Number.isNaN(lng) ? lng : null,
         raioMetros,
-        enderecoPonto: draftEndereco.trim() || null,
+        enderecoPonto,
       });
       await queryClient.invalidateQueries({ queryKey: ['admin', 'config-ponto', contratoId, subgrupoId, equipeId || null] });
       setDraftHoras('');
       setDraftHorarioEntrada('');
       setDraftHorarioSaida('');
       setDraftTolerancia('');
-      setDraftLatitude('');
-      setDraftLongitude('');
-      setDraftRaioMetros('');
-      setGeocodeError(null);
+      geo.limparRascunhoCoordenadasRaio();
       setSuccess('Configuração salva com sucesso.');
       setSaved(true);
     } catch (err: any) {
@@ -565,22 +489,32 @@ const ValoresPonto = () => {
                 <div className="border-t border-viva-100 pt-4">
                   <h4 className="text-base font-bold text-viva-900 mb-1">Valor hora por dia (ponto sem escala)</h4>
                   <p className="text-sm text-gray-600 mb-4">
-                    Preencha cada dia em reais por hora. Configurações antigas com um único valor aparecem repetidas em todos os dias até você ajustar.
+                    Preencha repasse e cobrança por dia. Configurações antigas com um único valor aparecem repetidas em todos os dias até você ajustar.
                   </p>
 
-                  <div className="space-y-6">
+                  <div className="p-4 rounded-xl border border-viva-200 bg-white space-y-4">
+                    <div>
+                      <p className="text-sm font-semibold text-viva-900">
+                        Semana (seg–dom){' '}
+                        <span className="font-normal text-viva-600">(ponto sem escala)</span>
+                      </p>
+                      <p className="text-xs text-gray-600 mt-1">
+                        Use → na segunda para copiar o valor para ter–dom. Um único salvar grava repasse e cobrança da semana (seg–dom).
+                      </p>
+                    </div>
+
                     <div>
                       <p className="text-sm font-semibold text-viva-800 mb-2">Repasse (R$/h)</p>
                       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                         {DIAS_SEMANA.map(({ key, label }) => (
                           <div
                             key={key}
-                            className="flex flex-wrap items-end gap-4 p-4 rounded-xl border border-viva-200 bg-viva-50/30"
+                            className="flex flex-wrap items-end gap-2 p-4 rounded-xl border border-viva-200 bg-viva-50/30"
                           >
                             <div className="min-w-[200px] flex-1">
                               <label className="block text-sm font-semibold text-viva-800 mb-1">
                                 {label}{' '}
-                                <span className="font-normal text-viva-600">(R$/h)</span>
+                                <span className="font-normal text-viva-600">(Repasse R$/h)</span>
                               </label>
                               <input
                                 type="text"
@@ -596,31 +530,33 @@ const ValoresPonto = () => {
                                 }
                               />
                             </div>
-                            <button
-                              type="button"
-                              className={`btn btn-primary`}
-                              onClick={handleSave}
-                              disabled={saving}
-                            >
-                              {saving ? 'Salvando...' : saved ? 'Salvo!' : 'Salvar'}
-                            </button>
+                            {key === 'seg' ? (
+                              <button
+                                type="button"
+                                className="btn btn-secondary shrink-0 px-2 min-w-[2.25rem]"
+                                title="Replicar valor da segunda para ter–dom"
+                                onClick={replicarSegParaRestanteRepasse}
+                              >
+                                →
+                              </button>
+                            ) : null}
                           </div>
                         ))}
                       </div>
                     </div>
 
-                    <div>
+                    <div className="pt-2">
                       <p className="text-sm font-semibold text-viva-800 mb-2">Cobrança (R$/h)</p>
                       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                         {DIAS_SEMANA.map(({ key, label }) => (
                           <div
                             key={key}
-                            className="flex flex-wrap items-end gap-4 p-4 rounded-xl border border-viva-200 bg-viva-50/30"
+                            className="flex flex-wrap items-end gap-2 p-4 rounded-xl border border-viva-200 bg-viva-50/30"
                           >
                             <div className="min-w-[200px] flex-1">
                               <label className="block text-sm font-semibold text-viva-800 mb-1">
                                 {label}{' '}
-                                <span className="font-normal text-viva-600">(R$/h)</span>
+                                <span className="font-normal text-viva-600">(Cobrança R$/h)</span>
                               </label>
                               <input
                                 type="text"
@@ -636,17 +572,25 @@ const ValoresPonto = () => {
                                 }
                               />
                             </div>
-                            <button
-                              type="button"
-                              className={`btn btn-primary`}
-                              onClick={handleSave}
-                              disabled={saving}
-                            >
-                              {saving ? 'Salvando...' : saved ? 'Salvo!' : 'Salvar'}
-                            </button>
+                            {key === 'seg' ? (
+                              <button
+                                type="button"
+                                className="btn btn-secondary shrink-0 px-2 min-w-[2.25rem]"
+                                title="Replicar valor da segunda para ter–dom"
+                                onClick={replicarSegParaRestanteCobranca}
+                              >
+                                →
+                              </button>
+                            ) : null}
                           </div>
                         ))}
                       </div>
+                    </div>
+
+                    <div className="flex justify-end pt-2">
+                      <button type="button" className="btn btn-primary" onClick={handleSave} disabled={saving}>
+                        {saving ? 'Salvando...' : saved ? 'Salvo!' : 'Salvar semana (seg–dom)'}
+                      </button>
                     </div>
                   </div>
                 </div>
@@ -701,62 +645,19 @@ const ValoresPonto = () => {
               </div>
 
               <div className="border-t border-viva-200 pt-4">
-                <h4 className="text-base font-bold text-viva-900 mb-2">Localização do ponto (opcional)</h4>
-                <p className="text-sm text-gray-600 mb-4">
-                  Informe o <strong>endereço</strong> onde o ponto deve ser registrado e clique em &quot;Buscar coordenadas&quot; (ou use sua localização atual). Se preenchido, o profissional precisará estar dentro do <strong>raio</strong> (em metros) desse local para bater o ponto. Deixe em branco para não exigir geolocalização.
-                </p>
-                <div className="flex flex-wrap items-end gap-4 p-4 rounded-xl border border-viva-200 bg-viva-50/30">
-                  <div className="min-w-[280px] flex-1 relative" ref={enderecoContainerRef}>
-                    <label className="block text-sm font-semibold text-viva-800 mb-1">Endereço</label>
-                    <input
-                      type="text"
-                      className="input w-full"
-                      placeholder="Digite para buscar (ex.: Rua X, 123 - Fortaleza/CE)"
-                      value={enderecoDisplay}
-                      onChange={(e) => { setDraftEndereco(e.target.value); setGeocodeError(null); }}
-                      onFocus={() => enderecoSugestoes.length > 0 && setEnderecoDropdownOpen(true)}
-                      autoComplete="off"
-                    />
-                    {enderecoBuscando && (
-                      <p className="text-xs text-viva-600 mt-1">Buscando endereços...</p>
-                    )}
-                    {enderecoDropdownOpen && enderecoSugestoes.length > 0 && (
-                      <ul className="absolute z-50 left-0 right-0 mt-1 py-1 bg-white border border-viva-200 rounded-lg shadow-lg max-h-48 overflow-auto">
-                        {enderecoSugestoes.map((item, i) => (
-                          <li
-                            key={`${item.lat}-${item.lon}-${i}`}
-                            role="option"
-                            className="px-3 py-2 text-sm text-viva-800 cursor-pointer hover:bg-viva-100 truncate"
-                            onClick={() => selecionarEndereco(item)}
-                          >
-                            {item.display_name}
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                  </div>
-                  <button
-                    type="button"
-                    className="btn btn-secondary"
-                    onClick={buscarCoordenadas}
-                    disabled={geocoding}
-                  >
-                    {geocoding ? 'Buscando...' : 'Buscar coordenadas'}
-                  </button>
-                  <button
-                    type="button"
-                    className="btn btn-secondary"
-                    onClick={usarMinhaLocalizacao}
-                  >
-                    Usar minha localização atual
-                  </button>
-                </div>
-                {geocodeError && <p className="text-sm text-red-600 mt-2">{geocodeError}</p>}
-                {temCoordenadas && (
-                  <p className="text-sm text-viva-700 mt-2">
-                    Coordenadas definidas: {latitudeDisplay}, {longitudeDisplay}
-                  </p>
-                )}
+                <PontoEnderecoMapaBlock
+                  geo={geo}
+                  title="Localização do ponto (opcional)"
+                  intro={
+                    <p className="text-sm text-gray-600 mb-4">
+                      Digite um <strong>endereço qualquer</strong> e use <strong>Pesquisar no mapa</strong> (ou{' '}
+                      <strong>Enter</strong>) para ver o local no mapa. Enquanto digita, aparecem sugestões; ao escolher
+                      uma, o mapa também atualiza. Você pode clicar no mapa ou arrastar o marcador. Com local definido,
+                      o profissional precisa estar dentro do <strong>raio</strong> (metros) para bater o ponto. Deixe
+                      coordenadas em branco para não exigir geolocalização.
+                    </p>
+                  }
+                />
                 <div className="flex flex-wrap items-end gap-4 p-4 rounded-xl border border-viva-200 bg-viva-50/30 mt-3">
                   <div className="min-w-[140px]">
                     <label className="block text-sm font-semibold text-viva-800 mb-1">Raio (metros)</label>
@@ -767,8 +668,8 @@ const ValoresPonto = () => {
                       step={10}
                       className="input w-full max-w-[120px]"
                       placeholder="Ex: 200"
-                      value={raioMetrosDisplay}
-                      onChange={(e) => setDraftRaioMetros(e.target.value)}
+                      value={geo.raioMetrosDisplay}
+                      onChange={(e) => geo.setDraftRaioMetros(e.target.value)}
                     />
                   </div>
                   <button

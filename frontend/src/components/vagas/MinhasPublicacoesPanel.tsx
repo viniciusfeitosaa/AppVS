@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
 import { notify } from '../../lib/notificationEmitter';
@@ -19,6 +20,7 @@ function formatData(iso: string) {
 
 const MinhasPublicacoesPanel = ({ onVerCandidatos }: Props) => {
   const queryClient = useQueryClient();
+  const [excluirModal, setExcluirModal] = useState<{ id: string; titulo: string } | null>(null);
   const { data, isLoading } = useQuery({
     queryKey: ['medico', 'vagas-publicadas'],
     queryFn: () => medicoService.listMinhasPublicadasVagas(),
@@ -60,47 +62,96 @@ const MinhasPublicacoesPanel = ({ onVerCandidatos }: Props) => {
     );
   }
 
+  const tituloLista = (v: MinhaVagaPublicadaItem) => `${v.tipoAtendimento} — ${v.setor}`;
+
   return (
-    <ul className="space-y-3">
-      {items.map((v) => (
-        <li
-          key={v.id}
-          className="rounded-2xl border border-viva-100 bg-white p-4 flex flex-wrap items-start justify-between gap-3"
+    <>
+      <ul className="space-y-3">
+        {items.map((v) => (
+          <li
+            key={v.id}
+            className="rounded-2xl border border-viva-100 bg-white p-4 flex flex-wrap items-start justify-between gap-3"
+          >
+            <div>
+              <p className="font-bold text-viva-950 font-display">{v.tipoAtendimento}</p>
+              <p className="text-sm text-viva-700 font-serif">{v.setor}</p>
+              <p className="text-xs text-viva-600 mt-1">
+                Publicada em {formatData(v.createdAt)} · {v.ativa ? 'Ativa' : 'Expirada'}{' '}
+                {v.ativa ? `(até ${formatData(v.expiresAt)})` : ''}
+              </p>
+              <p className="text-xs text-viva-700 mt-2">
+                Interesses: {v.totalInteresses} · Pendentes: {v.pendentes}
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => onVerCandidatos(v.id, tituloLista(v))}
+                className="rounded-xl bg-viva-900 px-4 py-2 text-xs font-semibold text-white hover:bg-viva-800"
+              >
+                Candidatos
+              </button>
+              <button
+                type="button"
+                onClick={() => setExcluirModal({ id: v.id, titulo: tituloLista(v) })}
+                disabled={delMut.isPending}
+                className="rounded-xl border border-red-200 px-4 py-2 text-xs font-semibold text-red-800 hover:bg-red-50 disabled:opacity-50"
+              >
+                Excluir
+              </button>
+            </div>
+          </li>
+        ))}
+      </ul>
+
+      {excluirModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50"
+          onClick={() => !delMut.isPending && setExcluirModal(null)}
+          role="presentation"
         >
-          <div>
-            <p className="font-bold text-viva-950 font-display">{v.tipoAtendimento}</p>
-            <p className="text-sm text-viva-700 font-serif">{v.setor}</p>
-            <p className="text-xs text-viva-600 mt-1">
-              Publicada em {formatData(v.createdAt)} · {v.ativa ? 'Ativa' : 'Expirada'}{' '}
-              {v.ativa ? `(até ${formatData(v.expiresAt)})` : ''}
+          <div
+            className="bg-white rounded-2xl shadow-xl max-w-md w-full p-6 border border-viva-100"
+            onClick={(e) => e.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="excluir-vaga-titulo"
+          >
+            <h3 id="excluir-vaga-titulo" className="text-lg font-bold text-viva-900 font-display mb-2">
+              Excluir vaga publicada?
+            </h3>
+            <p className="text-sm text-viva-700 font-serif mb-1">
+              <span className="font-semibold text-viva-900">{excluirModal.titulo}</span>
             </p>
-            <p className="text-xs text-viva-700 mt-2">
-              Interesses: {v.totalInteresses} · Pendentes: {v.pendentes}
+            <p className="text-sm text-viva-600 mb-5">
+              A vaga deixará de aparecer para outros profissionais. Esta ação não pode ser desfeita.
             </p>
+            <div className="flex flex-wrap gap-2 justify-end">
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => setExcluirModal(null)}
+                disabled={delMut.isPending}
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                className="btn btn-primary bg-red-600 hover:bg-red-700"
+                disabled={delMut.isPending}
+                onClick={() => {
+                  delMut.mutate(excluirModal.id, {
+                    onSuccess: () => setExcluirModal(null),
+                  });
+                }}
+              >
+                {delMut.isPending ? 'Excluindo…' : 'Excluir vaga'}
+              </button>
+            </div>
           </div>
-          <div className="flex flex-wrap gap-2">
-            <button
-              type="button"
-              onClick={() => onVerCandidatos(v.id, `${v.tipoAtendimento} — ${v.setor}`)}
-              className="rounded-xl bg-viva-900 px-4 py-2 text-xs font-semibold text-white hover:bg-viva-800"
-            >
-              Candidatos
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                if (!window.confirm('Excluir esta vaga?')) return;
-                delMut.mutate(v.id);
-              }}
-              disabled={delMut.isPending}
-              className="rounded-xl border border-red-200 px-4 py-2 text-xs font-semibold text-red-800 hover:bg-red-50 disabled:opacity-50"
-            >
-              Excluir
-            </button>
-          </div>
-        </li>
-      ))}
-    </ul>
+        </div>
+      )}
+    </>
   );
 };
 
