@@ -21,7 +21,10 @@ fi
 
 git fetch origin "${BRANCH}"
 git checkout "${BRANCH}"
-git pull --ff-only origin "${BRANCH}"
+# O servidor deve refletir exatamente o remoto; alterações locais em ficheiros
+# versionados (ex.: edições manuais na VPS) impedem `git pull` e quebram o deploy.
+# Ficheiros ignorados (.env, volumes, etc.) não são afetados.
+git reset --hard "origin/${BRANCH}"
 
 if [ ! -f .env ]; then
   echo "[deploy] Aviso: ficheiro .env não encontrado. Crie a partir de .env.example na VPS." >&2
