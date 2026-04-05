@@ -79,9 +79,30 @@ export async function listMeusDocumentos(medicoId: string, tenantId: string) {
       nomeArquivo: true,
       mimeType: true,
       tamanhoBytes: true,
+      aceitoEm: true,
       createdAt: true,
     },
   });
+}
+
+/** Regista ciência do profissional sobre o documento (uma vez; idempotente). */
+export async function confirmarCienciaDocumentoEnviado(medicoId: string, tenantId: string, id: string) {
+  const doc = await prisma.documentoEnviado.findFirst({
+    where: { id, medicoId, tenantId },
+    select: { id: true, aceitoEm: true },
+  });
+  if (!doc) {
+    throw { statusCode: 404, message: 'Documento não encontrado' };
+  }
+  if (doc.aceitoEm) {
+    return { id: doc.id, aceitoEm: doc.aceitoEm, jaRegistrado: true as const };
+  }
+  const updated = await prisma.documentoEnviado.update({
+    where: { id: doc.id },
+    data: { aceitoEm: new Date() },
+    select: { id: true, aceitoEm: true },
+  });
+  return { ...updated, jaRegistrado: false as const };
 }
 
 export async function getDocumentoForDownload(medicoId: string, tenantId: string, id: string) {

@@ -266,7 +266,8 @@ const EnvioDocumentos = () => {
                     <tr>
                       <th className="text-left px-3 py-2">Documento</th>
                       <th className="text-left px-3 py-2">Profissional</th>
-                      <th className="text-left px-3 py-2">Data</th>
+                      <th className="text-left px-3 py-2">Enviado</th>
+                      <th className="text-left px-3 py-2">Ciência / assinatura</th>
                       <th className="w-20 px-3 py-2"></th>
                     </tr>
                   </thead>
@@ -285,6 +286,13 @@ const EnvioDocumentos = () => {
                           {doc.medico ? fixMojibake(doc.medico.nomeCompleto) : '-'}
                         </td>
                         <td className="px-3 py-2 text-gray-600">{formatDate(doc.createdAt)}</td>
+                        <td className="px-3 py-2 text-viva-800">
+                          {doc.aceitoEm ? (
+                            <span className="text-green-800 font-medium">{formatDate(doc.aceitoEm)}</span>
+                          ) : (
+                            <span className="text-amber-700">Pendente</span>
+                          )}
+                        </td>
                         <td className="px-3 py-2">
                           <button
                             type="button"

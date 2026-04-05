@@ -761,7 +761,7 @@ const Dashboard = () => {
                 Documentos enviados para você
               </h3>
               <p className="text-xs text-viva-600 mt-1 font-serif max-w-xl">
-                Acesse a área de Documentos para ver todos e visualizar.
+                Acesse Documentos para registar ciência depois de ler (visível para o Master em Envio de Documentos).
               </p>
             </div>
             <Link
@@ -776,7 +776,14 @@ const Dashboard = () => {
           </div>
           {documentosDisponiveis.length > 0 && (
             <ul className="space-y-1 rounded-xl overflow-hidden">
-              {documentosDisponiveis.map((doc: { id: string; titulo?: string | null; nomeArquivo: string; createdAt: string }) => (
+              {documentosDisponiveis.map(
+                (doc: {
+                  id: string;
+                  titulo?: string | null;
+                  nomeArquivo: string;
+                  createdAt: string;
+                  aceitoEm?: string | null;
+                }) => (
                 <li key={doc.id}>
                   <button
                     type="button"
@@ -796,10 +803,20 @@ const Dashboard = () => {
                         <p className="text-[10px] text-viva-600 truncate mt-0.5">{doc.nomeArquivo}</p>
                       )}
                     </div>
+                    {doc.aceitoEm ? (
+                      <span className="text-[10px] font-medium text-green-800 shrink-0 px-2 py-0.5 rounded bg-green-100/90">
+                        Ciência OK
+                      </span>
+                    ) : (
+                      <span className="text-[10px] font-medium text-amber-800 shrink-0 px-2 py-0.5 rounded bg-amber-100/90">
+                        Pendente
+                      </span>
+                    )}
                     <span className="btn-sm btn-primary shrink-0 pointer-events-none">Visualizar</span>
                   </button>
                 </li>
-              ))}
+              )
+              )}
             </ul>
           )}
         </div>

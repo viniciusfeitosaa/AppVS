@@ -137,6 +137,13 @@ export const medicoService = {
     setTimeout(() => URL.revokeObjectURL(url), 60000);
   },
 
+  confirmarCienciaDocumentoEnviado: async (
+    id: string
+  ): Promise<{ success: boolean; data: { id: string; aceitoEm: string; jaRegistrado: boolean }; message?: string }> => {
+    const response = await api.post(`/medico/documentos-enviados/${id}/confirmar-ciencia`);
+    return response.data;
+  },
+
   listNotificacoes: async (limit?: number): Promise<{
     success: boolean;
     data: NotificacaoMedicoItem[];
@@ -284,5 +291,6 @@ export interface DocumentoEnviadoItem {
   nomeArquivo: string;
   mimeType: string;
   tamanhoBytes: number;
+  aceitoEm: string | null;
   createdAt: string;
 }

@@ -1,4 +1,5 @@
-import { useQuery } from '@tanstack/react-query';
+import { useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../context/AuthContext';
 import { medicoService } from '../services/medico.service';
 import { fixMojibake } from '../utils/validation.util';
@@ -25,12 +26,30 @@ function formatDate(s: string): string {
 
 const MeusDocumentos = () => {
   const { user } = useAuth();
+  const queryClient = useQueryClient();
   const isMaster = user?.role === 'MASTER';
+  const [cienciaErro, setCienciaErro] = useState<string | null>(null);
 
   const { data: docsResp, isLoading } = useQuery({
     queryKey: ['medico', 'documentos-enviados', user?.id],
     queryFn: () => medicoService.listDocumentosEnviados(),
     enabled: !!user && !isMaster,
+  });
+
+  const confirmarCienciaMutation = useMutation({
+    mutationFn: (id: string) => medicoService.confirmarCienciaDocumentoEnviado(id),
+    onSuccess: () => {
+      setCienciaErro(null);
+      queryClient.invalidateQueries({ queryKey: ['medico', 'documentos-enviados'] });
+      queryClient.invalidateQueries({ queryKey: ['medico', 'dashboard', user?.id] });
+    },
+    onError: (err: unknown) => {
+      const msg =
+        typeof err === 'object' && err !== null && 'response' in err
+          ? (err as { response?: { data?: { error?: string } } }).response?.data?.error
+          : null;
+      setCienciaErro(msg || 'Não foi possível registrar a ciência.');
+    },
   });
 
   const documentos = docsResp?.data ?? [];
@@ -55,12 +74,19 @@ const MeusDocumentos = () => {
           Meus Documentos
         </h1>
         <p className="text-viva-700 font-serif text-base">
-          Documentos enviados para você. Clique em Visualizar para abrir ou baixar.
+          Abra o ficheiro com <strong className="font-semibold text-viva-800">Visualizar</strong> e, depois de ler,
+          use <strong className="font-semibold text-viva-800">Registar ciência</strong> para que a equipa saiba que
+          tomou conhecimento (assinatura eletrónica simplificada).
         </p>
       </div>
 
       {/* Lista de documentos */}
       <div className="card stagger-2 border-l-4 border-l-viva-500 bg-gradient-to-br from-white to-viva-50/30">
+        {cienciaErro && (
+          <p className="text-sm text-red-600 mb-3 px-1" role="alert">
+            {cienciaErro}
+          </p>
+        )}
         {isLoading ? (
           <div className="flex items-center gap-3 py-8">
             <div className="animate-spin rounded-full h-8 w-8 border-2 border-viva-200 border-t-viva-600" />
@@ -78,12 +104,11 @@ const MeusDocumentos = () => {
         ) : (
           <ul className="space-y-2">
             {documentos.map((doc) => (
-              <li key={doc.id}>
-                <button
-                  type="button"
-                  className="w-full flex items-center gap-3 p-4 rounded-xl bg-viva-50/50 hover:bg-viva-100/50 active:bg-viva-100/80 border border-viva-200/40 transition text-left cursor-pointer"
-                  onClick={() => medicoService.openDocumentoEnviado(doc.id, doc.nomeArquivo)}
-                >
+              <li
+                key={doc.id}
+                className="flex flex-col sm:flex-row sm:items-center gap-2 p-4 rounded-xl bg-viva-50/50 border border-viva-200/40"
+              >
+                <div className="flex items-center gap-3 min-w-0 flex-1">
                   <span className="flex-shrink-0 w-10 h-10 rounded-xl bg-viva-200/50 flex items-center justify-center text-viva-700">
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -96,17 +121,37 @@ const MeusDocumentos = () => {
                     {doc.titulo && (
                       <p className="text-[10px] text-viva-600 truncate mt-0.5">{fixMojibake(doc.nomeArquivo)}</p>
                     )}
-                    <div className="flex gap-4 mt-1 text-[10px] text-viva-600 sm:hidden">
-                      <span>{formatBytes(doc.tamanhoBytes)}</span>
-                      <span>{formatDate(doc.createdAt)}</span>
-                    </div>
+                    <p className="text-[10px] text-viva-600 mt-1">
+                      {formatBytes(doc.tamanhoBytes)} · {formatDate(doc.createdAt)}
+                      {doc.aceitoEm && (
+                        <span className="text-green-800 font-medium"> · Ciência: {formatDate(doc.aceitoEm)}</span>
+                      )}
+                    </p>
                   </div>
-                  <div className="hidden sm:flex items-center gap-4 shrink-0">
-                    <span className="text-xs text-viva-700 w-14 text-right">{formatBytes(doc.tamanhoBytes)}</span>
-                    <span className="text-xs text-viva-600 w-24 text-right hidden md:block">{formatDate(doc.createdAt)}</span>
-                  </div>
-                  <span className="btn-sm btn-primary shrink-0 pointer-events-none">Visualizar</span>
-                </button>
+                </div>
+                <div className="flex flex-wrap items-center gap-2 shrink-0 sm:justify-end">
+                  <button
+                    type="button"
+                    className="btn-sm btn-primary"
+                    onClick={() => medicoService.openDocumentoEnviado(doc.id, doc.nomeArquivo)}
+                  >
+                    Visualizar
+                  </button>
+                  {doc.aceitoEm ? (
+                    <span className="text-xs font-medium text-green-800 px-2 py-1 rounded-lg bg-green-100/80">
+                      Ciência registada
+                    </span>
+                  ) : (
+                    <button
+                      type="button"
+                      className="btn-sm btn-secondary"
+                      disabled={confirmarCienciaMutation.isPending}
+                      onClick={() => confirmarCienciaMutation.mutate(doc.id)}
+                    >
+                      {confirmarCienciaMutation.isPending ? 'A registar…' : 'Registar ciência'}
+                    </button>
+                  )}
+                </div>
               </li>
             ))}
           </ul>

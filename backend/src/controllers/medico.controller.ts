@@ -3,6 +3,7 @@ import { getPerfilService, getMedicoDocumentoPerfilForDownload, updatePerfilServ
 import {
   listMeusDocumentos,
   getDocumentoForDownload,
+  confirmarCienciaDocumentoEnviado,
 } from '../services/documentosenviados.service';
 import {
   listNotificacoesMedicoService,
@@ -138,6 +139,31 @@ export const downloadDocumentoEnviadoController = async (req: Request, res: Resp
     return res.status(error.statusCode || 500).json({
       success: false,
       error: error.message || 'Erro ao baixar documento',
+    });
+  }
+};
+
+export const confirmarCienciaDocumentoEnviadoController = async (req: Request, res: Response) => {
+  try {
+    const medicoId = req.user?.id;
+    const tenantId = req.user?.tenantId;
+    if (!medicoId || !tenantId) {
+      return res.status(401).json({ success: false, error: 'Não autenticado' });
+    }
+    const id = req.params.id;
+    if (!id) {
+      return res.status(400).json({ success: false, error: 'ID do documento é obrigatório' });
+    }
+    const data = await confirmarCienciaDocumentoEnviado(medicoId, tenantId, id);
+    return res.status(200).json({
+      success: true,
+      data,
+      message: data.jaRegistrado ? 'Ciência já estava registrada.' : 'Ciência registrada com sucesso.',
+    });
+  } catch (error: any) {
+    return res.status(error.statusCode || 500).json({
+      success: false,
+      error: error.message || 'Erro ao confirmar ciência',
     });
   }
 };

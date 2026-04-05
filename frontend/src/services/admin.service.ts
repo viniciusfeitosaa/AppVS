@@ -198,6 +198,8 @@ export interface DocumentoEnviado {
   mimeType: string;
   tamanhoBytes: number;
   enviadoPorId: string | null;
+  /** Quando o profissional registrou ciência (assinatura eletrónica simplificada). */
+  aceitoEm: string | null;
   createdAt: string;
   medico?: {
     id: string;

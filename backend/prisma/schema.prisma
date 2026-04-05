@@ -245,6 +245,8 @@ model DocumentoEnviado {
   mimeType        String   @map("mime_type") @db.VarChar(120)
   tamanhoBytes    Int      @map("tamanho_bytes")
   enviadoPorId    String?  @map("enviado_por_id") @db.VarChar(36)
+  /// Profissional registrou ciência / assinatura eletrónica do documento (POST dedicado).
+  aceitoEm        DateTime? @map("aceito_em")
   createdAt       DateTime @default(now()) @map("created_at")
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)

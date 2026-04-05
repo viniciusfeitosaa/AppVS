@@ -6,6 +6,7 @@ import {
   listMeusDocumentosController,
   downloadMedicoDocumentoPerfilController,
   downloadDocumentoEnviadoController,
+  confirmarCienciaDocumentoEnviadoController,
   listNotificacoesMedicoController,
   marcarNotificacaoLidaMedicoController,
   marcarTodasNotificacoesLidasMedicoController,
@@ -55,7 +56,18 @@ router.get(
 );
 // Documentos enviados pelo Master para o profissional
 router.get('/documentos-enviados', requireModuleAccess(ModuloSistema.PERFIL), listMeusDocumentosController);
-router.get('/documentos-enviados/:id/download', requireModuleAccess(ModuloSistema.PERFIL), downloadDocumentoEnviadoController);
+router.get(
+  '/documentos-enviados/:id/download',
+  requireModuleAccess(ModuloSistema.PERFIL),
+  validateUUIDParam('id'),
+  downloadDocumentoEnviadoController
+);
+router.post(
+  '/documentos-enviados/:id/confirmar-ciencia',
+  requireModuleAccess(ModuloSistema.PERFIL),
+  validateUUIDParam('id'),
+  confirmarCienciaDocumentoEnviadoController
+);
 
 router.get('/notificacoes', requireRole([UserRole.MEDICO]), listNotificacoesMedicoController);
 router.patch(
