@@ -55,6 +55,11 @@ import {
   uploadAndSendDocumento,
   deleteDocumentoEnviado,
 } from '../services/documentosenviados.service';
+import {
+  docusealResendEmailSubmitterService,
+  docusealResumoPorEmailsService,
+  listDocusealPendentesAssinaturaService,
+} from '../services/docuseal.service';
 import { ModuloSistema, UserRole } from '@prisma/client';
 
 export const listMedicosController = async (req: Request, res: Response) => {
@@ -85,6 +90,65 @@ export const listMedicosController = async (req: Request, res: Response) => {
     return res.status(error.statusCode || 500).json({
       success: false,
       error: error.message || 'Erro ao listar médicos',
+    });
+  }
+};
+
+/** DocuSeal: pedidos de assinatura pendentes (env opcional). */
+export const listDocusealPendentesController = async (req: Request, res: Response) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ success: false, error: 'Não autenticado' });
+    }
+    const data = await listDocusealPendentesAssinaturaService();
+    return res.status(200).json({ success: true, data });
+  } catch (error: any) {
+    return res.status(error.statusCode || 500).json({
+      success: false,
+      error: error.message || 'Erro ao consultar DocuSeal',
+    });
+  }
+};
+
+/** DocuSeal: pendentes por e-mail (lista Médicos — coluna por profissional). */
+export const docusealResumoPorEmailsController = async (req: Request, res: Response) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ success: false, error: 'Não autenticado' });
+    }
+    const emails = req.body?.emails;
+    if (!Array.isArray(emails) || emails.some((e: unknown) => typeof e !== 'string')) {
+      return res.status(400).json({ success: false, error: 'Envie JSON { "emails": string[] }' });
+    }
+    if (emails.length > 150) {
+      return res.status(400).json({ success: false, error: 'Máximo de 150 e-mails por pedido.' });
+    }
+    const data = await docusealResumoPorEmailsService(emails as string[]);
+    return res.status(200).json({ success: true, data });
+  } catch (error: any) {
+    return res.status(error.statusCode || 500).json({
+      success: false,
+      error: error.message || 'Erro ao consultar DocuSeal',
+    });
+  }
+};
+
+/** DocuSeal: reenviar e-mail de assinatura a um signatário (PUT submitter + send_email). */
+export const docusealResendSubmitterController = async (req: Request, res: Response) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ success: false, error: 'Não autenticado' });
+    }
+    const id = parseInt(String(req.params.submitterId), 10);
+    if (!Number.isFinite(id) || id <= 0) {
+      return res.status(400).json({ success: false, error: 'submitterId inválido' });
+    }
+    await docusealResendEmailSubmitterService(id);
+    return res.status(200).json({ success: true, message: 'Pedido de reenvio registado no DocuSeal.' });
+  } catch (error: any) {
+    return res.status(error.statusCode || 500).json({
+      success: false,
+      error: error.message || 'Erro ao reenviar e-mail DocuSeal',
     });
   }
 };

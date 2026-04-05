@@ -188,6 +188,51 @@ export interface Equipe {
   subgrupo?: { id: string; nome: string } | null;
 }
 
+export interface DocusealPendenteSubmitter {
+  submitterId?: number | null;
+  name: string | null;
+  email: string | null;
+  status: string | null;
+  signUrl: string | null;
+}
+
+export interface DocusealPendenteSubmission {
+  submissionId: number;
+  submissionSlug: string | null;
+  templateName: string | null;
+  createdAt: string | null;
+  submittersPendentes: DocusealPendenteSubmitter[];
+}
+
+export interface DocusealPendentesResponse {
+  success: boolean;
+  data: {
+    configured: boolean;
+    error: string | null;
+    items: DocusealPendenteSubmission[];
+  };
+}
+
+export interface DocusealDocProfissional {
+  submitterId: number;
+  submissionId: number;
+  templateName: string | null;
+  createdAt: string | null;
+  name: string | null;
+  email: string | null;
+  status: string | null;
+  signUrl: string | null;
+}
+
+export interface DocusealResumoPorEmailsResponse {
+  success: boolean;
+  data: {
+    configured: boolean;
+    error: string | null;
+    byEmail: Record<string, DocusealDocProfissional[]>;
+  };
+}
+
 export interface DocumentoEnviado {
   id: string;
   tenantId: string;
@@ -279,6 +324,25 @@ export const adminService = {
     const response = await api.get<ListMedicosResponse>('/admin/medicos', {
       params,
     });
+    return response.data;
+  },
+
+  listDocusealPendentes: async (): Promise<DocusealPendentesResponse> => {
+    const response = await api.get<DocusealPendentesResponse>('/admin/integrations/docuseal/pending-submissions');
+    return response.data;
+  },
+
+  docusealResumoPorEmails: async (emails: string[]): Promise<DocusealResumoPorEmailsResponse> => {
+    const response = await api.post<DocusealResumoPorEmailsResponse>('/admin/integrations/docuseal/resumo-por-emails', {
+      emails,
+    });
+    return response.data;
+  },
+
+  docusealResendSubmitterEmail: async (submitterId: number): Promise<{ success: boolean; message?: string }> => {
+    const response = await api.post<{ success: boolean; message?: string }>(
+      `/admin/integrations/docuseal/submitters/${submitterId}/resend-email`
+    );
     return response.data;
   },
 

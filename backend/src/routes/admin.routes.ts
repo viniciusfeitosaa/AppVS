@@ -33,6 +33,9 @@ import {
   salvarMatrizAcessosModulosController,
   listContratosAtivosController,
   listMedicosController,
+  listDocusealPendentesController,
+  docusealResumoPorEmailsController,
+  docusealResendSubmitterController,
   listDocumentosEnviadosController,
   uploadDocumentoEnviadoController,
   deleteDocumentoEnviadoController,
@@ -82,6 +85,21 @@ router.use(authenticateToken);
 router.use(requireRole([UserRole.MASTER]));
 
 router.get('/medicos', requireModuleAccess(ModuloSistema.MEDICOS), listMedicosController);
+router.get(
+  '/integrations/docuseal/pending-submissions',
+  requireModuleAccess(ModuloSistema.MEDICOS),
+  listDocusealPendentesController
+);
+router.post(
+  '/integrations/docuseal/resumo-por-emails',
+  requireModuleAccess(ModuloSistema.MEDICOS),
+  docusealResumoPorEmailsController
+);
+router.post(
+  '/integrations/docuseal/submitters/:submitterId/resend-email',
+  requireModuleAccess(ModuloSistema.MEDICOS),
+  docusealResendSubmitterController
+);
 router.post('/medicos', requireModuleAccess(ModuloSistema.MEDICOS), createMedicoController);
 router.put('/medicos/:id', requireModuleAccess(ModuloSistema.MEDICOS), updateMedicoController);
 router.patch('/medicos/:id/ativo', requireModuleAccess(ModuloSistema.MEDICOS), toggleMedicoAtivoController);

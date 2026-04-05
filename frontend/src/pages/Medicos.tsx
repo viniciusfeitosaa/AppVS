@@ -1,10 +1,14 @@
 import { useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../context/AuthContext';
-import { adminService } from '../services/admin.service';
+import { adminService, type DocusealDocProfissional } from '../services/admin.service';
 import { notify } from '../lib/notificationEmitter';
 import { formatCRM, fixMojibake } from '../utils/validation.util';
+
+function emailChaveDocuseal(email: string | null | undefined): string {
+  return (email || '').trim().toLowerCase();
+}
 
 const PAGE_SIZE = 20;
 
@@ -12,6 +16,7 @@ type StatusFilter = 'all' | 'active' | 'inactive';
 
 const Medicos = () => {
   const { user } = useAuth();
+  const queryClient = useQueryClient();
   const isMaster = user?.role === 'MASTER';
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
@@ -21,6 +26,9 @@ const Medicos = () => {
   const [pontoModalOpen, setPontoModalOpen] = useState(false);
   const [pontoInicio, setPontoInicio] = useState('');
   const [pontoFim, setPontoFim] = useState('');
+  const [docusealModalMedico, setDocusealModalMedico] = useState<{ id: string; nomeCompleto: string; email: string | null } | null>(
+    null
+  );
 
   const ativoParam =
     statusFilter === 'all' ? undefined : statusFilter === 'active';
@@ -37,6 +45,36 @@ const Medicos = () => {
     enabled: !!user && isMaster,
   });
 
+  const medicos = data?.data || [];
+
+  const emailsPagina = useMemo(
+    () => medicos.map((m) => (typeof m.email === 'string' ? m.email.trim() : '')).filter(Boolean),
+    [medicos]
+  );
+  const emailsPaginaKey = useMemo(() => [...emailsPagina].sort().join('|'), [emailsPagina]);
+
+  const { data: docusealResumoResp, isLoading: loadingDocusealResumo } = useQuery({
+    queryKey: ['admin', 'docuseal-resumo-emails', user?.id, page, search, statusFilter, emailsPaginaKey],
+    queryFn: () => adminService.docusealResumoPorEmails(emailsPagina),
+    enabled: !!user && isMaster && !isLoading && emailsPagina.length > 0,
+    staleTime: 45 * 1000,
+  });
+
+  const resendDocusealMutation = useMutation({
+    mutationFn: (submitterId: number) => adminService.docusealResendSubmitterEmail(submitterId),
+    onSuccess: () => {
+      notify({ kind: 'success', title: 'DocuSeal', message: 'Pedido de reenvio de e-mail registado.' });
+      queryClient.invalidateQueries({ queryKey: ['admin', 'docuseal-resumo-emails'] });
+    },
+    onError: (err: unknown) => {
+      const msg =
+        typeof err === 'object' && err !== null && 'response' in err
+          ? (err as { response?: { data?: { error?: string } } }).response?.data?.error
+          : null;
+      notify({ kind: 'warning', title: 'DocuSeal', message: msg || 'Não foi possível reenviar o e-mail.' });
+    },
+  });
+
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setSearch(searchInput.trim());
@@ -48,6 +86,18 @@ const Medicos = () => {
     setPage(1);
   };
 
+  const { data: registrosPontoResp, isLoading: loadingPontos } = useQuery({
+    queryKey: ['admin', 'registros-ponto', selectedMedico?.id, pontoInicio, pontoFim],
+    queryFn: () =>
+      adminService.listRegistrosPonto({
+        medicoId: selectedMedico!.id,
+        ...(pontoInicio ? { dataInicio: pontoInicio } : {}),
+        ...(pontoFim ? { dataFim: pontoFim } : {}),
+      }),
+    enabled: !!user && isMaster && pontoModalOpen && !!selectedMedico?.id,
+  });
+  const registrosPonto: any[] = registrosPontoResp?.data?.data ?? registrosPontoResp?.data ?? [];
+
   if (!isMaster) {
     return (
       <div className="card border-l-4 border-red-400">
@@ -57,7 +107,6 @@ const Medicos = () => {
     );
   }
 
-  const medicos = data?.data || [];
   const pagination = data?.pagination;
   const totalPages = pagination?.totalPages ?? 0;
   const total = pagination?.total ?? 0;
@@ -71,17 +120,14 @@ const Medicos = () => {
     return crm ? `${nome} · ${crm}` : nome;
   }, [selectedMedico]);
 
-  const { data: registrosPontoResp, isLoading: loadingPontos } = useQuery({
-    queryKey: ['admin', 'registros-ponto', selectedMedico?.id, pontoInicio, pontoFim],
-    queryFn: () =>
-      adminService.listRegistrosPonto({
-        medicoId: selectedMedico!.id,
-        ...(pontoInicio ? { dataInicio: pontoInicio } : {}),
-        ...(pontoFim ? { dataFim: pontoFim } : {}),
-      }),
-    enabled: !!user && isMaster && pontoModalOpen && !!selectedMedico?.id,
-  });
-  const registrosPonto: any[] = registrosPontoResp?.data?.data ?? registrosPontoResp?.data ?? [];
+  const docusealByEmail = docusealResumoResp?.data?.byEmail;
+
+  const docusealDocsModal = useMemo((): DocusealDocProfissional[] => {
+    if (!docusealModalMedico?.email) return [];
+    const k = emailChaveDocuseal(docusealModalMedico.email);
+    if (!k || !docusealByEmail) return [];
+    return docusealByEmail[k] ?? [];
+  }, [docusealModalMedico, docusealByEmail]);
 
   return (
     <div className="card hover:shadow-lg transition-shadow">
@@ -174,6 +220,7 @@ const Medicos = () => {
                   <th className="py-2 pr-4">Especialidades</th>
                   <th className="py-2 pr-4">Vínculo</th>
                   <th className="py-2 pr-4">Status</th>
+                  <th className="py-2 pr-4 whitespace-nowrap">DocuSeal</th>
                 </tr>
               </thead>
               <tbody>
@@ -211,6 +258,57 @@ const Medicos = () => {
                         {medico.ativo ? 'Ativo' : 'Inativo'}
                       </span>
                     </td>
+                    <td className="py-2 pr-4" onClick={(e) => e.stopPropagation()}>
+                      {isLoading ? (
+                        <span className="text-xs text-viva-400">…</span>
+                      ) : !docusealResumoResp?.data?.configured ? (
+                        <span className="text-xs text-viva-400" title="Defina DOCUSEAL_API_BASE_URL e DOCUSEAL_API_TOKEN no servidor">
+                          —
+                        </span>
+                      ) : docusealResumoResp.data.error ? (
+                        <span
+                          className="text-xs font-semibold text-amber-800 cursor-help"
+                          title={docusealResumoResp.data.error}
+                        >
+                          Erro
+                        </span>
+                      ) : !emailChaveDocuseal(medico.email) ? (
+                        <span className="text-xs text-viva-500">Sem e-mail</span>
+                      ) : loadingDocusealResumo ? (
+                        <span className="text-xs text-viva-500">…</span>
+                      ) : (
+                        (() => {
+                          const k = emailChaveDocuseal(medico.email);
+                          const pend = k && docusealByEmail ? docusealByEmail[k] ?? [] : [];
+                          const open = () =>
+                            setDocusealModalMedico({
+                              id: medico.id,
+                              nomeCompleto: medico.nomeCompleto,
+                              email: medico.email ?? null,
+                            });
+                          if (pend.length > 0) {
+                            return (
+                              <button
+                                type="button"
+                                onClick={open}
+                                className="text-xs font-bold text-amber-900 bg-amber-100 border border-amber-300/60 rounded-full px-2.5 py-0.5 hover:bg-amber-200/80 transition"
+                              >
+                                Pendente ({pend.length})
+                              </button>
+                            );
+                          }
+                          return (
+                            <button
+                              type="button"
+                              onClick={open}
+                              className="text-xs font-bold text-green-900 bg-green-100 border border-green-300/60 rounded-full px-2.5 py-0.5 hover:bg-green-200/80 transition"
+                            >
+                              OK
+                            </button>
+                          );
+                        })()
+                      )}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -247,6 +345,93 @@ const Medicos = () => {
           )}
         </>
       )}
+
+      {docusealModalMedico &&
+        createPortal(
+          <div
+            className="fixed inset-0 z-[60] bg-black/40 overflow-y-auto flex items-start sm:items-center justify-center p-4"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="docuseal-modal-title"
+            onClick={() => setDocusealModalMedico(null)}
+          >
+            <div
+              className="card w-full max-w-lg border border-viva-200/70 shadow-2xl my-8"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-start justify-between gap-3 border-b border-viva-100 px-4 py-3">
+                <div className="min-w-0">
+                  <h3 id="docuseal-modal-title" className="text-base font-bold text-viva-900 font-display">
+                    Assinaturas DocuSeal
+                  </h3>
+                  <p className="text-xs text-viva-600 font-serif truncate">{fixMojibake(docusealModalMedico.nomeCompleto)}</p>
+                  <p className="text-[10px] text-viva-500 truncate">{docusealModalMedico.email || '—'}</p>
+                </div>
+                <button
+                  type="button"
+                  className="btn text-sm border border-viva-300 bg-white text-viva-800 shrink-0"
+                  onClick={() => setDocusealModalMedico(null)}
+                >
+                  Fechar
+                </button>
+              </div>
+              <div className="px-4 py-4 max-h-[min(70vh,480px)] overflow-y-auto">
+                {!docusealResumoResp?.data?.configured ? (
+                  <p className="text-sm text-viva-700 font-serif">
+                    Configure <code className="text-xs bg-viva-100 px-1 rounded">DOCUSEAL_API_BASE_URL</code> e{' '}
+                    <code className="text-xs bg-viva-100 px-1 rounded">DOCUSEAL_API_TOKEN</code> no backend.
+                  </p>
+                ) : docusealResumoResp.data.error ? (
+                  <p className="text-sm text-red-700 font-serif">{docusealResumoResp.data.error}</p>
+                ) : docusealDocsModal.length === 0 ? (
+                  <p className="text-sm text-viva-700 font-serif">
+                    Nenhum documento pendente de assinatura no DocuSeal para este e-mail (pedidos com estado
+                    &quot;pending&quot; na API).
+                  </p>
+                ) : (
+                  <ul className="space-y-3">
+                    {docusealDocsModal.map((doc) => (
+                      <li
+                        key={`${doc.submissionId}-${doc.submitterId}`}
+                        className="rounded-lg border border-viva-200/60 bg-viva-50/40 p-3 text-sm"
+                      >
+                        <p className="font-semibold text-viva-900">{doc.templateName || 'Documento'}</p>
+                        <p className="text-[10px] text-viva-500 mt-0.5">
+                          Submissão #{doc.submissionId}
+                          {doc.createdAt ? ` · ${new Date(doc.createdAt).toLocaleString('pt-BR')}` : ''}
+                        </p>
+                        {doc.status && <p className="text-xs text-viva-600 mt-1">Estado: {doc.status}</p>}
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          {doc.signUrl ? (
+                            <a
+                              href={doc.signUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="btn-sm btn-secondary inline-flex"
+                            >
+                              Abrir assinatura
+                            </a>
+                          ) : null}
+                          <button
+                            type="button"
+                            className="btn-sm btn-primary"
+                            disabled={resendDocusealMutation.isPending}
+                            onClick={() => resendDocusealMutation.mutate(doc.submitterId)}
+                          >
+                            {resendDocusealMutation.isPending && resendDocusealMutation.variables === doc.submitterId
+                              ? 'A enviar…'
+                              : 'Reenviar e-mail'}
+                          </button>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            </div>
+          </div>,
+          document.body
+        )}
 
       {pontoModalOpen &&
         selectedMedico &&
