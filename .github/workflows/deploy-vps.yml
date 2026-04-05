@@ -36,7 +36,16 @@ jobs:
           key: ${{ secrets.VPS_SSH_KEY }}
           command_timeout: 40m
           script: |
-            set -e
-            cd "${{ secrets.VPS_APP_PATH }}"
+            set -euo pipefail
+            APP_PATH="${{ secrets.VPS_APP_PATH }}"
+            BRANCH="main"
+            cd "$APP_PATH"
+            # Antes do script no disco: força alinhar com origin (evita deploy preso em `git pull` com working tree sujo).
+            if [ -d .git ]; then
+              echo "[deploy] Git: fetch + reset --hard origin/${BRANCH}"
+              git fetch origin "$BRANCH"
+              git checkout "$BRANCH"
+              git reset --hard "origin/${BRANCH}"
+            fi
             chmod +x scripts/deploy-vps.sh 2>/dev/null || true
             ./scripts/deploy-vps.sh
