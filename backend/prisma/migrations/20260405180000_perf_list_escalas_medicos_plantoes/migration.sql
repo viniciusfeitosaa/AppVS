@@ -2,7 +2,7 @@
 -- IF NOT EXISTS: seguro em re-execução.
 
 CREATE INDEX IF NOT EXISTS "medicos_tenant_id_nome_completo_idx"
-  ON "medicos" ("tenant_id", "nome_completo");
+  ON "medicos" ("tenant_id", "nomeCompleto");
 
 CREATE INDEX IF NOT EXISTS "medicos_tenant_id_ativo_idx"
   ON "medicos" ("tenant_id", "ativo");

@@ -13,16 +13,16 @@ fi
 
 echo "🚀 Iniciando aplicação..."
 
-echo "📦 Executando migrações do Prisma..."
-set +e
-npx prisma migrate deploy 2>&1
-MIGRATE_EXIT=$?
-set -e
-if [ "$MIGRATE_EXIT" -eq 0 ]; then
-  echo "✅ Migrações concluídas!"
+if [ "${SKIP_PRISMA_MIGRATE:-}" = "1" ]; then
+  echo "⚠️  SKIP_PRISMA_MIGRATE=1 — a saltar migrate deploy (não usar em produção salvo exceção)."
 else
-  echo "⚠️  Migrações não aplicadas (P3005/baseline ou pasta migrations vazia). Iniciando servidor."
-  echo "   Verifique backend/prisma/migrations e a DATABASE_URL."
+  echo "📦 Executando migrações do Prisma..."
+  if ! npx prisma migrate deploy; then
+    echo "❌ prisma migrate deploy falhou — o servidor não será iniciado (schema e BD desalinhados)."
+    echo "   Confirme DATABASE_URL, rede à BD e a pasta prisma/migrations na imagem."
+    exit 1
+  fi
+  echo "✅ Migrações concluídas!"
 fi
 
 echo "🌐 Iniciando servidor..."

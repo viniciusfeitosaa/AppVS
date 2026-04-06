@@ -53,6 +53,9 @@ RUN chmod +x docker-entrypoint.sh
 RUN mkdir -p /app/uploads/medicos /app/uploads/documentos-enviados \
   && chown -R nodejs:nodejs /app/uploads
 
+# Prisma (migrate deploy em runtime) precisa de escrever em node_modules/@prisma; sem isto migrações falham como user nodejs.
+RUN chown -R nodejs:nodejs /app
+
 # Mudar para usuário não-root
 USER nodejs
 

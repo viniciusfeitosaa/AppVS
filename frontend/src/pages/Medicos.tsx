@@ -161,7 +161,7 @@ const Medicos = () => {
   function docusealStatusLabel(status: string): string {
     switch (status) {
       case 'nao_enviado':
-        return 'Falta enviar o pedido ao profissional';
+        return 'Pedido de assinatura não enviado ao profissional';
       case 'pendente_medico':
         return 'Pendente — profissional ainda não assinou';
       case 'pendente_outros':
@@ -266,7 +266,7 @@ const Medicos = () => {
                   <th className="py-2 pr-4">Status</th>
                   <th
                     className="py-2 pr-4 whitespace-nowrap"
-                    title="DocuSeal: estado dos documentos configurados (até vários por profissional). Indica se falta enviar o pedido ou se o profissional ainda não assinou. Clique para ver cada documento e agir pela app."
+                    title="DocuSeal: estado dos documentos configurados (até vários por profissional). Indica pedidos ainda não enviados ou assinaturas pendentes do profissional. Clique para ver cada documento e agir pela app."
                   >
                     Documentos / assinatura
                   </th>
@@ -358,10 +358,10 @@ const Medicos = () => {
                                 <button
                                   type="button"
                                   onClick={open}
-                                  title="Ainda não foi criado o pedido de assinatura para um ou mais modelos. Abra para enviar ao profissional pela app."
+                                  title="Ainda não existe pedido de assinatura eletrónica para um ou mais documentos. Abra o painel para enviar ao profissional pela app."
                                   className="text-xs font-bold text-slate-800 bg-slate-200/90 border border-slate-300/70 rounded-full px-2.5 py-0.5 hover:bg-slate-200 transition"
                                 >
-                                  Falta enviar ({faltaEnviar})
+                                  Pendente de envio ({faltaEnviar})
                                 </button>
                               );
                             }
@@ -394,10 +394,10 @@ const Medicos = () => {
                             <button
                               type="button"
                               onClick={open}
-                              title="Nada a tratar pelos documentos configurados no servidor. Abra para rever os detalhes."
+                              title="Pedidos de assinatura concluídos nos documentos configurados, ou nada a tratar. Abra para rever o detalhe."
                               className="text-xs font-semibold text-viva-700 bg-viva-100/90 border border-viva-200/80 rounded-full px-2.5 py-0.5 hover:bg-viva-100 transition"
                             >
-                              Em dia
+                              Concluído
                             </button>
                           );
                         })()
@@ -528,9 +528,6 @@ const Medicos = () => {
                             </div>
                             {doc.submissionId != null && doc.submissionId > 0 ? (
                               <p className="text-[10px] text-viva-500 mt-0.5">Submissão #{doc.submissionId}</p>
-                            ) : null}
-                            {doc.signerStatus ? (
-                              <p className="text-xs text-viva-600 mt-1">Estado no DocuSeal: {doc.signerStatus}</p>
                             ) : null}
                             <div className="mt-2 flex flex-wrap gap-2">
                               {doc.status === 'nao_enviado' ? (
