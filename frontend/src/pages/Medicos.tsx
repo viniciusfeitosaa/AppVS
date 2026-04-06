@@ -2,12 +2,15 @@ import { useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../context/AuthContext';
-import { adminService, type DocusealDocProfissional } from '../services/admin.service';
+import { adminService } from '../services/admin.service';
 import { notify } from '../lib/notificationEmitter';
 import { formatCRM, fixMojibake } from '../utils/validation.util';
 
+/** Chave alinhada com `normalizarEmailDocuseal` no backend (ex.: @gmail → @gmail.com). */
 function emailChaveDocuseal(email: string | null | undefined): string {
-  return (email || '').trim().toLowerCase();
+  let t = (email || '').trim().toLowerCase();
+  t = t.replace(/@gmail?$/i, '@gmail.com');
+  return t;
 }
 
 const PAGE_SIZE = 20;
@@ -60,11 +63,44 @@ const Medicos = () => {
     staleTime: 45 * 1000,
   });
 
+  const { data: painelDocResp, isLoading: loadingPainelDoc } = useQuery({
+    queryKey: ['admin', 'medico-docuseal-docs', user?.id, docusealModalMedico?.id],
+    queryFn: () => adminService.getMedicoDocusealDocumentos(docusealModalMedico!.id),
+    enabled: !!user && isMaster && !!docusealModalMedico?.id,
+  });
+
+  const enviarDocusealTplMutation = useMutation({
+    mutationFn: ({ medicoId, templateId }: { medicoId: string; templateId: number }) =>
+      adminService.enviarDocusealTemplateMedico(medicoId, templateId),
+    onSuccess: (resp, vars) => {
+      const d = resp?.data;
+      if (d && d.created > 0) {
+        notify({ kind: 'success', title: 'DocuSeal', message: 'Pedido de assinatura enviado ao profissional.' });
+      } else if (d?.errors?.length) {
+        notify({ kind: 'warning', title: 'DocuSeal', message: d.errors[0] });
+      } else {
+        notify({ kind: 'info', title: 'DocuSeal', message: 'Sem novas submissões (verifique a resposta).' });
+      }
+      queryClient.invalidateQueries({ queryKey: ['admin', 'medico-docuseal-docs', user?.id, vars.medicoId] });
+      queryClient.invalidateQueries({ queryKey: ['admin', 'docuseal-resumo-emails'] });
+    },
+    onError: (err: unknown) => {
+      const msg =
+        typeof err === 'object' && err !== null && 'response' in err
+          ? (err as { response?: { data?: { error?: string } } }).response?.data?.error
+          : null;
+      notify({ kind: 'warning', title: 'DocuSeal', message: msg || 'Não foi possível enviar o pedido de assinatura.' });
+    },
+  });
+
   const resendDocusealMutation = useMutation({
     mutationFn: (submitterId: number) => adminService.docusealResendSubmitterEmail(submitterId),
     onSuccess: () => {
       notify({ kind: 'success', title: 'DocuSeal', message: 'Pedido de reenvio de e-mail registado.' });
       queryClient.invalidateQueries({ queryKey: ['admin', 'docuseal-resumo-emails'] });
+      if (docusealModalMedico?.id) {
+        queryClient.invalidateQueries({ queryKey: ['admin', 'medico-docuseal-docs', user?.id, docusealModalMedico.id] });
+      }
     },
     onError: (err: unknown) => {
       const msg =
@@ -122,12 +158,20 @@ const Medicos = () => {
 
   const docusealByEmail = docusealResumoResp?.data?.byEmail;
 
-  const docusealDocsModal = useMemo((): DocusealDocProfissional[] => {
-    if (!docusealModalMedico?.email) return [];
-    const k = emailChaveDocuseal(docusealModalMedico.email);
-    if (!k || !docusealByEmail) return [];
-    return docusealByEmail[k] ?? [];
-  }, [docusealModalMedico, docusealByEmail]);
+  function docusealStatusLabel(status: string): string {
+    switch (status) {
+      case 'nao_enviado':
+        return 'Falta enviar o pedido ao profissional';
+      case 'pendente_medico':
+        return 'Pendente — profissional ainda não assinou';
+      case 'pendente_outros':
+        return 'Aguarda assinatura da 2.ª parte';
+      case 'concluido':
+        return 'Concluído';
+      default:
+        return status;
+    }
+  }
 
   return (
     <div className="card hover:shadow-lg transition-shadow">
@@ -220,7 +264,12 @@ const Medicos = () => {
                   <th className="py-2 pr-4">Especialidades</th>
                   <th className="py-2 pr-4">Vínculo</th>
                   <th className="py-2 pr-4">Status</th>
-                  <th className="py-2 pr-4 whitespace-nowrap">DocuSeal</th>
+                  <th
+                    className="py-2 pr-4 whitespace-nowrap"
+                    title="DocuSeal: estado dos documentos configurados (até vários por profissional). Indica se falta enviar o pedido ou se o profissional ainda não assinou. Clique para ver cada documento e agir pela app."
+                  >
+                    Documentos / assinatura
+                  </th>
                 </tr>
               </thead>
               <tbody>
@@ -262,7 +311,10 @@ const Medicos = () => {
                       {isLoading ? (
                         <span className="text-xs text-viva-400">…</span>
                       ) : !docusealResumoResp?.data?.configured ? (
-                        <span className="text-xs text-viva-400" title="Defina DOCUSEAL_API_BASE_URL e DOCUSEAL_API_TOKEN no servidor">
+                        <span
+                          className="text-xs text-viva-400"
+                          title="No servidor: DOCUSEAL_URL (URL público do DocuSeal) + DOCUSEAL_API_KEY (token em Definições → API)."
+                        >
                           —
                         </span>
                       ) : docusealResumoResp.data.error ? (
@@ -280,17 +332,58 @@ const Medicos = () => {
                         (() => {
                           const k = emailChaveDocuseal(medico.email);
                           const pend = k && docusealByEmail ? docusealByEmail[k] ?? [] : [];
+                          const acoes = k ? docusealResumoResp?.data?.acoesPorEmail?.[k] : undefined;
                           const open = () =>
                             setDocusealModalMedico({
                               id: medico.id,
                               nomeCompleto: medico.nomeCompleto,
                               email: medico.email ?? null,
                             });
+                          if (acoes) {
+                            const { pendenteAssinaturaMedico, faltaEnviar, aguardaSegundaParte } = acoes;
+                            if (pendenteAssinaturaMedico > 0) {
+                              return (
+                                <button
+                                  type="button"
+                                  onClick={open}
+                                  title="O profissional ainda não assinou um ou mais documentos. Abra para ver o nome de cada um e reenviar o e-mail ou o link sem sair da app."
+                                  className="text-xs font-bold text-amber-900 bg-amber-100 border border-amber-300/60 rounded-full px-2.5 py-0.5 hover:bg-amber-200/80 transition"
+                                >
+                                  Não assinou ({pendenteAssinaturaMedico})
+                                </button>
+                              );
+                            }
+                            if (faltaEnviar > 0) {
+                              return (
+                                <button
+                                  type="button"
+                                  onClick={open}
+                                  title="Ainda não foi criado o pedido de assinatura para um ou mais modelos. Abra para enviar ao profissional pela app."
+                                  className="text-xs font-bold text-slate-800 bg-slate-200/90 border border-slate-300/70 rounded-full px-2.5 py-0.5 hover:bg-slate-200 transition"
+                                >
+                                  Falta enviar ({faltaEnviar})
+                                </button>
+                              );
+                            }
+                            if (aguardaSegundaParte > 0) {
+                              return (
+                                <button
+                                  type="button"
+                                  onClick={open}
+                                  title="O profissional já assinou; falta a segunda parte no fluxo DocuSeal."
+                                  className="text-xs font-bold text-sky-900 bg-sky-100 border border-sky-300/60 rounded-full px-2.5 py-0.5 hover:bg-sky-200/80 transition"
+                                >
+                                  Aguarda 2.ª parte ({aguardaSegundaParte})
+                                </button>
+                              );
+                            }
+                          }
                           if (pend.length > 0) {
                             return (
                               <button
                                 type="button"
                                 onClick={open}
+                                title="Há assinaturas em falta no DocuSeal para este e-mail (fora da lista de documentos configurados na app)."
                                 className="text-xs font-bold text-amber-900 bg-amber-100 border border-amber-300/60 rounded-full px-2.5 py-0.5 hover:bg-amber-200/80 transition"
                               >
                                 Pendente ({pend.length})
@@ -301,9 +394,10 @@ const Medicos = () => {
                             <button
                               type="button"
                               onClick={open}
-                              className="text-xs font-bold text-green-900 bg-green-100 border border-green-300/60 rounded-full px-2.5 py-0.5 hover:bg-green-200/80 transition"
+                              title="Nada a tratar pelos documentos configurados no servidor. Abra para rever os detalhes."
+                              className="text-xs font-semibold text-viva-700 bg-viva-100/90 border border-viva-200/80 rounded-full px-2.5 py-0.5 hover:bg-viva-100 transition"
                             >
-                              OK
+                              Em dia
                             </button>
                           );
                         })()
@@ -362,7 +456,7 @@ const Medicos = () => {
               <div className="flex items-start justify-between gap-3 border-b border-viva-100 px-4 py-3">
                 <div className="min-w-0">
                   <h3 id="docuseal-modal-title" className="text-base font-bold text-viva-900 font-display">
-                    Assinaturas DocuSeal
+                    Documentos para assinatura (DocuSeal)
                   </h3>
                   <p className="text-xs text-viva-600 font-serif truncate">{fixMojibake(docusealModalMedico.nomeCompleto)}</p>
                   <p className="text-[10px] text-viva-500 truncate">{docusealModalMedico.email || '—'}</p>
@@ -375,58 +469,135 @@ const Medicos = () => {
                   Fechar
                 </button>
               </div>
-              <div className="px-4 py-4 max-h-[min(70vh,480px)] overflow-y-auto">
-                {!docusealResumoResp?.data?.configured ? (
-                  <p className="text-sm text-viva-700 font-serif">
-                    Configure <code className="text-xs bg-viva-100 px-1 rounded">DOCUSEAL_API_BASE_URL</code> e{' '}
-                    <code className="text-xs bg-viva-100 px-1 rounded">DOCUSEAL_API_TOKEN</code> no backend.
-                  </p>
-                ) : docusealResumoResp.data.error ? (
-                  <p className="text-sm text-red-700 font-serif">{docusealResumoResp.data.error}</p>
-                ) : docusealDocsModal.length === 0 ? (
-                  <p className="text-sm text-viva-700 font-serif">
-                    Nenhum documento pendente de assinatura no DocuSeal para este e-mail (pedidos com estado
-                    &quot;pending&quot; na API).
-                  </p>
-                ) : (
-                  <ul className="space-y-3">
-                    {docusealDocsModal.map((doc) => (
-                      <li
-                        key={`${doc.submissionId}-${doc.submitterId}`}
-                        className="rounded-lg border border-viva-200/60 bg-viva-50/40 p-3 text-sm"
-                      >
-                        <p className="font-semibold text-viva-900">{doc.templateName || 'Documento'}</p>
-                        <p className="text-[10px] text-viva-500 mt-0.5">
-                          Submissão #{doc.submissionId}
-                          {doc.createdAt ? ` · ${new Date(doc.createdAt).toLocaleString('pt-BR')}` : ''}
+              <div className="px-4 py-4 max-h-[min(70vh,520px)] overflow-y-auto">
+                {loadingPainelDoc ? (
+                  <p className="text-sm text-viva-600 font-serif">A carregar documentos…</p>
+                ) : (() => {
+                  const pd = painelDocResp?.data;
+                  if (!pd) {
+                    return <p className="text-sm text-viva-600 font-serif">Sem dados.</p>;
+                  }
+                  if (!pd.configured) {
+                    return (
+                      <p className="text-sm text-viva-700 font-serif">
+                        DocuSeal não está ligado. Defina <code className="text-xs bg-viva-100 px-1 rounded">DOCUSEAL_URL</code> +{' '}
+                        <code className="text-xs bg-viva-100 px-1 rounded">DOCUSEAL_API_KEY</code> no servidor.
+                      </p>
+                    );
+                  }
+                  if (pd.error) {
+                    return <p className="text-sm text-red-700 font-serif">{pd.error}</p>;
+                  }
+                  if (pd.documentos.length === 0) {
+                    return (
+                      <p className="text-sm text-viva-700 font-serif">
+                        Nenhum documento de assinatura está configurado para este ambiente.
+                      </p>
+                    );
+                  }
+                  return (
+                    <div className="space-y-3">
+                      {!pd.inviteFlowOk ? (
+                        <p className="text-sm text-amber-900 font-serif bg-amber-50 border border-amber-200/80 rounded-lg p-3">
+                          Para usar <strong>Enviar ao profissional</strong>, o servidor precisa da segunda parte do fluxo
+                          de assinatura (e-mail e papéis alinhados ao DocuSeal). Até lá pode consultar pedidos já
+                          existentes.
                         </p>
-                        {doc.status && <p className="text-xs text-viva-600 mt-1">Estado: {doc.status}</p>}
-                        <div className="mt-2 flex flex-wrap gap-2">
-                          {doc.signUrl ? (
-                            <a
-                              href={doc.signUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="btn-sm btn-secondary inline-flex"
-                            >
-                              Abrir assinatura
-                            </a>
-                          ) : null}
-                          <button
-                            type="button"
-                            className="btn-sm btn-primary"
-                            disabled={resendDocusealMutation.isPending}
-                            onClick={() => resendDocusealMutation.mutate(doc.submitterId)}
+                      ) : null}
+                      <ul className="space-y-3">
+                        {pd.documentos.map((doc) => (
+                          <li
+                            key={doc.templateId}
+                            className="rounded-lg border border-viva-200/60 bg-viva-50/40 p-3 text-sm"
                           >
-                            {resendDocusealMutation.isPending && resendDocusealMutation.variables === doc.submitterId
-                              ? 'A enviar…'
-                              : 'Reenviar e-mail'}
-                          </button>
-                        </div>
-                      </li>
-                    ))}
-                  </ul>
-                )}
+                            <div className="flex flex-wrap items-start justify-between gap-2">
+                              <p className="font-semibold text-viva-900">{doc.templateName}</p>
+                              <span
+                                className={`text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full shrink-0 ${
+                                  doc.status === 'nao_enviado'
+                                    ? 'bg-slate-200 text-slate-800'
+                                    : doc.status === 'pendente_medico'
+                                      ? 'bg-amber-100 text-amber-900'
+                                      : doc.status === 'pendente_outros'
+                                        ? 'bg-sky-100 text-sky-900'
+                                        : 'bg-green-100 text-green-900'
+                                }`}
+                              >
+                                {docusealStatusLabel(doc.status)}
+                              </span>
+                            </div>
+                            {doc.submissionId != null && doc.submissionId > 0 ? (
+                              <p className="text-[10px] text-viva-500 mt-0.5">Submissão #{doc.submissionId}</p>
+                            ) : null}
+                            {doc.signerStatus ? (
+                              <p className="text-xs text-viva-600 mt-1">Estado no DocuSeal: {doc.signerStatus}</p>
+                            ) : null}
+                            <div className="mt-2 flex flex-wrap gap-2">
+                              {doc.status === 'nao_enviado' ? (
+                                <button
+                                  type="button"
+                                  className="btn-sm btn-primary"
+                                  disabled={
+                                    !pd.inviteFlowOk ||
+                                    (enviarDocusealTplMutation.isPending &&
+                                      enviarDocusealTplMutation.variables?.templateId === doc.templateId)
+                                  }
+                                  title={
+                                    !pd.inviteFlowOk
+                                      ? 'Complete a configuração da segunda parte no servidor para enviar pela app.'
+                                      : undefined
+                                  }
+                                  onClick={() =>
+                                    enviarDocusealTplMutation.mutate({
+                                      medicoId: docusealModalMedico.id,
+                                      templateId: doc.templateId,
+                                    })
+                                  }
+                                >
+                                  {enviarDocusealTplMutation.isPending &&
+                                  enviarDocusealTplMutation.variables?.templateId === doc.templateId
+                                    ? 'A enviar…'
+                                    : 'Enviar ao profissional'}
+                                </button>
+                              ) : null}
+                              {doc.status === 'pendente_medico' && doc.signUrl ? (
+                                <a
+                                  href={doc.signUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="btn-sm btn-secondary inline-flex"
+                                >
+                                  Abrir assinatura
+                                </a>
+                              ) : null}
+                              {doc.status === 'pendente_medico' ? (
+                                <button
+                                  type="button"
+                                  className="btn-sm btn-primary"
+                                  disabled={
+                                    resendDocusealMutation.isPending ||
+                                    doc.submitterId == null ||
+                                    doc.submitterId <= 0
+                                  }
+                                  onClick={() => {
+                                    if (doc.submitterId != null && doc.submitterId > 0) {
+                                      resendDocusealMutation.mutate(doc.submitterId);
+                                    }
+                                  }}
+                                >
+                                  {resendDocusealMutation.isPending &&
+                                  resendDocusealMutation.variables === doc.submitterId
+                                    ? 'A enviar…'
+                                    : 'Reenviar e-mail'}
+                                </button>
+                              ) : null}
+                            </div>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  );
+                })()}
               </div>
             </div>
           </div>,

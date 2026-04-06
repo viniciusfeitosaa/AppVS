@@ -15,6 +15,10 @@ import {
   scheduleFromTipoRow,
 } from '../utils/plantao-horario';
 import { isMissingDatabaseColumnError } from '../utils/prisma-column-error';
+import {
+  createDocusealSubmissionsForMedicoInvite,
+  docusealDocumentosPainelPorMedicoService,
+} from './docuseal.service';
 import crypto from 'crypto';
 import { Prisma } from '@prisma/client';
 
@@ -378,6 +382,11 @@ export async function inviteMedicoService(
 
   const inviteUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/ativar-conta/${rawToken}`;
 
+  const docuseal = await createDocusealSubmissionsForMedicoInvite({
+    nomeCompleto: medico.nomeCompleto,
+    email: medico.email,
+  });
+
   return {
     medicoId: medico.id,
     nomeCompleto: medico.nomeCompleto,
@@ -385,7 +394,69 @@ export async function inviteMedicoService(
     inviteUrl,
     expiresAt,
     token: rawToken,
+    docuseal,
   };
+}
+
+/** DocuSeal: estado por modelo obrigatório (enviar / assinar) para o modal na lista de médicos. */
+export async function getMedicoDocusealDocumentosService(tenantId: string, medicoId: string) {
+  const medico = await prisma.medico.findFirst({
+    where: { id: medicoId, tenantId },
+    select: { email: true, nomeCompleto: true },
+  });
+
+  if (!medico) {
+    throw { statusCode: 404, message: 'Médico não encontrado' };
+  }
+
+  return docusealDocumentosPainelPorMedicoService(medico.email || '', medico.nomeCompleto);
+}
+
+/** DocuSeal: criar e enviar um modelo (POST API) a partir da app. */
+export async function enviarDocusealTemplateMedicoService(
+  tenantId: string,
+  masterId: string,
+  medicoId: string,
+  templateId: number
+) {
+  if (!Number.isFinite(templateId) || templateId <= 0) {
+    throw { statusCode: 400, message: 'templateId inválido' };
+  }
+
+  const medico = await prisma.medico.findFirst({
+    where: { id: medicoId, tenantId },
+    select: { id: true, email: true, nomeCompleto: true },
+  });
+
+  if (!medico) {
+    throw { statusCode: 404, message: 'Médico não encontrado' };
+  }
+
+  if (!medico.email) {
+    throw { statusCode: 400, message: 'Médico sem e-mail cadastrado' };
+  }
+
+  const result = await createDocusealSubmissionsForMedicoInvite(
+    { nomeCompleto: medico.nomeCompleto, email: medico.email },
+    { onlyTemplateIds: [templateId] }
+  );
+
+  if (!result.attempted) {
+    throw {
+      statusCode: 503,
+      message: 'DocuSeal não configurado no servidor (templates e segunda parte).',
+    };
+  }
+
+  await createAuditLog({
+    acao: 'DOCUSEAL_ENVIAR_TEMPLATE',
+    tenantId,
+    masterId,
+    medicoId: medico.id,
+    detalhes: { templateId, created: result.created, errors: result.errors },
+  });
+
+  return result;
 }
 
 export async function toggleMedicoAtivoService(

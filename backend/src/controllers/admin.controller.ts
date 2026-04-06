@@ -21,6 +21,8 @@ import {
   getValoresPlantaoService,
   listAdicionaisPlantaoService,
   inviteMedicoService,
+  getMedicoDocusealDocumentosService,
+  enviarDocusealTemplateMedicoService,
   listContratoEquipesService,
   listContratoSubgruposService,
   listEscalaMedicosService,
@@ -129,6 +131,49 @@ export const docusealResumoPorEmailsController = async (req: Request, res: Respo
     return res.status(error.statusCode || 500).json({
       success: false,
       error: error.message || 'Erro ao consultar DocuSeal',
+    });
+  }
+};
+
+/** DocuSeal: modelos obrigatórios + estado (enviar / pendente) para um médico. */
+export const getMedicoDocusealDocumentosController = async (req: Request, res: Response) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ success: false, error: 'Não autenticado' });
+    }
+    const medicoId = req.params.id;
+    const data = await getMedicoDocusealDocumentosService(req.user.tenantId, medicoId);
+    return res.status(200).json({ success: true, data });
+  } catch (error: any) {
+    return res.status(error.statusCode || 500).json({
+      success: false,
+      error: error.message || 'Erro ao consultar documentos DocuSeal',
+    });
+  }
+};
+
+/** DocuSeal: enviar um modelo ao médico (cria submissão na API). */
+export const postMedicoDocusealEnviarTemplateController = async (req: Request, res: Response) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ success: false, error: 'Não autenticado' });
+    }
+    const medicoId = req.params.id;
+    const templateId = Number(req.body?.templateId);
+    if (!Number.isFinite(templateId)) {
+      return res.status(400).json({ success: false, error: 'Envie JSON { "templateId": number }' });
+    }
+    const result = await enviarDocusealTemplateMedicoService(
+      req.user.tenantId,
+      req.user.id,
+      medicoId,
+      templateId
+    );
+    return res.status(200).json({ success: true, data: result });
+  } catch (error: any) {
+    return res.status(error.statusCode || 500).json({
+      success: false,
+      error: error.message || 'Erro ao enviar documento DocuSeal',
     });
   }
 };

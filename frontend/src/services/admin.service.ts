@@ -214,7 +214,7 @@ export interface DocusealPendentesResponse {
 }
 
 export interface DocusealDocProfissional {
-  submitterId: number;
+  submitterId: number | null;
   submissionId: number;
   templateName: string | null;
   createdAt: string | null;
@@ -224,12 +224,42 @@ export interface DocusealDocProfissional {
   signUrl: string | null;
 }
 
+/** Contagens alinhadas à lista de documentos configurados no servidor (mesma lógica do modal). */
+export interface DocusealResumoAcaoPorEmail {
+  faltaEnviar: number;
+  pendenteAssinaturaMedico: number;
+  aguardaSegundaParte: number;
+}
+
 export interface DocusealResumoPorEmailsResponse {
   success: boolean;
   data: {
     configured: boolean;
     error: string | null;
     byEmail: Record<string, DocusealDocProfissional[]>;
+    acoesPorEmail?: Record<string, DocusealResumoAcaoPorEmail>;
+  };
+}
+
+export type DocusealDocPainelStatus = 'nao_enviado' | 'pendente_medico' | 'pendente_outros' | 'concluido';
+
+export interface DocusealDocumentoPainelItem {
+  templateId: number;
+  templateName: string;
+  status: DocusealDocPainelStatus;
+  submissionId: number | null;
+  submitterId: number | null;
+  signUrl: string | null;
+  signerStatus: string | null;
+}
+
+export interface DocusealDocumentosPainelResponse {
+  success: boolean;
+  data: {
+    configured: boolean;
+    inviteFlowOk: boolean;
+    error: string | null;
+    documentos: DocusealDocumentoPainelItem[];
   };
 }
 
@@ -343,6 +373,23 @@ export const adminService = {
     const response = await api.post<{ success: boolean; message?: string }>(
       `/admin/integrations/docuseal/submitters/${submitterId}/resend-email`
     );
+    return response.data;
+  },
+
+  getMedicoDocusealDocumentos: async (medicoId: string): Promise<DocusealDocumentosPainelResponse> => {
+    const response = await api.get<DocusealDocumentosPainelResponse>(
+      `/admin/medicos/${medicoId}/docuseal/documentos`
+    );
+    return response.data;
+  },
+
+  enviarDocusealTemplateMedico: async (
+    medicoId: string,
+    templateId: number
+  ): Promise<{ success: boolean; data?: { attempted: boolean; created: number; errors: string[] } }> => {
+    const response = await api.post(`/admin/medicos/${medicoId}/docuseal/enviar-template`, {
+      templateId,
+    });
     return response.data;
   },
 

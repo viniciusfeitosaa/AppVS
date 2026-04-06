@@ -5,6 +5,12 @@
   [build.environment]
     VITE_API_URL = "https://appvs.onrender.com/api"
 
+# Antes do catch-all /app/*: ficheiros estáticos com nome conflituoso com o prefixo
+[[redirects]]
+  from = "/app/vite.svg"
+  to = "/vite.svg"
+  status = 200
+
 # Raiz (/) serve a landing estática (dist/index.html). Só o app React precisa de rewrite:
 [[redirects]]
   from = "/app"
@@ -25,10 +31,10 @@
   to = "/app/login"
   status = 302
 
-# Favicon na raiz: servir o ícone do app (evita 404 em /favicon.ico)
+# Ícone na raiz do publish (public/vite.svg → /vite.svg)
 [[redirects]]
   from = "/favicon.ico"
-  to = "/app/vite.svg"
+  to = "/vite.svg"
   status = 302
 
 # Configurações de headers para segurança e performance
@@ -49,3 +55,8 @@
   for = "/app/assets/*"
   [headers.values]
     Cache-Control = "public, max-age=31536000, immutable"
+
+[[headers]]
+  for = "/app/index.html"
+  [headers.values]
+    Cache-Control = "no-cache, no-store, must-revalidate"

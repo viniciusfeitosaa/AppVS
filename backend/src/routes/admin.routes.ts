@@ -36,6 +36,8 @@ import {
   listDocusealPendentesController,
   docusealResumoPorEmailsController,
   docusealResendSubmitterController,
+  getMedicoDocusealDocumentosController,
+  postMedicoDocusealEnviarTemplateController,
   listDocumentosEnviadosController,
   uploadDocumentoEnviadoController,
   deleteDocumentoEnviadoController,
@@ -104,6 +106,18 @@ router.post('/medicos', requireModuleAccess(ModuloSistema.MEDICOS), createMedico
 router.put('/medicos/:id', requireModuleAccess(ModuloSistema.MEDICOS), updateMedicoController);
 router.patch('/medicos/:id/ativo', requireModuleAccess(ModuloSistema.MEDICOS), toggleMedicoAtivoController);
 router.post('/medicos/:id/invite', requireModuleAccess(ModuloSistema.MEDICOS), validateUUIDParam('id'), inviteMedicoController);
+router.get(
+  '/medicos/:id/docuseal/documentos',
+  requireModuleAccess(ModuloSistema.MEDICOS),
+  validateUUIDParam('id'),
+  getMedicoDocusealDocumentosController
+);
+router.post(
+  '/medicos/:id/docuseal/enviar-template',
+  requireModuleAccess(ModuloSistema.MEDICOS),
+  validateUUIDParam('id'),
+  postMedicoDocusealEnviarTemplateController
+);
 
 router.get('/contratos-ativos', requireModuleAccess(ModuloSistema.CONTRATOS_ATIVOS), listContratosAtivosController);
 router.post('/contratos-ativos', requireModuleAccess(ModuloSistema.CONTRATOS_ATIVOS), createContratoAtivoController);
