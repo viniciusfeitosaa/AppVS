@@ -11,6 +11,8 @@ services:
       - "${BACKEND_PORT:-3001}:3001"
     environment:
       - NODE_ENV=${NODE_ENV:-production}
+      # Cap do heap V8 (ajusta NODE_MAX_OLD_SPACE_SIZE_MB no .env se precisares de mais sob carga)
+      - NODE_OPTIONS=--max-old-space-size=${NODE_MAX_OLD_SPACE_SIZE_MB:-256}
       - PORT=3001
       - DATABASE_URL=${DATABASE_URL}
       - DB_HOST=${DB_HOST:-}
@@ -40,6 +42,12 @@ services:
       timeout: 10s
       retries: 3
       start_period: 40s
+    deploy:
+      resources:
+        limits:
+          memory: 384M
+        reservations:
+          memory: 128M
 
   # Frontend Service
   frontend:
@@ -68,6 +76,12 @@ services:
       timeout: 10s
       retries: 3
       start_period: 10s
+    deploy:
+      resources:
+        limits:
+          memory: 64M
+        reservations:
+          memory: 16M
 
   # Nginx Reverse Proxy (opcional - para produção com SSL)
   nginx:

@@ -183,6 +183,12 @@ const Escalas = () => {
   /** 'grupos' = primeira tela (Lista de subgrupos e equipes); 'escalas' = escalas + grade */
   const [viewEscalas, setViewEscalas] = useState<'grupos' | 'escalas'>('grupos');
   const [searchGrupos, setSearchGrupos] = useState('');
+  /** Filtros da lista de grupos (contrato / subgrupo) — reduzem itens visíveis quando há muitos cadastros. */
+  const [filtroListaContratoId, setFiltroListaContratoId] = useState('');
+  /** Se preenchido, a lista mostra só esse subgrupo (após filtro de contrato). */
+  const [filtroListaSubgrupoId, setFiltroListaSubgrupoId] = useState('');
+  /** Remonta o select "Ir para equipe" após cada escolha para voltar ao placeholder. */
+  const [equipeFiltroSelectKey, setEquipeFiltroSelectKey] = useState(0);
   /** Subgrupo selecionado na Lista de grupos; ao clicar, exibe as equipes desse subgrupo (ou mensagem se não tiver). */
   const [selectedSubgrupoId, setSelectedSubgrupoId] = useState<string | null>(null);
   /** Equipe selecionada: ao clicar, abre o painel lateral (menu) da equipe. */
@@ -856,11 +862,65 @@ const Escalas = () => {
       ),
     [subgrupos]
   );
+
+  const contratosParaFiltroLista = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const s of subgruposComEscala) {
+      for (const cs of s.contratoSubgrupos ?? []) {
+        const ca = cs.contratoAtivo;
+        if (ca?.usaEscala && ca?.id) map.set(ca.id, fixMojibake(ca.nome));
+      }
+    }
+    return Array.from(map.entries())
+      .sort((a, b) => a[1].localeCompare(b[1], 'pt-BR'))
+      .map(([id, nome]) => ({ id, nome }));
+  }, [subgruposComEscala]);
+
+  const subgruposAposFiltroContrato = useMemo(() => {
+    if (!filtroListaContratoId) return subgruposComEscala;
+    return subgruposComEscala.filter((s) =>
+      (s.contratoSubgrupos ?? []).some(
+        (cs) => cs.contratoAtivo?.id === filtroListaContratoId && cs.contratoAtivo?.usaEscala
+      )
+    );
+  }, [subgruposComEscala, filtroListaContratoId]);
+
+  const subgruposOrdenadosLista = useMemo(
+    () => [...subgruposAposFiltroContrato].sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR')),
+    [subgruposAposFiltroContrato]
+  );
+
+  const equipesParaFiltroLista = useMemo(() => {
+    const sgSet = new Set(subgruposAposFiltroContrato.map((s) => s.id));
+    let list = equipes.filter((e) => {
+      const sid = e.subgrupoId || e.subgrupo?.id;
+      return sid ? sgSet.has(sid) : false;
+    });
+    if (filtroListaSubgrupoId) {
+      list = list.filter((e) => (e.subgrupoId || e.subgrupo?.id) === filtroListaSubgrupoId);
+    }
+    return [...list].sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
+  }, [equipes, subgruposAposFiltroContrato, filtroListaSubgrupoId]);
+
   const subgruposFiltrados = useMemo(() => {
-    const base = subgruposComEscala;
+    let base = subgruposAposFiltroContrato;
+    if (filtroListaSubgrupoId) {
+      base = base.filter((s) => s.id === filtroListaSubgrupoId);
+    }
     if (!searchGruposLower) return base;
     return base.filter((s) => s.nome.toLowerCase().includes(searchGruposLower));
-  }, [subgruposComEscala, searchGruposLower]);
+  }, [subgruposAposFiltroContrato, filtroListaSubgrupoId, searchGruposLower]);
+
+  useEffect(() => {
+    if (!filtroListaContratoId) return;
+    if (filtroListaSubgrupoId && !subgruposAposFiltroContrato.some((s) => s.id === filtroListaSubgrupoId)) {
+      setFiltroListaSubgrupoId('');
+    }
+    if (selectedSubgrupoId && !subgruposAposFiltroContrato.some((s) => s.id === selectedSubgrupoId)) {
+      setSelectedSubgrupoId(null);
+      setSelectedEquipeId(null);
+    }
+  }, [filtroListaContratoId, subgruposAposFiltroContrato, filtroListaSubgrupoId, selectedSubgrupoId]);
 
   /** Equipes do subgrupo selecionado (só preenchido quando selectedSubgrupoId está setado). */
   const equipesDoSubgrupoSelecionado = useMemo(() => {
@@ -1282,6 +1342,102 @@ const Escalas = () => {
                 Escalas e grades
               </button>
             </div>
+            <div className="flex flex-col gap-2 mb-1">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                <div className="min-w-0">
+                  <label htmlFor="filtro-grupo-contrato" className="block text-xs font-medium text-viva-600 mb-1">
+                    Contrato
+                  </label>
+                  <select
+                    id="filtro-grupo-contrato"
+                    value={filtroListaContratoId}
+                    onChange={(e) => {
+                      setFiltroListaContratoId(e.target.value);
+                      setFiltroListaSubgrupoId('');
+                    }}
+                    className="w-full py-2 px-3 text-sm border border-viva-200 rounded-lg outline-none bg-viva-50/50 focus:ring-2 focus:ring-viva-500/30 focus:border-viva-500"
+                  >
+                    <option value="">Todos os contratos</option>
+                    {contratosParaFiltroLista.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.nome}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="min-w-0">
+                  <label htmlFor="filtro-grupo-subgrupo" className="block text-xs font-medium text-viva-600 mb-1">
+                    Subgrupo
+                  </label>
+                  <select
+                    id="filtro-grupo-subgrupo"
+                    value={filtroListaSubgrupoId}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      setFiltroListaSubgrupoId(v);
+                      if (v) setSelectedSubgrupoId(v);
+                    }}
+                    className="w-full py-2 px-3 text-sm border border-viva-200 rounded-lg outline-none bg-viva-50/50 focus:ring-2 focus:ring-viva-500/30 focus:border-viva-500"
+                  >
+                    <option value="">Todos os subgrupos</option>
+                    {subgruposOrdenadosLista.map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {fixMojibake(s.nome)}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="min-w-0">
+                  <label htmlFor="filtro-grupo-equipe" className="block text-xs font-medium text-viva-600 mb-1">
+                    Ir para equipe
+                  </label>
+                  <select
+                    id="filtro-grupo-equipe"
+                    key={equipeFiltroSelectKey}
+                    defaultValue=""
+                    onChange={(e) => {
+                      const id = e.target.value;
+                      if (!id) return;
+                      const eq = equipes.find((x) => x.id === id);
+                      if (!eq) return;
+                      const sid = eq.subgrupoId || eq.subgrupo?.id || '';
+                      const sub = subgrupos.find((s) => s.id === sid);
+                      const contratoId =
+                        sub?.contratoSubgrupos?.find((cs) => cs.contratoAtivo?.usaEscala)?.contratoAtivo?.id ?? '';
+                      if (contratoId) setFiltroListaContratoId(contratoId);
+                      setFiltroListaSubgrupoId(sid);
+                      setSelectedSubgrupoId(sid || null);
+                      setSelectedEquipeId(eq.id);
+                      setEquipePanelTab('calendario');
+                      setEquipeFiltroSelectKey((k) => k + 1);
+                    }}
+                    className="w-full py-2 px-3 text-sm border border-viva-200 rounded-lg outline-none bg-viva-50/50 focus:ring-2 focus:ring-viva-500/30 focus:border-viva-500"
+                  >
+                    <option value="">Escolher equipe…</option>
+                    {equipesParaFiltroLista.map((eq) => (
+                      <option key={eq.id} value={eq.id}>
+                        {fixMojibake(eq.nome)}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              {(filtroListaContratoId || filtroListaSubgrupoId || searchGrupos.trim()) && (
+                <div className="flex justify-end">
+                  <button
+                    type="button"
+                    className="text-sm font-medium text-viva-600 hover:text-viva-800 underline"
+                    onClick={() => {
+                      setFiltroListaContratoId('');
+                      setFiltroListaSubgrupoId('');
+                      setSearchGrupos('');
+                    }}
+                  >
+                    Limpar filtros de lista
+                  </button>
+                </div>
+              )}
+            </div>
             <div className="relative flex items-center gap-2">
               <svg className="absolute left-3 h-5 w-5 text-gray-500 pointer-events-none" fill="currentColor" viewBox="0 0 512 512"><path d="M505 442.7L405.3 343c-4.5-4.5-10.6-7-17-7H372c27.6-35.3 44-79.7 44-128C416 93.1 322.9 0 208 0S0 93.1 0 208s93.1 208 208 208c48.3 0 92.7-16.4 128-44v16.3c0 6.4 2.5 12.5 7 17l99.7 99.7c9.4 9.4 24.6 9.4 33.9 0l28.3-28.3c9.4-9.4 9.4-24.6.1-34zM208 336c-70.7 0-128-57.2-128-128 0-70.7 57.2-128 128-128 70.7 0 128 57.2 128 128 0 70.7-57.2 128-128 128z" /></svg>
               <input
@@ -1303,8 +1459,8 @@ const Escalas = () => {
           <div className="flex-1 overflow-y-auto min-h-0">
             {subgruposFiltrados.length === 0 ? (
               <div className="p-6 text-center text-viva-700">
-                {searchGrupos.trim()
-                  ? 'Nenhum subgrupo encontrado para esta busca.'
+                {searchGrupos.trim() || filtroListaContratoId || filtroListaSubgrupoId
+                  ? 'Nenhum subgrupo corresponde aos filtros ou à busca. Ajuste contrato, subgrupo ou o texto em "Procurar grupo".'
                   : subgruposComEscala.length === 0 && subgrupos.length > 0
                     ? 'Nenhum subgrupo vinculado a contratos que usam escalas. Vincule subgrupos aos contratos em Contratos ativos (e marque "Usar escalas").'
                     : 'Nenhum subgrupo cadastrado. Use o botão + para criar em Subgrupos e Equipes.'}
