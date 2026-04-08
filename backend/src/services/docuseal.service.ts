@@ -476,10 +476,9 @@ export async function docusealResumoPorEmailsService(emails: string[]): Promise<
     const conc = Math.min(5, Math.max(1, lista.length));
 
     const worker = async () => {
-      while (true) {
-        const i = cursor++;
-        if (i >= lista.length) break;
-        const emailNorm = lista[i];
+      let wi: number;
+      while ((wi = cursor++) < lista.length) {
+        const emailNorm = lista[wi];
         const raw = await fetchSubmissionsPaginated(c.apiBase, c.token, { q: emailNorm });
         if (temPainelPorTemplates) {
           const docs = documentosPainelFromRaw(raw, emailNorm, c.webBase, requiredTemplates);
