@@ -994,11 +994,27 @@ export async function listMinhasEscalasService(tenantId: string, medicoId: strin
  * Uma ida ao banco em paralelo: dados do dia + escalas (tela Ponto Eletrônico).
  * Reduz round-trips HTTP quando o cliente usa um único GET.
  */
+const painelTiming = process.env.MEDICO_DASHBOARD_TIMING === '1';
+
 export async function getPainelPontoEletronicoInicialService(tenantId: string, medicoId: string) {
+  const t0 = Date.now();
   const [meuDia, escalas] = await Promise.all([
-    getMeuDiaPontoService(tenantId, medicoId),
-    listMinhasEscalasService(tenantId, medicoId),
+    (async () => {
+      const t = Date.now();
+      const r = await getMeuDiaPontoService(tenantId, medicoId);
+      if (painelTiming) console.log(`[medico/dashboard]   └ meuDia ${Date.now() - t}ms`);
+      return r;
+    })(),
+    (async () => {
+      const t = Date.now();
+      const r = await listMinhasEscalasService(tenantId, medicoId);
+      if (painelTiming) console.log(`[medico/dashboard]   └ minhasEscalas ${Date.now() - t}ms`);
+      return r;
+    })(),
   ]);
+  if (painelTiming) {
+    console.log(`[medico/dashboard] painel interno ${Date.now() - t0}ms (paralelo meuDia+escalas)`);
+  }
   return { meuDia, escalas };
 }
 

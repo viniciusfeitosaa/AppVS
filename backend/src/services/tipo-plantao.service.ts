@@ -59,6 +59,9 @@ const TIPOS_LEITURA_TTL_MS = Math.max(
 );
 const tiposLeituraPorContrato = new Map<string, { exp: number; map: Map<string, TipoPlantao> }>();
 
+/** Pedidos paralelos com o mesmo conjunto de contratos (ex.: dashboard) partilham um único findMany. */
+const inflightTiposLeituraFetch = new Map<string, Promise<Map<string, Map<string, TipoPlantao>>>>();
+
 export function invalidateTiposLeituraCache(tenantId: string, contratoAtivoId: string) {
   tiposLeituraPorContrato.delete(`${tenantId}:${contratoAtivoId}`);
 }
@@ -527,18 +530,30 @@ export async function loadTiposMapPorContratoLeitura(
   }
 
   if (missing.length > 0) {
-    const tipos = await prisma.tipoPlantao.findMany({
-      where: { tenantId, contratoAtivoId: { in: missing } },
-    });
-
-    const freshByCid = new Map<string, Map<string, TipoPlantao>>();
-    for (const t of tipos) {
-      if (!freshByCid.has(t.contratoAtivoId)) {
-        freshByCid.set(t.contratoAtivoId, new Map());
-      }
-      freshByCid.get(t.contratoAtivoId)!.set(t.id, t);
+    const fetchKey = `${tenantId}|${[...missing].sort().join(',')}`;
+    let fetchP = inflightTiposLeituraFetch.get(fetchKey);
+    if (!fetchP) {
+      fetchP = (async () => {
+        try {
+          const tipos = await prisma.tipoPlantao.findMany({
+            where: { tenantId, contratoAtivoId: { in: missing } },
+          });
+          const freshByCid = new Map<string, Map<string, TipoPlantao>>();
+          for (const t of tipos) {
+            if (!freshByCid.has(t.contratoAtivoId)) {
+              freshByCid.set(t.contratoAtivoId, new Map());
+            }
+            freshByCid.get(t.contratoAtivoId)!.set(t.id, t);
+          }
+          return freshByCid;
+        } finally {
+          inflightTiposLeituraFetch.delete(fetchKey);
+        }
+      })();
+      inflightTiposLeituraFetch.set(fetchKey, fetchP);
     }
 
+    const freshByCid = await fetchP;
     const exp = now + TIPOS_LEITURA_TTL_MS;
     for (const cid of missing) {
       const map = freshByCid.get(cid) ?? new Map<string, TipoPlantao>();
