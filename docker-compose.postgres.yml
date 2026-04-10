@@ -1,0 +1,44 @@
+# Postgres na VPS, só rede Docker (sem "ports:") — não expõe 5432 na internet.
+# Uso: docker compose -f docker-compose.yml -f docker-compose.postgres.yml up -d
+#
+# No .env:
+#   POSTGRES_USER=appmedico
+#   POSTGRES_PASSWORD=<forte>
+#   POSTGRES_DB=appmedico
+#   DATABASE_URL=postgresql://appmedico:SENHA@postgres:5432/appmedico?schema=public
+#
+# Migração Supabase → aqui: pg_dump da origem + restore neste volume; depois prisma migrate deploy.
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: app-medico-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-appmedico}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Defina POSTGRES_PASSWORD no .env}
+      POSTGRES_DB: ${POSTGRES_DB:-appmedico}
+    volumes:
+      - app_medico_pgdata:/var/lib/postgresql/data
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-appmedico} -d ${POSTGRES_DB:-appmedico}"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 15s
+    deploy:
+      resources:
+        limits:
+          memory: 1536M
+        reservations:
+          memory: 256M
+
+  backend:
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  app_medico_pgdata:
