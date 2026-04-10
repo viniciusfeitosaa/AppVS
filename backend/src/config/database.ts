@@ -1,32 +1,52 @@
 import { PrismaClient } from '@prisma/client';
 
-/**
- * connection_limit do Prisma por processo Node.
- * Supabase Session pooler: em dev forçamos no máx. 1 (evita MaxClientsInSessionMode), mesmo se DATABASE_POOL_SIZE estiver alto.
- */
-const isSupabasePooler = /pooler\.supabase\.com/i.test(process.env.DATABASE_URL || '');
-const explicitPool = parseInt(process.env.DATABASE_POOL_SIZE || '', 10);
-/** Session pooler (5432): um client por conexão; multi-conexão exige Transaction pooler (6543) ou URL direta. */
-const supabaseDevMultiConn =
-  process.env.SUPABASE_PRISMA_MULTI_CONN === '1' &&
-  Number.isFinite(explicitPool) &&
-  explicitPool > 1;
-
-let resolvedPool = Number.isFinite(explicitPool) && explicitPool > 0
-  ? explicitPool
-  : process.env.NODE_ENV === 'production'
-    ? 10
-    : isSupabasePooler
-      ? 1
-      : 3;
-if (isSupabasePooler && process.env.NODE_ENV !== 'production' && !supabaseDevMultiConn) {
-  resolvedPool = Math.min(resolvedPool, 1);
+function parseDatabaseUrl(raw: string): { port: number; isSupabasePoolerHost: boolean } {
+  if (!raw) return { port: 5432, isSupabasePoolerHost: false };
+  try {
+    const normalized = raw.replace(/^postgresql:\/\//i, 'postgres://');
+    const u = new URL(normalized);
+    const port = parseInt(u.port || '5432', 10);
+    const host = (u.hostname || '').toLowerCase();
+    const isSupabasePoolerHost = host.includes('pooler.supabase.com');
+    return { port, isSupabasePoolerHost };
+  } catch {
+    return {
+      port: /:6543\b/.test(raw) ? 6543 : 5432,
+      isSupabasePoolerHost: /pooler\.supabase\.com/i.test(raw),
+    };
+  }
 }
-const CONNECTION_LIMIT = Math.min(Math.max(1, resolvedPool), 20);
+
+const dbUrlRaw = process.env.DATABASE_URL || '';
+const dbParsed = parseDatabaseUrl(dbUrlRaw);
+/** Session pooler Supabase (porta 5432): 1 conexão — filas enormes no dashboard (várias dezenas de queries em paralelo). */
+const isSupabaseSessionPool = dbParsed.isSupabasePoolerHost && dbParsed.port === 5432;
+/** Transaction pooler (porta 6543): Prisma pode usar várias conexões; exige `pgbouncer=true` na URL. */
+const isSupabaseTransactionPool = dbParsed.isSupabasePoolerHost && dbParsed.port === 6543;
+
+const explicitPool = parseInt(process.env.DATABASE_POOL_SIZE || '', 10);
+
+let resolvedPool: number;
+if (Number.isFinite(explicitPool) && explicitPool > 0) {
+  resolvedPool = explicitPool;
+} else if (isSupabaseSessionPool) {
+  resolvedPool = 1;
+} else if (isSupabaseTransactionPool) {
+  resolvedPool = process.env.NODE_ENV === 'production' ? 10 : 5;
+} else {
+  resolvedPool = process.env.NODE_ENV === 'production' ? 10 : 3;
+}
+
+/** Session pooler não suporta várias conexões Prisma; ignora DATABASE_POOL_SIZE > 1. */
+let connectionLimit = Math.min(Math.max(1, resolvedPool), 20);
+if (isSupabaseSessionPool) {
+  connectionLimit = 1;
+}
+const CONNECTION_LIMIT = connectionLimit;
 
 const SLOW_QUERY_MS = Math.max(1, parseInt(process.env.PRISMA_SLOW_QUERY_MS || '', 10) || 250);
 
-/** Garante connection_limit e pool_timeout na URL (Supabase + Render). Sobrescreve se a URL já tiver. */
+/** Garante connection_limit, pool_timeout e (Supabase :6543) pgbouncer=true na URL. */
 function getDatabaseUrl(): string {
   const url = process.env.DATABASE_URL || '';
   if (!url) return url;
@@ -35,6 +55,9 @@ function getDatabaseUrl(): string {
     .replace(/pool_timeout=\d+/g, 'pool_timeout=30');
   if (!u.includes('connection_limit=')) u += (u.includes('?') ? '&' : '?') + `connection_limit=${CONNECTION_LIMIT}`;
   if (!u.includes('pool_timeout=')) u += (u.includes('?') ? '&' : '?') + 'pool_timeout=30';
+  if (isSupabaseTransactionPool && !/pgbouncer=true/i.test(u)) {
+    u += (u.includes('?') ? '&' : '?') + 'pgbouncer=true';
+  }
   return u;
 }
 
@@ -67,14 +90,15 @@ const prismaClientSingleton = () => {
     });
   }
 
-  if (process.env.NODE_ENV === 'development') {
-    console.log(
-      `[DB] Prisma connection_limit=${CONNECTION_LIMIT}` +
-        (isSupabasePooler
-          ? supabaseDevMultiConn
-            ? ' (Supabase: multi-conexão ativa — use Transaction pooler :6543; Session :5432 = 1 conexão)'
-            : ' (Supabase Session pooler: limite 1 em dev; para paralelizar: Transaction pooler + DATABASE_POOL_SIZE + SUPABASE_PRISMA_MULTI_CONN=1)'
-          : '')
+  const poolerHint = isSupabaseSessionPool
+    ? ' — AVISO: Session pooler (:5432) = 1 conexão; queries paralelas enfileiram (dashboard lento). Use Transaction pooler porta 6543 + pgbouncer=true (Settings → Database no Supabase).'
+    : isSupabaseTransactionPool
+      ? ' (Supabase Transaction pooler :6543)'
+      : '';
+  console.log(`[DB] Prisma connection_limit=${CONNECTION_LIMIT}${poolerHint}`);
+  if (isSupabaseSessionPool) {
+    console.warn(
+      '[DB] Dashboard / medico fazem Promise.all com muitas queries. Com connection_limit=1 o tempo vira a soma das filas. Corrija DATABASE_URL para o host pooler porta 6543 (Transaction mode).'
     );
   }
 
