@@ -817,13 +817,10 @@ export async function listMinhasEscalasService(tenantId: string, medicoId: strin
     },
   });
 
-  const plantoesDoMedicoP = prisma.escalaPlantao.findMany({
+  /** groupBy evita varrer todos os plantões do médico (findMany+distinct ficava O(n) com histórico grande). */
+  const plantoesEscalaIdsP = prisma.escalaPlantao.groupBy({
+    by: ['escalaId'],
     where: { tenantId, medicoId },
-    select: {
-      escalaId: true,
-      escala: { select: { id: true, nome: true, dataInicio: true, dataFim: true, ativo: true } },
-    },
-    distinct: ['escalaId'],
   });
 
   const equipesDoMedicoP = prisma.equipeMedico.findMany({
@@ -833,9 +830,9 @@ export async function listMinhasEscalasService(tenantId: string, medicoId: strin
 
   const temSoPontoP = medicoTemContratoSoPonto(tenantId, medicoId);
 
-  const [alocacoes, plantoesDoMedico, equipesDoMedico, temContratoSoPontoFlag] = await Promise.all([
+  const [alocacoes, plantoesEscalaIds, equipesDoMedico, temContratoSoPontoFlag] = await Promise.all([
     alocacoesP,
-    plantoesDoMedicoP,
+    plantoesEscalaIdsP,
     equipesDoMedicoP,
     temSoPontoP,
   ]);
@@ -847,9 +844,16 @@ export async function listMinhasEscalasService(tenantId: string, medicoId: strin
     }
   }
 
-  for (const p of plantoesDoMedico) {
-    if (p.escala?.ativo && !uniqueByEscala.has(p.escala.id)) {
-      uniqueByEscala.set(p.escala.id, { ...p.escala, equipes: [] as string[] });
+  const escalaIdsDePlantoes = plantoesEscalaIds.map((r) => r.escalaId).filter(Boolean) as string[];
+  if (escalaIdsDePlantoes.length > 0) {
+    const escalasDePlantoes = await prisma.escala.findMany({
+      where: { tenantId, id: { in: escalaIdsDePlantoes }, ativo: true },
+      select: { id: true, nome: true, dataInicio: true, dataFim: true, ativo: true },
+    });
+    for (const e of escalasDePlantoes) {
+      if (!uniqueByEscala.has(e.id)) {
+        uniqueByEscala.set(e.id, { ...e, equipes: [] as string[] });
+      }
     }
   }
 

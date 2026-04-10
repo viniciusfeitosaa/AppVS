@@ -52,6 +52,17 @@ export function invalidateEnsureTiposWarmCache(tenantId: string, contratoAtivoId
   ensureTiposWarmUntil.delete(`${tenantId}:${contratoAtivoId}`);
 }
 
+/** Cache curto por contrato: dashboard/meu-dia chamavam loadTiposMapPorContratoLeitura várias vezes no mesmo request. */
+const TIPOS_LEITURA_TTL_MS = Math.max(
+  0,
+  parseInt(process.env.TIPOS_LEITURA_CACHE_MS || '', 10) || 20_000
+);
+const tiposLeituraPorContrato = new Map<string, { exp: number; map: Map<string, TipoPlantao> }>();
+
+export function invalidateTiposLeituraCache(tenantId: string, contratoAtivoId: string) {
+  tiposLeituraPorContrato.delete(`${tenantId}:${contratoAtivoId}`);
+}
+
 /**
  * Garante tipos padrão MT/SN e migra grade_id legado (mt/sn) para UUIDs do contrato.
  * Idempotente: seguro chamar antes de listar valores ou plantões.
@@ -345,6 +356,7 @@ export async function createTipoPlantaoService(input: {
     detalhes: { tipoPlantaoId: row.id, contratoAtivoId: input.contratoAtivoId, nome },
   });
 
+  invalidateTiposLeituraCache(input.tenantId, input.contratoAtivoId);
   return row;
 }
 
@@ -420,6 +432,7 @@ export async function updateTipoPlantaoService(input: {
     detalhes: { tipoPlantaoId: row.id, contratoAtivoId: existing.contratoAtivoId },
   });
 
+  invalidateTiposLeituraCache(input.tenantId, existing.contratoAtivoId);
   return row;
 }
 
@@ -457,6 +470,7 @@ export async function deleteTipoPlantaoService(tenantId: string, masterId: strin
   });
 
   invalidateEnsureTiposWarmCache(tenantId, existing.contratoAtivoId);
+  invalidateTiposLeituraCache(tenantId, existing.contratoAtivoId);
   return { ok: true as const };
 }
 
@@ -494,17 +508,47 @@ export async function loadTiposMapPorContratoLeitura(
   const ids = [...new Set(contratoAtivoIds.filter(Boolean))];
   if (ids.length === 0) return new Map();
 
-  const tipos = await prisma.tipoPlantao.findMany({
-    where: { tenantId, contratoAtivoId: { in: ids } },
-  });
-
   const out = new Map<string, Map<string, TipoPlantao>>();
-  for (const t of tipos) {
-    if (!out.has(t.contratoAtivoId)) {
-      out.set(t.contratoAtivoId, new Map());
+  const missing: string[] = [];
+  const now = Date.now();
+
+  if (TIPOS_LEITURA_TTL_MS > 0) {
+    for (const cid of ids) {
+      const ck = `${tenantId}:${cid}`;
+      const hit = tiposLeituraPorContrato.get(ck);
+      if (hit && hit.exp > now) {
+        out.set(cid, hit.map);
+      } else {
+        missing.push(cid);
+      }
     }
-    out.get(t.contratoAtivoId)!.set(t.id, t);
+  } else {
+    missing.push(...ids);
   }
+
+  if (missing.length > 0) {
+    const tipos = await prisma.tipoPlantao.findMany({
+      where: { tenantId, contratoAtivoId: { in: missing } },
+    });
+
+    const freshByCid = new Map<string, Map<string, TipoPlantao>>();
+    for (const t of tipos) {
+      if (!freshByCid.has(t.contratoAtivoId)) {
+        freshByCid.set(t.contratoAtivoId, new Map());
+      }
+      freshByCid.get(t.contratoAtivoId)!.set(t.id, t);
+    }
+
+    const exp = now + TIPOS_LEITURA_TTL_MS;
+    for (const cid of missing) {
+      const map = freshByCid.get(cid) ?? new Map<string, TipoPlantao>();
+      if (TIPOS_LEITURA_TTL_MS > 0) {
+        tiposLeituraPorContrato.set(`${tenantId}:${cid}`, { exp, map });
+      }
+      out.set(cid, map);
+    }
+  }
+
   return out;
 }
 
