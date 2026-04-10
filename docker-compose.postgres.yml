@@ -1,4 +1,9 @@
-# Postgres na VPS, só rede Docker (sem "ports:") — não expõe 5432 na internet.
+# Postgres na VPS — segurança por defeito
+# - Sem "ports:": porta 5432 NÃO é publicada; só containers na rede app-network (ex.: backend).
+# - Não coloques este serviço na proxy-network (NPM): a API não precisa de expor a BD.
+# - .env na VPS: chmod 600; password longa e aleatória (openssl rand -base64 32).
+# - Backups: ver scripts/backup-postgres.sh + cron + cópia para fora da VPS.
+#
 # Uso: docker compose -f docker-compose.yml -f docker-compose.postgres.yml up -d
 #
 # No .env:
@@ -7,7 +12,7 @@
 #   POSTGRES_DB=appmedico
 #   DATABASE_URL=postgresql://appmedico:SENHA@postgres:5432/appmedico?schema=public
 #
-# Migração Supabase → aqui: pg_dump da origem + restore neste volume; depois prisma migrate deploy.
+# Migração Supabase → aqui: pg_dump (conexão direta ao Postgres do projeto) + restore; prisma migrate deploy.
 
 services:
   postgres:
@@ -18,6 +23,8 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-appmedico}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Defina POSTGRES_PASSWORD no .env}
       POSTGRES_DB: ${POSTGRES_DB:-appmedico}
+      # Autenticação por password com SCRAM (melhor que md5 legado) em clusters novos.
+      POSTGRES_HOST_AUTH_METHOD: scram-sha-256
     volumes:
       - app_medico_pgdata:/var/lib/postgresql/data
     networks:
