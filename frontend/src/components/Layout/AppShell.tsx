@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '../../context/AuthContext';
 import { authService } from '../../services/auth.service';
 import { medicoService } from '../../services/medico.service';
@@ -103,10 +103,8 @@ const INACTIVITY_LOGOUT_MS = 40 * 60 * 1000;
 
 const AppShell = () => {
   const { user, logout } = useAuth();
-  const queryClient = useQueryClient();
   useInactivityLogout(INACTIVITY_LOGOUT_MS);
   const isMaster = user?.role === 'MASTER';
-  const isMedico = user?.role === 'MEDICO';
   const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
   const [openDesktopGroup, setOpenDesktopGroup] = useState<string | null>(null);
   const { data: modulosAcessoResp } = useQuery({
@@ -115,16 +113,27 @@ const AppShell = () => {
     enabled: !!user,
   });
 
+  const modulosMap = modulosAcessoResp?.data?.map || ({} as Record<ModuloSistema, boolean>);
+  const hasAccess = (modulo: ModuloSistema) => modulosMap[modulo] ?? true;
+
+  /** Evita 2× GET /ponto/meu-dia: o dashboard já inclui meuDia (mesma query key que a página Dashboard). */
+  const medicoComDashboard = !!user && user?.role === 'MEDICO' && hasAccess('DASHBOARD');
+  const { data: dashboardNavResp } = useQuery({
+    queryKey: ['medico', 'dashboard', user?.id],
+    queryFn: () => medicoService.getDashboard(),
+    enabled: medicoComDashboard,
+    staleTime: 30 * 1000,
+  });
   const { data: meuDiaNavResp } = useQuery({
     queryKey: ['ponto', 'meu-dia'],
     queryFn: () => pontoService.getMeuDia(),
-    enabled: !!user && user?.role === 'MEDICO',
+    enabled: !!user && user?.role === 'MEDICO' && !medicoComDashboard,
+    staleTime: 30 * 1000,
   });
-  const mostrarCalendarioEscalasNoMenu =
-    (meuDiaNavResp?.data as { temContratoComEscala?: boolean } | undefined)?.temContratoComEscala !== false;
-
-  const modulosMap = modulosAcessoResp?.data?.map || ({} as Record<ModuloSistema, boolean>);
-  const hasAccess = (modulo: ModuloSistema) => modulosMap[modulo] ?? true;
+  const meuDiaForMenu =
+    (dashboardNavResp?.data?.meuDia as { temContratoComEscala?: boolean } | undefined) ??
+    (meuDiaNavResp?.data as { temContratoComEscala?: boolean } | undefined);
+  const mostrarCalendarioEscalasNoMenu = meuDiaForMenu?.temContratoComEscala !== false;
 
   const dashboardItem: MenuItem = { to: '/dashboard', label: 'Dashboard' };
   const vagasNavItem: MenuItem = { to: '/vagas', label: 'Vagas' };
@@ -196,17 +205,6 @@ const AppShell = () => {
     ? [dashboardItem, { to: '/escalas', label: 'Escalas' }]
     : [dashboardItem, { to: '/ponto-eletronico', label: 'Ponto' }, vagasNavItem];
   const mobileTabs = mobileTabsBase.filter((item) => hasAccess(moduloByRoute[item.to]));
-
-  // Prefetch do Dashboard (reduz “delay” após login/navegação)
-  useEffect(() => {
-    if (!user || isMaster || !isMedico) return;
-    if (!hasAccess('DASHBOARD')) return;
-    queryClient.prefetchQuery({
-      queryKey: ['medico', 'dashboard', user.id],
-      queryFn: () => medicoService.getDashboard(),
-      staleTime: 30 * 1000,
-    });
-  }, [queryClient, user, isMaster, isMedico, modulosAcessoResp]);
 
   return (
     <div className="app-shell min-h-screen">
