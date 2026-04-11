@@ -121,14 +121,7 @@ const Vagas = () => {
               {mensagem && (
                 <p className="text-sm text-viva-800 font-serif leading-relaxed mb-4">{mensagem}</p>
               )}
-              {itens.length === 0 ? (
-                <div className="rounded-2xl border border-dashed border-viva-200 bg-viva-50/50 px-4 py-10 text-center">
-                  <p className="text-sm font-medium text-viva-800 font-display">Nenhuma vaga ativa</p>
-                  <p className="text-xs text-viva-600 mt-1 font-serif">
-                    Use <strong>Anunciar</strong> ou aguarde novas oportunidades.
-                  </p>
-                </div>
-              ) : (
+              {itens.length === 0 ? null : (
                 <ul className="space-y-4">
                   {itens.map((v) => (
                     <VagaCardDisponivel

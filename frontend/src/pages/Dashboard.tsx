@@ -13,6 +13,7 @@ import {
   inicioPlantaoCliente,
   type PlantaoAgendaInput,
 } from '../utils/plantao-agenda';
+import { canTrocarPlantaoAgendaEm, trocaPendenteVisivelNoPainel } from '../utils/troca-plantao-painel';
 
 /** Extrai a hora no formato "HHh" de "HH:mm" ou "HH:mm:ss". */
 const toHoraLabel = (horario: string | null | undefined): string | null => {
@@ -22,9 +23,6 @@ const toHoraLabel = (horario: string | null | undefined): string | null => {
   const [h] = part.split(':');
   return `${h}h`;
 };
-
-/** Limite para troca: até 10 min antes do início do plantão. Após isso o botão some. */
-const MINUTOS_ANTES_INICIO_PARA_TROCA = 10;
 
 /** Escala + ponto: link e check-in a partir de 10 min antes do início até o fim do plantão. */
 const MINUTOS_ANTES_INICIO_PARA_CHECKIN = 10;
@@ -46,14 +44,11 @@ function mensagemLinkBaterPontoAntesDaJanela(dataStr: string, p: PlantaoAgendaIn
   const inicio = inicioPlantaoCliente(dataStr, p);
   const abertura = new Date(inicio.getTime() - MINUTOS_ANTES_INICIO_PARA_CHECKIN * 60 * 1000);
   const hm = abertura.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-  return `Ponto disponível a partir das ${hm}.`;
+  return `Ponto a partir das ${hm}.`;
 }
 
 function canTrocarPlantaoAgenda(dataStr: string, p: PlantaoAgendaInput): boolean {
-  const now = new Date();
-  const inicio = inicioPlantaoCliente(dataStr, p);
-  const limite = new Date(inicio.getTime() - MINUTOS_ANTES_INICIO_PARA_TROCA * 60 * 1000);
-  return now < limite;
+  return canTrocarPlantaoAgendaEm(dataStr, p, new Date());
 }
 
 function isPlantaoAindaFuturoAgenda(dataStr: string, p: PlantaoAgendaInput): boolean {
@@ -279,25 +274,74 @@ const Dashboard = () => {
   const [showTrocaModal, setShowTrocaModal] = useState(false);
   const [trocaEscalaId, setTrocaEscalaId] = useState<string | null>(null);
   const [trocaPlantaoId, setTrocaPlantaoId] = useState<string | null>(null);
+  const [trocaMeuPlantaoMeta, setTrocaMeuPlantaoMeta] = useState<{ data: string; gradeId: string } | null>(
+    null
+  );
   const [trocaStep, setTrocaStep] = useState<1 | 2>(1);
+  const [trocaAcaoTipo, setTrocaAcaoTipo] = useState<'PERMUTA' | 'CEDER' | null>(null);
+  const [trocaDestinoModo, setTrocaDestinoModo] = useState<'colega' | 'equipe'>('colega');
   const [selectedColegaId, setSelectedColegaId] = useState<string | null>(null);
+  const [selectedPlantaoContrapartidaId, setSelectedPlantaoContrapartidaId] = useState<string | null>(null);
+  const [showAceitarEquipeModal, setShowAceitarEquipeModal] = useState(false);
+  const [aceitarEquipeCtx, setAceitarEquipeCtx] = useState<{
+    solicitacaoId: string;
+    escalaId: string;
+  } | null>(null);
+  const [aceitarMeuPlantaoId, setAceitarMeuPlantaoId] = useState<string | null>(null);
 
   const resetTrocaModal = () => {
     setShowTrocaModal(false);
     setTrocaStep(1);
+    setTrocaAcaoTipo(null);
+    setTrocaDestinoModo('colega');
     setSelectedColegaId(null);
     setTrocaEscalaId(null);
     setTrocaPlantaoId(null);
+    setTrocaMeuPlantaoMeta(null);
+    setSelectedPlantaoContrapartidaId(null);
+  };
+
+  const abrirTrocaDashboard = (pl: PlantaoProximo) => {
+    setTrocaEscalaId(pl.escalaId);
+    setTrocaPlantaoId(pl.id);
+    setTrocaMeuPlantaoMeta({ data: pl.data, gradeId: pl.gradeId });
+    setShowTrocaModal(true);
+    setTrocaStep(1);
+    setTrocaAcaoTipo(null);
+    setTrocaDestinoModo('colega');
+    setSelectedColegaId(null);
+    setSelectedPlantaoContrapartidaId(null);
   };
 
   const trocaMutation = useMutation({
-    mutationFn: () =>
-      pontoService.solicitarTrocaPlantao({
+    mutationFn: () => {
+      const tipo = trocaAcaoTipo;
+      if (!tipo) {
+        throw new Error('Selecione Trocar ou Ceder');
+      }
+      if (trocaDestinoModo === 'equipe') {
+        return pontoService.solicitarTrocaPlantao({
+          plantaoId: trocaPlantaoId!,
+          paraEquipeInteira: true,
+          ...(tipo === 'CEDER' ? { tipoSolicitacao: 'CEDER' as const } : {}),
+        });
+      }
+      if (tipo === 'CEDER') {
+        return pontoService.solicitarTrocaPlantao({
+          plantaoId: trocaPlantaoId!,
+          medicoDestinoId: selectedColegaId!,
+          tipoSolicitacao: 'CEDER',
+        });
+      }
+      return pontoService.solicitarTrocaPlantao({
         plantaoId: trocaPlantaoId!,
         medicoDestinoId: selectedColegaId!,
-      }),
+        plantaoContrapartidaId: selectedPlantaoContrapartidaId!,
+      });
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['medico', 'notificacoes'] });
+      queryClient.invalidateQueries({ queryKey: ['ponto', 'trocas-plantao-pendentes'] });
       resetTrocaModal();
     },
     onError: (err: unknown) => {
@@ -322,6 +366,22 @@ const Dashboard = () => {
   const colegasList = (colegasResp?.data ?? colegasResp ?? []) as Array<{ id: string; nomeCompleto: string; crm?: string | null }>;
   const selectedColega = selectedColegaId ? colegasList.find((c) => c.id === selectedColegaId) : null;
 
+  const { data: plantoesColegaResp, isFetching: plantoesColegaFetching } = useQuery({
+    queryKey: ['ponto', 'plantoes-colega-troca', trocaEscalaId, selectedColegaId],
+    queryFn: () => pontoService.listPlantoesColegaParaTroca(trocaEscalaId!, selectedColegaId!),
+    enabled:
+      !!user &&
+      isMedico &&
+      showTrocaModal &&
+      !!trocaEscalaId &&
+      !!selectedColegaId &&
+      trocaAcaoTipo === 'PERMUTA',
+  });
+  const plantoesColegaList = plantoesColegaResp?.data ?? [];
+  const plantaoContrapartidaSelecionado = selectedPlantaoContrapartidaId
+    ? plantoesColegaList.find((x) => x.id === selectedPlantaoContrapartidaId)
+    : null;
+
   const { data: trocasPendentesResp } = useQuery({
     queryKey: ['ponto', 'trocas-plantao-pendentes'],
     queryFn: () => pontoService.listTrocasPlantaoPendentes(),
@@ -331,13 +391,37 @@ const Dashboard = () => {
   const trocasRecebidas = trocasPendentesResp?.data?.recebidas ?? [];
   const trocasEnviadas = trocasPendentesResp?.data?.enviadas ?? [];
 
+  const trocasRecebidasVisiveis = useMemo(
+    () => trocasRecebidas.filter((t) => trocaPendenteVisivelNoPainel(t, relogioUi)),
+    [trocasRecebidas, relogioUi]
+  );
+  const trocasEnviadasVisiveis = useMemo(
+    () => trocasEnviadas.filter((t) => trocaPendenteVisivelNoPainel(t, relogioUi)),
+    [trocasEnviadas, relogioUi]
+  );
+
+  const { data: meusPlantoesAceiteResp, isFetching: meusPlantoesAceiteFetching } = useQuery({
+    queryKey: ['ponto', 'meus-plantoes-troca', aceitarEquipeCtx?.escalaId],
+    queryFn: () => pontoService.listMeusPlantoesParaTroca(aceitarEquipeCtx!.escalaId),
+    enabled: !!user && isMedico && showAceitarEquipeModal && !!aceitarEquipeCtx?.escalaId,
+  });
+  const meusPlantoesAceiteList = meusPlantoesAceiteResp?.data ?? [];
+
   const aceitarTrocaMutation = useMutation({
-    mutationFn: (id: string) => pontoService.aceitarTrocaPlantao(id),
+    mutationFn: (p: { id: string; plantaoContrapartidaId?: string }) =>
+      pontoService.aceitarTrocaPlantao(
+        p.id,
+        p.plantaoContrapartidaId ? { plantaoContrapartidaId: p.plantaoContrapartidaId } : undefined
+      ),
     onSuccess: () => {
-      notify({ kind: 'success', title: 'Troca aceita', message: 'Plantão transferido com sucesso.', source: 'ponto' });
+      notify({ kind: 'success', title: 'Pedido aceito', message: 'Plantão atualizado com sucesso.', source: 'ponto' });
+      setShowAceitarEquipeModal(false);
+      setAceitarEquipeCtx(null);
+      setAceitarMeuPlantaoId(null);
       queryClient.invalidateQueries({ queryKey: ['ponto', 'trocas-plantao-pendentes'] });
       queryClient.invalidateQueries({ queryKey: ['ponto', 'proximos-plantoes'] });
       queryClient.invalidateQueries({ queryKey: ['medico', 'dashboard'] });
+      queryClient.invalidateQueries({ queryKey: ['medico', 'notificacoes'] });
       queryClient.invalidateQueries({ queryKey: ['admin', 'escalas'] });
     },
     onError: (err: unknown) => {
@@ -428,16 +512,10 @@ const Dashboard = () => {
                     ? (
                         <button
                           type="button"
-                          onClick={() => {
-                            setTrocaEscalaId(proxima.escalaId);
-                            setTrocaPlantaoId(proxima.id);
-                            setShowTrocaModal(true);
-                            setTrocaStep(1);
-                            setSelectedColegaId(null);
-                          }}
+                          onClick={() => abrirTrocaDashboard(proxima)}
                           className="btn btn-secondary text-sm"
                         >
-                          Trocar plantão
+                          Trocar / ceder
                         </button>
                       )
                     : (
@@ -485,16 +563,10 @@ const Dashboard = () => {
                     ? (
                         <button
                           type="button"
-                          onClick={() => {
-                            setTrocaEscalaId(segundaProxima.escalaId);
-                            setTrocaPlantaoId(segundaProxima.id);
-                            setShowTrocaModal(true);
-                            setTrocaStep(1);
-                            setSelectedColegaId(null);
-                          }}
+                          onClick={() => abrirTrocaDashboard(segundaProxima)}
                           className="btn btn-secondary text-sm"
                         >
-                          Trocar plantão
+                          Trocar / ceder
                         </button>
                       )
                     : (
@@ -527,41 +599,128 @@ const Dashboard = () => {
         </div>
       )}
 
-      {isMedico && !isMaster && (trocasRecebidas.length > 0 || trocasEnviadas.length > 0) && (
+      {isMedico &&
+        !isMaster &&
+        (trocasRecebidasVisiveis.length > 0 || trocasEnviadasVisiveis.length > 0) && (
         <div className="card col-span-full stagger-2 border-l-4 border-l-amber-500 bg-gradient-to-r from-amber-50 to-orange-50/40">
-          <h3 className="text-sm font-semibold text-amber-900 font-display mb-3">Trocas de plantão pendentes</h3>
+          <h3 className="text-sm font-semibold text-amber-900 font-display mb-3">Pedidos de plantão pendentes</h3>
           <div className="space-y-3">
-            {trocasRecebidas.map((t) => (
+            {trocasRecebidasVisiveis.map((t) => (
               <div key={t.id} className="rounded-xl border border-amber-200 bg-amber-50/40 p-3 flex flex-wrap items-center justify-between gap-3">
                 <p className="text-sm text-amber-950">
-                  <strong>{fixMojibake(t.solicitante.nomeCompleto)}</strong> solicitou troca em{' '}
-                  <strong>{formatDataCurta(String(t.dataPlantao).slice(0, 10))}</strong> ({faixaExibicaoPlantao({ gradeId: t.gradeId })}).
+                  {t.paraEquipeInteira ? (
+                    (t.tipoSolicitacao ?? 'PERMUTA') === 'CEDER' ? (
+                      <>
+                        <strong>{fixMojibake(t.solicitante.nomeCompleto)}</strong> cedeu o plantão do dia{' '}
+                        <strong>{formatDataCurta(String(t.dataPlantao).slice(0, 10))}</strong> (
+                        {faixaExibicaoPlantao({ gradeId: t.gradeId })}) à <strong>equipe</strong>. O primeiro a aceitar assume esse
+                        plantão (sem permuta).
+                      </>
+                    ) : (
+                      <>
+                        <strong>{fixMojibake(t.solicitante.nomeCompleto)}</strong> abriu permuta com a <strong>equipe</strong> pelo
+                        plantão do dia <strong>{formatDataCurta(String(t.dataPlantao).slice(0, 10))}</strong> (
+                        {faixaExibicaoPlantao({ gradeId: t.gradeId })}). O primeiro a aceitar escolhe qual plantão seu permuta.
+                      </>
+                    )
+                  ) : (t.tipoSolicitacao ?? 'PERMUTA') === 'CEDER' ? (
+                    <>
+                      <strong>{fixMojibake(t.solicitante.nomeCompleto)}</strong> está cedendo a <strong>você</strong> o plantão do dia{' '}
+                      <strong>{formatDataCurta(String(t.dataPlantao).slice(0, 10))}</strong> (
+                      {faixaExibicaoPlantao({ gradeId: t.gradeId })}).
+                    </>
+                  ) : t.contrapartidaPlantaoId && t.dataPlantaoContrapartida && t.gradeIdContrapartida ? (
+                    <>
+                      <strong>{fixMojibake(t.solicitante.nomeCompleto)}</strong> propõe permutar: você assume o plantão dele no dia{' '}
+                      <strong>{formatDataCurta(String(t.dataPlantao).slice(0, 10))}</strong> (
+                      {faixaExibicaoPlantao({ gradeId: t.gradeId })}) e ele(a) assume o seu no dia{' '}
+                      <strong>{formatDataCurta(String(t.dataPlantaoContrapartida).slice(0, 10))}</strong> (
+                      {faixaExibicaoPlantao({ gradeId: t.gradeIdContrapartida })}).
+                    </>
+                  ) : (
+                    <>
+                      <strong>{fixMojibake(t.solicitante.nomeCompleto)}</strong> solicitou troca em{' '}
+                      <strong>{formatDataCurta(String(t.dataPlantao).slice(0, 10))}</strong> (
+                      {faixaExibicaoPlantao({ gradeId: t.gradeId })}).
+                    </>
+                  )}
                 </p>
                 <div className="flex gap-2">
-                  <button
-                    type="button"
-                    className="btn btn-secondary text-sm"
-                    disabled={aceitarTrocaMutation.isPending || recusarTrocaMutation.isPending}
-                    onClick={() => recusarTrocaMutation.mutate(t.id)}
-                  >
-                    Recusar
-                  </button>
+                  {!t.paraEquipeInteira ? (
+                    <button
+                      type="button"
+                      className="btn btn-secondary text-sm"
+                      disabled={aceitarTrocaMutation.isPending || recusarTrocaMutation.isPending}
+                      onClick={() => recusarTrocaMutation.mutate(t.id)}
+                    >
+                      Recusar
+                    </button>
+                  ) : null}
                   <button
                     type="button"
                     className="btn btn-primary text-sm"
                     disabled={aceitarTrocaMutation.isPending || recusarTrocaMutation.isPending}
-                    onClick={() => aceitarTrocaMutation.mutate(t.id)}
+                    onClick={() => {
+                      const exigeMeuPlantao =
+                        t.paraEquipeInteira && (t.tipoSolicitacao ?? 'PERMUTA') === 'PERMUTA';
+                      if (exigeMeuPlantao) {
+                        setAceitarEquipeCtx({ solicitacaoId: t.id, escalaId: t.escalaId });
+                        setAceitarMeuPlantaoId(null);
+                        setShowAceitarEquipeModal(true);
+                      } else {
+                        aceitarTrocaMutation.mutate({ id: t.id });
+                      }
+                    }}
                   >
                     Aceitar
                   </button>
                 </div>
               </div>
             ))}
-            {trocasEnviadas.map((t) => (
+            {trocasEnviadasVisiveis.map((t) => (
               <div key={t.id} className="rounded-xl border border-viva-200/70 bg-viva-50/40 p-3">
                 <p className="text-sm text-viva-800">
-                  Solicitação enviada para <strong>{fixMojibake(t.destino.nomeCompleto)}</strong> em{' '}
-                  <strong>{formatDataCurta(String(t.dataPlantao).slice(0, 10))}</strong> ({faixaExibicaoPlantao({ gradeId: t.gradeId })}).
+                  {t.paraEquipeInteira ? (
+                    (t.tipoSolicitacao ?? 'PERMUTA') === 'CEDER' ? (
+                      <>
+                        Cessão aberta à <strong>equipe</strong>: seu plantão no dia{' '}
+                        <strong>{formatDataCurta(String(t.dataPlantao).slice(0, 10))}</strong> (
+                        {faixaExibicaoPlantao({ gradeId: t.gradeId })}). O primeiro colega a aceitar assume o plantão.
+                      </>
+                    ) : (
+                      <>
+                        Troca aberta à <strong>equipe</strong>: seu plantão no dia{' '}
+                        <strong>{formatDataCurta(String(t.dataPlantao).slice(0, 10))}</strong> (
+                        {faixaExibicaoPlantao({ gradeId: t.gradeId })}). Aguardando o primeiro colega a aceitar.
+                      </>
+                    )
+                  ) : (t.tipoSolicitacao ?? 'PERMUTA') === 'CEDER' && t.destino ? (
+                    <>
+                      Cessão enviada para <strong>{fixMojibake(t.destino.nomeCompleto)}</strong>: seu plantão no dia{' '}
+                      <strong>{formatDataCurta(String(t.dataPlantao).slice(0, 10))}</strong> (
+                      {faixaExibicaoPlantao({ gradeId: t.gradeId })}).
+                    </>
+                  ) : t.contrapartidaPlantaoId && t.dataPlantaoContrapartida && t.gradeIdContrapartida && t.destino ? (
+                    <>
+                      Troca enviada para <strong>{fixMojibake(t.destino.nomeCompleto)}</strong>: seu plantão no dia{' '}
+                      <strong>{formatDataCurta(String(t.dataPlantao).slice(0, 10))}</strong> (
+                      {faixaExibicaoPlantao({ gradeId: t.gradeId })}) pelo plantão dele(a) no dia{' '}
+                      <strong>{formatDataCurta(String(t.dataPlantaoContrapartida).slice(0, 10))}</strong> (
+                      {faixaExibicaoPlantao({ gradeId: t.gradeIdContrapartida })}).
+                    </>
+                  ) : t.destino ? (
+                    <>
+                      Solicitação enviada para <strong>{fixMojibake(t.destino.nomeCompleto)}</strong> em{' '}
+                      <strong>{formatDataCurta(String(t.dataPlantao).slice(0, 10))}</strong> (
+                      {faixaExibicaoPlantao({ gradeId: t.gradeId })}).
+                    </>
+                  ) : (
+                    <>
+                      Solicitação registrada — plantão no dia{' '}
+                      <strong>{formatDataCurta(String(t.dataPlantao).slice(0, 10))}</strong> (
+                      {faixaExibicaoPlantao({ gradeId: t.gradeId })}).
+                    </>
+                  )}
                 </p>
               </div>
             ))}
@@ -582,51 +741,273 @@ const Dashboard = () => {
         </div>
       )}
 
-      {/* Modal Trocar plantão */}
+      {/* Modal permutar plantão (seu plantão ↔ plantão do colega) */}
       {showTrocaModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" onClick={resetTrocaModal}>
           <div
-            className="bg-white rounded-2xl shadow-xl max-w-md w-full p-5 flex flex-col gap-4"
+            className="bg-white rounded-2xl shadow-xl max-w-md w-full p-5 flex flex-col gap-4 max-h-[90vh] overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
           >
             <h3 className="text-lg font-semibold text-viva-900 font-display">
-              {trocaStep === 1 ? 'Trocar plantão' : 'Confirmar troca'}
+              {trocaStep === 1
+                ? trocaAcaoTipo === null
+                  ? 'Trocar ou ceder plantão'
+                  : trocaAcaoTipo === 'CEDER'
+                    ? 'Ceder plantão'
+                    : 'Trocar plantão'
+                : trocaAcaoTipo === 'CEDER'
+                  ? 'Confirmar cessão'
+                  : 'Confirmar troca'}
             </h3>
             {trocaStep === 1 ? (
               <>
-                <p className="text-sm text-viva-700">Com qual profissional da equipe você deseja trocar?</p>
-                <select
-                  value={selectedColegaId ?? ''}
-                  onChange={(e) => setSelectedColegaId(e.target.value || null)}
-                  className="input w-full py-2"
-                >
-                  <option value="">Selecione um profissional</option>
-                  {colegasList.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {fixMojibake(c.nomeCompleto)}
-                      {c.crm ? ` — ${c.crm}` : ''}
-                    </option>
-                  ))}
-                </select>
-                <div className="flex gap-2 justify-end">
-                  <button type="button" className="btn btn-secondary" onClick={resetTrocaModal}>
-                    Cancelar
+                <p className="text-sm text-viva-700">O que você deseja fazer?</p>
+                <div className="flex rounded-xl border border-viva-200 p-1 gap-1 bg-viva-50/50">
+                  <button
+                    type="button"
+                    className={`flex-1 text-sm py-2.5 rounded-lg font-medium transition-colors ${
+                      trocaAcaoTipo === 'PERMUTA'
+                        ? 'bg-viva-600 text-white shadow-sm'
+                        : 'text-viva-800 hover:bg-white/80'
+                    }`}
+                    onClick={() => {
+                      setTrocaAcaoTipo('PERMUTA');
+                      setSelectedPlantaoContrapartidaId(null);
+                    }}
+                  >
+                    Trocar
                   </button>
                   <button
                     type="button"
-                    className="btn btn-primary"
-                    disabled={!selectedColegaId}
-                    onClick={() => setTrocaStep(2)}
+                    className={`flex-1 text-sm py-2.5 rounded-lg font-medium transition-colors ${
+                      trocaAcaoTipo === 'CEDER'
+                        ? 'bg-viva-600 text-white shadow-sm'
+                        : 'text-viva-800 hover:bg-white/80'
+                    }`}
+                    onClick={() => {
+                      setTrocaAcaoTipo('CEDER');
+                      setSelectedPlantaoContrapartidaId(null);
+                    }}
                   >
-                    Confirmar
+                    Ceder
                   </button>
                 </div>
+                {trocaAcaoTipo != null ? (
+                  <>
+                    <p className="text-xs text-viva-600 font-serif leading-relaxed">
+                      {trocaAcaoTipo === 'CEDER'
+                        ? 'Quem aceitar fica com o seu plantão; não precisa ceder um dele.'
+                        : 'Troca pelo plantão de um colega. À equipe: quem aceitar escolhe o dele na troca.'}
+                    </p>
+                    <p className="text-sm text-viva-700 pt-1">Quem pode receber o pedido?</p>
+                    <div className="flex rounded-xl border border-viva-200 p-1 gap-1 bg-viva-50/50">
+                      <button
+                        type="button"
+                        className={`flex-1 text-sm py-2.5 rounded-lg font-medium transition-colors ${
+                          trocaDestinoModo === 'colega'
+                            ? 'bg-viva-600 text-white shadow-sm'
+                            : 'text-viva-800 hover:bg-white/80'
+                        }`}
+                        onClick={() => {
+                          setTrocaDestinoModo('colega');
+                          setSelectedColegaId(null);
+                          setSelectedPlantaoContrapartidaId(null);
+                        }}
+                      >
+                        Um colega
+                      </button>
+                      <button
+                        type="button"
+                        className={`flex-1 text-sm py-2.5 rounded-lg font-medium transition-colors ${
+                          trocaDestinoModo === 'equipe'
+                            ? 'bg-viva-600 text-white shadow-sm'
+                            : 'text-viva-800 hover:bg-white/80'
+                        }`}
+                        onClick={() => {
+                          setTrocaDestinoModo('equipe');
+                          setSelectedColegaId(null);
+                          setSelectedPlantaoContrapartidaId(null);
+                        }}
+                      >
+                        Equipe inteira
+                      </button>
+                    </div>
+                    {trocaDestinoModo === 'equipe' ? (
+                      <p className="text-sm text-viva-700 font-serif leading-relaxed">
+                        {trocaAcaoTipo === 'CEDER' ? (
+                          <>
+                            Colegas da escala veem o pedido. <strong>O primeiro a aceitar</strong> fica com o plantão, sem
+                            contrapartida.
+                          </>
+                        ) : (
+                          <>
+                            Colegas da escala veem o pedido. <strong>O primeiro a aceitar</strong> indica o plantão dele na
+                            troca.
+                          </>
+                        )}
+                      </p>
+                    ) : (
+                      <>
+                        <label className="text-xs font-semibold text-viva-600 uppercase tracking-wide">Profissional</label>
+                        <select
+                          value={selectedColegaId ?? ''}
+                          onChange={(e) => {
+                            const v = e.target.value || null;
+                            setSelectedColegaId(v);
+                            setSelectedPlantaoContrapartidaId(null);
+                          }}
+                          className="input w-full py-2"
+                        >
+                          <option value="">Selecione um profissional</option>
+                          {colegasList.map((c) => (
+                            <option key={c.id} value={c.id}>
+                              {fixMojibake(c.nomeCompleto)}
+                              {c.crm ? ` — ${c.crm}` : ''}
+                            </option>
+                          ))}
+                        </select>
+                        {selectedColegaId && trocaAcaoTipo === 'PERMUTA' ? (
+                          <div className="flex flex-col gap-2 pt-1 border-t border-viva-100">
+                            <label className="text-xs font-semibold text-viva-600 uppercase tracking-wide">
+                              Plantão do colega
+                            </label>
+                            <p className="text-xs text-viva-600 font-serif">
+                              Plantões de <strong>{selectedColega ? fixMojibake(selectedColega.nomeCompleto) : '—'}</strong> nesta
+                              escala.
+                            </p>
+                            {plantoesColegaFetching ? (
+                              <p className="text-sm text-viva-600 font-serif">Carregando…</p>
+                            ) : plantoesColegaList.length === 0 ? (
+                              <p className="text-sm text-amber-800 font-serif">Nenhum plantão disponível para troca.</p>
+                            ) : (
+                              <select
+                                value={selectedPlantaoContrapartidaId ?? ''}
+                                onChange={(e) => setSelectedPlantaoContrapartidaId(e.target.value || null)}
+                                className="input w-full py-2"
+                              >
+                                <option value="">Selecione o plantão do colega</option>
+                                {plantoesColegaList.map((pl) => (
+                                  <option key={pl.id} value={pl.id}>
+                                    {formatDataCurta(pl.data)} — {pl.gradeLabel}
+                                  </option>
+                                ))}
+                              </select>
+                            )}
+                          </div>
+                        ) : selectedColegaId && trocaAcaoTipo === 'CEDER' ? (
+                          <p className="text-sm text-viva-700 font-serif pt-1 border-t border-viva-100">
+                            O plantão será cedido a <strong>{selectedColega ? fixMojibake(selectedColega.nomeCompleto) : '—'}</strong>{' '}
+                            se ele(a) aceitar.
+                          </p>
+                        ) : null}
+                      </>
+                    )}
+                    <div className="flex gap-2 justify-end">
+                      <button type="button" className="btn btn-secondary" onClick={resetTrocaModal}>
+                        Cancelar
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-primary"
+                        disabled={
+                          trocaDestinoModo === 'colega'
+                            ? !selectedColegaId ||
+                              (trocaAcaoTipo === 'PERMUTA' &&
+                                (!selectedPlantaoContrapartidaId ||
+                                  plantoesColegaList.length === 0 ||
+                                  plantoesColegaFetching))
+                            : false
+                        }
+                        onClick={() => setTrocaStep(2)}
+                      >
+                        {trocaAcaoTipo === 'CEDER' ? 'Revisar cessão' : 'Revisar troca'}
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <div className="flex gap-2 justify-end pt-1">
+                    <button type="button" className="btn btn-secondary" onClick={resetTrocaModal}>
+                      Cancelar
+                    </button>
+                  </div>
+                )}
               </>
             ) : (
               <>
-                <p className="text-sm text-viva-700">
-                  Deseja confirmar a troca de plantão com <strong>{selectedColega ? fixMojibake(selectedColega.nomeCompleto) : '—'}?</strong>
-                </p>
+                {trocaDestinoModo === 'equipe' ? (
+                  <>
+                    <p className="text-sm text-viva-700 leading-relaxed">
+                      Confirme o envio do seu plantão à <strong>equipe</strong>:
+                    </p>
+                    <ul className="text-sm text-viva-800 list-disc pl-5 space-y-1 font-serif">
+                      <li>
+                        Seu plantão em{' '}
+                        <strong>
+                          {trocaMeuPlantaoMeta ? formatDataCurta(trocaMeuPlantaoMeta.data) : '—'}
+                        </strong>{' '}
+                        (
+                        {trocaMeuPlantaoMeta
+                          ? faixaExibicaoPlantao({ gradeId: trocaMeuPlantaoMeta.gradeId })
+                          : '—'}
+                        ){trocaAcaoTipo === 'CEDER' ? ' vai para o primeiro colega que aceitar.' : ' é ofertado à equipe em troca.'}
+                      </li>
+                      <li>
+                        {trocaAcaoTipo === 'CEDER'
+                          ? 'Quem aceitar fica com ele, sem dar outro plantão.'
+                          : 'O primeiro a aceitar escolhe o plantão dele.'}
+                      </li>
+                    </ul>
+                  </>
+                ) : trocaAcaoTipo === 'CEDER' ? (
+                  <>
+                    <p className="text-sm text-viva-700 leading-relaxed">
+                      Confirme a <strong>cessão</strong> para{' '}
+                      <strong>{selectedColega ? fixMojibake(selectedColega.nomeCompleto) : '—'}</strong>:
+                    </p>
+                    <ul className="text-sm text-viva-800 list-disc pl-5 space-y-1 font-serif">
+                      <li>
+                        Seu plantão em{' '}
+                        <strong>
+                          {trocaMeuPlantaoMeta ? formatDataCurta(trocaMeuPlantaoMeta.data) : '—'}
+                        </strong>{' '}
+                        (
+                        {trocaMeuPlantaoMeta
+                          ? faixaExibicaoPlantao({ gradeId: trocaMeuPlantaoMeta.gradeId })
+                          : '—'}
+                        ) passará para essa pessoa se ela aceitar.
+                      </li>
+                    </ul>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-sm text-viva-700 leading-relaxed">
+                      Confirme a <strong>troca</strong> com{' '}
+                      <strong>{selectedColega ? fixMojibake(selectedColega.nomeCompleto) : '—'}</strong>:
+                    </p>
+                    <ul className="text-sm text-viva-800 list-disc pl-5 space-y-1 font-serif">
+                      <li>
+                        Você fica com o plantão dele em{' '}
+                        <strong>
+                          {plantaoContrapartidaSelecionado
+                            ? formatDataCurta(plantaoContrapartidaSelecionado.data)
+                            : '—'}
+                        </strong>{' '}
+                        ({plantaoContrapartidaSelecionado?.gradeLabel ?? '—'}).
+                      </li>
+                      <li>
+                        Ele(a) fica com o seu plantão em{' '}
+                        <strong>
+                          {trocaMeuPlantaoMeta ? formatDataCurta(trocaMeuPlantaoMeta.data) : '—'}
+                        </strong>{' '}
+                        (
+                        {trocaMeuPlantaoMeta
+                          ? faixaExibicaoPlantao({ gradeId: trocaMeuPlantaoMeta.gradeId })
+                          : '—'}
+                        ).
+                      </li>
+                    </ul>
+                  </>
+                )}
                 <div className="flex gap-2 justify-end">
                   <button type="button" className="btn btn-secondary" onClick={() => setTrocaStep(1)}>
                     Voltar
@@ -634,14 +1015,90 @@ const Dashboard = () => {
                   <button
                     type="button"
                     className="btn btn-primary"
-                    disabled={trocaMutation.isPending || !trocaPlantaoId || !selectedColegaId}
+                    disabled={
+                      trocaMutation.isPending ||
+                      !trocaPlantaoId ||
+                      (trocaDestinoModo === 'colega' &&
+                        (!selectedColegaId ||
+                          (trocaAcaoTipo === 'PERMUTA' && !selectedPlantaoContrapartidaId) ||
+                          trocaAcaoTipo == null))
+                    }
                     onClick={() => trocaMutation.mutate()}
                   >
-                    {trocaMutation.isPending ? 'Enviando…' : 'Confirmar troca'}
+                    {trocaMutation.isPending ? 'Enviando…' : 'Enviar pedido'}
                   </button>
                 </div>
               </>
             )}
+          </div>
+        </div>
+      )}
+
+      {showAceitarEquipeModal && aceitarEquipeCtx && (
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50"
+          onClick={() => {
+            setShowAceitarEquipeModal(false);
+            setAceitarEquipeCtx(null);
+            setAceitarMeuPlantaoId(null);
+          }}
+        >
+          <div
+            className="bg-white rounded-2xl shadow-xl max-w-md w-full p-5 flex flex-col gap-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="text-lg font-semibold text-viva-900 font-display">Aceitar permuta da equipe</h3>
+            <p className="text-sm text-viva-700 font-serif">
+              Escolha <strong>seu</strong> plantão nesta escala que você oferece em troca.
+            </p>
+            {meusPlantoesAceiteFetching ? (
+              <p className="text-sm text-viva-600 font-serif">Carregando…</p>
+            ) : meusPlantoesAceiteList.length === 0 ? (
+              <p className="text-sm text-amber-800 font-serif">Nenhum plantão seu disponível para troca aqui.</p>
+            ) : (
+              <select
+                value={aceitarMeuPlantaoId ?? ''}
+                onChange={(e) => setAceitarMeuPlantaoId(e.target.value || null)}
+                className="input w-full py-2"
+              >
+                <option value="">Selecione seu plantão</option>
+                {meusPlantoesAceiteList.map((pl) => (
+                  <option key={pl.id} value={pl.id}>
+                    {formatDataCurta(pl.data)} — {pl.gradeLabel}
+                  </option>
+                ))}
+              </select>
+            )}
+            <div className="flex gap-2 justify-end">
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => {
+                  setShowAceitarEquipeModal(false);
+                  setAceitarEquipeCtx(null);
+                  setAceitarMeuPlantaoId(null);
+                }}
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                className="btn btn-primary"
+                disabled={
+                  aceitarTrocaMutation.isPending ||
+                  !aceitarMeuPlantaoId ||
+                  meusPlantoesAceiteList.length === 0
+                }
+                onClick={() =>
+                  aceitarTrocaMutation.mutate({
+                    id: aceitarEquipeCtx.solicitacaoId,
+                    plantaoContrapartidaId: aceitarMeuPlantaoId!,
+                  })
+                }
+              >
+                {aceitarTrocaMutation.isPending ? 'Confirmando…' : 'Confirmar permuta'}
+              </button>
+            </div>
           </div>
         </div>
       )}

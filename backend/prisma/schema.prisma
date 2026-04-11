@@ -549,10 +549,12 @@ model EscalaPlantao {
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   escala Escala @relation(fields: [escalaId], references: [id], onDelete: Cascade)
   medico Medico @relation(fields: [medicoId], references: [id], onDelete: Cascade)
-  solicitacoesTroca SolicitacaoTrocaPlantao[]
+  solicitacoesTrocaPrincipal     SolicitacaoTrocaPlantao[] @relation("TrocaPlantaoPrincipal")
+  solicitacoesTrocaContrapartida SolicitacaoTrocaPlantao[] @relation("TrocaPlantaoContrapartida")
 
   @@map("escala_plantoes")
-  @@unique([escalaId, data, gradeId])
+  /// Vários médicos podem compartilhar o mesmo dia/turno (cada um com seu registro).
+  @@unique([escalaId, data, gradeId, medicoId])
   @@index([tenantId])
   @@index([escalaId])
   @@index([medicoId])
@@ -561,26 +563,34 @@ model EscalaPlantao {
   @@index([escalaId, data])
 }
 
-// Registro de pedido de troca de plantão (auditoria; não altera a grade automaticamente).
+// Registro de pedido: PERMUTA (troca bilateral) ou CEDER (cede o plantão ao aceitante, sem contrapartida).
+// medicoDestinoId e contrapartidaPlantaoId nulos = pedido aberto à equipe.
 model SolicitacaoTrocaPlantao {
-  id                  String   @id @default(uuid())
-  tenantId            String   @map("tenant_id")
-  escalaPlantaoId     String   @map("escala_plantao_id")
-  medicoSolicitanteId String   @map("medico_solicitante_id")
-  medicoDestinoId     String   @map("medico_destino_id")
-  status              String   @default("PENDENTE") @db.VarChar(20)
-  respondidaEm        DateTime? @map("respondida_em")
-  createdAt           DateTime @default(now()) @map("created_at")
+  id                       String   @id @default(uuid())
+  tenantId                 String   @map("tenant_id")
+  escalaPlantaoId          String   @map("escala_plantao_id")
+  /// Plantão do colega que o solicitante assume em troca (mesma escala). Só em PERMUTA.
+  contrapartidaPlantaoId   String?  @map("contrapartida_plantao_id")
+  medicoSolicitanteId      String   @map("medico_solicitante_id")
+  /// Null = aberto a colegas da mesma equipe na escala; preenchido ao aceitar ou em pedido direto.
+  medicoDestinoId          String?  @map("medico_destino_id")
+  /// PERMUTA | CEDER
+  tipoSolicitacao          String   @default("PERMUTA") @map("tipo_solicitacao") @db.VarChar(20)
+  status                   String   @default("PENDENTE") @db.VarChar(20)
+  respondidaEm             DateTime? @map("respondida_em")
+  createdAt                DateTime @default(now()) @map("created_at")
 
-  tenant      Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  plantao     EscalaPlantao @relation(fields: [escalaPlantaoId], references: [id], onDelete: Cascade)
-  solicitante Medico        @relation("SolicitacaoTrocaSolicitante", fields: [medicoSolicitanteId], references: [id], onDelete: Cascade)
-  destino     Medico        @relation("SolicitacaoTrocaDestino", fields: [medicoDestinoId], references: [id], onDelete: Cascade)
+  tenant               Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  plantao              EscalaPlantao  @relation("TrocaPlantaoPrincipal", fields: [escalaPlantaoId], references: [id], onDelete: Cascade)
+  plantaoContrapartida EscalaPlantao? @relation("TrocaPlantaoContrapartida", fields: [contrapartidaPlantaoId], references: [id], onDelete: Cascade)
+  solicitante          Medico         @relation("SolicitacaoTrocaSolicitante", fields: [medicoSolicitanteId], references: [id], onDelete: Cascade)
+  destino              Medico?        @relation("SolicitacaoTrocaDestino", fields: [medicoDestinoId], references: [id], onDelete: Cascade)
 
   @@map("solicitacoes_troca_plantao")
   @@index([tenantId, medicoSolicitanteId])
   @@index([tenantId, medicoDestinoId, status])
   @@index([escalaPlantaoId])
+  @@index([contrapartidaPlantaoId])
 }
 
 model TipoPlantao {

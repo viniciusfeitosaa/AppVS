@@ -984,6 +984,29 @@ export async function listMinhasEscalasService(tenantId: string, medicoId: strin
       gradeFaixas: [],
     });
   }
+
+  /** Ponto de referência GPS (igual ao usado no check-in) para o app escolher a escala mais próxima. */
+  const preloadedMedicoEquipes: PreloadedMedicoEquipesGeo = (
+    await prisma.equipeMedico.findMany({
+      where: { tenantId, medicoId },
+      select: { equipeId: true, equipe: { select: { subgrupoId: true } } },
+    })
+  ).map((r) => ({ equipeId: r.equipeId, subgrupoId: r.equipe.subgrupoId ?? null }));
+
+  await Promise.all(
+    result.map(async (entry: (typeof result)[number] & { referenciaGeo?: unknown }) => {
+      const escalaIdParam = entry.id === PONTO_SEM_ESCALA_ESCALA_ID ? null : entry.id;
+      const raw = await getConfigPontoParaMedico(tenantId, medicoId, escalaIdParam, preloadedMedicoEquipes);
+      entry.referenciaGeo = raw
+        ? {
+            latitude: Number(raw.latitude),
+            longitude: Number(raw.longitude),
+            raioMetros: Number(raw.raioMetros),
+          }
+        : null;
+    })
+  );
+
   if (CACHE_TTL_MS > 0) {
     setCached(minhasEscalasCache, cacheKey(tenantId, medicoId), result);
   }
@@ -1066,6 +1089,18 @@ export async function listEquipeColegasService(
       nomeCompleto: c.medico!.nomeCompleto,
       crm: c.medico!.crm,
     }));
+}
+
+/** Colega = mesmas equipes na escala (regra de troca). */
+async function medicoEhColegaDoSolicitanteNaEscala(
+  tenantId: string,
+  solicitanteId: string,
+  medicoCandidatoId: string,
+  escalaId: string
+): Promise<boolean> {
+  if (solicitanteId === medicoCandidatoId) return false;
+  const colegas = await listEquipeColegasService(tenantId, solicitanteId, escalaId);
+  return colegas.some((c) => c.id === medicoCandidatoId);
 }
 
 const startOfDay = (d: Date) => {
@@ -1225,19 +1260,116 @@ const STATUS_TROCA_PENDENTE = 'PENDENTE';
 const STATUS_TROCA_ACEITA = 'ACEITA';
 const STATUS_TROCA_RECUSADA = 'RECUSADA';
 
+function plantaoAindaNoPrazoParaTroca(
+  dataPlantao: Date,
+  gradeId: string,
+  contratoAtivoId: string,
+  tipoMaps: Awaited<ReturnType<typeof loadTiposMapPorContratoLeitura>>
+): boolean {
+  const dataStr = dataPlantao.toISOString().slice(0, 10);
+  const schedule = scheduleForGradeId(gradeId, tipoMaps.get(contratoAtivoId));
+  const inicio = inicioPlantaoAsDate(dataStr, schedule);
+  const limiteTroca = new Date(inicio.getTime() - MINUTOS_ANTES_INICIO_PARA_TROCA * 60 * 1000);
+  return new Date() < limiteTroca;
+}
+
+/** Plantões futuros de um médico na escala, dentro do prazo de troca (núcleo compartilhado). */
+async function listPlantoesDoMedicoNaEscalaElegiveisParaTroca(
+  tenantId: string,
+  escalaId: string,
+  medicoTargetId: string
+): Promise<Array<{ id: string; data: string; gradeId: string; gradeLabel: string }>> {
+  const escala = await prisma.escala.findFirst({
+    where: { id: escalaId, tenantId, ativo: true },
+    select: {
+      id: true,
+      contratoAtivo: { select: { id: true, permiteTrocaPlantao: true } },
+    },
+  });
+  if (!escala?.contratoAtivo?.permiteTrocaPlantao) {
+    return [];
+  }
+
+  const plantoes = await prisma.escalaPlantao.findMany({
+    where: {
+      tenantId,
+      escalaId,
+      medicoId: medicoTargetId,
+      data: { gte: startOfToday() },
+    },
+    orderBy: [{ data: 'asc' }, { gradeId: 'asc' }],
+    select: { id: true, data: true, gradeId: true },
+  });
+
+  const tipoMaps = await loadTiposMapPorContratoLeitura(tenantId, [escala.contratoAtivo.id]);
+  const tipoMap = tipoMaps.get(escala.contratoAtivo.id);
+
+  const out: Array<{ id: string; data: string; gradeId: string; gradeLabel: string }> = [];
+  for (const pl of plantoes) {
+    if (
+      !plantaoAindaNoPrazoParaTroca(pl.data, pl.gradeId, escala.contratoAtivo.id, tipoMaps)
+    ) {
+      continue;
+    }
+    const tipoRow = tipoMap?.get(pl.gradeId);
+    out.push({
+      id: pl.id,
+      data: pl.data.toISOString().slice(0, 10),
+      gradeId: pl.gradeId,
+      gradeLabel: faixaHorarioLabelExibicao(pl.gradeId, tipoRow ?? null),
+    });
+  }
+  return out;
+}
+
 /**
- * Registra solicitação de troca: notifica colega e solicitante (não altera escala_plantoes).
+ * Plantões futuros do colega na mesma escala, ainda dentro do prazo para solicitar troca (permuta).
+ */
+export async function listPlantoesColegaParaTrocaService(
+  tenantId: string,
+  medicoSolicitanteId: string,
+  escalaId: string,
+  medicoDestinoId: string
+) {
+  const colegas = await listEquipeColegasService(tenantId, medicoSolicitanteId, escalaId);
+  if (!colegas.some((c) => c.id === medicoDestinoId)) {
+    throw { statusCode: 403, message: 'Profissional não pertence às mesmas equipes nesta escala' };
+  }
+  return listPlantoesDoMedicoNaEscalaElegiveisParaTroca(tenantId, escalaId, medicoDestinoId);
+}
+
+/** Plantões do próprio médico na escala (para aceitar permuta aberta à equipe e escolher contrapartida). */
+export async function listMeusPlantoesParaTrocaService(
+  tenantId: string,
+  medicoId: string,
+  escalaId: string
+) {
+  return listPlantoesDoMedicoNaEscalaElegiveisParaTroca(tenantId, escalaId, medicoId);
+}
+
+const TROCA_SOLIC_TIPO_PERMUTA = 'PERMUTA' as const;
+const TROCA_SOLIC_TIPO_CEDER = 'CEDER' as const;
+
+export type SolicitarTrocaPlantaoInput =
+  | { tipo?: typeof TROCA_SOLIC_TIPO_PERMUTA; modo: 'equipe' }
+  | {
+      tipo?: typeof TROCA_SOLIC_TIPO_PERMUTA;
+      modo: 'colega';
+      medicoDestinoId: string;
+      plantaoContrapartidaId: string;
+    }
+  | { tipo: typeof TROCA_SOLIC_TIPO_CEDER; modo: 'equipe' }
+  | { tipo: typeof TROCA_SOLIC_TIPO_CEDER; modo: 'colega'; medicoDestinoId: string };
+
+/**
+ * Permuta (troca bilateral) ou cessão (cede o plantão ao aceitante). Equipe ou colega direto.
  */
 export async function solicitarTrocaPlantaoService(
   tenantId: string,
   medicoSolicitanteId: string,
   plantaoId: string,
-  medicoDestinoId: string
+  input: SolicitarTrocaPlantaoInput
 ) {
-  if (medicoSolicitanteId === medicoDestinoId) {
-    throw { statusCode: 400, message: 'Selecione outro profissional para a troca' };
-  }
-
   const plantao = await prisma.escalaPlantao.findFirst({
     where: { id: plantaoId, tenantId, medicoId: medicoSolicitanteId },
     select: {
@@ -1266,17 +1398,263 @@ export async function solicitarTrocaPlantaoService(
     throw { statusCode: 403, message: 'Troca de plantão não permitida para este contrato' };
   }
 
-  const dataStr = plantao.data.toISOString().slice(0, 10);
   const tipoMaps = await loadTiposMapPorContratoLeitura(tenantId, [plantao.escala.contratoAtivoId]);
-  const tipoMap = tipoMaps.get(plantao.escala.contratoAtivoId);
-  const schedule = scheduleForGradeId(plantao.gradeId, tipoMap);
-  const inicio = inicioPlantaoAsDate(dataStr, schedule);
-  const limiteTroca = new Date(inicio.getTime() - MINUTOS_ANTES_INICIO_PARA_TROCA * 60 * 1000);
-  if (new Date() >= limiteTroca) {
+  if (
+    !plantaoAindaNoPrazoParaTroca(plantao.data, plantao.gradeId, plantao.escala.contratoAtivoId, tipoMaps)
+  ) {
     throw { statusCode: 400, message: 'Período para solicitar troca encerrado' };
   }
+
+  const tipoMap = tipoMaps.get(plantao.escala.contratoAtivoId);
   const tipoRow = tipoMap?.get(plantao.gradeId);
   const gradeLabel = faixaHorarioLabelExibicao(plantao.gradeId, tipoRow ?? null);
+  const dataStr = plantao.data.toISOString().slice(0, 10);
+  const tipoSol =
+    input.tipo === TROCA_SOLIC_TIPO_CEDER ? TROCA_SOLIC_TIPO_CEDER : TROCA_SOLIC_TIPO_PERMUTA;
+
+  if (input.modo === 'equipe') {
+    const pendenteOutra = await prisma.solicitacaoTrocaPlantao.findFirst({
+      where: {
+        tenantId,
+        status: STATUS_TROCA_PENDENTE,
+        OR: [{ escalaPlantaoId: plantao.id }, { contrapartidaPlantaoId: plantao.id }],
+      },
+    });
+    if (pendenteOutra) {
+      throw {
+        statusCode: 409,
+        message: 'Já existe solicitação pendente envolvendo este plantão',
+      };
+    }
+
+    const colegas = await listEquipeColegasService(tenantId, medicoSolicitanteId, plantao.escalaId);
+    if (colegas.length === 0) {
+      throw { statusCode: 403, message: 'Não há colegas na equipe nesta escala para receber o pedido' };
+    }
+
+    const solicitante = await prisma.medico.findFirst({
+      where: { id: medicoSolicitanteId, tenantId, ativo: true },
+      select: { nomeCompleto: true },
+    });
+    if (!solicitante) {
+      throw { statusCode: 404, message: 'Profissional não encontrado' };
+    }
+
+    const solicitacao = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+      const row = await tx.solicitacaoTrocaPlantao.create({
+        data: {
+          tenantId,
+          escalaPlantaoId: plantao.id,
+          contrapartidaPlantaoId: null,
+          medicoSolicitanteId,
+          medicoDestinoId: null,
+          tipoSolicitacao: tipoSol,
+          status: STATUS_TROCA_PENDENTE,
+        } as Parameters<Prisma.TransactionClient['solicitacaoTrocaPlantao']['create']>[0]['data'],
+      });
+      await createAuditLog(
+        {
+          acao: 'SOLICITAR_TROCA_PLANTAO',
+          tenantId,
+          medicoId: medicoSolicitanteId,
+          detalhes: {
+            solicitacaoId: row.id,
+            plantaoId: plantao.id,
+            escalaId: plantao.escalaId,
+            paraEquipeInteira: true,
+            tipoSolicitacao: tipoSol,
+          },
+        },
+        tx
+      );
+      return row;
+    });
+
+    try {
+      const nm = await import('./notificacao-medico.service');
+      if (tipoSol === TROCA_SOLIC_TIPO_CEDER) {
+        await nm.notificarCederPlantaoAbertaEquipe(tenantId, {
+          solicitacaoId: solicitacao.id,
+          medicoSolicitanteId,
+          colegaMedicoIds: colegas.map((c) => c.id),
+          solicitanteNome: solicitante.nomeCompleto.trim(),
+          plantaoId: plantao.id,
+          escalaId: plantao.escalaId,
+          escalaNome: plantao.escala.nome,
+          dataPlantaoIso: dataStr,
+          gradeLabel,
+        });
+      } else {
+        await nm.notificarTrocaPlantaoAbertaEquipe(tenantId, {
+          solicitacaoId: solicitacao.id,
+          medicoSolicitanteId,
+          colegaMedicoIds: colegas.map((c) => c.id),
+          solicitanteNome: solicitante.nomeCompleto.trim(),
+          plantaoId: plantao.id,
+          escalaId: plantao.escalaId,
+          escalaNome: plantao.escala.nome,
+          dataPlantaoIso: dataStr,
+          gradeLabel,
+        });
+      }
+    } catch (e) {
+      console.error('[troca-plantao] Falha ao enviar notificações (registro persistido):', e);
+    }
+
+    return { ok: true as const, solicitacaoId: solicitacao.id };
+  }
+
+  const { medicoDestinoId, plantaoContrapartidaId } = input as {
+    medicoDestinoId: string;
+    plantaoContrapartidaId?: string;
+  };
+  if (medicoSolicitanteId === medicoDestinoId) {
+    throw { statusCode: 400, message: 'Selecione outro profissional' };
+  }
+
+  if (tipoSol === TROCA_SOLIC_TIPO_CEDER) {
+    const pendenteCeder = await prisma.solicitacaoTrocaPlantao.findFirst({
+      where: {
+        tenantId,
+        status: STATUS_TROCA_PENDENTE,
+        OR: [{ escalaPlantaoId: plantao.id }, { contrapartidaPlantaoId: plantao.id }],
+      },
+    });
+    if (pendenteCeder) {
+      throw {
+        statusCode: 409,
+        message: 'Já existe solicitação pendente envolvendo este plantão',
+      };
+    }
+    const colegasCeder = await listEquipeColegasService(tenantId, medicoSolicitanteId, plantao.escalaId);
+    if (!colegasCeder.some((c) => c.id === medicoDestinoId)) {
+      throw { statusCode: 403, message: 'Profissional não pertence às mesmas equipes nesta escala' };
+    }
+    const [solicitanteCeder, destinoCeder] = await Promise.all([
+      prisma.medico.findFirst({
+        where: { id: medicoSolicitanteId, tenantId, ativo: true },
+        select: { nomeCompleto: true },
+      }),
+      prisma.medico.findFirst({
+        where: { id: medicoDestinoId, tenantId, ativo: true },
+        select: { nomeCompleto: true },
+      }),
+    ]);
+    if (!solicitanteCeder || !destinoCeder) {
+      throw { statusCode: 404, message: 'Profissional não encontrado' };
+    }
+
+    const solicitacaoCeder = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+      const row = await tx.solicitacaoTrocaPlantao.create({
+        data: {
+          tenantId,
+          escalaPlantaoId: plantao.id,
+          contrapartidaPlantaoId: null,
+          medicoSolicitanteId,
+          medicoDestinoId,
+          tipoSolicitacao: TROCA_SOLIC_TIPO_CEDER,
+          status: STATUS_TROCA_PENDENTE,
+        },
+      });
+      await createAuditLog(
+        {
+          acao: 'SOLICITAR_TROCA_PLANTAO',
+          tenantId,
+          medicoId: medicoSolicitanteId,
+          detalhes: {
+            solicitacaoId: row.id,
+            plantaoId: plantao.id,
+            escalaId: plantao.escalaId,
+            medicoDestinoId,
+            tipoSolicitacao: TROCA_SOLIC_TIPO_CEDER,
+            ceder: true,
+          },
+        },
+        tx
+      );
+      return row;
+    });
+
+    try {
+      const { notificarCederPlantaoParaColega } = await import('./notificacao-medico.service');
+      await notificarCederPlantaoParaColega(tenantId, {
+        solicitacaoId: solicitacaoCeder.id,
+        medicoSolicitanteId,
+        medicoDestinoId,
+        solicitanteNome: solicitanteCeder.nomeCompleto.trim(),
+        destinoNome: destinoCeder.nomeCompleto.trim(),
+        plantaoId: plantao.id,
+        escalaId: plantao.escalaId,
+        escalaNome: plantao.escala.nome,
+        dataPlantaoIso: dataStr,
+        gradeLabel,
+      });
+    } catch (e) {
+      console.error('[troca-plantao] Falha ao enviar notificações (registro persistido):', e);
+    }
+
+    return { ok: true as const, solicitacaoId: solicitacaoCeder.id };
+  }
+
+  const pidContra = (plantaoContrapartidaId ?? '').trim();
+  if (!pidContra) {
+    throw { statusCode: 400, message: 'Informe o plantão do colega para permutar' };
+  }
+  if (plantaoId === pidContra) {
+    throw { statusCode: 400, message: 'Selecione um plantão diferente do seu para permutar' };
+  }
+
+  const plantaoContra = await prisma.escalaPlantao.findFirst({
+    where: { id: pidContra, tenantId, medicoId: medicoDestinoId },
+    select: {
+      id: true,
+      data: true,
+      gradeId: true,
+      escalaId: true,
+    },
+  });
+  if (!plantaoContra) {
+    throw { statusCode: 404, message: 'Plantão do colega não encontrado' };
+  }
+  if (plantaoContra.escalaId !== plantao.escalaId) {
+    throw { statusCode: 400, message: 'Os dois plantões devem ser da mesma escala' };
+  }
+  if (
+    !plantaoAindaNoPrazoParaTroca(
+      plantaoContra.data,
+      plantaoContra.gradeId,
+      plantao.escala.contratoAtivoId,
+      tipoMaps
+    )
+  ) {
+    throw {
+      statusCode: 400,
+      message: 'O plantão escolhido do colega já não está no período para troca',
+    };
+  }
+
+  const tipoRowContra = tipoMap?.get(plantaoContra.gradeId);
+  const gradeLabelContra = faixaHorarioLabelExibicao(plantaoContra.gradeId, tipoRowContra ?? null);
+  const dataStrContra = plantaoContra.data.toISOString().slice(0, 10);
+
+  const pendenteOutra = await prisma.solicitacaoTrocaPlantao.findFirst({
+    where: {
+      tenantId,
+      status: STATUS_TROCA_PENDENTE,
+      OR: [
+        { escalaPlantaoId: plantao.id },
+        { escalaPlantaoId: plantaoContra.id },
+        { contrapartidaPlantaoId: plantao.id },
+        { contrapartidaPlantaoId: plantaoContra.id },
+      ],
+    },
+  });
+  if (pendenteOutra) {
+    throw {
+      statusCode: 409,
+      message: 'Já existe solicitação pendente envolvendo um destes plantões',
+    };
+  }
 
   const colegas = await listEquipeColegasService(tenantId, medicoSolicitanteId, plantao.escalaId);
   if (!colegas.some((c) => c.id === medicoDestinoId)) {
@@ -1303,8 +1681,10 @@ export async function solicitarTrocaPlantaoService(
       data: {
         tenantId,
         escalaPlantaoId: plantao.id,
+        contrapartidaPlantaoId: plantaoContra.id,
         medicoSolicitanteId,
         medicoDestinoId,
+        tipoSolicitacao: TROCA_SOLIC_TIPO_PERMUTA,
         status: STATUS_TROCA_PENDENTE,
       },
     });
@@ -1316,8 +1696,10 @@ export async function solicitarTrocaPlantaoService(
         detalhes: {
           solicitacaoId: row.id,
           plantaoId: plantao.id,
+          plantaoContrapartidaId: plantaoContra.id,
           escalaId: plantao.escalaId,
           medicoDestinoId,
+          tipoSolicitacao: TROCA_SOLIC_TIPO_PERMUTA,
         },
       },
       tx
@@ -1338,6 +1720,9 @@ export async function solicitarTrocaPlantaoService(
       escalaNome: plantao.escala.nome,
       dataPlantaoIso: dataStr,
       gradeLabel,
+      contrapartidaPlantaoId: plantaoContra.id,
+      dataContrapartidaIso: dataStrContra,
+      gradeLabelContrapartida: gradeLabelContra,
     });
   } catch (e) {
     console.error('[troca-plantao] Falha ao enviar notificações (registro persistido):', e);
@@ -1347,29 +1732,63 @@ export async function solicitarTrocaPlantaoService(
 }
 
 export async function listTrocasPlantaoPendentesService(tenantId: string, medicoId: string) {
-  const rows = await prisma.solicitacaoTrocaPlantao.findMany({
+  const includeBlock = {
+    solicitante: { select: { id: true, nomeCompleto: true } },
+    destino: { select: { id: true, nomeCompleto: true } },
+    plantao: {
+      select: {
+        id: true,
+        data: true,
+        gradeId: true,
+        escalaId: true,
+        escala: { select: { nome: true } },
+      },
+    },
+    plantaoContrapartida: {
+      select: {
+        id: true,
+        data: true,
+        gradeId: true,
+        escalaId: true,
+      },
+    },
+  } as const;
+
+  const baseRows = await prisma.solicitacaoTrocaPlantao.findMany({
     where: {
       tenantId,
       status: STATUS_TROCA_PENDENTE,
       OR: [{ medicoDestinoId: medicoId }, { medicoSolicitanteId: medicoId }],
     },
     orderBy: { createdAt: 'desc' },
-    include: {
-      solicitante: { select: { id: true, nomeCompleto: true } },
-      destino: { select: { id: true, nomeCompleto: true } },
-      plantao: {
-        select: {
-          id: true,
-          data: true,
-          gradeId: true,
-          escalaId: true,
-          escala: { select: { nome: true } },
-        },
-      },
-    },
+    include: includeBlock,
   });
 
-  const mapRow = (r: (typeof rows)[number]) => ({
+  const broadcastExtras = (await prisma.solicitacaoTrocaPlantao.findMany({
+    where: {
+      tenantId,
+      status: STATUS_TROCA_PENDENTE,
+      medicoDestinoId: null,
+      medicoSolicitanteId: { not: medicoId },
+    },
+    orderBy: { createdAt: 'desc' },
+    include: includeBlock,
+  } as Parameters<typeof prisma.solicitacaoTrocaPlantao.findMany>[0])) as typeof baseRows;
+
+  const baseIds = new Set(baseRows.map((r) => r.id));
+  const extras: typeof baseRows = [];
+  for (const r of broadcastExtras) {
+    if (baseIds.has(r.id)) continue;
+    const ok = await medicoEhColegaDoSolicitanteNaEscala(
+      tenantId,
+      r.medicoSolicitanteId,
+      medicoId,
+      r.plantao.escalaId
+    );
+    if (ok) extras.push(r);
+  }
+
+  const mapRow = (r: (typeof baseRows)[number]) => ({
     id: r.id,
     createdAt: r.createdAt,
     plantaoId: r.plantao.id,
@@ -1377,63 +1796,272 @@ export async function listTrocasPlantaoPendentesService(tenantId: string, medico
     escalaId: r.plantao.escalaId,
     escalaNome: r.plantao.escala?.nome ?? null,
     gradeId: r.plantao.gradeId,
+    contrapartidaPlantaoId: r.plantaoContrapartida?.id ?? null,
+    dataPlantaoContrapartida: r.plantaoContrapartida?.data ?? null,
+    gradeIdContrapartida: r.plantaoContrapartida?.gradeId ?? null,
     solicitante: { id: r.solicitante.id, nomeCompleto: r.solicitante.nomeCompleto },
-    destino: { id: r.destino.id, nomeCompleto: r.destino.nomeCompleto },
+    destino: r.destino
+      ? { id: r.destino.id, nomeCompleto: r.destino.nomeCompleto }
+      : null,
+    paraEquipeInteira: r.medicoDestinoId === null,
+    tipoSolicitacao:
+      String((r as { tipoSolicitacao?: string }).tipoSolicitacao ?? TROCA_SOLIC_TIPO_PERMUTA).toUpperCase() ===
+      TROCA_SOLIC_TIPO_CEDER
+        ? TROCA_SOLIC_TIPO_CEDER
+        : TROCA_SOLIC_TIPO_PERMUTA,
   });
 
-  return {
-    recebidas: rows.filter((r) => r.medicoDestinoId === medicoId).map(mapRow),
-    enviadas: rows.filter((r) => r.medicoSolicitanteId === medicoId).map(mapRow),
-  };
+  const recebidasDiretas = baseRows
+    .filter((r) => r.medicoDestinoId === medicoId)
+    .map(mapRow);
+  const recebidasEquipe = extras.map(mapRow);
+  const recebidas = [...recebidasDiretas, ...recebidasEquipe].sort(
+    (a, b) => b.createdAt.getTime() - a.createdAt.getTime()
+  );
+
+  const enviadas = baseRows
+    .filter((r) => r.medicoSolicitanteId === medicoId)
+    .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+    .map(mapRow);
+
+  return { recebidas, enviadas };
 }
 
-export async function aceitarTrocaPlantaoService(tenantId: string, medicoId: string, solicitacaoId: string) {
+export async function aceitarTrocaPlantaoService(
+  tenantId: string,
+  medicoId: string,
+  solicitacaoId: string,
+  plantaoContrapartidaIdNoAceite?: string | null
+) {
   const now = new Date();
   const result = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
     const solic = await tx.solicitacaoTrocaPlantao.findFirst({
-      where: { id: solicitacaoId, tenantId, medicoDestinoId: medicoId },
-      include: { plantao: { include: { escala: { select: { contratoAtivoId: true } } } } },
+      where: { id: solicitacaoId, tenantId, status: STATUS_TROCA_PENDENTE },
+      include: {
+        plantao: { include: { escala: { select: { contratoAtivoId: true } } } },
+        plantaoContrapartida: {
+          select: { id: true, data: true, gradeId: true, medicoId: true, escalaId: true },
+        },
+      },
     });
     if (!solic) throw { statusCode: 404, message: 'Solicitação não encontrada' };
-    if (solic.status !== STATUS_TROCA_PENDENTE) {
-      throw { statusCode: 400, message: 'Solicitação já respondida' };
+
+    if (solic.medicoSolicitanteId === medicoId) {
+      throw { statusCode: 400, message: 'Você não pode aceitar o próprio pedido' };
+    }
+
+    const abertaEquipe = solic.medicoDestinoId === null;
+    if (abertaEquipe) {
+      const okColega = await medicoEhColegaDoSolicitanteNaEscala(
+        tenantId,
+        solic.medicoSolicitanteId,
+        medicoId,
+        solic.plantao.escalaId
+      );
+      if (!okColega) throw { statusCode: 404, message: 'Solicitação não encontrada' };
+    } else if (solic.medicoDestinoId !== medicoId) {
+      throw { statusCode: 404, message: 'Solicitação não encontrada' };
     }
 
     const tipoMaps = await loadTiposMapPorContratoLeitura(tenantId, [solic.plantao.escala.contratoAtivoId]);
-    const schedule = scheduleForGradeId(
-      solic.plantao.gradeId,
-      tipoMaps.get(solic.plantao.escala.contratoAtivoId)
-    );
-    const inicio = inicioPlantaoAsDate(solic.plantao.data.toISOString().slice(0, 10), schedule);
-    const limiteTroca = new Date(inicio.getTime() - MINUTOS_ANTES_INICIO_PARA_TROCA * 60 * 1000);
-    if (new Date() >= limiteTroca) {
+    const cid = solic.plantao.escala.contratoAtivoId;
+    if (!plantaoAindaNoPrazoParaTroca(solic.plantao.data, solic.plantao.gradeId, cid, tipoMaps)) {
       throw { statusCode: 400, message: 'Período para aceitar troca encerrado' };
     }
 
-    const updatedPlantao = await tx.escalaPlantao.updateMany({
-      where: { id: solic.escalaPlantaoId, tenantId, medicoId: solic.medicoSolicitanteId },
-      data: { medicoId: solic.medicoDestinoId },
-    });
-    if (updatedPlantao.count === 0) {
-      throw { statusCode: 409, message: 'Plantão já não pertence mais ao solicitante' };
+    const tipoSolicNorm = String(
+      (solic as { tipoSolicitacao?: string | null }).tipoSolicitacao ?? TROCA_SOLIC_TIPO_PERMUTA
+    ).toUpperCase();
+    const ehCeder = tipoSolicNorm === TROCA_SOLIC_TIPO_CEDER;
+
+    if (ehCeder) {
+      const pendCeder = await tx.solicitacaoTrocaPlantao.findFirst({
+        where: {
+          tenantId,
+          status: STATUS_TROCA_PENDENTE,
+          id: { not: solic.id },
+          OR: [
+            { escalaPlantaoId: solic.escalaPlantaoId },
+            { contrapartidaPlantaoId: solic.escalaPlantaoId },
+          ],
+        },
+      });
+      if (pendCeder) {
+        throw {
+          statusCode: 409,
+          message: 'Outro pedido pendente envolve este plantão; não é possível aceitar agora',
+        };
+      }
+      const upCeder = await tx.escalaPlantao.updateMany({
+        where: { id: solic.escalaPlantaoId, tenantId, medicoId: solic.medicoSolicitanteId },
+        data: { medicoId },
+      });
+      if (upCeder.count === 0) {
+        throw { statusCode: 409, message: 'Plantão já não pertence mais ao solicitante' };
+      }
+      await tx.solicitacaoTrocaPlantao.update({
+        where: { id: solic.id },
+        data: {
+          status: STATUS_TROCA_ACEITA,
+          respondidaEm: now,
+          medicoDestinoId: medicoId,
+        },
+      });
+      await tx.solicitacaoTrocaPlantao.updateMany({
+        where: {
+          tenantId,
+          status: STATUS_TROCA_PENDENTE,
+          id: { not: solic.id },
+          OR: [
+            { escalaPlantaoId: solic.escalaPlantaoId },
+            { contrapartidaPlantaoId: solic.escalaPlantaoId },
+          ],
+        },
+        data: { status: STATUS_TROCA_RECUSADA, respondidaEm: now },
+      });
+      return { ...solic, contrapartidaPlantaoId: null as string | null, medicoDestinoId: medicoId };
     }
+
+    let contrapartidaId = solic.contrapartidaPlantaoId;
+    let bRow: {
+      id: string;
+      data: Date;
+      gradeId: string;
+      medicoId: string;
+      escalaId: string;
+    } | null = solic.plantaoContrapartida;
+
+    if (abertaEquipe) {
+      const pid = (plantaoContrapartidaIdNoAceite ?? '').trim();
+      if (!pid) {
+        throw {
+          statusCode: 400,
+          message: 'Informe o plantão seu que você oferece na permuta (plantaoContrapartidaId)',
+        };
+      }
+      const b = await tx.escalaPlantao.findFirst({
+        where: { id: pid, tenantId, medicoId, escalaId: solic.plantao.escalaId },
+        select: { id: true, data: true, gradeId: true, medicoId: true, escalaId: true },
+      });
+      if (!b) {
+        throw { statusCode: 404, message: 'Plantão não encontrado ou não é seu nesta escala' };
+      }
+      if (b.id === solic.escalaPlantaoId) {
+        throw { statusCode: 400, message: 'Escolha outro plantão para permutar' };
+      }
+      if (!plantaoAindaNoPrazoParaTroca(b.data, b.gradeId, cid, tipoMaps)) {
+        throw { statusCode: 400, message: 'O plantão que você escolheu já não está no período para troca' };
+      }
+      contrapartidaId = b.id;
+      bRow = b;
+    }
+
+    if (!contrapartidaId || !bRow) {
+      if (abertaEquipe) {
+        throw { statusCode: 400, message: 'Solicitação sem contrapartida definida' };
+      }
+      const destId = solic.medicoDestinoId;
+      if (!destId) {
+        throw { statusCode: 400, message: 'Solicitação sem contrapartida definida' };
+      }
+      const updatedPlantao = await tx.escalaPlantao.updateMany({
+        where: { id: solic.escalaPlantaoId, tenantId, medicoId: solic.medicoSolicitanteId },
+        data: { medicoId: destId },
+      });
+      if (updatedPlantao.count === 0) {
+        throw { statusCode: 409, message: 'Plantão já não pertence mais ao solicitante' };
+      }
+      const idsLegado = [solic.escalaPlantaoId];
+      await tx.solicitacaoTrocaPlantao.update({
+        where: { id: solic.id },
+        data: { status: STATUS_TROCA_ACEITA, respondidaEm: now },
+      });
+      await tx.solicitacaoTrocaPlantao.updateMany({
+        where: {
+          tenantId,
+          status: STATUS_TROCA_PENDENTE,
+          id: { not: solic.id },
+          OR: [
+            { escalaPlantaoId: { in: idsLegado } },
+            { contrapartidaPlantaoId: { in: idsLegado } },
+          ],
+        },
+        data: { status: STATUS_TROCA_RECUSADA, respondidaEm: now },
+      });
+      return { ...solic, contrapartidaPlantaoId: null as string | null, medicoDestinoId: destId };
+    }
+
+    if (bRow.escalaId !== solic.plantao.escalaId) {
+      throw { statusCode: 400, message: 'Plantões de permuta devem ser da mesma escala' };
+    }
+    if (!abertaEquipe && bRow.medicoId !== solic.medicoDestinoId) {
+      throw { statusCode: 409, message: 'Plantão do colega já não está mais com o destinatário' };
+    }
+    if (abertaEquipe && bRow.medicoId !== medicoId) {
+      throw { statusCode: 409, message: 'Plantão inválido para aceitar este pedido' };
+    }
+    if (!plantaoAindaNoPrazoParaTroca(bRow.data, bRow.gradeId, cid, tipoMaps)) {
+      throw { statusCode: 400, message: 'Período para aceitar troca encerrado (plantão do colega)' };
+    }
+
+    const pendenteOutra = await tx.solicitacaoTrocaPlantao.findFirst({
+      where: {
+        tenantId,
+        status: STATUS_TROCA_PENDENTE,
+        id: { not: solic.id },
+        OR: [
+          { escalaPlantaoId: solic.escalaPlantaoId },
+          { escalaPlantaoId: bRow.id },
+          { contrapartidaPlantaoId: solic.escalaPlantaoId },
+          { contrapartidaPlantaoId: bRow.id },
+        ],
+      },
+    });
+    if (pendenteOutra) {
+      throw {
+        statusCode: 409,
+        message: 'Outro pedido pendente envolve um destes plantões; não é possível aceitar agora',
+      };
+    }
+
+    const upA = await tx.escalaPlantao.updateMany({
+      where: { id: solic.escalaPlantaoId, tenantId, medicoId: solic.medicoSolicitanteId },
+      data: { medicoId },
+    });
+    const upB = await tx.escalaPlantao.updateMany({
+      where: { id: bRow.id, tenantId, medicoId },
+      data: { medicoId: solic.medicoSolicitanteId },
+    });
+    if (upA.count === 0 || upB.count === 0) {
+      throw { statusCode: 409, message: 'Não foi possível permutar: um dos plantões já foi alterado' };
+    }
+
+    const idsEnvolvidos = [solic.escalaPlantaoId, contrapartidaId];
 
     await tx.solicitacaoTrocaPlantao.update({
       where: { id: solic.id },
-      data: { status: STATUS_TROCA_ACEITA, respondidaEm: now },
+      data: {
+        status: STATUS_TROCA_ACEITA,
+        respondidaEm: now,
+        medicoDestinoId: medicoId,
+        contrapartidaPlantaoId: contrapartidaId,
+      },
     });
 
     await tx.solicitacaoTrocaPlantao.updateMany({
       where: {
         tenantId,
-        escalaPlantaoId: solic.escalaPlantaoId,
-        id: { not: solic.id },
         status: STATUS_TROCA_PENDENTE,
+        id: { not: solic.id },
+        OR: [
+          { escalaPlantaoId: { in: idsEnvolvidos } },
+          { contrapartidaPlantaoId: { in: idsEnvolvidos } },
+        ],
       },
       data: { status: STATUS_TROCA_RECUSADA, respondidaEm: now },
     });
 
-    return solic;
+    return { ...solic, contrapartidaPlantaoId: contrapartidaId, medicoDestinoId: medicoId };
   });
 
   await createAuditLog({
@@ -1443,6 +2071,7 @@ export async function aceitarTrocaPlantaoService(tenantId: string, medicoId: str
     detalhes: {
       solicitacaoId,
       plantaoId: result.escalaPlantaoId,
+      plantaoContrapartidaId: result.contrapartidaPlantaoId ?? undefined,
       medicoSolicitanteId: result.medicoSolicitanteId,
       medicoDestinoId: result.medicoDestinoId,
     },
@@ -1453,11 +2082,20 @@ export async function aceitarTrocaPlantaoService(tenantId: string, medicoId: str
 
 export async function recusarTrocaPlantaoService(tenantId: string, medicoId: string, solicitacaoId: string) {
   const row = await prisma.solicitacaoTrocaPlantao.findFirst({
-    where: { id: solicitacaoId, tenantId, medicoDestinoId: medicoId },
+    where: { id: solicitacaoId, tenantId },
     select: { id: true, status: true, escalaPlantaoId: true, medicoSolicitanteId: true, medicoDestinoId: true },
   });
   if (!row) throw { statusCode: 404, message: 'Solicitação não encontrada' };
   if (row.status !== STATUS_TROCA_PENDENTE) throw { statusCode: 400, message: 'Solicitação já respondida' };
+  if (row.medicoDestinoId === null) {
+    throw {
+      statusCode: 400,
+      message: 'Pedidos abertos à equipe não podem ser recusados; apenas o primeiro aceite encerra o pedido',
+    };
+  }
+  if (row.medicoDestinoId !== medicoId) {
+    throw { statusCode: 404, message: 'Solicitação não encontrada' };
+  }
 
   await prisma.solicitacaoTrocaPlantao.update({
     where: { id: row.id },

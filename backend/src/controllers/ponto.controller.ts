@@ -13,6 +13,8 @@ import {
   listMeusPlantoesMesCalendarioService,
   listMinhasEquipesCalendarioService,
   solicitarTrocaPlantaoService,
+  listPlantoesColegaParaTrocaService,
+  listMeusPlantoesParaTrocaService,
   listTrocasPlantaoPendentesService,
   aceitarTrocaPlantaoService,
   recusarTrocaPlantaoService,
@@ -298,17 +300,89 @@ export const solicitarTrocaPlantaoController = async (req: Request, res: Respons
       return res.status(401).json({ success: false, error: 'Não autenticado' });
     }
     const plantaoId = String(req.body.plantaoId);
-    const medicoDestinoId = String(req.body.medicoDestinoId);
-    const data = await solicitarTrocaPlantaoService(req.user.tenantId, req.user.id, plantaoId, medicoDestinoId);
+    const paraEquipe =
+      req.body.paraEquipeInteira === true ||
+      req.body.paraEquipeInteira === 'true' ||
+      req.body.paraEquipeInteira === 1 ||
+      req.body.paraEquipeInteira === '1';
+    const tipoRaw = String(req.body?.tipoSolicitacao ?? 'PERMUTA').toUpperCase();
+    const ehCeder = tipoRaw === 'CEDER';
+
+    const data = paraEquipe
+      ? await solicitarTrocaPlantaoService(req.user.tenantId, req.user.id, plantaoId, {
+          modo: 'equipe',
+          ...(ehCeder ? { tipo: 'CEDER' as const } : {}),
+        })
+      : ehCeder
+        ? await solicitarTrocaPlantaoService(req.user.tenantId, req.user.id, plantaoId, {
+            tipo: 'CEDER',
+            modo: 'colega',
+            medicoDestinoId: String(req.body.medicoDestinoId),
+          })
+        : await solicitarTrocaPlantaoService(req.user.tenantId, req.user.id, plantaoId, {
+            modo: 'colega',
+            medicoDestinoId: String(req.body.medicoDestinoId),
+            plantaoContrapartidaId: String(req.body.plantaoContrapartidaId),
+          });
+
+    let message: string;
+    if (paraEquipe) {
+      message = ehCeder
+        ? 'Pedido de cessão enviado à equipe. O primeiro colega a aceitar assume o plantão.'
+        : 'Pedido enviado à equipe. O primeiro colega a aceitar fecha a permuta.';
+    } else {
+      message = ehCeder
+        ? 'Cessão registrada. O profissional foi notificado.'
+        : 'Solicitação de permuta registrada. Você e o profissional foram notificados.';
+    }
+
     return res.status(201).json({
       success: true,
       data,
-      message: 'Solicitação de troca registrada. Você e o profissional foram notificados.',
+      message,
     });
   } catch (error: any) {
     return res.status(error.statusCode || 500).json({
       success: false,
       error: error.message || 'Erro ao solicitar troca de plantão',
+    });
+  }
+};
+
+export const listMeusPlantoesParaTrocaController = async (req: Request, res: Response) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ success: false, error: 'Não autenticado' });
+    }
+    const escalaId = String(req.query.escalaId);
+    const data = await listMeusPlantoesParaTrocaService(req.user.tenantId, req.user.id, escalaId);
+    return res.status(200).json({ success: true, data });
+  } catch (error: any) {
+    return res.status(error.statusCode || 500).json({
+      success: false,
+      error: error.message || 'Erro ao listar seus plantões para troca',
+    });
+  }
+};
+
+export const listPlantoesColegaParaTrocaController = async (req: Request, res: Response) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ success: false, error: 'Não autenticado' });
+    }
+    const escalaId = String(req.query.escalaId);
+    const medicoDestinoId = String(req.query.medicoDestinoId);
+    const data = await listPlantoesColegaParaTrocaService(
+      req.user.tenantId,
+      req.user.id,
+      escalaId,
+      medicoDestinoId
+    );
+    return res.status(200).json({ success: true, data });
+  } catch (error: any) {
+    return res.status(error.statusCode || 500).json({
+      success: false,
+      error: error.message || 'Erro ao listar plantões do colega',
     });
   }
 };
@@ -334,7 +408,15 @@ export const aceitarTrocaPlantaoController = async (req: Request, res: Response)
       return res.status(401).json({ success: false, error: 'Não autenticado' });
     }
     const solicitacaoId = String(req.params.id);
-    const data = await aceitarTrocaPlantaoService(req.user.tenantId, req.user.id, solicitacaoId);
+    const raw = req.body?.plantaoContrapartidaId;
+    const plantaoContrapartidaId =
+      raw != null && String(raw).trim() !== '' ? String(raw).trim() : undefined;
+    const data = await aceitarTrocaPlantaoService(
+      req.user.tenantId,
+      req.user.id,
+      solicitacaoId,
+      plantaoContrapartidaId
+    );
     return res.status(200).json({ success: true, data, message: 'Troca aceita com sucesso' });
   } catch (error: any) {
     return res.status(error.statusCode || 500).json({

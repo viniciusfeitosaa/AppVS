@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useLayoutEffect } from 'react';
+import { useState, useEffect, useRef, useLayoutEffect, useMemo } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../context/AuthContext';
 import { authService } from '../services/auth.service';
@@ -115,6 +115,30 @@ const formatDiaPlantaoCurto = (dataStr: string) => {
     .replace(/\./g, '');
 };
 
+/** Haversine (metros) — alinhado ao backend de ponto. */
+function distanciaMetros(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const R = 6371000;
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLon = ((lon2 - lon1) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos((lat1 * Math.PI) / 180) *
+      Math.cos((lat2 * Math.PI) / 180) *
+      Math.sin(dLon / 2) *
+      Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+}
+
+type EscalaPontoPainel = {
+  id: string;
+  nome: string;
+  referenciaGeo?: { latitude: number; longitude: number; raioMetros: number } | null;
+};
+
+/** Várias escalas: `ok` = mais próxima por GPS; `fallback` = GPS indisponível ou sem referência — usa primeira da lista. */
+type EscalaAutoStatus = 'idle' | 'unica' | 'loading' | 'ok' | 'fallback';
+
 const PontoEletronico = () => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
@@ -132,6 +156,8 @@ const PontoEletronico = () => {
   const [streamAttachKey, setStreamAttachKey] = useState(0);
   const [motivoSemFoto, setMotivoSemFoto] = useState('');
   const [showSemFotoSection, setShowSemFotoSection] = useState(false);
+  /** Várias escalas: escolha automática por GPS (sem select). */
+  const [escalaAutoStatus, setEscalaAutoStatus] = useState<EscalaAutoStatus>('idle');
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const cameraStartAttemptRef = useRef(0);
@@ -157,7 +183,7 @@ const PontoEletronico = () => {
     painelResp != null && meuDiaPayload != null
       ? { success: painelResp.success, data: meuDiaPayload }
       : undefined;
-  const listaEscalas = painelResp?.data?.escalas ?? [];
+  const listaEscalas: EscalaPontoPainel[] = (painelResp?.data?.escalas ?? []) as EscalaPontoPainel[];
   const registroAbertoPainel = meuDiaPayload?.registroAberto;
 
   const { data: canCheckInResp } = useQuery({
@@ -184,11 +210,91 @@ const PontoEletronico = () => {
     return () => clearInterval(t);
   }, []);
 
+  const escalasAutoDep = useMemo(() => {
+    const arr = (painelResp?.data?.escalas ?? []) as EscalaPontoPainel[];
+    return JSON.stringify(arr.map((e) => ({ id: e.id, ref: e.referenciaGeo ?? null })));
+  }, [painelResp?.data?.escalas]);
+
   useEffect(() => {
-    if (listaEscalas.length > 0 && !selectedEscalaId) {
-      setSelectedEscalaId(listaEscalas[0].id);
+    if (loadingPainel) return;
+
+    type Parsed = { id: string; ref: EscalaPontoPainel['referenciaGeo'] };
+    let parsed: Parsed[];
+    try {
+      parsed = JSON.parse(escalasAutoDep) as Parsed[];
+    } catch {
+      setSelectedEscalaId('');
+      setEscalaAutoStatus('idle');
+      return;
     }
-  }, [listaEscalas.length, selectedEscalaId]);
+
+    if (parsed.length === 0) {
+      setSelectedEscalaId('');
+      setEscalaAutoStatus('idle');
+      return;
+    }
+
+    if (parsed.length === 1) {
+      setSelectedEscalaId(parsed[0].id);
+      setEscalaAutoStatus('unica');
+      return;
+    }
+
+    const comGeo = parsed
+      .map((row) => {
+        const r = row.ref;
+        if (!r) return null;
+        const lat = Number(r.latitude);
+        const lon = Number(r.longitude);
+        if (Number.isNaN(lat) || Number.isNaN(lon)) return null;
+        return { id: row.id, lat, lon };
+      })
+      .filter((x): x is { id: string; lat: number; lon: number } => x != null);
+
+    const usarPrimeiraEscala = () => {
+      setSelectedEscalaId(parsed[0].id);
+      setEscalaAutoStatus('fallback');
+    };
+
+    /** GPS e referências no ponto são opcionais: sem isso, mantém o comportamento anterior (primeira escala). */
+    if (comGeo.length === 0 || !navigator.geolocation) {
+      usarPrimeiraEscala();
+      return;
+    }
+
+    let cancelled = false;
+    setEscalaAutoStatus('loading');
+    setSelectedEscalaId('');
+
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        if (cancelled) return;
+        const uLat = pos.coords.latitude;
+        const uLon = pos.coords.longitude;
+        let best = comGeo[0];
+        let bestD = distanciaMetros(uLat, uLon, best.lat, best.lon);
+        for (let i = 1; i < comGeo.length; i++) {
+          const d = distanciaMetros(uLat, uLon, comGeo[i].lat, comGeo[i].lon);
+          if (d < bestD) {
+            bestD = d;
+            best = comGeo[i];
+          }
+        }
+        setSelectedEscalaId(best.id);
+        setEscalaAutoStatus('ok');
+      },
+      () => {
+        if (cancelled) return;
+        setSelectedEscalaId(parsed[0].id);
+        setEscalaAutoStatus('fallback');
+      },
+      { enableHighAccuracy: true, timeout: 25000, maximumAge: 0 }
+    );
+
+    return () => {
+      cancelled = true;
+    };
+  }, [loadingPainel, escalasAutoDep]);
 
   if (!isMedico) {
     return (
@@ -217,10 +323,6 @@ const PontoEletronico = () => {
   const totalMinutosHoje = meuDiaResp?.data?.totalMinutosHoje || 0;
   const totalMinutosSemana = meuDiaResp?.data?.totalMinutosSemana || 0;
   const ultimoRegistroPonto = meuDiaResp?.data?.ultimoRegistroPonto;
-  const equipeDoDia: string[] = meuDiaResp?.data?.equipeDoDia || [];
-  const minhasEquipes: string[] = meuDiaResp?.data?.minhasEquipes || [];
-  const equipeExibida: string[] =
-    equipeDoDia.length > 0 ? equipeDoDia : minhasEquipes;
   const plantoesHoje: PlantaoHojeMeuDia[] = (meuDiaResp?.data as { plantoesHoje?: PlantaoHojeMeuDia[] } | undefined)
     ?.plantoesHoje ?? [];
   const plantoesHojeNaEscala = selectedEscalaId
@@ -337,7 +439,11 @@ const PontoEletronico = () => {
 
   const openCheckinModal = () => {
     if (listaEscalas.length > 0 && !selectedEscalaId) {
-      setError('Selecione uma escala para realizar o check-in.');
+      if (escalaAutoStatus === 'loading') {
+        setError('Aguarde um instante enquanto definimos a escala.');
+      } else {
+        setError('Não foi possível identificar a escala. Atualize a página ou tente novamente.');
+      }
       return;
     }
     if (!registroAberto && selectedEscalaId && canCheckInResp?.data?.allowed === false) {
@@ -549,27 +655,24 @@ const PontoEletronico = () => {
           Registrar ponto
         </h3>
         {listaEscalas.length > 1 && (
-          <div className="w-full max-w-sm mx-auto mb-4 text-left">
+          <div className="w-full max-w-sm mx-auto mb-4 text-center space-y-1">
             <label className="block text-xs font-semibold text-viva-800 mb-1 font-display">
               Onde está registrando o ponto
             </label>
-            <select
-              className="input w-full text-sm"
-              value={selectedEscalaId}
-              onChange={(e) => setSelectedEscalaId(e.target.value)}
-            >
-              {listaEscalas.map((e: { id: string; nome: string }) => (
-                <option key={e.id} value={e.id}>
-                  {e.nome}
-                </option>
-              ))}
-            </select>
+            {escalaAutoStatus === 'loading' && (
+              <p className="text-sm text-viva-600 font-serif">A localizar a unidade mais próxima (opcional)…</p>
+            )}
+            {(escalaAutoStatus === 'ok' ||
+              escalaAutoStatus === 'unica' ||
+              escalaAutoStatus === 'fallback') &&
+              selectedEscalaId && (
+                <p className="input w-full text-sm py-2.5 bg-viva-50/80 text-viva-900 font-medium text-center">
+                  {listaEscalas.find((e) => e.id === selectedEscalaId)?.nome ?? '—'}
+                </p>
+              )}
           </div>
         )}
         <div className="flex flex-col items-center gap-3 text-center mb-6">
-          <p className="text-sm text-viva-800 font-medium font-serif">
-            {equipeExibida.length > 0 ? equipeExibida.join(', ') : '—'}
-          </p>
           {selectedEscalaId === PONTO_SEM_ESCALA_ESCALA_ID ? (
             <p className="text-xs text-viva-600 font-serif">
               <span className="font-medium text-viva-800">Ponto sem escala de plantão</span>

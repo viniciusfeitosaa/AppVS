@@ -47,6 +47,24 @@ export const loginMasterController = async (req: Request, res: Response) => {
   }
 };
 
+/** Erros de infraestrutura (DB / rede) que não devem parecer "senha errada". */
+function isDatabaseOrNetworkFailure(message: string): boolean {
+  const m = message.toLowerCase();
+  return (
+    m.includes("can't reach database") ||
+    m.includes("server has closed the connection") ||
+    m.includes('p1001') ||
+    m.includes('p1017') ||
+    m.includes('econnrefused') ||
+    m.includes('enotfound') ||
+    m.includes('etimedout') ||
+    m.includes('ssl') ||
+    m.includes('certificate') ||
+    m.includes('self signed') ||
+    m.includes('no pg_hba.conf entry')
+  );
+}
+
 export const loginEmailController = async (req: Request, res: Response) => {
   try {
     const { email, password } = req.body;
@@ -56,11 +74,35 @@ export const loginEmailController = async (req: Request, res: Response) => {
       success: true,
       data: result,
     });
-  } catch (error: any) {
-    console.error('[auth/login]', error?.message ?? error);
-    return res.status(error.statusCode || 500).json({
+  } catch (error: unknown) {
+    const err = error as { statusCode?: number; message?: string };
+    const rawMsg = err?.message ?? String(error);
+    console.error('[auth/login]', rawMsg);
+
+    if (err?.statusCode === 401 || err?.statusCode === 400) {
+      return res.status(err.statusCode).json({
+        success: false,
+        error: err.message || 'Erro ao fazer login',
+      });
+    }
+
+    const isDev = process.env.NODE_ENV === 'development';
+    const infra = isDatabaseOrNetworkFailure(rawMsg);
+    const statusCode = err?.statusCode ?? (infra ? 503 : 500);
+    const errorMessage =
+      err?.statusCode != null
+        ? err.message || 'Erro ao fazer login'
+        : infra
+          ? isDev
+            ? rawMsg
+            : 'Não foi possível conectar ao banco de dados. Em Postgres na própria VPS, use sslmode=disable na DATABASE_URL se o servidor não usar TLS; confira host, porta e se rodou migrate/seed.'
+          : isDev
+            ? rawMsg
+            : err.message || 'Erro ao fazer login';
+
+    return res.status(statusCode).json({
       success: false,
-      error: error.message || 'Erro ao fazer login',
+      error: errorMessage,
     });
   }
 };

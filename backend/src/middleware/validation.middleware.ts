@@ -265,7 +265,62 @@ export const validateEscalaIdQueryPonto = [
 /** POST /ponto/solicitar-troca-plantao */
 export const validateSolicitarTrocaPlantao = [
   body('plantaoId').notEmpty().isUUID().withMessage('plantaoId inválido'),
-  body('medicoDestinoId').notEmpty().isUUID().withMessage('medicoDestinoId inválido'),
+  body('paraEquipeInteira').optional().isBoolean().withMessage('paraEquipeInteira inválido'),
+  body('tipoSolicitacao')
+    .optional()
+    .isIn(['PERMUTA', 'CEDER', 'permuta', 'ceder'])
+    .withMessage('tipoSolicitacao inválido (use PERMUTA ou CEDER)'),
+  body('medicoDestinoId').optional({ values: 'falsy' }).isUUID().withMessage('medicoDestinoId inválido'),
+  body('plantaoContrapartidaId')
+    .optional({ values: 'falsy' })
+    .isUUID()
+    .withMessage('plantaoContrapartidaId inválido'),
+  body().custom((_v, { req }) => {
+    const pe =
+      req.body?.paraEquipeInteira === true ||
+      req.body?.paraEquipeInteira === 'true' ||
+      req.body?.paraEquipeInteira === 1 ||
+      req.body?.paraEquipeInteira === '1';
+    const tipoRaw = String(req.body?.tipoSolicitacao ?? 'PERMUTA').toUpperCase();
+    const tipo = tipoRaw === 'CEDER' ? 'CEDER' : 'PERMUTA';
+    const pcid = req.body?.plantaoContrapartidaId;
+    const temPcid = pcid != null && String(pcid).trim() !== '';
+    if (pe) {
+      if (temPcid) {
+        throw new Error('plantaoContrapartidaId não se aplica ao pedido à equipe');
+      }
+      return true;
+    }
+    const mid = req.body?.medicoDestinoId;
+    const temMid = typeof mid === 'string' && mid.length > 0;
+    if (tipo === 'CEDER') {
+      if (temPcid) {
+        throw new Error('Na cessão a um colega não informe plantaoContrapartidaId');
+      }
+      if (temMid) return true;
+      throw new Error('Na cessão a um colega informe medicoDestinoId');
+    }
+    if (temMid && temPcid) return true;
+    throw new Error(
+      'Informe paraEquipeInteira, ou permuta (medicoDestinoId + plantaoContrapartidaId), ou cessão (tipoSolicitacao CEDER + medicoDestinoId)'
+    );
+  }),
+  handleValidationErrors,
+];
+
+/** POST /ponto/trocas-plantao/:id/aceitar (body opcional: plantaoContrapartidaId para pedido à equipe) */
+export const validateAceitarTrocaPlantao = [
+  body('plantaoContrapartidaId')
+    .optional({ values: 'falsy' })
+    .isUUID()
+    .withMessage('plantaoContrapartidaId inválido'),
+  handleValidationErrors,
+];
+
+/** GET /ponto/plantoes-colega-troca */
+export const validatePlantoesColegaTrocaQuery = [
+  query('escalaId').notEmpty().isUUID().withMessage('escalaId inválido'),
+  query('medicoDestinoId').notEmpty().isUUID().withMessage('medicoDestinoId inválido'),
   handleValidationErrors,
 ];
 

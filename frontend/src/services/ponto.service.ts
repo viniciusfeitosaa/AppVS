@@ -30,8 +30,15 @@ export interface TrocaPlantaoPendenteItem {
   escalaId: string;
   escalaNome: string | null;
   gradeId: string;
+  contrapartidaPlantaoId: string | null;
+  dataPlantaoContrapartida: string | null;
+  gradeIdContrapartida: string | null;
   solicitante: { id: string; nomeCompleto: string };
-  destino: { id: string; nomeCompleto: string };
+  destino: { id: string; nomeCompleto: string } | null;
+  /** Pedido aberto à equipe; quem aceitar escolhe o plantão dele. */
+  paraEquipeInteira?: boolean;
+  /** PERMUTA (troca bilateral) ou CEDER (cede o plantão ao aceitante). */
+  tipoSolicitacao?: 'PERMUTA' | 'CEDER';
 }
 
 export const pontoService = {
@@ -83,6 +90,26 @@ export const pontoService = {
     return response.data;
   },
 
+  /** Plantões futuros do colega na mesma escala elegíveis para permuta (escolha no fluxo de troca). */
+  listPlantoesColegaParaTroca: async (escalaId: string, medicoDestinoId: string) => {
+    const response = await api.get('/ponto/plantoes-colega-troca', {
+      params: { escalaId, medicoDestinoId },
+    });
+    return response.data as {
+      success: boolean;
+      data: Array<{ id: string; data: string; gradeId: string; gradeLabel: string }>;
+    };
+  },
+
+  /** Seus plantões na escala elegíveis para oferecer ao aceitar permuta aberta à equipe. */
+  listMeusPlantoesParaTroca: async (escalaId: string) => {
+    const response = await api.get('/ponto/meus-plantoes-troca', { params: { escalaId } });
+    return response.data as {
+      success: boolean;
+      data: Array<{ id: string; data: string; gradeId: string; gradeLabel: string }>;
+    };
+  },
+
   listProximosPlantoes: async () => {
     const response = await api.get('/ponto/proximos-plantoes');
     return response.data;
@@ -120,7 +147,17 @@ export const pontoService = {
     return response.data;
   },
 
-  solicitarTrocaPlantao: async (payload: { plantaoId: string; medicoDestinoId: string }) => {
+  solicitarTrocaPlantao: async (
+    payload:
+      | { plantaoId: string; paraEquipeInteira: true; tipoSolicitacao?: 'PERMUTA' | 'CEDER' }
+      | {
+          plantaoId: string;
+          medicoDestinoId: string;
+          plantaoContrapartidaId: string;
+          tipoSolicitacao?: 'PERMUTA';
+        }
+      | { plantaoId: string; medicoDestinoId: string; tipoSolicitacao: 'CEDER' }
+  ) => {
     const response = await api.post('/ponto/solicitar-troca-plantao', payload);
     return response.data as { success: boolean; message?: string; data?: unknown };
   },
@@ -133,8 +170,11 @@ export const pontoService = {
     };
   },
 
-  aceitarTrocaPlantao: async (solicitacaoId: string) => {
-    const response = await api.post(`/ponto/trocas-plantao/${solicitacaoId}/aceitar`);
+  aceitarTrocaPlantao: async (
+    solicitacaoId: string,
+    body?: { plantaoContrapartidaId?: string }
+  ) => {
+    const response = await api.post(`/ponto/trocas-plantao/${solicitacaoId}/aceitar`, body ?? {});
     return response.data as { success: boolean; message?: string };
   },
 

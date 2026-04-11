@@ -143,13 +143,16 @@ export interface EscalaPlantao {
 export interface HistoricoTrocaPlantaoEscala {
   id: string;
   status: string;
+  /** PERMUTA | CEDER (padrão PERMUTA em registros antigos). */
+  tipoSolicitacao?: string;
   respondidaEm: string;
   createdAt: string;
   plantaoId: string;
   dataPlantao: string;
   gradeId: string;
   solicitante: { id: string; nomeCompleto: string; crm: string | null };
-  destino: { id: string; nomeCompleto: string; crm: string | null };
+  /** Null em registros antigos de pedido aberto à equipe antes do aceite preencher destino. */
+  destino: { id: string; nomeCompleto: string; crm: string | null } | null;
 }
 
 export interface AdicionalPlantaoData {

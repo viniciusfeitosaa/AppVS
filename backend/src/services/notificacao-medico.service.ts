@@ -158,6 +158,177 @@ export async function notificarTrocaPlantaoSolicitada(
     escalaNome: string;
     dataPlantaoIso: string;
     gradeLabel: string;
+    /** Permuta: plantão do colega que o solicitante assume em troca. */
+    contrapartidaPlantaoId?: string;
+    dataContrapartidaIso?: string;
+    gradeLabelContrapartida?: string;
+  }
+) {
+  const {
+    solicitacaoId,
+    medicoSolicitanteId,
+    medicoDestinoId,
+    solicitanteNome,
+    destinoNome,
+    plantaoId,
+    escalaId,
+    escalaNome,
+    dataPlantaoIso,
+    gradeLabel,
+    contrapartidaPlantaoId,
+    dataContrapartidaIso,
+    gradeLabelContrapartida,
+  } = input;
+
+  const fmt = (iso: string) =>
+    new Date(iso + 'T12:00:00').toLocaleDateString('pt-BR', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+    });
+
+  const dataFmt = fmt(dataPlantaoIso);
+  const ehPermuta =
+    contrapartidaPlantaoId &&
+    dataContrapartidaIso &&
+    gradeLabelContrapartida != null &&
+    gradeLabelContrapartida !== '';
+
+  const corpoDestino = ehPermuta
+    ? `${solicitanteNome} propõe permutar plantões na escala "${escalaNome}": você assumiria o plantão dele no dia ${dataFmt} (${gradeLabel}) e ele(a) assumiria o seu plantão do dia ${fmt(dataContrapartidaIso!)} (${gradeLabelContrapartida}). Responda no app (aceitar ou recusar).`
+    : `${solicitanteNome} solicitou trocar o plantão do dia ${dataFmt} (${gradeLabel}) na escala "${escalaNome}". Confira com a pessoa ou a coordenação para alinhar a troca.`;
+
+  const corpoSolicitante = ehPermuta
+    ? `Pedido enviado: você oferece trocar seu plantão de ${dataFmt} (${gradeLabel}) pelo plantão de ${destinoNome} em ${fmt(dataContrapartidaIso!)} (${gradeLabelContrapartida}), escala "${escalaNome}". Aguardando resposta.`
+    : `Seu pedido de troca de plantão com ${destinoNome} foi registrado (${escalaNome}, ${dataFmt}, ${gradeLabel}). O profissional foi notificado.`;
+
+  await prisma.notificacaoMedico.create({
+    data: {
+      tenantId,
+      medicoId: medicoDestinoId,
+      tipo: TIPO_NOTIFICACAO.TROCA_PLANTAO_SOLICITADA,
+      titulo: ehPermuta ? 'Pedido de permuta de plantão' : 'Pedido de troca de plantão',
+      corpo: corpoDestino,
+      metadata: {
+        ...(solicitacaoId ? { solicitacaoId } : {}),
+        plantaoId,
+        ...(contrapartidaPlantaoId ? { contrapartidaPlantaoId } : {}),
+        escalaId,
+        medicoSolicitanteId,
+        medicoDestinoId,
+        papel: 'destino',
+      },
+    },
+  });
+
+  await prisma.notificacaoMedico.create({
+    data: {
+      tenantId,
+      medicoId: medicoSolicitanteId,
+      tipo: TIPO_NOTIFICACAO.TROCA_PLANTAO_SOLICITADA,
+      titulo: ehPermuta ? 'Permuta de plantão enviada' : 'Solicitação de troca enviada',
+      corpo: corpoSolicitante,
+      metadata: {
+        ...(solicitacaoId ? { solicitacaoId } : {}),
+        plantaoId,
+        ...(contrapartidaPlantaoId ? { contrapartidaPlantaoId } : {}),
+        escalaId,
+        medicoSolicitanteId,
+        medicoDestinoId,
+        papel: 'solicitante',
+      },
+    },
+  });
+}
+
+/** Permuta aberta a todos os colegas da equipe na escala; o primeiro a aceitar fecha a troca. */
+export async function notificarTrocaPlantaoAbertaEquipe(
+  tenantId: string,
+  input: {
+    solicitacaoId: string;
+    medicoSolicitanteId: string;
+    colegaMedicoIds: string[];
+    solicitanteNome: string;
+    plantaoId: string;
+    escalaId: string;
+    escalaNome: string;
+    dataPlantaoIso: string;
+    gradeLabel: string;
+  }
+) {
+  const {
+    solicitacaoId,
+    medicoSolicitanteId,
+    colegaMedicoIds,
+    solicitanteNome,
+    plantaoId,
+    escalaId,
+    escalaNome,
+    dataPlantaoIso,
+    gradeLabel,
+  } = input;
+
+  const dataFmt = new Date(dataPlantaoIso + 'T12:00:00').toLocaleDateString('pt-BR', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+  });
+
+  const corpoColega = `${solicitanteNome} abriu permuta com a equipe na escala "${escalaNome}": plantão dele no dia ${dataFmt} (${gradeLabel}). O primeiro a aceitar escolhe qual plantão seu permuta. Abra o painel para responder.`;
+
+  if (colegaMedicoIds.length > 0) {
+    await prisma.notificacaoMedico.createMany({
+      data: colegaMedicoIds.map((medicoId) => ({
+        tenantId,
+        medicoId,
+        tipo: TIPO_NOTIFICACAO.TROCA_PLANTAO_SOLICITADA,
+        titulo: 'Permuta aberta à equipe',
+        corpo: corpoColega,
+        metadata: {
+          solicitacaoId,
+          plantaoId,
+          escalaId,
+          medicoSolicitanteId,
+          papel: 'destino_equipe' as const,
+          paraEquipeInteira: true,
+        },
+      })),
+    });
+  }
+
+  await prisma.notificacaoMedico.create({
+    data: {
+      tenantId,
+      medicoId: medicoSolicitanteId,
+      tipo: TIPO_NOTIFICACAO.TROCA_PLANTAO_SOLICITADA,
+      titulo: 'Pedido enviado à equipe',
+      corpo: `Seu pedido de permuta (${escalaNome}, ${dataFmt}) foi enviado à equipe. O primeiro colega a aceitar fecha a troca.`,
+      metadata: {
+        solicitacaoId,
+        plantaoId,
+        escalaId,
+        medicoSolicitanteId,
+        papel: 'solicitante_equipe' as const,
+        paraEquipeInteira: true,
+      },
+    },
+  });
+}
+
+/** Cessão direta a um colega: o aceitante assume o plantão do solicitante (sem contrapartida). */
+export async function notificarCederPlantaoParaColega(
+  tenantId: string,
+  input: {
+    solicitacaoId: string;
+    medicoSolicitanteId: string;
+    medicoDestinoId: string;
+    solicitanteNome: string;
+    destinoNome: string;
+    plantaoId: string;
+    escalaId: string;
+    escalaNome: string;
+    dataPlantaoIso: string;
+    gradeLabel: string;
   }
 ) {
   const {
@@ -179,20 +350,25 @@ export async function notificarTrocaPlantaoSolicitada(
     year: 'numeric',
   });
 
+  const corpoDestino = `${solicitanteNome} está cedendo a você o plantão do dia ${dataFmt} (${gradeLabel}) na escala "${escalaNome}". Responda no app (aceitar ou recusar).`;
+
+  const corpoSolicitante = `Pedido de cessão enviado: você cede seu plantão de ${dataFmt} (${gradeLabel}) para ${destinoNome}, escala "${escalaNome}". Aguardando resposta.`;
+
   await prisma.notificacaoMedico.create({
     data: {
       tenantId,
       medicoId: medicoDestinoId,
       tipo: TIPO_NOTIFICACAO.TROCA_PLANTAO_SOLICITADA,
-      titulo: 'Pedido de troca de plantão',
-      corpo: `${solicitanteNome} solicitou trocar o plantão do dia ${dataFmt} (${gradeLabel}) na escala "${escalaNome}". Confira com a pessoa ou a coordenação para alinhar a troca.`,
+      titulo: 'Cessão de plantão',
+      corpo: corpoDestino,
       metadata: {
-        ...(solicitacaoId ? { solicitacaoId } : {}),
+        solicitacaoId,
         plantaoId,
         escalaId,
         medicoSolicitanteId,
         medicoDestinoId,
-        papel: 'destino',
+        papel: 'destino' as const,
+        tipoSolicitacao: 'CEDER' as const,
       },
     },
   });
@@ -202,15 +378,92 @@ export async function notificarTrocaPlantaoSolicitada(
       tenantId,
       medicoId: medicoSolicitanteId,
       tipo: TIPO_NOTIFICACAO.TROCA_PLANTAO_SOLICITADA,
-      titulo: 'Solicitação de troca enviada',
-      corpo: `Seu pedido de troca de plantão com ${destinoNome} foi registrado (${escalaNome}, ${dataFmt}, ${gradeLabel}). O profissional foi notificado.`,
+      titulo: 'Cessão enviada',
+      corpo: corpoSolicitante,
       metadata: {
-        ...(solicitacaoId ? { solicitacaoId } : {}),
+        solicitacaoId,
         plantaoId,
         escalaId,
         medicoSolicitanteId,
         medicoDestinoId,
-        papel: 'solicitante',
+        papel: 'solicitante' as const,
+        tipoSolicitacao: 'CEDER' as const,
+      },
+    },
+  });
+}
+
+/** Cessão aberta à equipe: o primeiro a aceitar assume o plantão (sem oferecer contrapartida). */
+export async function notificarCederPlantaoAbertaEquipe(
+  tenantId: string,
+  input: {
+    solicitacaoId: string;
+    medicoSolicitanteId: string;
+    colegaMedicoIds: string[];
+    solicitanteNome: string;
+    plantaoId: string;
+    escalaId: string;
+    escalaNome: string;
+    dataPlantaoIso: string;
+    gradeLabel: string;
+  }
+) {
+  const {
+    solicitacaoId,
+    medicoSolicitanteId,
+    colegaMedicoIds,
+    solicitanteNome,
+    plantaoId,
+    escalaId,
+    escalaNome,
+    dataPlantaoIso,
+    gradeLabel,
+  } = input;
+
+  const dataFmt = new Date(dataPlantaoIso + 'T12:00:00').toLocaleDateString('pt-BR', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+  });
+
+  const corpoColega = `${solicitanteNome} cedeu o plantão do dia ${dataFmt} (${gradeLabel}) à equipe na escala "${escalaNome}". O primeiro a aceitar assume esse plantão (sem permuta). Abra o painel para responder.`;
+
+  if (colegaMedicoIds.length > 0) {
+    await prisma.notificacaoMedico.createMany({
+      data: colegaMedicoIds.map((medicoId) => ({
+        tenantId,
+        medicoId,
+        tipo: TIPO_NOTIFICACAO.TROCA_PLANTAO_SOLICITADA,
+        titulo: 'Cessão aberta à equipe',
+        corpo: corpoColega,
+        metadata: {
+          solicitacaoId,
+          plantaoId,
+          escalaId,
+          medicoSolicitanteId,
+          papel: 'destino_equipe' as const,
+          paraEquipeInteira: true,
+          tipoSolicitacao: 'CEDER' as const,
+        },
+      })),
+    });
+  }
+
+  await prisma.notificacaoMedico.create({
+    data: {
+      tenantId,
+      medicoId: medicoSolicitanteId,
+      tipo: TIPO_NOTIFICACAO.TROCA_PLANTAO_SOLICITADA,
+      titulo: 'Cessão enviada à equipe',
+      corpo: `Seu pedido de cessão (${escalaNome}, ${dataFmt}) foi enviado à equipe. O primeiro colega a aceitar assume o plantão.`,
+      metadata: {
+        solicitacaoId,
+        plantaoId,
+        escalaId,
+        medicoSolicitanteId,
+        papel: 'solicitante_equipe' as const,
+        paraEquipeInteira: true,
+        tipoSolicitacao: 'CEDER' as const,
       },
     },
   });

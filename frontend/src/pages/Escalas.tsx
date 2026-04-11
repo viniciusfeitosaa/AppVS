@@ -959,14 +959,19 @@ const Escalas = () => {
     return round2(base * (1 + percentual / 100));
   };
 
+  type PlantaoSlotEntry = {
+    medico: { id: string; nomeCompleto: string; crm: string; telefone?: string | null; email?: string | null };
+    plantaoId: string;
+    valorHora: string | null;
+  };
+
   const plantaoMap = useMemo(() => {
-    const map = new Map<
-      string,
-      { medico: { id: string; nomeCompleto: string; crm: string; telefone?: string | null; email?: string | null }; plantaoId: string; valorHora: string | null }
-    >();
+    const map = new Map<string, PlantaoSlotEntry[]>();
     for (const p of plantoes) {
+      if (!p.medico?.id) continue;
       const dateStr = p.data.slice(0, 10);
-      map.set(`${dateStr}_${p.gradeId}`, {
+      const key = `${dateStr}_${p.gradeId}`;
+      const entry: PlantaoSlotEntry = {
         medico: {
           id: p.medico.id,
           nomeCompleto: p.medico.nomeCompleto,
@@ -976,20 +981,27 @@ const Escalas = () => {
         },
         plantaoId: p.id,
         valorHora: p.valorHora ?? null,
-      });
+      };
+      const list = map.get(key) ?? [];
+      list.push(entry);
+      map.set(key, list);
+    }
+    for (const list of map.values()) {
+      list.sort((a, b) =>
+        (a.medico?.nomeCompleto ?? '').localeCompare(b.medico?.nomeCompleto ?? '', 'pt-BR')
+      );
     }
     return map;
   }, [plantoes]);
 
   const plantoesMonth = useMemo(() => plantoesMonthResp?.data || [], [plantoesMonthResp]);
   const plantaoMapMonth = useMemo(() => {
-    const map = new Map<
-      string,
-      { medico: { id: string; nomeCompleto: string; crm: string; telefone?: string | null; email?: string | null }; plantaoId: string; valorHora: string | null }
-    >();
+    const map = new Map<string, PlantaoSlotEntry[]>();
     for (const p of plantoesMonth) {
+      if (!p.medico?.id) continue;
       const dateStr = p.data.slice(0, 10);
-      map.set(`${dateStr}_${p.gradeId}`, {
+      const key = `${dateStr}_${p.gradeId}`;
+      const entry: PlantaoSlotEntry = {
         medico: {
           id: p.medico.id,
           nomeCompleto: p.medico.nomeCompleto,
@@ -999,7 +1011,15 @@ const Escalas = () => {
         },
         plantaoId: p.id,
         valorHora: p.valorHora ?? null,
-      });
+      };
+      const list = map.get(key) ?? [];
+      list.push(entry);
+      map.set(key, list);
+    }
+    for (const list of map.values()) {
+      list.sort((a, b) =>
+        (a.medico?.nomeCompleto ?? '').localeCompare(b.medico?.nomeCompleto ?? '', 'pt-BR')
+      );
     }
     return map;
   }, [plantoesMonth]);
@@ -1184,11 +1204,13 @@ const Escalas = () => {
   const plantaoSlotValor = useMemo(() => {
     if (!cellModal.date || !cellModal.grade) return null;
     const key = `${dateToInput(cellModal.date)}_${cellModal.grade.id}`;
-    const slot = plantaoMap.get(key);
+    const slots = plantaoMap.get(key) ?? [];
+    const medicoModalId = cellModal.medico?.id;
+    const slot = medicoModalId ? slots.find((s) => s?.medico?.id === medicoModalId) : slots[0];
     if (slot?.valorHora == null || slot.valorHora === '') return null;
     const n = parseFloat(String(slot.valorHora));
     return Number.isNaN(n) ? null : n;
-  }, [cellModal.date, cellModal.grade, plantaoMap]);
+  }, [cellModal.date, cellModal.grade, cellModal.medico, plantaoMap]);
 
   const valorBaseModal = useMemo(() => {
     if (!cellModal.grade) return null;
@@ -1830,6 +1852,7 @@ const Escalas = () => {
 
                 // Plantões do mês visível na grade principal (mesmo recorte de datas)
                 for (const p of plantoesHistoricoDrawer) {
+                  if (!p.medico) continue;
                   const d = new Date(p.data);
                   const grade = gradesForGrid.find((g) => g.id === p.gradeId);
                   historico.push({
@@ -1845,18 +1868,32 @@ const Escalas = () => {
                   const dPlantao = new Date(t.dataPlantao + 'T12:00:00');
                   const grade = gradesForGrid.find((g) => g.id === t.gradeId);
                   const sol = fixMojibake(t.solicitante.nomeCompleto);
-                  const dst = fixMojibake(t.destino.nomeCompleto);
+                  const dst = t.destino
+                    ? fixMojibake(t.destino.nomeCompleto)
+                    : 'colega (pedido à equipe)';
                   const crmS = t.solicitante.crm ?? '—';
-                  const crmD = t.destino.crm ?? '—';
+                  const crmD = t.destino?.crm ?? '—';
                   const aceita = t.status === 'ACEITA';
+                  const ehCederHist = String(t.tipoSolicitacao ?? 'PERMUTA').toUpperCase() === 'CEDER';
+                  const blocoData = `· ${formatDayShort(dPlantao)} · ${grade?.label ?? 'Turno'} ${grade?.horario ? `· ${grade.horario}` : ''}`;
                   historico.push({
                     id: `troca-${t.id}`,
                     data: new Date(t.respondidaEm),
                     tipo: 'troca',
-                    titulo: aceita ? 'Troca de plantão realizada' : 'Troca de plantão recusada',
+                    titulo: aceita
+                      ? ehCederHist
+                        ? 'Cessão de plantão concluída'
+                        : 'Permuta de plantão concluída'
+                      : ehCederHist
+                        ? 'Cessão de plantão recusada'
+                        : 'Permuta de plantão recusada',
                     descricao: aceita
-                      ? `${sol} (${crmS}) cedeu o plantão a ${dst} (${crmD}) · ${formatDayShort(dPlantao)} · ${grade?.label ?? 'Turno'} ${grade?.horario ? `· ${grade.horario}` : ''}`
-                      : `${sol} (${crmS}) solicitou troca com ${dst} (${crmD}) — recusada · ${formatDayShort(dPlantao)} · ${grade?.label ?? 'Turno'} ${grade?.horario ? `· ${grade.horario}` : ''}`,
+                      ? ehCederHist
+                        ? `${sol} (${crmS}) cedeu o plantão a ${dst}${t.destino ? ` (${crmD})` : ''} ${blocoData}`
+                        : `${sol} (${crmS}) concluiu permuta com ${dst}${t.destino ? ` (${crmD})` : ''} ${blocoData}`
+                      : ehCederHist
+                        ? `${sol} (${crmS}) pediu cessão para ${dst}${t.destino ? ` (${crmD})` : ''} — recusada ${blocoData}`
+                        : `${sol} (${crmS}) solicitou permuta com ${dst}${t.destino ? ` (${crmD})` : ''} — recusada ${blocoData}`,
                   });
                 }
 
@@ -2154,7 +2191,7 @@ const Escalas = () => {
                         return `${a.replace(':', 'h')} às ${b.replace(':', 'h')}`;
                       };
                       return gradesParaPlantoesDoDia.map((grade) => {
-                        const alocados = plantoesDia.filter((p) => p.gradeId === grade.id);
+                        const alocados = plantoesDia.filter((p) => p.gradeId === grade.id && p.medico);
                         const adicionalPercentualDia = adicionalPercentualDoDiaPorGrade.get(grade.id) ?? 0;
                         return (
                           <div key={grade.id} className="rounded-xl overflow-hidden my-2">
@@ -2388,24 +2425,6 @@ const Escalas = () => {
                 }`}
               >
                 <div className="relative flex-1 flex flex-col overflow-y-auto overflow-x-auto min-w-0">
-                  {gradeSomenteLeitura && (
-                    <div
-                      className="sticky top-0 z-20 mb-2 shrink-0 flex items-start gap-2 rounded-xl border border-viva-300/60 bg-white/90 px-3 py-2.5 shadow-sm backdrop-blur-md"
-                      role="status"
-                    >
-                      <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-viva-600/10 text-viva-800" aria-hidden>
-                        <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                        </svg>
-                      </span>
-                      <p className="min-w-0 text-sm leading-snug text-viva-900">
-                        <span className="font-semibold font-display">Escala publicada</span>
-                        <span className="text-viva-700"> — visualização com leve desfoque. Para editar plantões, use </span>
-                        <span className="font-semibold text-viva-900">Editar escala</span>
-                        <span className="text-viva-700"> na barra inferior.</span>
-                      </p>
-                    </div>
-                  )}
                   <table
                     className={`w-full border-separate border-spacing-0 text-sm transition-[filter] duration-200 ${
                       gradeSomenteLeitura ? 'blur-[1.25px] contrast-[0.98]' : ''
@@ -2480,8 +2499,11 @@ const Escalas = () => {
                                 const d = new Date(gradeMonthStart.getFullYear(), gradeMonthStart.getMonth(), day);
                                 const dateStr = dateToInput(d);
                                 const key = `${dateStr}_${gradeId}`;
-                                const cell = plantaoMapMonth.get(key);
-                                const showInCell = row.medicoId ? cell?.medico.id === row.medicoId : false;
+                                const slotsNoDia = plantaoMapMonth.get(key) ?? [];
+                                const cell = row.medicoId
+                                  ? slotsNoDia.find((s) => s?.medico?.id === row.medicoId)
+                                  : undefined;
+                                const showInCell = !!cell;
                                 const isWeekend = d.getDay() === 0 || d.getDay() === 6;
                                 const vagas = row.medicoId === '' ? (plantaoVagoSlots[key] ?? 0) : 0;
                                 return (
@@ -2501,12 +2523,13 @@ const Escalas = () => {
                                             label: `${formatDayShort(d)} · ${grade.label}`,
                                           });
                                         } else {
+                                          const firstSlot = slotsNoDia[0];
                                           setCellModal({
                                             open: true,
                                             grade,
                                             date: d,
-                                            medico: cell?.medico ?? null,
-                                            plantaoId: cell?.plantaoId,
+                                            medico: firstSlot?.medico ?? null,
+                                            plantaoId: firstSlot?.plantaoId,
                                             isPlantaoVagoRow: true,
                                           });
                                         }
@@ -2516,7 +2539,7 @@ const Escalas = () => {
                                       if (!selectedEscalaId || !row.medicoId) return;
 
                                       // Toggle tipo "select": se já está alocado para este médico, remove; senão, aloca.
-                                      const isSameMedico = !!cell && cell.medico.id === row.medicoId;
+                                      const isSameMedico = !!cell?.medico?.id && cell.medico.id === row.medicoId;
 
                                       const opKey = key;
                                       setPendingPlantaoKey(opKey);
@@ -2564,8 +2587,11 @@ const Escalas = () => {
                                         <span className="inline-flex h-6 w-6 items-center justify-center rounded-full border-2 border-viva-500/70">
                                           <span className="h-3 w-3 border-2 border-viva-500 border-t-transparent rounded-full animate-spin" />
                                         </span>
-                                      ) : showInCell && cell ? (
-                                        <div className="w-[30px] laptop:w-[24px] aspect-square rounded-full overflow-hidden border-2 border-viva-600 shadow-sm" title={cell.medico.nomeCompleto}>
+                                      ) : showInCell && cell?.medico ? (
+                                        <div
+                                          className="w-[30px] laptop:w-[24px] aspect-square rounded-full overflow-hidden border-2 border-viva-600 shadow-sm"
+                                          title={cell.medico.nomeCompleto}
+                                        >
                                           <img
                                             className="w-full h-full object-cover"
                                             alt={cell.medico.nomeCompleto}
@@ -2587,6 +2613,29 @@ const Escalas = () => {
                       )}
                     </tbody>
                   </table>
+                  {gradeSomenteLeitura && (
+                    <div
+                      className="pointer-events-none absolute inset-0 z-30 flex items-center justify-center p-4"
+                      role="status"
+                      aria-live="polite"
+                    >
+                      <div className="flex items-center gap-2.5 rounded-2xl border border-viva-300/70 bg-white/95 px-4 py-2.5 shadow-lg ring-1 ring-black/[0.04] backdrop-blur-sm">
+                        <span
+                          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-viva-600/10 text-viva-800"
+                          aria-hidden
+                        >
+                          <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
+                            />
+                          </svg>
+                        </span>
+                        <span className="font-semibold font-display text-sm text-viva-900">Escala publicada</span>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
               <div className="flex justify-between gap-2 border-t border-viva-200 p-3 items-center flex-wrap shrink-0">

@@ -1542,7 +1542,7 @@ export async function listEscalaPlantoesService(
         select: { id: true, nomeCompleto: true, crm: true, email: true, telefone: true },
       },
     },
-    orderBy: [{ data: 'asc' }, { gradeId: 'asc' }],
+    orderBy: [{ data: 'asc' }, { gradeId: 'asc' }, { medicoId: 'asc' }],
   });
 }
 
@@ -1581,7 +1581,7 @@ export async function listEquipePlantoesService(
         select: { id: true, nomeCompleto: true, crm: true, email: true, telefone: true },
       },
     },
-    orderBy: [{ data: 'asc' }, { gradeId: 'asc' }],
+    orderBy: [{ data: 'asc' }, { gradeId: 'asc' }, { medicoId: 'asc' }],
   });
 
   if (plantoes.length === 0) return [];
@@ -1680,6 +1680,7 @@ export async function listHistoricoTrocasPlantaoEscalaService(tenantId: string, 
   return rows.map((r) => ({
     id: r.id,
     status: r.status,
+    tipoSolicitacao: String((r as { tipoSolicitacao?: string }).tipoSolicitacao ?? 'PERMUTA').toUpperCase(),
     respondidaEm: (r.respondidaEm ?? r.createdAt).toISOString(),
     createdAt: r.createdAt.toISOString(),
     plantaoId: r.plantao.id,
@@ -1690,11 +1691,13 @@ export async function listHistoricoTrocasPlantaoEscalaService(tenantId: string, 
       nomeCompleto: r.solicitante.nomeCompleto,
       crm: r.solicitante.crm,
     },
-    destino: {
-      id: r.destino.id,
-      nomeCompleto: r.destino.nomeCompleto,
-      crm: r.destino.crm,
-    },
+    destino: r.destino
+      ? {
+          id: r.destino.id,
+          nomeCompleto: r.destino.nomeCompleto,
+          crm: r.destino.crm,
+        }
+      : null,
   }));
 }
 
@@ -1760,34 +1763,41 @@ export async function createEscalaPlantaoService(input: {
         },
       });
 
-      const plantao = await tx.escalaPlantao.upsert({
+      const medicoInclude = {
+        medico: {
+          select: { id: true, nomeCompleto: true, crm: true, email: true, telefone: true },
+        },
+      };
+
+      const existingPlantao = await tx.escalaPlantao.findFirst({
         where: {
-          escalaId_data_gradeId: {
-            escalaId: input.escalaId,
-            data: dataDate,
-            gradeId,
-          },
-        },
-        update: {
-          medicoId: input.medicoId,
-          valorHora,
-          ...snap,
-        },
-        create: {
           tenantId: input.tenantId,
           escalaId: input.escalaId,
           data: dataDate,
           gradeId,
           medicoId: input.medicoId,
-          valorHora,
-          ...snap,
         },
-        include: {
-          medico: {
-            select: { id: true, nomeCompleto: true, crm: true, email: true, telefone: true },
-          },
-        },
+        include: medicoInclude,
       });
+
+      const plantao = existingPlantao
+        ? await tx.escalaPlantao.update({
+            where: { id: existingPlantao.id },
+            data: { valorHora, ...snap },
+            include: medicoInclude,
+          })
+        : await tx.escalaPlantao.create({
+            data: {
+              tenantId: input.tenantId,
+              escalaId: input.escalaId,
+              data: dataDate,
+              gradeId,
+              medicoId: input.medicoId,
+              valorHora,
+              ...snap,
+            },
+            include: medicoInclude,
+          });
 
       await createAuditLog(
         {
@@ -1809,6 +1819,13 @@ export async function createEscalaPlantaoService(input: {
   } catch (e) {
     if (isMissingDatabaseColumnError(e, 'horas_turno_snapshot')) {
       return await runPlantaoTx(false);
+    }
+    if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') {
+      throw {
+        statusCode: 409,
+        message:
+          'Conflito ao gravar plantão: já existe registro para este dia e turno. Se você precisa de mais de um médico no mesmo slot, rode no backend: npx prisma migrate deploy (migração escala_plantao_multi_medico_slot).',
+      };
     }
     throw e;
   }

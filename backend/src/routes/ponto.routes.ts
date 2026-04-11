@@ -11,6 +11,8 @@ import {
   validateEscalaIdQueryPonto,
   validateUUIDParam,
   validateSolicitarTrocaPlantao,
+  validateAceitarTrocaPlantao,
+  validatePlantoesColegaTrocaQuery,
   validateMeusPlantoesCalendarioQuery,
 } from '../middleware/validation.middleware';
 import {
@@ -26,6 +28,8 @@ import {
   listMeusPlantoesCalendarioController,
   listMinhasEquipesCalendarioController,
   solicitarTrocaPlantaoController,
+  listPlantoesColegaParaTrocaController,
+  listMeusPlantoesParaTrocaController,
   listTrocasPlantaoPendentesController,
   aceitarTrocaPlantaoController,
   recusarTrocaPlantaoController,
@@ -52,6 +56,12 @@ router.get('/meu-dia', getMeuDiaPontoController);
 router.get('/painel-inicial', getPainelPontoInicialController);
 router.get('/minhas-escalas', listMinhasEscalasController);
 router.get('/equipe-colegas', validateUUIDQuery('escalaId'), listEquipeColegasController);
+router.get(
+  '/plantoes-colega-troca',
+  validatePlantoesColegaTrocaQuery,
+  listPlantoesColegaParaTrocaController
+);
+router.get('/meus-plantoes-troca', validateUUIDQuery('escalaId'), listMeusPlantoesParaTrocaController);
 router.get('/proximos-plantoes', listProximosPlantoesController);
 router.get(
   '/meus-plantoes-calendario',
@@ -61,7 +71,12 @@ router.get(
 router.get('/minhas-equipes-calendario', listMinhasEquipesCalendarioController);
 router.post('/solicitar-troca-plantao', validateSolicitarTrocaPlantao, solicitarTrocaPlantaoController);
 router.get('/trocas-plantao-pendentes', listTrocasPlantaoPendentesController);
-router.post('/trocas-plantao/:id/aceitar', validateUUIDParam('id'), aceitarTrocaPlantaoController);
+router.post(
+  '/trocas-plantao/:id/aceitar',
+  validateUUIDParam('id'),
+  validateAceitarTrocaPlantao,
+  aceitarTrocaPlantaoController
+);
 router.post('/trocas-plantao/:id/recusar', validateUUIDParam('id'), recusarTrocaPlantaoController);
 router.get('/can-checkin', validateEscalaIdQueryPonto, canCheckInController);
 router.get('/registros/:id/foto-checkin', validateUUIDParam('id'), downloadFotoCheckinMedicoController);
