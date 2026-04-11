@@ -6,6 +6,7 @@ import {
   createContratoAtivoController,
   createEscalaController,
   createEscalaPlantaoController,
+  replicarEscalaPlantoesMesController,
   createMedicoController,
   deleteEscalaController,
   deleteContratoAtivoController,
@@ -79,7 +80,7 @@ import {
 import { authenticateToken, requireAnyModuleAccess, requireModuleAccess, requireRole } from '../middleware/auth.middleware';
 import { uploadDocumentoEnviado } from '../middleware/upload.middleware';
 import { ModuloSistema, UserRole } from '@prisma/client';
-import { validateUUIDParam, validateCreateEscala, validateUpdateEscala, validateCreateEscalaPlantao, validateAlocarMedicoEscala, validateUpsertAdicionalPlantao, validateListAdicionaisPlantao, validateRemoverAdicionalPlantao, validateCreateTipoPlantao, validateUpdateTipoPlantao, validateSetConfigPonto } from '../middleware/validation.middleware';
+import { validateUUIDParam, validateCreateEscala, validateUpdateEscala, validateCreateEscalaPlantao, validateReplicarPlantoesMes, validateAlocarMedicoEscala, validateUpsertAdicionalPlantao, validateListAdicionaisPlantao, validateRemoverAdicionalPlantao, validateCreateTipoPlantao, validateUpdateTipoPlantao, validateSetConfigPonto } from '../middleware/validation.middleware';
 
 const router = Router();
 
@@ -155,6 +156,13 @@ router.get(
   requireModuleAccess(ModuloSistema.ESCALAS),
   validateUUIDParam('id'),
   listHistoricoTrocasPlantaoEscalaController
+);
+router.post(
+  '/escalas/:id/plantoes/replicar-mes',
+  requireModuleAccess(ModuloSistema.ESCALAS),
+  validateUUIDParam('id'),
+  validateReplicarPlantoesMes,
+  replicarEscalaPlantoesMesController
 );
 router.post('/escalas/:id/plantoes', requireModuleAccess(ModuloSistema.ESCALAS), validateUUIDParam('id'), validateCreateEscalaPlantao, createEscalaPlantaoController);
 router.delete('/escalas/:id/plantoes/:plantaoId', requireModuleAccess(ModuloSistema.ESCALAS), validateUUIDParam('id'), validateUUIDParam('plantaoId'), removerEscalaPlantaoController);

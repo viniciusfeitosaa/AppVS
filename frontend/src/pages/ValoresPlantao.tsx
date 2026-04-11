@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../context/AuthContext';
+import { useMasterEscopo } from '../context/MasterEscopoContext';
 import { PontoEnderecoMapaBlock } from '../components/PontoEnderecoMapaBlock';
 import { usePontoEnderecoMapa } from '../hooks/usePontoEnderecoMapa';
 import { adminService, ConfigPontoEletronico, TipoPlantaoConfig, ValorPlantaoConfig } from '../services/admin.service';
@@ -55,9 +56,7 @@ const ValoresPlantao = () => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const isMaster = user?.role === 'MASTER';
-  const [contratoId, setContratoId] = useState<string>('');
-  const [subgrupoId, setSubgrupoId] = useState<string>('');
-  const [equipeId, setEquipeId] = useState<string>('');
+  const { contratoId, subgrupoId, equipeId, setContratoId, setSubgrupoId, setEquipeId } = useMasterEscopo();
   const [saving, setSaving] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -282,8 +281,6 @@ const ValoresPlantao = () => {
 
   const onContratoChange = (id: string) => {
     setContratoId(id);
-    setSubgrupoId('');
-    setEquipeId('');
     setDraft({});
     setDraftValorHoraPorDia({});
     setDraftValorHoraCobrancaPorDia({});
@@ -296,7 +293,6 @@ const ValoresPlantao = () => {
 
   const onSubgrupoChange = (id: string) => {
     setSubgrupoId(id);
-    setEquipeId('');
     setDraft({});
     setDraftValorHoraPorDia({});
     setDraftValorHoraCobrancaPorDia({});

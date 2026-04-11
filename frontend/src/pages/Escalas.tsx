@@ -1,7 +1,10 @@
-import { useMemo, useState, useRef, useEffect } from 'react';
+import { useMemo, useState, useRef, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 import { useAuth } from '../context/AuthContext';
+import { useMasterEscopo } from '../context/MasterEscopoContext';
 import { useDebouncedValue } from '../hooks/useDebouncedValue';
 import {
   adminService,
@@ -118,11 +121,30 @@ function formatDayName(d: Date): string {
   return names[i];
 }
 
+/** Ex.: "2026-04" → "Abril de 2026" */
+function formatMesAnoFromYM(ym: string): string {
+  const parts = ym.split('-').map(Number);
+  const y = parts[0];
+  const m = parts[1];
+  if (!y || !m || m < 1 || m > 12) return ym;
+  const d = new Date(y, m - 1, 1);
+  const raw = d.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+  return raw.charAt(0).toUpperCase() + raw.slice(1);
+}
+
 /** Primeiras duas palavras do nome para exibir na célula */
 function shortName(nomeCompleto: string): string {
   const parts = nomeCompleto.trim().split(/\s+/);
   if (parts.length <= 2) return nomeCompleto.trim();
   return parts.slice(0, 2).join(' ');
+}
+
+/** Texto seguro para Helvetica no jsPDF (evita células corrompidas com Unicode raro). */
+function textoSeguroPdf(s: string): string {
+  return String(s)
+    .replace(/\u202f/g, ' ')
+    .replace(/\u00a0/g, ' ')
+    .replace(/\u2013|\u2014|\u2212/g, '-');
 }
 
 function formatValorHora(valor: string | number | null | undefined): string {
@@ -152,6 +174,14 @@ const Escalas = () => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const isMaster = user?.role === 'MASTER';
+  const {
+    contratoId: filtroListaContratoId,
+    subgrupoId: selectedSubgrupoId,
+    equipeId: selectedEquipeId,
+    setContratoId: setFiltroListaContratoId,
+    setSubgrupoId: setSelectedSubgrupoId,
+    setEquipeId: setSelectedEquipeId,
+  } = useMasterEscopo();
   const [selectedEscalaId, setSelectedEscalaId] = useState<string>('');
   const [editingEscalaId, setEditingEscalaId] = useState<string | null>(null);
   const [form, setForm] = useState<EscalaFormState>(emptyForm);
@@ -182,15 +212,17 @@ const Escalas = () => {
 
   /** 'grupos' = primeira tela (Lista de subgrupos e equipes); 'escalas' = escalas + grade */
   const [viewEscalas, setViewEscalas] = useState<'grupos' | 'escalas'>('grupos');
+  /** Entradas extra no history ao abrir a grade pelo painel "Editar escala" → Voltar / browser back volta ao painel. */
+  const panelGradeHistoryDepthRef = useRef(0);
   const [searchGrupos, setSearchGrupos] = useState('');
-  /** Contrato escolhido na lista de grupos; obrigatório para exibir subgrupos e equipes abaixo. */
-  const [filtroListaContratoId, setFiltroListaContratoId] = useState('');
-  /** Subgrupo selecionado na Lista de grupos; ao clicar, exibe as equipes desse subgrupo (ou mensagem se não tiver). */
-  const [selectedSubgrupoId, setSelectedSubgrupoId] = useState<string | null>(null);
-  /** Equipe selecionada: ao clicar, abre o painel lateral (menu) da equipe. */
-  const [selectedEquipeId, setSelectedEquipeId] = useState<string | null>(null);
+  /** Contrato / subgrupo / equipe vêm do MasterEscopo (partilhado entre módulos + localStorage). */
   /** Aba ativa no painel lateral da equipe. */
   const [equipePanelTab, setEquipePanelTab] = useState<'calendario' | 'editar' | 'membros' | 'historico' | 'relatorio'>('calendario');
+  /** Aba Membros: busca e seleção para adicionar profissionais à equipe. */
+  const [membrosEquipeBusca, setMembrosEquipeBusca] = useState('');
+  const [membrosEquipePickIds, setMembrosEquipePickIds] = useState<string[]>([]);
+  const [membrosEquipeActionLoading, setMembrosEquipeActionLoading] = useState(false);
+  const [membrosEquipeError, setMembrosEquipeError] = useState<string | null>(null);
   /** Mês/ano exibido no calendário do painel da equipe. */
   const [calendarViewDate, setCalendarViewDate] = useState(() => new Date());
   /** Dia clicado no calendário: abre o painel "Plantões do dia". */
@@ -207,6 +239,18 @@ const Escalas = () => {
    * Rascunho: edição liberada por padrão.
    */
   const [gradeEdicaoLiberada, setGradeEdicaoLiberada] = useState(true);
+
+  useEffect(() => {
+    const onPopState = () => {
+      if (panelGradeHistoryDepthRef.current <= 0) return;
+      panelGradeHistoryDepthRef.current -= 1;
+      setViewEscalas('grupos');
+      setSelectedEscalaId('');
+      setEquipePanelTab('editar');
+    };
+    window.addEventListener('popstate', onPopState);
+    return () => window.removeEventListener('popstate', onPopState);
+  }, []);
 
   type CellModalState = {
     open: boolean;
@@ -226,9 +270,26 @@ const Escalas = () => {
   const [confirmClearVagas, setConfirmClearVagas] = useState<{ open: boolean; key?: string; label?: string }>(
     { open: false }
   );
+  const [replicarMesModalOpen, setReplicarMesModalOpen] = useState(false);
+  const [replicarMesDestino, setReplicarMesDestino] = useState('');
+  const [replicarMesSubmitting, setReplicarMesSubmitting] = useState(false);
+  /** Toast lateral (ex.: escala replicada / publicada), some após 3s. */
+  const [escalaSuccessToast, setEscalaSuccessToast] = useState<{ title: string; detail?: string } | null>(null);
   useEffect(() => {
     if (cellModal.open && cellModal.isPlantaoVagoRow) setPlantaoVagoVagas(0);
   }, [cellModal.open, cellModal.isPlantaoVagoRow]);
+
+  useEffect(() => {
+    if (!escalaSuccessToast) return;
+    const t = window.setTimeout(() => setEscalaSuccessToast(null), 3000);
+    return () => window.clearTimeout(t);
+  }, [escalaSuccessToast]);
+
+  useEffect(() => {
+    setMembrosEquipePickIds([]);
+    setMembrosEquipeBusca('');
+    setMembrosEquipeError(null);
+  }, [selectedEquipeId]);
 
   useEffect(() => {
     if (!medicoAllocateOpen) return;
@@ -550,6 +611,77 @@ const Escalas = () => {
     queryFn: () => adminService.listEquipeMedicos(equipeIdParaGrade),
     enabled: isMaster && !!equipeIdParaGrade,
   });
+
+  const medicosParaMembrosEquipeTab =
+    isMaster && viewEscalas === 'grupos' && equipePanelTab === 'membros' && !!selectedEquipeId;
+  const { data: medicosMembrosEquipeResp, isFetching: loadingMedicosMembrosEquipe } = useQuery({
+    queryKey: ['admin', 'medicos', 'for-equipe-membros-tab', selectedEquipeId],
+    queryFn: () => adminService.listMedicos({ page: 1, limit: 2000, ativo: true }),
+    enabled: medicosParaMembrosEquipeTab,
+    staleTime: 60 * 1000,
+  });
+
+  const invalidateEquipeMedicosList = useCallback(() => {
+    if (selectedEquipeId) {
+      queryClient.invalidateQueries({ queryKey: ['admin', 'equipes', selectedEquipeId, 'medicos'] });
+    }
+    if (equipeIdParaGrade && equipeIdParaGrade !== selectedEquipeId) {
+      queryClient.invalidateQueries({ queryKey: ['admin', 'equipes', equipeIdParaGrade, 'medicos'] });
+    }
+  }, [queryClient, selectedEquipeId, equipeIdParaGrade]);
+
+  const toggleMembrosEquipePick = (medicoId: string) => {
+    setMembrosEquipePickIds((prev) =>
+      prev.includes(medicoId) ? prev.filter((id) => id !== medicoId) : [...prev, medicoId]
+    );
+  };
+
+  const adicionarMedicoNaEquipeUm = async (equipeId: string, medicoId: string) => {
+    setMembrosEquipeError(null);
+    setMembrosEquipeActionLoading(true);
+    try {
+      await adminService.addMedicoToEquipe(equipeId, medicoId);
+      setMembrosEquipePickIds((prev) => prev.filter((id) => id !== medicoId));
+    } catch (err: any) {
+      setMembrosEquipeError(err.response?.data?.error || err.message || 'Erro ao adicionar');
+    } finally {
+      setMembrosEquipeActionLoading(false);
+    }
+    void invalidateEquipeMedicosList();
+  };
+
+  const adicionarMedicosSelecionadosNaEquipe = async (equipeId: string, ids: string[]) => {
+    const toAdd = ids.filter(Boolean);
+    if (toAdd.length === 0) return;
+    setMembrosEquipeError(null);
+    setMembrosEquipeActionLoading(true);
+    try {
+      for (const medicoId of toAdd) {
+        await adminService.addMedicoToEquipe(equipeId, medicoId);
+      }
+      setMembrosEquipePickIds([]);
+    } catch (err: any) {
+      setMembrosEquipeError(err.response?.data?.error || err.message || 'Erro ao adicionar');
+    } finally {
+      setMembrosEquipeActionLoading(false);
+    }
+    void invalidateEquipeMedicosList();
+  };
+
+  const removerMedicoDaEquipePainel = async (equipeId: string, medicoId: string) => {
+    setMembrosEquipeError(null);
+    setMembrosEquipeActionLoading(true);
+    try {
+      await adminService.removeMedicoFromEquipe(equipeId, medicoId);
+      setMembrosEquipePickIds((prev) => prev.filter((id) => id !== medicoId));
+    } catch (err: any) {
+      setMembrosEquipeError(err.response?.data?.error || err.message || 'Erro ao remover');
+    } finally {
+      setMembrosEquipeActionLoading(false);
+    }
+    void invalidateEquipeMedicosList();
+  };
+
   const { data: alocacoesResp } = useQuery({
     queryKey: ['admin', 'escalas', selectedEscalaId, 'medicos'],
     queryFn: () => adminService.listEscalaMedicos(selectedEscalaId),
@@ -576,6 +708,13 @@ const Escalas = () => {
     const d = new Date(gradeMonthStart.getFullYear(), gradeMonthStart.getMonth() + 1, 0);
     d.setHours(23, 59, 59, 999);
     return d;
+  }, [gradeMonthStart]);
+
+  /** YYYY-MM do mês visível na grade (origem da replicação). */
+  const mesOrigemGradeYM = useMemo(() => {
+    const y = gradeMonthStart.getFullYear();
+    const m = gradeMonthStart.getMonth() + 1;
+    return `${y}-${String(m).padStart(2, '0')}`;
   }, [gradeMonthStart]);
 
   const { data: plantoesMonthResp } = useQuery({
@@ -890,15 +1029,15 @@ const Escalas = () => {
 
   useEffect(() => {
     if (!filtroListaContratoId) {
-      setSelectedSubgrupoId(null);
-      setSelectedEquipeId(null);
+      setSelectedSubgrupoId('');
+      setSelectedEquipeId('');
       return;
     }
     if (selectedSubgrupoId && !subgruposAposFiltroContrato.some((s) => s.id === selectedSubgrupoId)) {
-      setSelectedSubgrupoId(null);
-      setSelectedEquipeId(null);
+      setSelectedSubgrupoId('');
+      setSelectedEquipeId('');
     }
-  }, [filtroListaContratoId, subgruposAposFiltroContrato, selectedSubgrupoId]);
+  }, [filtroListaContratoId, subgruposAposFiltroContrato, selectedSubgrupoId, setSelectedSubgrupoId, setSelectedEquipeId]);
 
   /** Equipes do subgrupo selecionado (só preenchido quando selectedSubgrupoId está setado). */
   const equipesDoSubgrupoSelecionado = useMemo(() => {
@@ -1024,6 +1163,151 @@ const Escalas = () => {
     return map;
   }, [plantoesMonth]);
 
+  const imprimirRelatorioEscalaPdf = useCallback(() => {
+    if (!selectedEscala || !selectedEscalaId) return;
+    const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+    const mesTitulo = gradeMonthStart.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+    const slugMes = `${gradeMonthStart.getFullYear()}-${String(gradeMonthStart.getMonth() + 1).padStart(2, '0')}`;
+    let y = 12;
+    doc.setFontSize(14);
+    doc.text(textoSeguroPdf(fixMojibake(selectedEscala.nome)), 14, y);
+    y += 7;
+    doc.setFontSize(10);
+    doc.text(
+      textoSeguroPdf(
+        fixMojibake(
+          `${selectedEscala.contratoAtivo?.nome ?? '-'} | Periodo: ${toDateInput(selectedEscala.dataInicio)} a ${toDateInput(selectedEscala.dataFim)} | Status: ${selectedEscala.ativo ? 'Publicada' : 'Rascunho'}`
+        )
+      ),
+      14,
+      y
+    );
+    y += 6;
+    doc.text(textoSeguroPdf(fixMojibake(`Mes de referencia: ${mesTitulo}`)), 14, y);
+    y += 9;
+
+    const daysInMonth = gradeMonthEnd.getDate();
+    const header = [
+      textoSeguroPdf('Profissional'),
+      textoSeguroPdf('Turno'),
+      ...Array.from({ length: daysInMonth }, (_, i) => String(i + 1)),
+    ];
+
+    const equipeMedicosList =
+      equipeIdParaGrade && Array.isArray(equipeMedicosResp?.data)
+        ? (equipeMedicosResp!.data as { medicoId: string; medico?: { nomeCompleto: string; crm?: string | null } }[]).map(
+            (em) => ({
+              label: em.medico?.nomeCompleto ?? '—',
+              medicoId: em.medicoId,
+            })
+          )
+        : null;
+    const baseList =
+      equipeMedicosList !== null
+        ? equipeMedicosList
+        : alocacoes.map((a) => ({
+            label: a.medico.nomeCompleto,
+            medicoId: a.medico.id,
+          }));
+    const tableRows = [{ label: 'Plantão Vago', medicoId: '' }, ...baseList.map((r) => ({ label: r.label, medicoId: r.medicoId }))];
+
+    const body: string[][] = [];
+    for (const row of tableRows) {
+      for (const grade of gradesForGrid) {
+        const dayCells: string[] = [];
+        for (let day = 1; day <= daysInMonth; day++) {
+          const d = new Date(gradeMonthStart.getFullYear(), gradeMonthStart.getMonth(), day);
+          const dateStr = dateToInput(d);
+          const key = `${dateStr}_${grade.id}`;
+          const slots = plantaoMapMonth.get(key) ?? [];
+          if (row.medicoId === '') {
+            const vagas = plantaoVagoSlots[key] ?? 0;
+            dayCells.push(vagas > 0 ? String(vagas) : '');
+          } else {
+            const cell = slots.find((s) => s.medico.id === row.medicoId);
+            dayCells.push(cell ? textoSeguroPdf(fixMojibake(shortName(cell.medico.nomeCompleto))) : '');
+          }
+        }
+        body.push([
+          textoSeguroPdf(fixMojibake(row.label)),
+          textoSeguroPdf(fixMojibake(`${grade.label} (${grade.regua[0]}-${grade.regua[1]})`)),
+          ...dayCells.map((c) => textoSeguroPdf(c)),
+        ]);
+      }
+    }
+
+    if (gradesForGrid.length === 0) {
+      doc.setFontSize(10);
+      doc.text(textoSeguroPdf('Nenhum turno configurado para esta escala.'), 14, y);
+    } else {
+      autoTable(doc, {
+        startY: y,
+        head: [header],
+        body,
+        styles: { fontSize: 5, cellPadding: 0.35, overflow: 'hidden' },
+        headStyles: { fillColor: [37, 111, 255], textColor: 255, fontStyle: 'bold' },
+        margin: { left: 10, right: 10, bottom: 14 },
+        theme: 'grid',
+      });
+      const g = doc as jsPDF & { lastAutoTable?: { finalY: number } };
+      const finalY = g.lastAutoTable?.finalY;
+      if (finalY != null) {
+        doc.setFontSize(8);
+        doc.setTextColor(80, 80, 80);
+        doc.text(textoSeguroPdf(`Gerado em ${new Date().toLocaleString('pt-BR')}`), 14, Math.min(finalY + 6, doc.internal.pageSize.getHeight() - 8));
+      }
+    }
+
+    const baseNome = (selectedEscala.nome || 'escala').replace(/[<>:"/\\|?*\x00-\x1f]/g, '_').trim().slice(0, 80);
+    doc.save(`relatorio-escala_${baseNome}_${slugMes}.pdf`);
+  }, [
+    selectedEscala,
+    selectedEscalaId,
+    gradeMonthStart,
+    gradeMonthEnd,
+    gradesForGrid,
+    plantaoMapMonth,
+    plantaoVagoSlots,
+    equipeIdParaGrade,
+    equipeMedicosResp,
+    alocacoes,
+  ]);
+
+  const medicoParaReplicar = cellModal.medico?.id ?? medicoIdToAllocateCell;
+  const alocacaoParaValor = useMemo(() => {
+    if (!cellModal.medico?.id) return null;
+    return alocacoes.find((a) => a.medicoId === cellModal.medico!.id) ?? null;
+  }, [alocacoes, cellModal.medico?.id]);
+
+  const plantaoSlotValor = useMemo(() => {
+    if (!cellModal.date || !cellModal.grade) return null;
+    const key = `${dateToInput(cellModal.date)}_${cellModal.grade.id}`;
+    const slots = plantaoMap.get(key) ?? [];
+    const medicoModalId = cellModal.medico?.id;
+    const slot = medicoModalId ? slots.find((s) => s?.medico?.id === medicoModalId) : slots[0];
+    if (slot?.valorHora == null || slot.valorHora === '') return null;
+    const n = parseFloat(String(slot.valorHora));
+    return Number.isNaN(n) ? null : n;
+  }, [cellModal.date, cellModal.grade, cellModal.medico, plantaoMap]);
+
+  const valorBaseModal = useMemo(() => {
+    if (!cellModal.grade) return null;
+    return valorByGrade.get(cellModal.grade.id) ?? null;
+  }, [cellModal.grade, valorByGrade]);
+
+  const adicionalPercentualModal = useMemo(() => {
+    if (!cellModal.date || !cellModal.grade) return null;
+    const key = `${dateToInput(cellModal.date)}_${cellModal.grade.id}`;
+    return adicionalPercentualByDataGrade.get(key) ?? null;
+  }, [adicionalPercentualByDataGrade, cellModal.date, cellModal.grade]);
+
+  const valorFinalModal = getValorFinalComAdicional(valorBaseModal, adicionalPercentualModal);
+
+  useEffect(() => {
+    if (!cellModal.open || !cellModal.date || !cellModal.grade) return;
+    setAdicionalPercentualInput(String(adicionalPercentualModal ?? 0));
+  }, [cellModal.open, cellModal.date, cellModal.grade, adicionalPercentualModal]);
+
   if (!isMaster) {
     return (
       <div className="card border-l-4 border-red-400 stagger-1">
@@ -1054,6 +1338,49 @@ const Escalas = () => {
       queryClient.invalidateQueries({
         queryKey: ['admin', 'equipes', selectedEquipeId, 'plantoes', 'year-range'],
       });
+    }
+  };
+
+  const abrirModalReplicarMes = () => {
+    const next = new Date(gradeMonthStart);
+    next.setMonth(next.getMonth() + 1);
+    setReplicarMesDestino(
+      `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, '0')}`
+    );
+    setReplicarMesModalOpen(true);
+    setError(null);
+  };
+
+  const confirmarReplicarMes = async () => {
+    if (!selectedEscalaId || replicarMesDestino === mesOrigemGradeYM) return;
+    setReplicarMesSubmitting(true);
+    setError(null);
+    try {
+      const res = await adminService.replicarEscalaPlantoesMes(selectedEscalaId, {
+        mesOrigem: mesOrigemGradeYM,
+        mesDestino: replicarMesDestino,
+      });
+      const d = res?.data;
+      if (!d) {
+        setError('Resposta inválida do servidor.');
+        return;
+      }
+      const partes = [
+        `${d.criados} plantão(ões) criado(s).`,
+        d.ignoradosJaExistia > 0 ? `${d.ignoradosJaExistia} ignorado(s) (já existiam no destino).` : '',
+        d.ignoradosForaPeriodo > 0 ? `${d.ignoradosForaPeriodo} fora do período da escala.` : '',
+        d.erros > 0 ? `${d.erros} não replicado(s) (ex.: médico inativo).` : '',
+      ].filter(Boolean);
+      setEscalaSuccessToast({
+        title: 'Escala replicada',
+        detail: partes.length ? partes.join(' ') : undefined,
+      });
+      setReplicarMesModalOpen(false);
+      invalidatePlantoes();
+    } catch (err: any) {
+      setError(err.response?.data?.error || err.message || 'Erro ao replicar plantões');
+    } finally {
+      setReplicarMesSubmitting(false);
     }
   };
 
@@ -1195,41 +1522,6 @@ const Escalas = () => {
     }
   };
 
-  const medicoParaReplicar = cellModal.medico?.id ?? medicoIdToAllocateCell;
-  const alocacaoParaValor = useMemo(() => {
-    if (!cellModal.medico?.id) return null;
-    return alocacoes.find((a) => a.medicoId === cellModal.medico!.id) ?? null;
-  }, [alocacoes, cellModal.medico?.id]);
-
-  const plantaoSlotValor = useMemo(() => {
-    if (!cellModal.date || !cellModal.grade) return null;
-    const key = `${dateToInput(cellModal.date)}_${cellModal.grade.id}`;
-    const slots = plantaoMap.get(key) ?? [];
-    const medicoModalId = cellModal.medico?.id;
-    const slot = medicoModalId ? slots.find((s) => s?.medico?.id === medicoModalId) : slots[0];
-    if (slot?.valorHora == null || slot.valorHora === '') return null;
-    const n = parseFloat(String(slot.valorHora));
-    return Number.isNaN(n) ? null : n;
-  }, [cellModal.date, cellModal.grade, cellModal.medico, plantaoMap]);
-
-  const valorBaseModal = useMemo(() => {
-    if (!cellModal.grade) return null;
-    return valorByGrade.get(cellModal.grade.id) ?? null;
-  }, [cellModal.grade, valorByGrade]);
-
-  const adicionalPercentualModal = useMemo(() => {
-    if (!cellModal.date || !cellModal.grade) return null;
-    const key = `${dateToInput(cellModal.date)}_${cellModal.grade.id}`;
-    return adicionalPercentualByDataGrade.get(key) ?? null;
-  }, [adicionalPercentualByDataGrade, cellModal.date, cellModal.grade]);
-
-  const valorFinalModal = getValorFinalComAdicional(valorBaseModal, adicionalPercentualModal);
-
-  useEffect(() => {
-    if (!cellModal.open || !cellModal.date || !cellModal.grade) return;
-    setAdicionalPercentualInput(String(adicionalPercentualModal ?? 0));
-  }, [cellModal.open, cellModal.date, cellModal.grade, adicionalPercentualModal]);
-
   const salvarAdicionalDoDiaModal = async () => {
     if (!isMaster || !selectedEscala?.contratoAtivoId || !cellModal.date || !cellModal.grade) return;
     setLoadingAction(true);
@@ -1318,6 +1610,20 @@ const Escalas = () => {
     }
   };
 
+  const escalaToastEl =
+    escalaSuccessToast && (
+      <div
+        role="status"
+        aria-live="polite"
+        className="fixed right-4 top-20 md:top-24 z-[100] w-[min(22rem,calc(100vw-2rem))] rounded-xl border border-viva-200 border-l-4 border-l-viva-500 bg-white shadow-lg px-4 py-3 animate-slide-in-right"
+      >
+        <p className="text-sm font-semibold text-viva-900 font-display">{escalaSuccessToast.title}</p>
+        {escalaSuccessToast.detail ? (
+          <p className="text-xs text-viva-700 mt-1.5 leading-snug font-serif">{escalaSuccessToast.detail}</p>
+        ) : null}
+      </div>
+    );
+
   if (viewEscalas === 'grupos') {
     const equipePanelTabs: { id: typeof equipePanelTab; label: string }[] = [
       { id: 'calendario', label: 'Calendário' },
@@ -1326,9 +1632,10 @@ const Escalas = () => {
       { id: 'historico', label: 'Histórico' },
       { id: 'relatorio', label: 'Relatório' },
     ];
-  return (
+    return (
       <>
-      <div className="flex flex-col h-full">
+        {escalaToastEl}
+        <div className="flex flex-col h-full">
         <div className="flex-1 bg-white rounded-lg border border-viva-200/80 flex flex-col overflow-hidden">
           <div className="pb-4 border-b border-viva-200 px-4 sm:px-5 flex-shrink-0">
             <div className="flex flex-wrap items-center justify-between gap-3 my-3">
@@ -1428,7 +1735,7 @@ const Escalas = () => {
                         <button
                           key={s.id}
                           type="button"
-                          onClick={() => setSelectedSubgrupoId(isSelected ? null : s.id)}
+                          onClick={() => setSelectedSubgrupoId(isSelected ? '' : s.id)}
                           className={`flex items-stretch gap-2 p-3 rounded-lg w-full transition text-left border-b border-viva-100 last:border-b-0 ${isSelected ? 'bg-viva-100 ring-2 ring-viva-500/30' : 'hover:bg-viva-50/80'}`}
                         >
                           <div className="w-1.5 rounded-md bg-viva-500 flex-shrink-0 self-stretch" />
@@ -1491,7 +1798,7 @@ const Escalas = () => {
         <>
           <div
             className="fixed inset-0 bg-black/30 z-40"
-            onClick={() => setSelectedEquipeId(null)}
+            onClick={() => setSelectedEquipeId('')}
             aria-hidden="true"
           />
           <div className="fixed top-0 right-0 bottom-0 w-full max-w-md bg-white shadow-2xl z-50 flex flex-col">
@@ -1499,7 +1806,7 @@ const Escalas = () => {
               <div className="flex items-center gap-3 p-3">
                 <button
                   type="button"
-                  onClick={() => setSelectedEquipeId(null)}
+                  onClick={() => setSelectedEquipeId('')}
                   className="p-2 rounded-lg text-white hover:bg-viva-500 transition"
                   aria-label="Fechar"
                 >
@@ -1725,6 +2032,8 @@ const Escalas = () => {
                             <button
                               type="button"
                               onClick={() => {
+                                panelGradeHistoryDepthRef.current += 1;
+                                window.history.pushState({ vivaEscalasPanelGrade: true }, '', window.location.href);
                                 setViewEscalas('escalas');
                                 const firstDay = new Date(editarEscalaYear, month1Based - 1, 1);
                                 firstDay.setHours(0, 0, 0, 0);
@@ -1751,32 +2060,127 @@ const Escalas = () => {
                 const equipeEscalas = equipeEscalasResp?.data ?? [];
                 const escalaAtualDaEquipe = selectedEscalaId && equipeEscalas.some((e: { id: string }) => e.id === selectedEscalaId);
                 const alocadosIds = escalaAtualDaEquipe ? new Set(alocacoes.map((a: { medicoId: string }) => a.medicoId)) : new Set<string>();
+                const idsNaEquipe = new Set(equipeMedicos.map((em: { medicoId: string }) => em.medicoId));
+                const todosMedicos = (medicosMembrosEquipeResp?.data ?? []) as AdminMedico[];
+                const qBusca = membrosEquipeBusca.trim().toLowerCase();
+                const medicosDisponiveis = todosMedicos.filter((m) => {
+                  if (idsNaEquipe.has(m.id)) return false;
+                  if (!qBusca) return true;
+                  const nome = (m.nomeCompleto ?? '').toLowerCase();
+                  const crm = (m.crm ?? '').toLowerCase();
+                  return nome.includes(qBusca) || crm.includes(qBusca);
+                });
+                const equipeIdAlvo = selectedEquipeId!;
                 return (
                   <div className="py-2">
                     <p className="font-medium text-viva-900 mb-3">Membros da equipe</p>
                     {!selectedEquipeId ? (
                       <p className="text-sm text-gray-500">Selecione uma equipe para ver os profissionais.</p>
-                    ) : equipeMedicos.length === 0 ? (
-                      <p className="text-sm text-gray-500">Nenhum profissional vinculado a esta equipe.</p>
                     ) : (
-                      <ul className="space-y-2">
-                        {equipeMedicos.map((em: { id: string; medicoId: string; medico?: { nomeCompleto: string; crm?: string | null } }) => (
-                          <li
-                            key={em.id}
-                            className="flex items-center justify-between border border-viva-200 rounded-lg px-3 py-2 bg-white"
-                          >
-                            <div>
-                              <p className="font-medium text-viva-900 text-sm">{em.medico?.nomeCompleto ?? '—'}</p>
-                              {em.medico?.crm && (
-                                <p className="text-xs text-viva-600">CRM: {em.medico.crm}</p>
-                              )}
-                            </div>
-                            {escalaAtualDaEquipe && alocadosIds.has(em.medicoId) && (
-                              <span className="text-[10px] font-medium text-viva-600 bg-viva-100 px-2 py-0.5 rounded">Alocado na escala</span>
-                            )}
-                          </li>
-                        ))}
-                      </ul>
+                      <>
+                        <div className="mb-4 pb-4 border-b border-viva-100">
+                          <p className="text-xs font-semibold uppercase tracking-wide text-viva-600 mb-2">Adicionar profissionais</p>
+                          <input
+                            type="text"
+                            className="input w-full py-2 text-sm mb-2"
+                            placeholder="Buscar por nome ou CRM…"
+                            value={membrosEquipeBusca}
+                            onChange={(e) => setMembrosEquipeBusca(e.target.value)}
+                            disabled={membrosEquipeActionLoading}
+                            autoComplete="off"
+                          />
+                          {membrosEquipeError && (
+                            <p className="text-xs text-red-600 font-medium mb-2">{membrosEquipeError}</p>
+                          )}
+                          {loadingMedicosMembrosEquipe && todosMedicos.length === 0 ? (
+                            <p className="text-sm text-viva-600 py-2">Carregando profissionais…</p>
+                          ) : medicosDisponiveis.length === 0 ? (
+                            <p className="text-sm text-gray-500 py-1">
+                              {todosMedicos.length === 0 && !loadingMedicosMembrosEquipe
+                                ? 'Não foi possível carregar a lista de médicos.'
+                                : 'Nenhum profissional disponível: todos já estão na equipe ou a busca não encontrou resultados.'}
+                            </p>
+                          ) : (
+                            <>
+                              <ul className="max-h-44 overflow-y-auto space-y-1 rounded-lg border border-viva-200 bg-viva-50/50 p-1.5">
+                                {medicosDisponiveis.map((m) => (
+                                  <li
+                                    key={m.id}
+                                    className="flex items-center gap-2 rounded-md px-2 py-1.5 bg-white border border-transparent hover:border-viva-100"
+                                  >
+                                    <input
+                                      type="checkbox"
+                                      className="rounded border-viva-300 text-viva-600 focus:ring-viva-500 shrink-0"
+                                      checked={membrosEquipePickIds.includes(m.id)}
+                                      onChange={() => toggleMembrosEquipePick(m.id)}
+                                      disabled={membrosEquipeActionLoading}
+                                      aria-label={`Selecionar ${m.nomeCompleto}`}
+                                    />
+                                    <div className="flex-1 min-w-0">
+                                      <p className="font-medium text-viva-900 text-sm truncate">{m.nomeCompleto}</p>
+                                      {m.crm ? <p className="text-xs text-viva-600">CRM: {m.crm}</p> : null}
+                                    </div>
+                                    <button
+                                      type="button"
+                                      className="btn btn-secondary text-xs py-1 px-2 shrink-0"
+                                      disabled={membrosEquipeActionLoading}
+                                      onClick={() => adicionarMedicoNaEquipeUm(equipeIdAlvo, m.id)}
+                                    >
+                                      Adicionar
+                                    </button>
+                                  </li>
+                                ))}
+                              </ul>
+                              <button
+                                type="button"
+                                className="btn btn-primary text-sm w-full mt-2"
+                                disabled={membrosEquipePickIds.length === 0 || membrosEquipeActionLoading}
+                                onClick={() => {
+                                  const ids = [...membrosEquipePickIds];
+                                  void adicionarMedicosSelecionadosNaEquipe(equipeIdAlvo, ids);
+                                }}
+                              >
+                                {membrosEquipeActionLoading
+                                  ? 'Aplicando…'
+                                  : `Adicionar selecionados (${membrosEquipePickIds.length})`}
+                              </button>
+                            </>
+                          )}
+                        </div>
+                        <p className="text-xs font-semibold uppercase tracking-wide text-viva-600 mb-2">Na equipe</p>
+                        {equipeMedicos.length === 0 ? (
+                          <p className="text-sm text-gray-500">Nenhum profissional vinculado a esta equipe.</p>
+                        ) : (
+                          <ul className="space-y-2">
+                            {equipeMedicos.map((em: { id: string; medicoId: string; medico?: { nomeCompleto: string; crm?: string | null } }) => (
+                              <li
+                                key={em.id}
+                                className="flex items-center justify-between gap-2 border border-viva-200 rounded-lg px-3 py-2 bg-white"
+                              >
+                                <div className="min-w-0">
+                                  <p className="font-medium text-viva-900 text-sm">{em.medico?.nomeCompleto ?? '—'}</p>
+                                  {em.medico?.crm && <p className="text-xs text-viva-600">CRM: {em.medico.crm}</p>}
+                                </div>
+                                <div className="flex items-center gap-2 shrink-0">
+                                  {escalaAtualDaEquipe && alocadosIds.has(em.medicoId) && (
+                                    <span className="text-[10px] font-medium text-viva-600 bg-viva-100 px-2 py-0.5 rounded whitespace-nowrap">
+                                      Alocado na escala
+                                    </span>
+                                  )}
+                                  <button
+                                    type="button"
+                                    className="btn btn-secondary text-xs py-1 px-2"
+                                    disabled={membrosEquipeActionLoading}
+                                    onClick={() => removerMedicoDaEquipePainel(equipeIdAlvo, em.medicoId)}
+                                  >
+                                    Remover
+                                  </button>
+                                </div>
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                      </>
                     )}
                   </div>
                 );
@@ -2304,6 +2708,8 @@ const Escalas = () => {
   }
 
   return (
+    <>
+      {escalaToastEl}
     <div className="space-y-6">
       {/* Hero */}
       <div className="card dashboard-hero col-span-full stagger-1 py-8 md:py-10">
@@ -2326,7 +2732,13 @@ const Escalas = () => {
           <button
             type="button"
             className="btn btn-secondary inline-flex items-center gap-2"
-            onClick={() => setViewEscalas('grupos')}
+            onClick={() => {
+              if (panelGradeHistoryDepthRef.current > 0) {
+                window.history.back();
+              } else {
+                setViewEscalas('grupos');
+              }
+            }}
           >
             <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16" /></svg>
             Lista de grupos
@@ -2399,7 +2811,13 @@ const Escalas = () => {
                   <button
                     type="button"
                     className="p-1 rounded hover:bg-white/20"
-                    onClick={() => setSelectedEscalaId('')}
+                    onClick={() => {
+                      if (panelGradeHistoryDepthRef.current > 0) {
+                        window.history.back();
+                      } else {
+                        setSelectedEscalaId('');
+                      }
+                    }}
                     aria-label="Voltar"
                   >
                     <svg stroke="currentColor" fill="currentColor" strokeWidth="0" viewBox="0 0 448 512" className="w-5 h-5" xmlns="http://www.w3.org/2000/svg"><path d="M257.5 445.1l-22.2 22.2c-9.4 9.4-24.6 9.4-33.9 0L7 273c-9.4-9.4-9.4-24.6 0-33.9L201.4 44.7c9.4-9.4 24.6-9.4 33.9 0l22.2 22.2c9.5 9.5 9.3 25-.4 34.3L136.6 216H424c13.3 0 24 10.7 24 24v32c0 13.3-10.7 24-24 24H136.6l120.5 114.8c9.8 9.3 10 24.8.4 34.3z" /></svg>
@@ -2646,21 +3064,38 @@ const Escalas = () => {
                     placeholder="Quem gostaria de encontrar?"
                     value={gradeBuscaProfissional}
                     onChange={(e) => setGradeBuscaProfissional(e.target.value)}
+                    disabled={gradeSomenteLeitura}
+                    title={gradeSomenteLeitura ? 'Disponível ao editar a escala publicada' : undefined}
                   />
                 </div>
-                <p className={`text-sm whitespace-nowrap font-medium ${!selectedEscala ? 'text-gray-500' : selectedEscala.ativo ? 'text-viva-600' : 'text-amber-600'}`}>
-                  {!selectedEscala
-                    ? 'Sem escala'
-                    : selectedEscala.ativo
-                      ? gradeEdicaoLiberada
-                        ? 'Publicada · em edição'
-                        : 'Publicada'
-                      : 'Em rascunho'}
-                </p>
+                <div className="flex flex-col items-end gap-1 min-w-0">
+                  <p className={`text-sm whitespace-nowrap font-medium ${!selectedEscala ? 'text-gray-500' : selectedEscala.ativo ? 'text-viva-600' : 'text-amber-600'}`}>
+                    {!selectedEscala
+                      ? 'Sem escala'
+                      : selectedEscala.ativo
+                        ? gradeEdicaoLiberada
+                          ? 'Publicada · em edição'
+                          : 'Publicada'
+                        : 'Em rascunho'}
+                  </p>
+                </div>
                 <div className="flex gap-2 items-center flex-wrap">
-                  <button type="button" className="btn btn-secondary text-sm">Imprimir</button>
-                  <button type="button" className="btn btn-secondary text-sm">Revisar</button>
-                  <button type="button" className="btn btn-secondary text-sm">Replicar</button>
+                  <button
+                    type="button"
+                    className="btn btn-secondary text-sm"
+                    disabled={!selectedEscalaId || !selectedEscala}
+                    onClick={() => imprimirRelatorioEscalaPdf()}
+                  >
+                    Imprimir
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-secondary text-sm"
+                    disabled={!selectedEscalaId || loadingAction || replicarMesSubmitting}
+                    onClick={abrirModalReplicarMes}
+                  >
+                    Replicar
+                  </button>
                   {selectedEscala?.ativo && !gradeEdicaoLiberada && (
                     <button
                       type="button"
@@ -2685,28 +3120,28 @@ const Escalas = () => {
                       Cancelar edição
                     </button>
                   )}
-                  <button
-                    type="button"
-                    className="btn btn-primary text-sm"
-                    disabled={
-                      !selectedEscala || loadingAction || (selectedEscala.ativo === true && !gradeEdicaoLiberada)
-                    }
-                    onClick={async () => {
-                      if (!selectedEscala?.id) return;
-                      if (selectedEscala.ativo && !gradeEdicaoLiberada) return;
-                      setLoadingAction(true);
-                      try {
-                        await adminService.updateEscala(selectedEscala.id, { ativo: true });
-                        await invalidateEscalas();
-                        await queryClient.invalidateQueries({ queryKey: ['admin', 'equipes'] });
-                        setGradeEdicaoLiberada(false);
-                      } finally {
-                        setLoadingAction(false);
-                      }
-                    }}
-                  >
-                    Publicar
-                  </button>
+                  {selectedEscala && (!selectedEscala.ativo || gradeEdicaoLiberada) && (
+                    <button
+                      type="button"
+                      className="btn btn-primary text-sm"
+                      disabled={loadingAction}
+                      onClick={async () => {
+                        if (!selectedEscala?.id) return;
+                        setLoadingAction(true);
+                        try {
+                          await adminService.updateEscala(selectedEscala.id, { ativo: true });
+                          await invalidateEscalas();
+                          await queryClient.invalidateQueries({ queryKey: ['admin', 'equipes'] });
+                          setGradeEdicaoLiberada(false);
+                          setEscalaSuccessToast({ title: 'Escala publicada' });
+                        } finally {
+                          setLoadingAction(false);
+                        }
+                      }}
+                    >
+                      Publicar
+                    </button>
+                  )}
                 </div>
               </div>
             </>
@@ -2735,6 +3170,63 @@ const Escalas = () => {
                 <button type="button" className="btn btn-secondary" onClick={resetForm}>Cancelar</button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {replicarMesModalOpen && selectedEscala && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50"
+          onClick={() => {
+            if (replicarMesSubmitting) return;
+            setReplicarMesModalOpen(false);
+            setError(null);
+          }}
+        >
+          <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-viva-600 mb-2 font-display">
+              Replicar plantões para outro mês
+            </h3>
+            <p className="text-sm text-viva-800 mb-4">
+              Os plantões do mês visível na grade ({formatMesAnoFromYM(mesOrigemGradeYM)}) serão copiados para o mesmo dia do mês de destino (ajustado ao último dia do mês, se necessário).
+            </p>
+            <label className="block text-xs font-medium text-viva-900 mb-1.5">Mês de destino</label>
+            <input
+              type="month"
+              className="input w-full max-w-xs"
+              value={replicarMesDestino}
+              min={toDateInput(selectedEscala.dataInicio).slice(0, 7)}
+              max={toDateInput(selectedEscala.dataFim).slice(0, 7)}
+              onChange={(e) => setReplicarMesDestino(e.target.value)}
+              disabled={replicarMesSubmitting}
+            />
+            {replicarMesDestino === mesOrigemGradeYM && replicarMesDestino && (
+              <p className="text-xs text-amber-700 mt-2">Escolha um mês diferente do que está aberto na grade.</p>
+            )}
+            {error && <p className="text-sm text-red-600 font-medium mt-3">{error}</p>}
+            <div className="flex gap-2 mt-6 flex-wrap">
+              <button
+                type="button"
+                className="btn btn-primary"
+                disabled={
+                  replicarMesSubmitting || !replicarMesDestino || replicarMesDestino === mesOrigemGradeYM
+                }
+                onClick={confirmarReplicarMes}
+              >
+                {replicarMesSubmitting ? 'Replicando…' : 'Confirmar'}
+              </button>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                disabled={replicarMesSubmitting}
+                onClick={() => {
+                  setReplicarMesModalOpen(false);
+                  setError(null);
+                }}
+              >
+                Cancelar
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -3181,6 +3673,7 @@ const Escalas = () => {
         </div>
       )}
     </div>
+    </>
   );
 };
 

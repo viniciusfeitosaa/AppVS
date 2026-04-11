@@ -1,120 +1,29 @@
-import { useMemo, useState, useRef, useEffect, useLayoutEffect } from 'react';
-import { createPortal } from 'react-dom';
+import { useMemo, useState, useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { adminService } from '../services/admin.service';
-
-function SearchableSelect({
-  options,
-  value,
-  onChange,
-  placeholder,
-  disabled,
-  className = 'input',
-}: {
-  options: { value: string; label: string }[];
-  value: string;
-  onChange: (value: string) => void;
-  placeholder: string;
-  disabled?: boolean;
-  className?: string;
-}) {
-  const [open, setOpen] = useState(false);
-  const [search, setSearch] = useState('');
-  const [dropdownRect, setDropdownRect] = useState<{ top: number; left: number; width: number } | null>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
-  const dropdownRef = useRef<HTMLUListElement>(null);
-
-  const selectedLabel = useMemo(() => options.find((o) => o.value === value)?.label ?? '', [options, value]);
-  const filtered = useMemo(() => {
-    if (!search.trim()) return options;
-    const s = search.trim().toLowerCase();
-    return options.filter((o) => o.label.toLowerCase().includes(s));
-  }, [options, search]);
-
-  useLayoutEffect(() => {
-    if (!open || !containerRef.current) {
-      setDropdownRect(null);
-      return;
-    }
-    const update = () => {
-      if (containerRef.current) {
-        const r = containerRef.current.getBoundingClientRect();
-        setDropdownRect({ top: r.bottom + 4, left: r.left, width: r.width });
-      }
-    };
-    update();
-    window.addEventListener('scroll', update, true);
-    window.addEventListener('resize', update);
-    return () => {
-      window.removeEventListener('scroll', update, true);
-      window.removeEventListener('resize', update);
-    };
-  }, [open]);
-
-  useEffect(() => {
-    const onOutside = (e: MouseEvent) => {
-      const target = e.target as Node;
-      if (containerRef.current?.contains(target) || dropdownRef.current?.contains(target)) return;
-      setOpen(false);
-    };
-    document.addEventListener('mousedown', onOutside);
-    return () => document.removeEventListener('mousedown', onOutside);
-  }, []);
-
-  const dropdown = open && dropdownRect && createPortal(
-    <ul
-      ref={dropdownRef}
-      className="fixed z-[9999] mt-0 max-h-60 overflow-auto bg-white border border-viva-200 rounded-lg shadow-lg py-1"
-      style={{ top: dropdownRect.top, left: dropdownRect.left, width: dropdownRect.width, minWidth: 200 }}
-    >
-      {filtered.length === 0 ? (
-        <li className="px-3 py-2 text-sm text-gray-500">Nenhum resultado</li>
-      ) : (
-        filtered.map((o) => (
-          <li
-            key={o.value}
-            role="option"
-            className={`px-3 py-2 text-sm cursor-pointer hover:bg-viva-100 ${o.value === value ? 'bg-viva-50 text-viva-900 font-medium' : 'text-viva-800'}`}
-            onClick={() => { onChange(o.value); setSearch(''); setOpen(false); }}
-          >
-            {o.label}
-          </li>
-        ))
-      )}
-    </ul>,
-    document.body
-  );
-
-  return (
-    <div ref={containerRef} className="relative flex-1 min-w-0">
-      <input
-        type="text"
-        className={className}
-        placeholder={placeholder}
-        value={open ? search : selectedLabel || ''}
-        onChange={(e) => { setSearch(e.target.value); if (!open) setOpen(true); }}
-        onFocus={() => setOpen(true)}
-        disabled={disabled}
-        autoComplete="off"
-      />
-      {dropdown}
-    </div>
-  );
-}
+import { useMasterEscopo } from '../context/MasterEscopoContext';
+import { adminService, type AdminMedico } from '../services/admin.service';
 
 const SubgruposEquipes = () => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const location = useLocation();
   const isMaster = user?.role === 'MASTER';
-  const [selectedContratoId, setSelectedContratoId] = useState('');
+  const {
+    contratoId: selectedContratoId,
+    subgrupoId: selectedSubgrupoId,
+    equipeId: selectedEquipeId,
+    setContratoId: setSelectedContratoId,
+    setSubgrupoId: setSelectedSubgrupoId,
+    setEquipeId: setSelectedEquipeId,
+  } = useMasterEscopo();
   const [subgrupoNome, setSubgrupoNome] = useState('');
   const [equipeNome, setEquipeNome] = useState('');
-  const [selectedSubgrupoId, setSelectedSubgrupoId] = useState('');
-  const [selectedEquipeId, setSelectedEquipeId] = useState('');
-  const [medicoIdToEquipe, setMedicoIdToEquipe] = useState('');
+  const [membrosEquipeBusca, setMembrosEquipeBusca] = useState('');
+  const [membrosEquipePickIds, setMembrosEquipePickIds] = useState<string[]>([]);
+  const [membrosEquipeError, setMembrosEquipeError] = useState<string | null>(null);
+  const [membrosEquipeActionLoading, setMembrosEquipeActionLoading] = useState(false);
   const [loadingAction, setLoadingAction] = useState(false);
   const [novaEscalaNome, setNovaEscalaNome] = useState('');
   const [confirmExcluir, setConfirmExcluir] = useState<{ tipo: 'subgrupo' | 'equipe'; id: string; nome: string } | null>(null);
@@ -141,9 +50,9 @@ const SubgruposEquipes = () => {
     queryFn: () => adminService.listEscalasByEquipe(selectedEquipeId!),
     enabled: isMaster && !!selectedEquipeId,
   });
-  const { data: medicosResp } = useQuery({
+  const { data: medicosResp, isFetching: loadingMedicosLista } = useQuery({
     queryKey: ['admin', 'medicos', 'for-subgrupos'],
-    queryFn: () => adminService.listMedicos({ page: 1, limit: 2000 }),
+    queryFn: () => adminService.listMedicos({ page: 1, limit: 2000, ativo: true }),
     enabled: isMaster,
   });
   const { data: subgruposResp } = useQuery({
@@ -168,6 +77,20 @@ const SubgruposEquipes = () => {
   const equipes = useMemo(() => equipesResp?.data || [], [equipesResp]);
   const equipeMedicos = useMemo(() => equipeMedicosResp?.data || [], [equipeMedicosResp]);
   const equipeEscalas = useMemo(() => equipeEscalasResp?.data || [], [equipeEscalasResp]);
+  const idsNaEquipe = useMemo(
+    () => new Set(equipeMedicos.map((a: { medicoId: string }) => a.medicoId)),
+    [equipeMedicos]
+  );
+  const medicosDisponiveis = useMemo(() => {
+    const q = membrosEquipeBusca.trim().toLowerCase();
+    return medicos.filter((m: AdminMedico) => {
+      if (idsNaEquipe.has(m.id)) return false;
+      if (!q) return true;
+      const nome = (m.nomeCompleto ?? '').toLowerCase();
+      const crm = (m.crm ?? '').toLowerCase();
+      return nome.includes(q) || crm.includes(q);
+    });
+  }, [medicos, idsNaEquipe, membrosEquipeBusca]);
   /** Subgrupos do contrato selecionado (quando há contrato). */
   const subgruposDoContrato = useMemo(() => {
     if (!selectedContratoId) return subgrupos;
@@ -188,6 +111,12 @@ const SubgruposEquipes = () => {
     const contratoId = (subgrupo?.contratoSubgrupos ?? [])[0]?.contratoAtivo?.id;
     if (contratoId) setSelectedContratoId(contratoId);
   }, [subgrupos, location.state, selectedContratoId]);
+
+  useEffect(() => {
+    setMembrosEquipePickIds([]);
+    setMembrosEquipeBusca('');
+    setMembrosEquipeError(null);
+  }, [selectedEquipeId]);
 
   const invalidateSubgrupos = async () => {
     await queryClient.invalidateQueries({ queryKey: ['admin', 'subgrupos'] });
@@ -267,16 +196,59 @@ const SubgruposEquipes = () => {
       setLoadingAction(false);
     }
   };
-  const adicionarMedicoEquipe = async () => {
-    if (!selectedEquipeId || !medicoIdToEquipe) return;
-    setLoadingAction(true);
+  const toggleMembrosEquipePick = (medicoId: string) => {
+    setMembrosEquipePickIds((prev) =>
+      prev.includes(medicoId) ? prev.filter((id) => id !== medicoId) : [...prev, medicoId]
+    );
+  };
+
+  const adicionarMedicoNaEquipeUm = async (medicoId: string) => {
+    if (!selectedEquipeId) return;
+    setMembrosEquipeError(null);
+    setMembrosEquipeActionLoading(true);
     try {
-      await adminService.addMedicoToEquipe(selectedEquipeId, medicoIdToEquipe);
-      setMedicoIdToEquipe('');
-      await invalidateEquipes();
+      await adminService.addMedicoToEquipe(selectedEquipeId, medicoId);
+      setMembrosEquipePickIds((prev) => prev.filter((id) => id !== medicoId));
+    } catch (err: any) {
+      setMembrosEquipeError(err.response?.data?.error || err.message || 'Erro ao adicionar');
     } finally {
-      setLoadingAction(false);
+      setMembrosEquipeActionLoading(false);
     }
+    void invalidateEquipes();
+  };
+
+  const adicionarMedicosSelecionadosNaEquipe = async () => {
+    if (!selectedEquipeId) return;
+    const toAdd = [...membrosEquipePickIds];
+    if (toAdd.length === 0) return;
+    setMembrosEquipeError(null);
+    setMembrosEquipeActionLoading(true);
+    try {
+      for (const medicoId of toAdd) {
+        await adminService.addMedicoToEquipe(selectedEquipeId, medicoId);
+      }
+      setMembrosEquipePickIds([]);
+    } catch (err: any) {
+      setMembrosEquipeError(err.response?.data?.error || err.message || 'Erro ao adicionar');
+    } finally {
+      setMembrosEquipeActionLoading(false);
+    }
+    void invalidateEquipes();
+  };
+
+  const removerMedicoDaEquipe = async (medicoId: string) => {
+    if (!selectedEquipeId) return;
+    setMembrosEquipeError(null);
+    setMembrosEquipeActionLoading(true);
+    try {
+      await adminService.removeMedicoFromEquipe(selectedEquipeId, medicoId);
+      setMembrosEquipePickIds((prev) => prev.filter((id) => id !== medicoId));
+    } catch (err: any) {
+      setMembrosEquipeError(err.response?.data?.error || err.message || 'Erro ao remover');
+    } finally {
+      setMembrosEquipeActionLoading(false);
+    }
+    void invalidateEquipes();
   };
   const openConfirmExcluirSubgrupo = (e: React.MouseEvent, id: string, nome: string) => {
     e.stopPropagation();
@@ -417,25 +389,101 @@ const SubgruposEquipes = () => {
             </div>
             {selectedEquipeId && (
               <div className="mt-4 pt-4 border-t border-viva-100">
-                <p className="text-sm font-medium text-viva-800 mb-2">Médicos da equipe</p>
-                <div className="flex gap-2 items-start mb-2">
-                  <SearchableSelect
-                    options={medicos.map((m) => ({ value: m.id, label: `${m.nomeCompleto} (${m.crm})` }))}
-                    value={medicoIdToEquipe}
-                    onChange={setMedicoIdToEquipe}
-                    placeholder="Pesquisar e adicionar médico"
-                    disabled={loadingAction}
+                <p className="text-sm font-medium text-viva-800 mb-3">Médicos da equipe</p>
+                <div className="mb-4 pb-4 border-b border-viva-100">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-viva-600 mb-2">Adicionar profissionais</p>
+                  <input
+                    type="text"
+                    className="input w-full py-2 text-sm mb-2"
+                    placeholder="Buscar por nome ou CRM…"
+                    value={membrosEquipeBusca}
+                    onChange={(e) => setMembrosEquipeBusca(e.target.value)}
+                    disabled={membrosEquipeActionLoading}
+                    autoComplete="off"
                   />
-                  <button type="button" className="btn btn-secondary shrink-0" onClick={adicionarMedicoEquipe}>Adicionar</button>
+                  {membrosEquipeError && (
+                    <p className="text-xs text-red-600 font-medium mb-2">{membrosEquipeError}</p>
+                  )}
+                  {loadingMedicosLista && medicos.length === 0 ? (
+                    <p className="text-sm text-viva-600 py-2">Carregando profissionais…</p>
+                  ) : medicosDisponiveis.length === 0 ? (
+                    <p className="text-sm text-gray-500 py-1">
+                      {medicos.length === 0 && !loadingMedicosLista
+                        ? 'Não foi possível carregar a lista de médicos.'
+                        : 'Nenhum profissional disponível: todos já estão na equipe ou a busca não encontrou resultados.'}
+                    </p>
+                  ) : (
+                    <>
+                      <ul className="max-h-44 overflow-y-auto space-y-1 rounded-lg border border-viva-200 bg-viva-50/50 p-1.5">
+                        {medicosDisponiveis.map((m) => (
+                          <li
+                            key={m.id}
+                            className="flex items-center gap-2 rounded-md px-2 py-1.5 bg-white border border-transparent hover:border-viva-100"
+                          >
+                            <input
+                              type="checkbox"
+                              className="rounded border-viva-300 text-viva-600 focus:ring-viva-500 shrink-0"
+                              checked={membrosEquipePickIds.includes(m.id)}
+                              onChange={() => toggleMembrosEquipePick(m.id)}
+                              disabled={membrosEquipeActionLoading}
+                              aria-label={`Selecionar ${m.nomeCompleto}`}
+                            />
+                            <div className="flex-1 min-w-0">
+                              <p className="font-medium text-viva-900 text-sm truncate">{m.nomeCompleto}</p>
+                              {m.crm ? <p className="text-xs text-viva-600">CRM: {m.crm}</p> : null}
+                            </div>
+                            <button
+                              type="button"
+                              className="btn btn-secondary text-xs py-1 px-2 shrink-0"
+                              disabled={membrosEquipeActionLoading}
+                              onClick={() => adicionarMedicoNaEquipeUm(m.id)}
+                            >
+                              Adicionar
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                      <button
+                        type="button"
+                        className="btn btn-primary text-sm w-full mt-2"
+                        disabled={membrosEquipePickIds.length === 0 || membrosEquipeActionLoading}
+                        onClick={adicionarMedicosSelecionadosNaEquipe}
+                      >
+                        {membrosEquipeActionLoading
+                          ? 'Aplicando…'
+                          : `Adicionar selecionados (${membrosEquipePickIds.length})`}
+                      </button>
+                    </>
+                  )}
                 </div>
-                <div className="space-y-1">
-                  {equipeMedicos.map((a: { id: string; medicoId: string; medico?: { nomeCompleto: string } }) => (
-                    <div key={a.id} className="flex items-center justify-between border border-viva-200 rounded-lg px-2 py-1.5">
-                      <span className="text-sm text-viva-900">{a.medico?.nomeCompleto}</span>
-                      <button type="button" className="btn btn-secondary text-sm" onClick={() => adminService.removeMedicoFromEquipe(selectedEquipeId, a.medicoId).then(invalidateEquipes)}>Remover</button>
-                    </div>
-                  ))}
-                </div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-viva-600 mb-2">Na equipe</p>
+                {equipeMedicos.length === 0 ? (
+                  <p className="text-sm text-gray-500">Nenhum profissional vinculado a esta equipe.</p>
+                ) : (
+                  <ul className="space-y-2">
+                    {equipeMedicos.map(
+                      (a: { id: string; medicoId: string; medico?: { nomeCompleto: string; crm?: string | null } }) => (
+                        <li
+                          key={a.id}
+                          className="flex items-center justify-between gap-2 border border-viva-200 rounded-lg px-3 py-2 bg-white"
+                        >
+                          <div className="min-w-0">
+                            <p className="font-medium text-viva-900 text-sm">{a.medico?.nomeCompleto ?? '—'}</p>
+                            {a.medico?.crm ? <p className="text-xs text-viva-600">CRM: {a.medico.crm}</p> : null}
+                          </div>
+                          <button
+                            type="button"
+                            className="btn btn-secondary text-sm shrink-0"
+                            disabled={membrosEquipeActionLoading}
+                            onClick={() => removerMedicoDaEquipe(a.medicoId)}
+                          >
+                            Remover
+                          </button>
+                        </li>
+                      )
+                    )}
+                  </ul>
+                )}
               </div>
             )}
           </>

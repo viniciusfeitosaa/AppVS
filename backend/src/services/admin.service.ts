@@ -1831,6 +1831,145 @@ export async function createEscalaPlantaoService(input: {
   }
 }
 
+function parseMesYYYYMM(mes: string): { y: number; m: number } {
+  const m = mes.trim().match(/^(\d{4})-(\d{2})$/);
+  if (!m) throw { statusCode: 400, message: 'Formato de mês inválido (use YYYY-MM)' };
+  const y = parseInt(m[1], 10);
+  const mo = parseInt(m[2], 10);
+  if (mo < 1 || mo > 12) throw { statusCode: 400, message: 'Mês inválido' };
+  return { y, m: mo };
+}
+
+function ymdUTC(d: Date): string {
+  return d.toISOString().slice(0, 10);
+}
+
+/** Replica plantões do mês de origem para o mesmo dia civil no mês de destino (ajusta último dia se necessário). */
+export async function replicarEscalaPlantoesMesService(input: {
+  tenantId: string;
+  masterId: string;
+  escalaId: string;
+  mesOrigem: string;
+  mesDestino: string;
+}): Promise<{
+  criados: number;
+  ignoradosJaExistia: number;
+  ignoradosForaPeriodo: number;
+  erros: number;
+  totalOrigem: number;
+}> {
+  const orig = parseMesYYYYMM(input.mesOrigem);
+  const dest = parseMesYYYYMM(input.mesDestino);
+  if (input.mesOrigem.trim() === input.mesDestino.trim()) {
+    throw { statusCode: 400, message: 'O mês de destino deve ser diferente do mês de origem' };
+  }
+
+  const escala = await prisma.escala.findFirst({
+    where: { id: input.escalaId, tenantId: input.tenantId },
+  });
+  if (!escala) {
+    throw { statusCode: 404, message: 'Escala não encontrada' };
+  }
+
+  const escalaInicio = ymdUTC(escala.dataInicio);
+  const escalaFim = ymdUTC(escala.dataFim);
+
+  const inicioOrig = new Date(Date.UTC(orig.y, orig.m - 1, 1));
+  const fimOrig = new Date(Date.UTC(orig.y, orig.m, 0, 23, 59, 59, 999));
+
+  const plantoes = await prisma.escalaPlantao.findMany({
+    where: {
+      tenantId: input.tenantId,
+      escalaId: input.escalaId,
+      data: { gte: inicioOrig, lte: fimOrig },
+    },
+  });
+
+  if (plantoes.length === 0) {
+    throw { statusCode: 400, message: 'Não há plantões no mês de origem para replicar' };
+  }
+
+  let criados = 0;
+  let ignoradosJaExistia = 0;
+  let ignoradosForaPeriodo = 0;
+  let erros = 0;
+
+  const lastDayDest = new Date(Date.UTC(dest.y, dest.m, 0)).getUTCDate();
+
+  for (const p of plantoes) {
+    const src = new Date(p.data);
+    const srcDay = src.getUTCDate();
+    const dayClamped = Math.min(srcDay, lastDayDest);
+    const targetYmd = `${dest.y}-${String(dest.m).padStart(2, '0')}-${String(dayClamped).padStart(2, '0')}`;
+
+    if (targetYmd < escalaInicio || targetYmd > escalaFim) {
+      ignoradosForaPeriodo += 1;
+      continue;
+    }
+
+    const dataDateTarget = new Date(`${targetYmd}T12:00:00.000Z`);
+    const jaExiste = await prisma.escalaPlantao.findFirst({
+      where: {
+        tenantId: input.tenantId,
+        escalaId: input.escalaId,
+        data: dataDateTarget,
+        gradeId: p.gradeId,
+        medicoId: p.medicoId,
+      },
+    });
+    if (jaExiste) {
+      ignoradosJaExistia += 1;
+      continue;
+    }
+
+    try {
+      await createEscalaPlantaoService({
+        tenantId: input.tenantId,
+        masterId: input.masterId,
+        escalaId: input.escalaId,
+        data: targetYmd,
+        gradeId: p.gradeId,
+        medicoId: p.medicoId,
+        valorHora: p.valorHora != null ? Number(p.valorHora) : undefined,
+      });
+      criados += 1;
+    } catch (e: any) {
+      const code = e?.statusCode;
+      if (code === 409) {
+        ignoradosJaExistia += 1;
+      } else if (code === 404) {
+        erros += 1;
+      } else {
+        throw e;
+      }
+    }
+  }
+
+  await createAuditLog({
+    acao: 'REPLICAR_ESCALA_PLANTAO_MES',
+    tenantId: input.tenantId,
+    masterId: input.masterId,
+    detalhes: {
+      escalaId: input.escalaId,
+      mesOrigem: input.mesOrigem,
+      mesDestino: input.mesDestino,
+      criados,
+      ignoradosJaExistia,
+      ignoradosForaPeriodo,
+      erros,
+      totalOrigem: plantoes.length,
+    },
+  });
+
+  return {
+    criados,
+    ignoradosJaExistia,
+    ignoradosForaPeriodo,
+    erros,
+    totalOrigem: plantoes.length,
+  };
+}
+
 export async function removerEscalaPlantaoService(
   tenantId: string,
   masterId: string,

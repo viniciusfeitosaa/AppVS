@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../context/AuthContext';
+import { useMasterEscopo } from '../context/MasterEscopoContext';
 import { PontoEnderecoMapaBlock } from '../components/PontoEnderecoMapaBlock';
 import { usePontoEnderecoMapa } from '../hooks/usePontoEnderecoMapa';
 import { adminService, ConfigPontoEletronico } from '../services/admin.service';
@@ -74,9 +75,7 @@ const ValoresPonto = () => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const isMaster = user?.role === 'MASTER';
-  const [contratoId, setContratoId] = useState<string>('');
-  const [subgrupoId, setSubgrupoId] = useState<string>('');
-  const [equipeId, setEquipeId] = useState<string>(''); // '' = Subgrupo (todas as equipes)
+  const { contratoId, subgrupoId, equipeId, setContratoId, setSubgrupoId, setEquipeId } = useMasterEscopo();
   const [mes, setMes] = useState<number>(() => new Date().getMonth() + 1);
   const [ano, setAno] = useState<number>(() => new Date().getFullYear());
   const [draftHoras, setDraftHoras] = useState<string>('');
@@ -197,8 +196,6 @@ const ValoresPonto = () => {
 
   const onContratoChange = (id: string) => {
     setContratoId(id);
-    setSubgrupoId('');
-    setEquipeId('');
     setDraftHoras('');
     setDraftValorPorDia({});
     setDraftValorCobrancaPorDia({});
@@ -210,7 +207,6 @@ const ValoresPonto = () => {
 
   const onSubgrupoChange = (id: string) => {
     setSubgrupoId(id);
-    setEquipeId('');
     setDraftHoras('');
     setDraftValorPorDia({});
     setDraftValorCobrancaPorDia({});

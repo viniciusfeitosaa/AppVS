@@ -536,6 +536,19 @@ export const validateCreateEscalaPlantao = [
   handleValidationErrors,
 ];
 
+/** POST /admin/escalas/:id/plantoes/replicar-mes */
+export const validateReplicarPlantoesMes = [
+  body('mesOrigem')
+    .notEmpty()
+    .matches(/^\d{4}-(0[1-9]|1[0-2])$/)
+    .withMessage('mesOrigem deve ser YYYY-MM'),
+  body('mesDestino')
+    .notEmpty()
+    .matches(/^\d{4}-(0[1-9]|1[0-2])$/)
+    .withMessage('mesDestino deve ser YYYY-MM'),
+  handleValidationErrors,
+];
+
 /** POST /admin/tipos-plantao */
 export const validateCreateTipoPlantao = [
   body('contratoAtivoId').notEmpty().isUUID().withMessage('contratoAtivoId inválido'),

@@ -524,6 +524,25 @@ export const adminService = {
     return response.data;
   },
 
+  replicarEscalaPlantoesMes: async (
+    escalaId: string,
+    payload: { mesOrigem: string; mesDestino: string }
+  ): Promise<{
+    success: boolean;
+    data?: {
+      criados: number;
+      ignoradosJaExistia: number;
+      ignoradosForaPeriodo: number;
+      erros: number;
+      totalOrigem: number;
+    };
+    message?: string;
+    error?: string;
+  }> => {
+    const response = await api.post(`/admin/escalas/${escalaId}/plantoes/replicar-mes`, payload);
+    return response.data;
+  },
+
   listAdicionaisPlantao: async (params: {
     contratoAtivoId: string;
     dataInicio?: string;

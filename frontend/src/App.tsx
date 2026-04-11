@@ -1,6 +1,7 @@
 import { useState, useEffect, lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { MasterEscopoProvider } from './context/MasterEscopoContext';
 import { NotificationProvider } from './context/NotificationContext';
 import ProtectedRoute from './components/Layout/ProtectedRoute';
 import AppShell from './components/Layout/AppShell';
@@ -204,14 +205,16 @@ function AppRoutes() {
 function App() {
   return (
     <AuthProvider>
-      <NotificationProvider>
-        <BrowserRouter
-          basename={(import.meta.env.BASE_URL || '/').replace(/\/$/, '') || undefined}
-          future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
-        >
-          <AppRoutes />
-        </BrowserRouter>
-      </NotificationProvider>
+      <MasterEscopoProvider>
+        <NotificationProvider>
+          <BrowserRouter
+            basename={(import.meta.env.BASE_URL || '/').replace(/\/$/, '') || undefined}
+            future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
+          >
+            <AppRoutes />
+          </BrowserRouter>
+        </NotificationProvider>
+      </MasterEscopoProvider>
     </AuthProvider>
   );
 }

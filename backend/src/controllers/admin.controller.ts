@@ -14,6 +14,7 @@ import {
   createEscalaService,
   createContratoAtivoService,
   createEscalaPlantaoService,
+  replicarEscalaPlantoesMesService,
   createMedicoService,
   deleteEscalaService,
   deleteContratoAtivoService,
@@ -784,6 +785,30 @@ export const createEscalaPlantaoController = async (req: Request, res: Response)
     const statusCode = error.statusCode || 500;
     const message = error.message || 'Erro ao atribuir plantão';
     if (statusCode === 500) console.error('[createEscalaPlantao]', error);
+    return res.status(statusCode).json({
+      success: false,
+      error: message,
+    });
+  }
+};
+
+export const replicarEscalaPlantoesMesController = async (req: Request, res: Response) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ success: false, error: 'Não autenticado' });
+    }
+    const data = await replicarEscalaPlantoesMesService({
+      tenantId: req.user.tenantId,
+      masterId: req.user.id,
+      escalaId: req.params.id,
+      mesOrigem: String(req.body.mesOrigem ?? '').trim(),
+      mesDestino: String(req.body.mesDestino ?? '').trim(),
+    });
+    return res.status(200).json({ success: true, data, message: 'Replicação concluída' });
+  } catch (error: any) {
+    const statusCode = error.statusCode || 500;
+    const message = error.message || 'Erro ao replicar plantões do mês';
+    if (statusCode === 500) console.error('[replicarEscalaPlantoesMes]', error);
     return res.status(statusCode).json({
       success: false,
       error: message,

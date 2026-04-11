@@ -1,9 +1,11 @@
-import { Fragment, useMemo, useState } from 'react';
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
 import { useAuth } from '../context/AuthContext';
+import { useMasterEscopo } from '../context/MasterEscopoContext';
 import { adminService } from '../services/admin.service';
 import { fixMojibake } from '../utils/validation.util';
 
@@ -215,9 +217,16 @@ const exportHorasPdf = (
   doc.save(`relatorio-horas_${dataInicio}_${dataFim}.pdf`);
 };
 
+function pathnameEndsWithRelatorios(pathname: string): boolean {
+  return pathname === '/relatorios' || pathname.endsWith('/relatorios');
+}
+
 const Relatorios = () => {
   const { user } = useAuth();
   const isMaster = user?.role === 'MASTER';
+  const location = useLocation();
+  const masterEscopo = useMasterEscopo();
+  const prevPathRef = useRef(location.pathname);
 
   const now = new Date();
   const [dataInicio, setDataInicio] = useState(formatDateInput(new Date(now.getFullYear(), now.getMonth(), 1)));
@@ -226,6 +235,25 @@ const Relatorios = () => {
   const [subgrupoId, setSubgrupoId] = useState('');
   const [equipeId, setEquipeId] = useState('');
   const [mostrarDetalheCalculo, setMostrarDetalheCalculo] = useState(false);
+
+  /** Ao entrar nesta página, copia o escopo guardado (outros módulos) para os filtros — Relatórios continua podendo usar "Todos". */
+  useEffect(() => {
+    const path = location.pathname;
+    const prev = prevPathRef.current;
+    prevPathRef.current = path;
+    const entered = pathnameEndsWithRelatorios(path) && !pathnameEndsWithRelatorios(prev);
+    if (!isMaster || !masterEscopo.hydrated || !entered) return;
+    setContratoId(masterEscopo.contratoId);
+    setSubgrupoId(masterEscopo.subgrupoId);
+    setEquipeId(masterEscopo.equipeId);
+  }, [
+    location.pathname,
+    isMaster,
+    masterEscopo.hydrated,
+    masterEscopo.contratoId,
+    masterEscopo.subgrupoId,
+    masterEscopo.equipeId,
+  ]);
 
   const { data: contratosResp } = useQuery({
     queryKey: ['admin', 'contratos-ativos', 'relatorio-filtros'],
