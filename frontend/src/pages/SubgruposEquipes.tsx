@@ -38,7 +38,7 @@ const SubgruposEquipes = () => {
     if (state.equipeId && typeof state.equipeId === 'string') {
       setSelectedEquipeId(state.equipeId);
     }
-  }, [location.state]);
+  }, [location.state, setSelectedEquipeId, setSelectedSubgrupoId]);
 
   const { data: contratosAtivosResp } = useQuery({
     queryKey: ['admin', 'contratos-ativos', 'subgrupos-equipes'],
@@ -110,7 +110,7 @@ const SubgruposEquipes = () => {
     const subgrupo = subgrupos.find((s) => s.id === subgrupoId);
     const contratoId = (subgrupo?.contratoSubgrupos ?? [])[0]?.contratoAtivo?.id;
     if (contratoId) setSelectedContratoId(contratoId);
-  }, [subgrupos, location.state, selectedContratoId]);
+  }, [subgrupos, location.state, selectedContratoId, setSelectedContratoId]);
 
   useEffect(() => {
     setMembrosEquipePickIds([]);

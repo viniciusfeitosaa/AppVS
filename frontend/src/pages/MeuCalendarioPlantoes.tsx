@@ -177,7 +177,7 @@ const MeuCalendarioPlantoes = () => {
     enabled: isMedico,
   });
 
-  const plantoes = (data?.data ?? []) as PlantaoCal[];
+  const plantoes = useMemo(() => (data?.data ?? []) as PlantaoCal[], [data?.data]);
   const byDay = useMemo(() => {
     const m = new Map<string, PlantaoCal[]>();
     for (const p of plantoes) {

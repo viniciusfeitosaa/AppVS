@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
@@ -8,10 +8,10 @@ const Home = () => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [isVideoLoaded, setIsVideoLoaded] = useState(false);
 
-  const handleComplete = () => {
+  const handleComplete = useCallback(() => {
     setIntroPlayed(true);
     navigate('/login');
-  };
+  }, [navigate, setIntroPlayed]);
 
   const tryPlay = () => {
     const video = videoRef.current;
@@ -24,7 +24,7 @@ const Home = () => {
   useEffect(() => {
     const timer = setTimeout(handleComplete, 10000);
     return () => clearTimeout(timer);
-  }, [navigate, setIntroPlayed]);
+  }, [handleComplete]);
 
   useEffect(() => {
     const video = videoRef.current;

@@ -48,7 +48,7 @@ const Medicos = () => {
     enabled: !!user && isMaster,
   });
 
-  const medicos = data?.data || [];
+  const medicos = useMemo(() => data?.data || [], [data?.data]);
 
   const emailsPagina = useMemo(
     () => medicos.map((m) => (typeof m.email === 'string' ? m.email.trim() : '')).filter(Boolean),

@@ -171,13 +171,17 @@ const Dashboard = () => {
     : dashboardResp
       ? { data: dashboardResp.data.escalas }
       : undefined;
-  const proximosResp = forceLegacyQueries
-    ? proximosLegacy
-      ? { data: (proximosLegacy as any).data ?? proximosLegacy }
-      : undefined
-    : dashboardResp
-      ? { data: dashboardResp.data.proximosPlantoes }
-      : undefined;
+  const proximosResp = useMemo(
+    () =>
+      forceLegacyQueries
+        ? proximosLegacy
+          ? { data: (proximosLegacy as any).data ?? proximosLegacy }
+          : undefined
+        : dashboardResp
+          ? { data: dashboardResp.data.proximosPlantoes }
+          : undefined,
+    [forceLegacyQueries, proximosLegacy, dashboardResp]
+  );
   const docsResp = forceLegacyQueries
     ? docsLegacy
       ? { data: (docsLegacy as any).data ?? docsLegacy }
@@ -388,8 +392,14 @@ const Dashboard = () => {
     enabled: !!user && isMedico && !isMaster,
     staleTime: 10 * 1000,
   });
-  const trocasRecebidas = trocasPendentesResp?.data?.recebidas ?? [];
-  const trocasEnviadas = trocasPendentesResp?.data?.enviadas ?? [];
+  const trocasRecebidas = useMemo(
+    () => trocasPendentesResp?.data?.recebidas ?? [],
+    [trocasPendentesResp?.data?.recebidas]
+  );
+  const trocasEnviadas = useMemo(
+    () => trocasPendentesResp?.data?.enviadas ?? [],
+    [trocasPendentesResp?.data?.enviadas]
+  );
 
   const trocasRecebidasVisiveis = useMemo(
     () => trocasRecebidas.filter((t) => trocaPendenteVisivelNoPainel(t, relogioUi)),

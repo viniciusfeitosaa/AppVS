@@ -774,7 +774,7 @@ const Escalas = () => {
     }
     if (!selectedEscala) return;
     setGradeEdicaoLiberada(!selectedEscala.ativo);
-  }, [selectedEscalaId, selectedEscala?.id, selectedEscala?.ativo]);
+  }, [selectedEscalaId, selectedEscala]);
 
   const gradeSomenteLeitura = useMemo(
     () => selectedEscala?.ativo === true && !gradeEdicaoLiberada,
@@ -1258,7 +1258,17 @@ const Escalas = () => {
       }
     }
 
-    const baseNome = (selectedEscala.nome || 'escala').replace(/[<>:"/\\|?*\x00-\x1f]/g, '_').trim().slice(0, 80);
+    const rawPdfNome = selectedEscala.nome || 'escala';
+    const baseNome = [...rawPdfNome]
+      .map((ch) => {
+        const code = ch.charCodeAt(0);
+        if (code < 32) return '_';
+        if ('<>:"/\\|?*'.includes(ch)) return '_';
+        return ch;
+      })
+      .join('')
+      .trim()
+      .slice(0, 80);
     doc.save(`relatorio-escala_${baseNome}_${slugMes}.pdf`);
   }, [
     selectedEscala,
@@ -1277,7 +1287,7 @@ const Escalas = () => {
   const alocacaoParaValor = useMemo(() => {
     if (!cellModal.medico?.id) return null;
     return alocacoes.find((a) => a.medicoId === cellModal.medico!.id) ?? null;
-  }, [alocacoes, cellModal.medico?.id]);
+  }, [alocacoes, cellModal.medico]);
 
   const plantaoSlotValor = useMemo(() => {
     if (!cellModal.date || !cellModal.grade) return null;

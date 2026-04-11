@@ -60,10 +60,10 @@ function ModalAssociarContrato({
     enabled: !!contrato.id,
   });
 
-  const subgrupos = subgruposResp?.data ?? [];
-  const equipes = equipesResp?.data ?? [];
-  const linkSubgrupos = linkSubgruposResp?.data ?? [];
-  const linkEquipes = linkEquipesResp?.data ?? [];
+  const subgrupos = useMemo(() => subgruposResp?.data ?? [], [subgruposResp?.data]);
+  const equipes = useMemo(() => equipesResp?.data ?? [], [equipesResp?.data]);
+  const linkSubgrupos = useMemo(() => linkSubgruposResp?.data ?? [], [linkSubgruposResp?.data]);
+  const linkEquipes = useMemo(() => linkEquipesResp?.data ?? [], [linkEquipesResp?.data]);
   const linkedSubgrupoIds = useMemo(() => linkSubgrupos.map((l) => l.subgrupo.id), [linkSubgrupos]);
   const linkedEquipeIds = useMemo(() => linkEquipes.map((l) => l.equipe.id), [linkEquipes]);
   const subgruposDisponiveis = useMemo(

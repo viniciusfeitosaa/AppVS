@@ -279,7 +279,7 @@ const Relatorios = () => {
     enabled: isMaster && Boolean(subgrupoId),
   });
 
-  const contratos = contratosResp?.data ?? [];
+  const contratos = useMemo(() => contratosResp?.data ?? [], [contratosResp?.data]);
   const subgruposList = subgruposResp?.data ?? [];
   const equipesList = equipesResp?.data ?? [];
   const equipesDoSubgrupo = equipesPorSubgrupoResp?.data ?? [];
@@ -375,41 +375,50 @@ const Relatorios = () => {
     return map;
   }, [adicionaisResp?.data]);
 
-  if (!isMaster) {
-    return (
-      <div className="card border-l-4 border-red-400">
-        <h2 className="text-xl font-bold text-viva-900 mb-2">Acesso restrito</h2>
-        <p className="text-gray-600">Esta área de relatórios é exclusiva para o perfil Master.</p>
-      </div>
-    );
-  }
-
-  const raw = registrosResp?.data;
-  const registros: RegistroPontoAdmin[] = Array.isArray(raw) ? raw : raw?.data ?? [];
-  const valorHoraPorMedico: Record<string, number> = !Array.isArray(raw) && raw?.valorHoraPorMedico ? raw.valorHoraPorMedico : {};
-  const valorHoraCobrancaPorMedico: Record<string, number> =
-    !Array.isArray(raw) && raw?.valorHoraCobrancaPorMedico ? raw.valorHoraCobrancaPorMedico : {};
-  const valorHoraPorRegistroPontoId: Record<string, number> =
-    !Array.isArray(raw) && raw?.valorHoraPorRegistroPontoId ? raw.valorHoraPorRegistroPontoId : {};
-  const valorHoraCobrancaPorRegistroPontoId: Record<string, number> =
-    !Array.isArray(raw) && raw?.valorHoraCobrancaPorRegistroPontoId ? raw.valorHoraCobrancaPorRegistroPontoId : {};
-  const valorHoraPorMedicoEscala: Record<string, number> = !Array.isArray(raw) && raw?.valorHoraPorMedicoEscala ? raw.valorHoraPorMedicoEscala : {};
-  const plantoesValorHoraPorEscalaDataGrade: Record<string, number> =
-    !Array.isArray(raw) && raw?.plantoesValorHoraPorEscalaDataGrade ? raw.plantoesValorHoraPorEscalaDataGrade : {};
-  const valorPlantao12hPorRegistroPontoId: Record<string, number> =
-    !Array.isArray(raw) && raw?.valorPlantao12hPorRegistroPontoId
-      ? raw.valorPlantao12hPorRegistroPontoId
-      : {};
-  const gradeIdPlantaoPorRegistroPontoId: Record<string, string> =
-    !Array.isArray(raw) && raw?.gradeIdPlantaoPorRegistroPontoId
-      ? raw.gradeIdPlantaoPorRegistroPontoId
-      : {};
-  const horasTurnoPorRegistroPontoId: Record<string, number> =
-    !Array.isArray(raw) && raw?.horasTurnoPorRegistroPontoId ? raw.horasTurnoPorRegistroPontoId : {};
-  const horasTurnoPorGradeId: Record<string, number> =
-    !Array.isArray(raw) && raw?.horasTurnoPorGradeId ? raw.horasTurnoPorGradeId : {};
+  const registrosDerived = useMemo(() => {
+    const raw = registrosResp?.data;
+    return {
+      registros: (Array.isArray(raw) ? raw : raw?.data ?? []) as RegistroPontoAdmin[],
+      valorHoraPorMedico: (!Array.isArray(raw) && raw?.valorHoraPorMedico ? raw.valorHoraPorMedico : {}) as Record<
+        string,
+        number
+      >,
+      valorHoraCobrancaPorMedico: (!Array.isArray(raw) && raw?.valorHoraCobrancaPorMedico
+        ? raw.valorHoraCobrancaPorMedico
+        : {}) as Record<string, number>,
+      valorHoraPorRegistroPontoId: (!Array.isArray(raw) && raw?.valorHoraPorRegistroPontoId
+        ? raw.valorHoraPorRegistroPontoId
+        : {}) as Record<string, number>,
+      valorHoraCobrancaPorRegistroPontoId: (!Array.isArray(raw) && raw?.valorHoraCobrancaPorRegistroPontoId
+        ? raw.valorHoraCobrancaPorRegistroPontoId
+        : {}) as Record<string, number>,
+      valorHoraPorMedicoEscala: (!Array.isArray(raw) && raw?.valorHoraPorMedicoEscala
+        ? raw.valorHoraPorMedicoEscala
+        : {}) as Record<string, number>,
+      plantoesValorHoraPorEscalaDataGrade: (!Array.isArray(raw) && raw?.plantoesValorHoraPorEscalaDataGrade
+        ? raw.plantoesValorHoraPorEscalaDataGrade
+        : {}) as Record<string, number>,
+      valorPlantao12hPorRegistroPontoId: (!Array.isArray(raw) && raw?.valorPlantao12hPorRegistroPontoId
+        ? raw.valorPlantao12hPorRegistroPontoId
+        : {}) as Record<string, number>,
+      gradeIdPlantaoPorRegistroPontoId: (!Array.isArray(raw) && raw?.gradeIdPlantaoPorRegistroPontoId
+        ? raw.gradeIdPlantaoPorRegistroPontoId
+        : {}) as Record<string, string>,
+    };
+  }, [registrosResp?.data]);
 
   const { agrupado, totalMinutos, totalRegistros } = useMemo(() => {
+    const {
+      registros,
+      valorHoraPorMedico,
+      valorHoraCobrancaPorMedico,
+      valorHoraPorRegistroPontoId,
+      valorHoraCobrancaPorRegistroPontoId,
+      valorHoraPorMedicoEscala,
+      plantoesValorHoraPorEscalaDataGrade,
+      valorPlantao12hPorRegistroPontoId,
+      gradeIdPlantaoPorRegistroPontoId,
+    } = registrosDerived;
     const map = new Map<string, AgrupamentoHoras>();
     let somaMinutos = 0;
 
@@ -638,22 +647,10 @@ const Relatorios = () => {
       totalRegistros: registros.length,
     };
   }, [
+    registrosDerived,
     contratoId,
-    fixMojibake,
-    registros,
-    subgrupoId,
     usaEscalaEPonto,
     valoresPlantaoPorGrade,
-    valorHoraPorMedico,
-    valorHoraCobrancaPorMedico,
-    valorHoraPorRegistroPontoId,
-    valorHoraCobrancaPorRegistroPontoId,
-    valorHoraPorMedicoEscala,
-    plantoesValorHoraPorEscalaDataGrade,
-    valorPlantao12hPorRegistroPontoId,
-    gradeIdPlantaoPorRegistroPontoId,
-    horasTurnoPorRegistroPontoId,
-    horasTurnoPorGradeId,
     apenasPonto,
     adicionaisPorDataGrade,
   ]);
@@ -679,6 +676,15 @@ const Relatorios = () => {
       cobranca: temCob ? round2(cob) : null,
     };
   }, [agrupado, mostrarRepasseECobranca]);
+
+  if (!isMaster) {
+    return (
+      <div className="card border-l-4 border-red-400">
+        <h2 className="text-xl font-bold text-viva-900 mb-2">Acesso restrito</h2>
+        <p className="text-gray-600">Esta área de relatórios é exclusiva para o perfil Master.</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
