@@ -1,8 +1,8 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../context/AuthContext';
-import { adminService } from '../services/admin.service';
+import { adminService, type AdminMedico } from '../services/admin.service';
 import { notify } from '../lib/notificationEmitter';
 import { formatCRM, fixMojibake } from '../utils/validation.util';
 
@@ -25,13 +25,15 @@ const Medicos = () => {
   const [search, setSearch] = useState('');
   const [searchInput, setSearchInput] = useState('');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
-  const [selectedMedico, setSelectedMedico] = useState<any | null>(null);
+  const [selectedMedico, setSelectedMedico] = useState<AdminMedico | null>(null);
   const [pontoModalOpen, setPontoModalOpen] = useState(false);
   const [pontoInicio, setPontoInicio] = useState('');
   const [pontoFim, setPontoFim] = useState('');
   const [docusealModalMedico, setDocusealModalMedico] = useState<{ id: string; nomeCompleto: string; email: string | null } | null>(
     null
   );
+  const [equipesModalMedico, setEquipesModalMedico] = useState<AdminMedico | null>(null);
+  const [buscaEquipesModal, setBuscaEquipesModal] = useState('');
 
   const ativoParam =
     statusFilter === 'all' ? undefined : statusFilter === 'active';
@@ -48,7 +50,76 @@ const Medicos = () => {
     enabled: !!user && isMaster,
   });
 
-  const medicos = useMemo(() => data?.data || [], [data?.data]);
+  const medicos = useMemo(() => (data?.data || []) as AdminMedico[], [data?.data]);
+
+  const modalEquipesMedicoId = equipesModalMedico?.id ?? null;
+  useEffect(() => {
+    setBuscaEquipesModal('');
+  }, [modalEquipesMedicoId]);
+
+  useEffect(() => {
+    if (!modalEquipesMedicoId) return;
+    const fresh = medicos.find((x) => x.id === modalEquipesMedicoId);
+    if (fresh) setEquipesModalMedico(fresh);
+  }, [medicos, modalEquipesMedicoId]);
+
+  const { data: equipesTenantResp, isLoading: loadingTodasEquipes } = useQuery({
+    queryKey: ['admin', 'equipes', 'modal-vinculo-medico', user?.id],
+    queryFn: () => adminService.listEquipes(),
+    enabled: !!user && isMaster && !!equipesModalMedico,
+  });
+
+  const todasEquipesOrdenadas = useMemo(() => {
+    const raw = equipesTenantResp?.data ?? [];
+    return [...raw].sort((a, b) => {
+      const sa = fixMojibake(a.subgrupo?.nome ?? '\uffff');
+      const sb = fixMojibake(b.subgrupo?.nome ?? '\uffff');
+      if (sa !== sb) return sa.localeCompare(sb, 'pt-BR', { sensitivity: 'base' });
+      return fixMojibake(a.nome).localeCompare(fixMojibake(b.nome), 'pt-BR', { sensitivity: 'base' });
+    });
+  }, [equipesTenantResp?.data]);
+
+  const equipesModalFiltradas = useMemo(() => {
+    const q = buscaEquipesModal.trim().toLowerCase();
+    if (!q) return todasEquipesOrdenadas;
+    return todasEquipesOrdenadas.filter((eq) => {
+      const nome = fixMojibake(eq.nome).toLowerCase();
+      const sub = eq.subgrupo ? fixMojibake(eq.subgrupo.nome).toLowerCase() : '';
+      return nome.includes(q) || sub.includes(q);
+    });
+  }, [todasEquipesOrdenadas, buscaEquipesModal]);
+
+  const addMedicoEquipeMutation = useMutation({
+    mutationFn: ({ equipeId, medicoId }: { equipeId: string; medicoId: string }) =>
+      adminService.addMedicoToEquipe(equipeId, medicoId),
+    onSuccess: () => {
+      notify({ kind: 'success', title: 'Equipes', message: 'Profissional adicionado à equipe.' });
+      queryClient.invalidateQueries({ queryKey: ['admin', 'medicos', user?.id] });
+    },
+    onError: (err: unknown) => {
+      const msg =
+        typeof err === 'object' && err !== null && 'response' in err
+          ? (err as { response?: { data?: { error?: string } } }).response?.data?.error
+          : null;
+      notify({ kind: 'warning', title: 'Equipes', message: msg || 'Não foi possível adicionar à equipe.' });
+    },
+  });
+
+  const removeMedicoEquipeMutation = useMutation({
+    mutationFn: ({ equipeId, medicoId }: { equipeId: string; medicoId: string }) =>
+      adminService.removeMedicoFromEquipe(equipeId, medicoId),
+    onSuccess: () => {
+      notify({ kind: 'success', title: 'Equipes', message: 'Profissional removido da equipe.' });
+      queryClient.invalidateQueries({ queryKey: ['admin', 'medicos', user?.id] });
+    },
+    onError: (err: unknown) => {
+      const msg =
+        typeof err === 'object' && err !== null && 'response' in err
+          ? (err as { response?: { data?: { error?: string } } }).response?.data?.error
+          : null;
+      notify({ kind: 'warning', title: 'Equipes', message: msg || 'Não foi possível remover da equipe.' });
+    },
+  });
 
   const emailsPagina = useMemo(
     () => medicos.map((m) => (typeof m.email === 'string' ? m.email.trim() : '')).filter(Boolean),
@@ -263,6 +334,12 @@ const Medicos = () => {
                   <th className="py-2 pr-4">Email</th>
                   <th className="py-2 pr-4">Especialidades</th>
                   <th className="py-2 pr-4">Vínculo</th>
+                  <th
+                    className="py-2 pr-4 min-w-[140px]"
+                    title="Equipes em que o profissional está vinculado. Clique em Gerir equipes para adicionar ou remover."
+                  >
+                    Equipes
+                  </th>
                   <th className="py-2 pr-4">Status</th>
                   <th
                     className="py-2 pr-4 whitespace-nowrap"
@@ -295,6 +372,32 @@ const Medicos = () => {
                     </td>
                     <td className="py-2 pr-4 text-gray-700">
                       {medico.vinculo?.trim() ? fixMojibake(medico.vinculo) : 'Associado'}
+                    </td>
+                    <td className="py-2 pr-4 align-top max-w-[220px]" onClick={(e) => e.stopPropagation()}>
+                      {(() => {
+                        const eq = medico.equipes ?? [];
+                        const nomes = eq.map((e) => fixMojibake(e.nome));
+                        const preview =
+                          eq.length === 0
+                            ? '—'
+                            : nomes.length <= 2
+                              ? nomes.join(', ')
+                              : `${nomes.slice(0, 2).join(', ')} +${eq.length - 2}`;
+                        return (
+                          <div className="space-y-1">
+                            <p className="text-xs text-gray-700 line-clamp-2" title={nomes.join(' · ')}>
+                              {preview}
+                            </p>
+                            <button
+                              type="button"
+                              className="text-xs font-semibold text-viva-700 hover:text-viva-900 underline-offset-2 hover:underline"
+                              onClick={() => setEquipesModalMedico(medico)}
+                            >
+                              Gerir equipes
+                            </button>
+                          </div>
+                        );
+                      })()}
                     </td>
                     <td className="py-2 pr-4">
                       <span
@@ -439,6 +542,137 @@ const Medicos = () => {
           )}
         </>
       )}
+
+      {equipesModalMedico &&
+        createPortal(
+          <div
+            className="fixed inset-0 z-[60] bg-black/40 overflow-y-auto flex items-start sm:items-center justify-center p-4"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="equipes-medico-modal-title"
+            onClick={() => {
+              setEquipesModalMedico(null);
+              setBuscaEquipesModal('');
+            }}
+          >
+            <div
+              className="card w-full max-w-lg border border-viva-200/70 shadow-2xl my-8"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-start justify-between gap-3 border-b border-viva-100 px-4 py-3">
+                <div className="min-w-0">
+                  <h3 id="equipes-medico-modal-title" className="text-base font-bold text-viva-900 font-display">
+                    Equipes do profissional
+                  </h3>
+                  <p className="text-xs text-viva-600 font-serif truncate">{fixMojibake(equipesModalMedico.nomeCompleto)}</p>
+                  <p className="text-[10px] text-viva-500">{formatCRM(equipesModalMedico.crm ?? '')}</p>
+                </div>
+                <button
+                  type="button"
+                  className="btn text-sm border border-viva-300 bg-white text-viva-800 shrink-0"
+                  onClick={() => {
+                    setEquipesModalMedico(null);
+                    setBuscaEquipesModal('');
+                  }}
+                >
+                  Fechar
+                </button>
+              </div>
+              <div className="px-4 pt-2 pb-3">
+                {!equipesModalMedico.ativo && (
+                  <p className="text-xs text-amber-900 bg-amber-50 border border-amber-200/80 rounded-lg p-2 mb-3">
+                    Profissional inativo: só é possível remover de equipes; adicionar fica bloqueado.
+                  </p>
+                )}
+                {loadingTodasEquipes ? (
+                  <p className="text-sm text-viva-600 font-serif">A carregar equipes…</p>
+                ) : todasEquipesOrdenadas.length === 0 ? (
+                  <p className="text-sm text-viva-700 font-serif">Não há equipes cadastradas neste tenant.</p>
+                ) : (
+                  <>
+                    <label htmlFor="busca-equipes-modal" className="sr-only">
+                      Pesquisar equipes por nome ou subgrupo
+                    </label>
+                    <input
+                      id="busca-equipes-modal"
+                      type="search"
+                      className="input w-full text-sm mb-3"
+                      placeholder="Pesquisar equipe ou subgrupo…"
+                      value={buscaEquipesModal}
+                      onChange={(e) => setBuscaEquipesModal(e.target.value)}
+                      autoComplete="off"
+                      spellCheck={false}
+                    />
+                    <div className="max-h-[min(65vh,420px)] overflow-y-auto -mx-1 px-1">
+                      {equipesModalFiltradas.length === 0 ? (
+                        <p className="text-sm text-viva-600 font-serif py-2">
+                          Nenhuma equipe corresponde à pesquisa.
+                        </p>
+                      ) : (
+                        <ul className="divide-y divide-viva-100">
+                          {equipesModalFiltradas.map((eq) => {
+                            const isMember = (equipesModalMedico.equipes ?? []).some((e) => e.id === eq.id);
+                            const mid = equipesModalMedico.id;
+                            const addPending =
+                              addMedicoEquipeMutation.isPending &&
+                              addMedicoEquipeMutation.variables?.equipeId === eq.id &&
+                              addMedicoEquipeMutation.variables?.medicoId === mid;
+                            const removePending =
+                              removeMedicoEquipeMutation.isPending &&
+                              removeMedicoEquipeMutation.variables?.equipeId === eq.id &&
+                              removeMedicoEquipeMutation.variables?.medicoId === mid;
+                            return (
+                              <li key={eq.id} className="flex flex-wrap items-center justify-between gap-2 py-3 first:pt-0">
+                                <div className="min-w-0 flex-1">
+                                  <p className="text-sm font-semibold text-viva-900">{fixMojibake(eq.nome)}</p>
+                                  {eq.subgrupo ? (
+                                    <p className="text-[11px] text-viva-600 mt-0.5">{fixMojibake(eq.subgrupo.nome)}</p>
+                                  ) : null}
+                                  {!eq.ativo ? (
+                                    <span className="mt-1 inline-block text-[10px] font-bold uppercase text-amber-900 bg-amber-100 px-2 py-0.5 rounded-full">
+                                      Equipe inativa
+                                    </span>
+                                  ) : null}
+                                </div>
+                                <div className="shrink-0">
+                                  {isMember ? (
+                                    <button
+                                      type="button"
+                                      className="btn btn-secondary text-xs px-3 py-1.5"
+                                      disabled={removePending}
+                                      onClick={() => removeMedicoEquipeMutation.mutate({ equipeId: eq.id, medicoId: mid })}
+                                    >
+                                      {removePending ? 'A remover…' : 'Remover'}
+                                    </button>
+                                  ) : (
+                                    <button
+                                      type="button"
+                                      className="btn btn-primary text-xs px-3 py-1.5"
+                                      disabled={addPending || !equipesModalMedico.ativo}
+                                      title={
+                                        !equipesModalMedico.ativo
+                                          ? 'Reative o profissional para poder adicionar a equipes.'
+                                          : undefined
+                                      }
+                                      onClick={() => addMedicoEquipeMutation.mutate({ equipeId: eq.id, medicoId: mid })}
+                                    >
+                                      {addPending ? 'A adicionar…' : 'Adicionar'}
+                                    </button>
+                                  )}
+                                </div>
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      )}
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
+          </div>,
+          document.body
+        )}
 
       {docusealModalMedico &&
         createPortal(

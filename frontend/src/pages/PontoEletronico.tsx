@@ -108,6 +108,8 @@ function escolherPlantaoMaisRelevante(lista: PlantaoHojeMeuDia[], at: Date): Pla
   return passados[0]?.p ?? lista[0];
 }
 
+const PLANTOES_HOJE_VAZIO: PlantaoHojeMeuDia[] = [];
+
 const formatDiaPlantaoCurto = (dataStr: string) => {
   const d = new Date(`${dataStr}T12:00:00`);
   return d
@@ -183,23 +185,44 @@ const PontoEletronico = () => {
     painelResp != null && meuDiaPayload != null
       ? { success: painelResp.success, data: meuDiaPayload }
       : undefined;
-  const listaEscalas: EscalaPontoPainel[] = (painelResp?.data?.escalas ?? []) as EscalaPontoPainel[];
+  const listaEscalas: EscalaPontoPainel[] = useMemo(
+    () => (painelResp?.data?.escalas ?? []) as EscalaPontoPainel[],
+    [painelResp?.data?.escalas]
+  );
   const registroAbertoPainel = meuDiaPayload?.registroAberto;
 
+  const plantoesHojePainel: PlantaoHojeMeuDia[] =
+    (meuDiaPayload as { plantoesHoje?: PlantaoHojeMeuDia[] } | undefined)?.plantoesHoje ?? PLANTOES_HOJE_VAZIO;
+
+  const escalaIdEfetivo = useMemo(() => {
+    const ids = new Set(listaEscalas.map((e) => e.id));
+    const abertoId = registroAbertoPainel?.escalaId ?? null;
+    if (abertoId && (ids.has(abertoId) || abertoId === PONTO_SEM_ESCALA_ESCALA_ID)) {
+      return abertoId;
+    }
+    if (plantoesHojePainel.length > 0) {
+      const p = escolherPlantaoMaisRelevante(plantoesHojePainel, agora);
+      if (p && (ids.has(p.escalaId) || p.escalaId === PONTO_SEM_ESCALA_ESCALA_ID)) {
+        return p.escalaId;
+      }
+    }
+    return selectedEscalaId;
+  }, [listaEscalas, registroAbertoPainel?.escalaId, plantoesHojePainel, agora, selectedEscalaId]);
+
   const { data: canCheckInResp } = useQuery({
-    queryKey: ['ponto', 'can-checkin', selectedEscalaId],
-    queryFn: () => pontoService.canCheckIn(selectedEscalaId!),
+    queryKey: ['ponto', 'can-checkin', escalaIdEfetivo],
+    queryFn: () => pontoService.canCheckIn(escalaIdEfetivo!),
     enabled:
       !!user &&
       isMedico &&
-      !!selectedEscalaId &&
+      !!escalaIdEfetivo &&
       painelResp != null &&
       !registroAbertoPainel,
     refetchInterval:
       painelResp != null &&
       !registroAbertoPainel &&
-      selectedEscalaId &&
-      selectedEscalaId !== PONTO_SEM_ESCALA_ESCALA_ID
+      escalaIdEfetivo &&
+      escalaIdEfetivo !== PONTO_SEM_ESCALA_ESCALA_ID
         ? 30000
         : false,
     staleTime: 10 * 1000,
@@ -323,14 +346,13 @@ const PontoEletronico = () => {
   const totalMinutosHoje = meuDiaResp?.data?.totalMinutosHoje || 0;
   const totalMinutosSemana = meuDiaResp?.data?.totalMinutosSemana || 0;
   const ultimoRegistroPonto = meuDiaResp?.data?.ultimoRegistroPonto;
-  const plantoesHoje: PlantaoHojeMeuDia[] = (meuDiaResp?.data as { plantoesHoje?: PlantaoHojeMeuDia[] } | undefined)
-    ?.plantoesHoje ?? [];
-  const plantoesHojeNaEscala = selectedEscalaId
-    ? plantoesHoje.filter((p) => p.escalaId === selectedEscalaId)
+  const plantoesHoje = plantoesHojePainel;
+  const plantoesHojeNaEscala = escalaIdEfetivo
+    ? plantoesHoje.filter((p) => p.escalaId === escalaIdEfetivo)
     : [];
   const plantaoHojeExibir =
-    selectedEscalaId &&
-    selectedEscalaId !== PONTO_SEM_ESCALA_ESCALA_ID &&
+    escalaIdEfetivo &&
+    escalaIdEfetivo !== PONTO_SEM_ESCALA_ESCALA_ID &&
     plantoesHojeNaEscala.length > 0
       ? escolherPlantaoMaisRelevante(plantoesHojeNaEscala, agora)
       : null;
@@ -438,7 +460,7 @@ const PontoEletronico = () => {
   };
 
   const openCheckinModal = () => {
-    if (listaEscalas.length > 0 && !selectedEscalaId) {
+    if (listaEscalas.length > 0 && !escalaIdEfetivo) {
       if (escalaAutoStatus === 'loading') {
         setError('Aguarde um instante enquanto definimos a escala.');
       } else {
@@ -446,7 +468,7 @@ const PontoEletronico = () => {
       }
       return;
     }
-    if (!registroAberto && selectedEscalaId && canCheckInResp?.data?.allowed === false) {
+    if (!registroAberto && escalaIdEfetivo && canCheckInResp?.data?.allowed === false) {
       setError(null);
       return;
     }
@@ -548,7 +570,7 @@ const PontoEletronico = () => {
         return;
       }
       await pontoService.checkIn({
-        ...(selectedEscalaId && { escalaId: selectedEscalaId }),
+        ...(escalaIdEfetivo && { escalaId: escalaIdEfetivo }),
         observacao,
         ...(pos && { latitude: pos.latitude, longitude: pos.longitude }),
         foto,
@@ -582,7 +604,7 @@ const PontoEletronico = () => {
         return;
       }
       await pontoService.checkInSemFoto({
-        ...(selectedEscalaId && { escalaId: selectedEscalaId }),
+        ...(escalaIdEfetivo && { escalaId: escalaIdEfetivo }),
         observacao,
         motivoSemFoto: m,
         ...(pos && { latitude: pos.latitude, longitude: pos.longitude }),
@@ -659,21 +681,19 @@ const PontoEletronico = () => {
             <label className="block text-xs font-semibold text-viva-800 mb-1 font-display">
               Onde está registrando o ponto
             </label>
-            {escalaAutoStatus === 'loading' && (
+            {escalaAutoStatus === 'loading' && !escalaIdEfetivo && (
               <p className="text-sm text-viva-600 font-serif">A localizar a unidade mais próxima (opcional)…</p>
             )}
-            {(escalaAutoStatus === 'ok' ||
-              escalaAutoStatus === 'unica' ||
-              escalaAutoStatus === 'fallback') &&
-              selectedEscalaId && (
+            {escalaIdEfetivo &&
+              (escalaAutoStatus !== 'loading' || escalaIdEfetivo !== selectedEscalaId) && (
                 <p className="input w-full text-sm py-2.5 bg-viva-50/80 text-viva-900 font-medium text-center">
-                  {listaEscalas.find((e) => e.id === selectedEscalaId)?.nome ?? '—'}
+                  {listaEscalas.find((e) => e.id === escalaIdEfetivo)?.nome ?? '—'}
                 </p>
               )}
           </div>
         )}
         <div className="flex flex-col items-center gap-3 text-center mb-6">
-          {selectedEscalaId === PONTO_SEM_ESCALA_ESCALA_ID ? (
+          {escalaIdEfetivo === PONTO_SEM_ESCALA_ESCALA_ID ? (
             <p className="text-xs text-viva-600 font-serif">
               <span className="font-medium text-viva-800">Ponto sem escala de plantão</span>
             </p>
@@ -684,8 +704,10 @@ const PontoEletronico = () => {
                 {plantaoHojeExibir.faixaHorario?.trim() || '—'}
               </span>
             </p>
-          ) : selectedEscalaId ? (
-            <p className="text-xs text-viva-600 font-serif">Sem plantão seu nesta escala para hoje.</p>
+          ) : escalaIdEfetivo ? (
+            <p className="text-xs text-viva-600 font-serif">
+              Você não tem plantão nesta escala hoje (conforme seu calendário de escalas).
+            </p>
           ) : null}
           {(configHorario.horarioEntrada || configHorario.horarioSaida) && (
             <p className="text-xs text-viva-600">

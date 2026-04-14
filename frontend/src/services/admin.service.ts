@@ -1,6 +1,14 @@
 import api from './api';
 import { ModuloSistema } from '../constants/modulos';
 
+/** Equipes do profissional (listagem em `/admin/medicos`). */
+export interface MedicoEquipeResumo {
+  id: string;
+  nome: string;
+  ativo: boolean;
+  subgrupo: { id: string; nome: string } | null;
+}
+
 export interface AdminMedico {
   id: string;
   nomeCompleto: string;
@@ -14,6 +22,7 @@ export interface AdminMedico {
   ativo: boolean;
   createdAt: string;
   updatedAt: string;
+  equipes?: MedicoEquipeResumo[];
 }
 
 export interface ContratoAtivo {

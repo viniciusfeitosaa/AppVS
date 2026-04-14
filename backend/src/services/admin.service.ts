@@ -176,8 +176,51 @@ export async function listMedicosService(params: ListMedicosParams) {
     take: limit,
   });
 
+  const medicoIds = items.map((m) => m.id);
+  const equipeLinks =
+    medicoIds.length === 0
+      ? []
+      : await prisma.equipeMedico.findMany({
+          where: { tenantId: params.tenantId, medicoId: { in: medicoIds } },
+          select: {
+            medicoId: true,
+            equipe: {
+              select: {
+                id: true,
+                nome: true,
+                ativo: true,
+                subgrupo: { select: { id: true, nome: true } },
+              },
+            },
+          },
+        });
+
+  const equipesPorMedico = new Map<
+    string,
+    { id: string; nome: string; ativo: boolean; subgrupo: { id: string; nome: string } | null }[]
+  >();
+  for (const row of equipeLinks) {
+    const e = row.equipe;
+    if (!e) continue;
+    const list = equipesPorMedico.get(row.medicoId) ?? [];
+    list.push({
+      id: e.id,
+      nome: e.nome,
+      ativo: e.ativo,
+      subgrupo: e.subgrupo ? { id: e.subgrupo.id, nome: e.subgrupo.nome } : null,
+    });
+    equipesPorMedico.set(row.medicoId, list);
+  }
+
+  const itemsComEquipes = items.map((m) => {
+    const eq = [...(equipesPorMedico.get(m.id) ?? [])].sort((a, b) =>
+      a.nome.localeCompare(b.nome, 'pt-BR', { sensitivity: 'base' })
+    );
+    return { ...m, equipes: eq };
+  });
+
   return {
-    items,
+    items: itemsComEquipes,
     pagination: {
       page,
       limit,
