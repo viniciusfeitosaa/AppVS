@@ -12,4 +12,7 @@ export function registerNotificationHandler(fn: AddFn | null) {
 /** Dispara uma notificação na central (header). Seguro se o provider ainda não montou (no-op). */
 export function notify(input: AppNotificationInput): void {
   addFn?.(input);
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent<AppNotificationInput>('viva:toast', { detail: input }));
+  }
 }

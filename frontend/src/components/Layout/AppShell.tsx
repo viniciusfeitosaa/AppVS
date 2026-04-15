@@ -8,6 +8,7 @@ import { pontoService } from '../../services/ponto.service';
 import { ModuloSistema } from '../../constants/modulos';
 import { useInactivityLogout } from '../../hooks/useInactivityLogout';
 import NotificationBell from './NotificationBell';
+import GlobalToasts from './GlobalToasts';
 
 type MenuItem = { to: string; label: string };
 type MenuGroup = { title: string; items: MenuItem[] };
@@ -30,6 +31,8 @@ const getMobileIcon = (label: string) => {
         </svg>
       );
     case 'Relatórios':
+    case 'Relatório financeiro':
+    case 'Relatórios de ponto eletrônico':
       return (
         <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
           <path d="M4 4h16v16H4z" />
@@ -146,7 +149,13 @@ const AppShell = () => {
     ? [
         { title: 'Escalas', items: [{ to: '/escalas', label: 'Escalas' }, { to: '/subgrupos-equipes', label: 'Subgrupos e Equipes' }] },
         { title: 'Corpo Clínico', items: [{ to: '/medicos', label: 'Médicos' }] },
-        { title: 'Relatórios', items: [{ to: '/relatorios', label: 'Relatórios' }] },
+        {
+          title: 'Relatórios',
+          items: [
+            { to: '/relatorios', label: 'Relatório financeiro' },
+            { to: '/relatorios-ponto-eletronico', label: 'Relatórios de ponto eletrônico' },
+          ],
+        },
         {
           title: 'Administração',
           items: [
@@ -180,6 +189,7 @@ const AppShell = () => {
     '/subgrupos-equipes': 'ESCALAS',
     '/medicos': 'MEDICOS',
     '/relatorios': 'RELATORIOS',
+    '/relatorios-ponto-eletronico': 'RELATORIOS',
     '/contratos-ativos': 'CONTRATOS_ATIVOS',
     '/valores-plantao': 'VALORES_PLANTAO',
     '/valores-ponto': 'PONTO_ELETRONICO',
@@ -208,6 +218,7 @@ const AppShell = () => {
 
   return (
     <div className="app-shell min-h-screen">
+      <GlobalToasts />
       <header className="sticky top-0 z-30 isolate border-b border-viva-200/60 bg-white/95 backdrop-blur-xl shadow-[0_4px_24px_-12px_rgba(8,50,20,0.1)] ring-1 ring-viva-900/[0.03]">
         <div className="max-w-screen-2xl mx-auto px-4 md:px-6 lg:px-8">
           <div className="h-16 flex items-center justify-between gap-3">

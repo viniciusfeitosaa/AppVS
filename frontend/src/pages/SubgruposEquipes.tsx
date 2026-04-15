@@ -4,6 +4,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useMasterEscopo } from '../context/MasterEscopoContext';
 import { adminService, type AdminMedico } from '../services/admin.service';
+import { notify } from '../lib/notificationEmitter';
 
 const SubgruposEquipes = () => {
   const { user } = useAuth();
@@ -26,7 +27,9 @@ const SubgruposEquipes = () => {
   const [membrosEquipeActionLoading, setMembrosEquipeActionLoading] = useState(false);
   const [loadingAction, setLoadingAction] = useState(false);
   const [novaEscalaNome, setNovaEscalaNome] = useState('');
-  const [confirmExcluir, setConfirmExcluir] = useState<{ tipo: 'subgrupo' | 'equipe'; id: string; nome: string } | null>(null);
+  const [confirmExcluir, setConfirmExcluir] = useState<{ tipo: 'subgrupo' | 'equipe' | 'escala'; id: string; nome: string } | null>(null);
+  const [editEscala, setEditEscala] = useState<{ id: string; nome: string } | null>(null);
+  const [editEscalaNome, setEditEscalaNome] = useState('');
 
   /** Ao vir da página Escalas pelo link "Ir para Subgrupos e Equipes" ou "Criar escala e vincular", pré-selecionar subgrupo e/ou equipe. */
   useEffect(() => {
@@ -145,8 +148,11 @@ const SubgruposEquipes = () => {
       if (created?.data?.id) {
         await adminService.addContratoSubgrupo(selectedContratoId, created.data.id);
         setSubgrupoNome('');
+        notify({ kind: 'success', title: 'Subgrupo criado', message: 'Subgrupo associado ao contrato com sucesso.', source: 'subgrupo' });
       }
       await invalidateSubgrupos();
+    } catch (err: any) {
+      notify({ kind: 'error', title: 'Erro ao criar subgrupo', message: err.response?.data?.error || err.message || 'Tente novamente.', source: 'subgrupo' });
     } finally {
       setLoadingAction(false);
     }
@@ -163,6 +169,9 @@ const SubgruposEquipes = () => {
       });
       setEquipeNome('');
       await invalidateEquipes();
+      notify({ kind: 'success', title: 'Equipe criada', message: 'Equipe vinculada ao subgrupo com sucesso.', source: 'equipe' });
+    } catch (err: any) {
+      notify({ kind: 'error', title: 'Erro ao criar equipe', message: err.response?.data?.error || err.message || 'Tente novamente.', source: 'equipe' });
     } finally {
       setLoadingAction(false);
     }
@@ -192,6 +201,9 @@ const SubgruposEquipes = () => {
       }
       await invalidateEscalas();
       if (selectedEquipeId) queryClient.invalidateQueries({ queryKey: ['admin', 'equipes', selectedEquipeId, 'escalas'] });
+      notify({ kind: 'success', title: 'Escala criada', message: 'Escala criada e vinculada automaticamente.', source: 'escala' });
+    } catch (err: any) {
+      notify({ kind: 'error', title: 'Erro ao criar escala', message: err.response?.data?.error || err.message || 'Tente novamente.', source: 'escala' });
     } finally {
       setLoadingAction(false);
     }
@@ -209,8 +221,10 @@ const SubgruposEquipes = () => {
     try {
       await adminService.addMedicoToEquipe(selectedEquipeId, medicoId);
       setMembrosEquipePickIds((prev) => prev.filter((id) => id !== medicoId));
+      notify({ kind: 'success', title: 'Profissional adicionado', message: 'Profissional incluído na equipe.', source: 'equipe' });
     } catch (err: any) {
       setMembrosEquipeError(err.response?.data?.error || err.message || 'Erro ao adicionar');
+      notify({ kind: 'error', title: 'Erro ao adicionar profissional', message: err.response?.data?.error || err.message || 'Tente novamente.', source: 'equipe' });
     } finally {
       setMembrosEquipeActionLoading(false);
     }
@@ -228,8 +242,10 @@ const SubgruposEquipes = () => {
         await adminService.addMedicoToEquipe(selectedEquipeId, medicoId);
       }
       setMembrosEquipePickIds([]);
+      notify({ kind: 'success', title: 'Profissionais adicionados', message: `${toAdd.length} profissional(is) incluído(s) na equipe.`, source: 'equipe' });
     } catch (err: any) {
       setMembrosEquipeError(err.response?.data?.error || err.message || 'Erro ao adicionar');
+      notify({ kind: 'error', title: 'Erro ao adicionar selecionados', message: err.response?.data?.error || err.message || 'Tente novamente.', source: 'equipe' });
     } finally {
       setMembrosEquipeActionLoading(false);
     }
@@ -243,8 +259,10 @@ const SubgruposEquipes = () => {
     try {
       await adminService.removeMedicoFromEquipe(selectedEquipeId, medicoId);
       setMembrosEquipePickIds((prev) => prev.filter((id) => id !== medicoId));
+      notify({ kind: 'success', title: 'Profissional removido', message: 'Profissional removido da equipe.', source: 'equipe' });
     } catch (err: any) {
       setMembrosEquipeError(err.response?.data?.error || err.message || 'Erro ao remover');
+      notify({ kind: 'error', title: 'Erro ao remover profissional', message: err.response?.data?.error || err.message || 'Tente novamente.', source: 'equipe' });
     } finally {
       setMembrosEquipeActionLoading(false);
     }
@@ -258,6 +276,36 @@ const SubgruposEquipes = () => {
     e.stopPropagation();
     setConfirmExcluir({ tipo: 'equipe', id, nome });
   };
+  const openConfirmExcluirEscala = (e: React.MouseEvent, id: string, nome: string) => {
+    e.stopPropagation();
+    setConfirmExcluir({ tipo: 'escala', id, nome });
+  };
+  const openEditEscala = (e: React.MouseEvent, id: string, nome: string) => {
+    e.stopPropagation();
+    setEditEscala({ id, nome });
+    setEditEscalaNome(nome);
+  };
+  const closeEditEscala = () => {
+    setEditEscala(null);
+    setEditEscalaNome('');
+  };
+  const salvarEdicaoEscala = async () => {
+    if (!editEscala) return;
+    const nome = editEscalaNome.trim();
+    if (!nome || nome === editEscala.nome) {
+      closeEditEscala();
+      return;
+    }
+    setLoadingAction(true);
+    try {
+      await adminService.updateEscala(editEscala.id, { nome });
+      await invalidateEscalas();
+      if (selectedEquipeId) queryClient.invalidateQueries({ queryKey: ['admin', 'equipes', selectedEquipeId, 'escalas'] });
+      closeEditEscala();
+    } finally {
+      setLoadingAction(false);
+    }
+  };
   const closeConfirmExcluir = () => setConfirmExcluir(null);
   const executarExcluir = async () => {
     if (!confirmExcluir) return;
@@ -270,10 +318,16 @@ const SubgruposEquipes = () => {
         queryClient.removeQueries({ queryKey: ['admin', 'subgrupos', id, 'medicos'] });
         await invalidateSubgrupos();
       } else {
-        await adminService.deleteEquipe(id);
-        if (selectedEquipeId === id) setSelectedEquipeId('');
-        queryClient.removeQueries({ queryKey: ['admin', 'equipes', id, 'medicos'] });
-        await invalidateEquipes();
+        if (tipo === 'equipe') {
+          await adminService.deleteEquipe(id);
+          if (selectedEquipeId === id) setSelectedEquipeId('');
+          queryClient.removeQueries({ queryKey: ['admin', 'equipes', id, 'medicos'] });
+          await invalidateEquipes();
+        } else {
+          await adminService.deleteEscala(id);
+          await invalidateEscalas();
+          if (selectedEquipeId) queryClient.invalidateQueries({ queryKey: ['admin', 'equipes', selectedEquipeId, 'escalas'] });
+        }
       }
       setConfirmExcluir(null);
     } finally {
@@ -498,19 +552,21 @@ const SubgruposEquipes = () => {
         ) : (
           <>
             <p className="text-sm text-gray-600 mb-3">Equipe selecionada: <strong>{equipes.find((e: { id: string; nome: string }) => e.id === selectedEquipeId)?.nome}</strong>. A nova escala será criada e já vinculada a esta equipe e ao subgrupo.</p>
-            <form onSubmit={criarEscala} className="flex flex-wrap items-end gap-2 mb-4">
-              <div className="min-w-[200px]">
-                <label className="block text-sm font-medium text-viva-800 mb-1">Nova escala</label>
-                <input
-                  type="text"
-                  className="input w-full"
-                  placeholder="Ex: UPA Bom Jardim - Chefe de Equipe"
-                  value={novaEscalaNome}
-                  onChange={(e) => setNovaEscalaNome(e.target.value)}
-                />
-              </div>
-              <button type="submit" className="btn btn-primary" disabled={loadingAction}>Criar escala</button>
-            </form>
+            {equipeEscalas.length === 0 && (
+              <form onSubmit={criarEscala} className="flex flex-wrap items-end gap-2 mb-4">
+                <div className="min-w-[200px]">
+                  <label className="block text-sm font-medium text-viva-800 mb-1">Nova escala</label>
+                  <input
+                    type="text"
+                    className="input w-full"
+                    placeholder="Ex: UPA Bom Jardim - Chefe de Equipe"
+                    value={novaEscalaNome}
+                    onChange={(e) => setNovaEscalaNome(e.target.value)}
+                  />
+                </div>
+                <button type="submit" className="btn btn-primary" disabled={loadingAction}>Criar escala</button>
+              </form>
+            )}
             {equipeEscalas.length > 0 && (
               <div>
                 <p className="text-sm font-medium text-viva-800 mb-2">Escalas desta equipe</p>
@@ -518,7 +574,24 @@ const SubgruposEquipes = () => {
                   {equipeEscalas.map((esc: { id: string; nome: string }) => (
                     <li key={esc.id} className="flex items-center justify-between border border-viva-200 rounded-lg px-2 py-1.5">
                       <span className="text-sm text-viva-900">{esc.nome}</span>
-                      <Link to="/escalas" state={{ escalaId: esc.id }} className="text-sm text-viva-600 hover:underline font-medium">Abrir na página Escalas</Link>
+                      <div className="flex items-center gap-3">
+                        <button
+                          type="button"
+                          className="text-sm text-viva-700 hover:underline font-medium"
+                          onClick={(e) => openEditEscala(e, esc.id, esc.nome)}
+                        >
+                          Editar
+                        </button>
+                        <button
+                          type="button"
+                          className="text-sm text-red-700 hover:underline font-medium"
+                          onClick={(e) => openConfirmExcluirEscala(e, esc.id, esc.nome)}
+                          disabled={loadingAction}
+                        >
+                          Excluir
+                        </button>
+                        <Link to="/escalas" state={{ escalaId: esc.id }} className="text-sm text-viva-600 hover:underline font-medium">Abrir na página Escalas</Link>
+                      </div>
                     </li>
                   ))}
                 </ul>
@@ -538,7 +611,9 @@ const SubgruposEquipes = () => {
             <p className="text-sm text-gray-600 mb-4">
               {confirmExcluir.tipo === 'subgrupo'
                 ? `Excluir o subgrupo "${confirmExcluir.nome}"? Esta ação não pode ser desfeita.`
-                : `Excluir a equipe "${confirmExcluir.nome}"? Esta ação não pode ser desfeita.`}
+                : confirmExcluir.tipo === 'equipe'
+                  ? `Excluir a equipe "${confirmExcluir.nome}"? Esta ação não pode ser desfeita.`
+                  : `Excluir a escala "${confirmExcluir.nome}"? Esta ação não pode ser desfeita.`}
             </p>
             <div className="flex gap-2 justify-end">
               <button type="button" className="btn btn-secondary" onClick={closeConfirmExcluir} disabled={loadingAction}>
@@ -546,6 +621,30 @@ const SubgruposEquipes = () => {
               </button>
               <button type="button" className="btn btn-primary bg-red-600 hover:bg-red-700" onClick={executarExcluir} disabled={loadingAction}>
                 {loadingAction ? 'Excluindo...' : 'Excluir'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {editEscala && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" onClick={closeEditEscala}>
+          <div className="bg-white rounded-xl shadow-xl max-w-sm w-full p-6" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-lg font-bold text-viva-900 mb-2">Editar escala</h3>
+            <p className="text-sm text-gray-600 mb-3">Atualize o nome da escala selecionada.</p>
+            <input
+              type="text"
+              className="input w-full"
+              value={editEscalaNome}
+              onChange={(e) => setEditEscalaNome(e.target.value)}
+              placeholder="Nome da escala"
+              autoFocus
+            />
+            <div className="flex gap-2 justify-end mt-4">
+              <button type="button" className="btn btn-secondary" onClick={closeEditEscala} disabled={loadingAction}>
+                Cancelar
+              </button>
+              <button type="button" className="btn btn-primary" onClick={salvarEdicaoEscala} disabled={loadingAction}>
+                {loadingAction ? 'Salvando...' : 'Salvar'}
               </button>
             </div>
           </div>

@@ -163,7 +163,7 @@ const exportHorasPdf = (
 ) => {
   const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
   doc.setFontSize(14);
-  doc.text(textoSeguroPdf('Relatório de Horas por médico e escala'), 14, 12);
+  doc.text(textoSeguroPdf('Relatório financeiro de horas por médico e escala'), 14, 12);
   doc.setFontSize(10);
   doc.text(textoSeguroPdf(`Período: ${dataInicio} a ${dataFim}`), 14, 18);
   const cel = (s: string) => textoSeguroPdf(s);
@@ -689,7 +689,7 @@ const Relatorios = () => {
   return (
     <div className="space-y-6">
       <div className="card border-l-4 border-viva-500">
-        <h2 className="text-2xl font-bold text-viva-900 mb-1">Relatório de Horas</h2>
+        <h2 className="text-2xl font-bold text-viva-900 mb-1">Relatório financeiro</h2>
         <p className="text-gray-600">Consolidação por médico e escala, com filtros de período.</p>
       </div>
 

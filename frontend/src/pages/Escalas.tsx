@@ -15,6 +15,7 @@ import {
   type TipoPlantaoConfig,
 } from '../services/admin.service';
 import { fixMojibake } from '../utils/validation.util';
+import { notify } from '../lib/notificationEmitter';
 
 interface EscalaFormState {
   contratoAtivoId: string;
@@ -273,17 +274,10 @@ const Escalas = () => {
   const [replicarMesModalOpen, setReplicarMesModalOpen] = useState(false);
   const [replicarMesDestino, setReplicarMesDestino] = useState('');
   const [replicarMesSubmitting, setReplicarMesSubmitting] = useState(false);
-  /** Toast lateral (ex.: escala replicada / publicada), some após 3s. */
-  const [escalaSuccessToast, setEscalaSuccessToast] = useState<{ title: string; detail?: string } | null>(null);
   useEffect(() => {
     if (cellModal.open && cellModal.isPlantaoVagoRow) setPlantaoVagoVagas(0);
   }, [cellModal.open, cellModal.isPlantaoVagoRow]);
 
-  useEffect(() => {
-    if (!escalaSuccessToast) return;
-    const t = window.setTimeout(() => setEscalaSuccessToast(null), 3000);
-    return () => window.clearTimeout(t);
-  }, [escalaSuccessToast]);
 
   useEffect(() => {
     setMembrosEquipePickIds([]);
@@ -1381,9 +1375,11 @@ const Escalas = () => {
         d.ignoradosForaPeriodo > 0 ? `${d.ignoradosForaPeriodo} fora do período da escala.` : '',
         d.erros > 0 ? `${d.erros} não replicado(s) (ex.: médico inativo).` : '',
       ].filter(Boolean);
-      setEscalaSuccessToast({
+      notify({
+        kind: 'success',
         title: 'Escala replicada',
-        detail: partes.length ? partes.join(' ') : undefined,
+        message: partes.length ? partes.join(' ') : 'Plantões replicados com sucesso.',
+        source: 'escala',
       });
       setReplicarMesModalOpen(false);
       invalidatePlantoes();
@@ -1620,20 +1616,6 @@ const Escalas = () => {
     }
   };
 
-  const escalaToastEl =
-    escalaSuccessToast && (
-      <div
-        role="status"
-        aria-live="polite"
-        className="fixed right-4 top-20 md:top-24 z-[100] w-[min(22rem,calc(100vw-2rem))] rounded-xl border border-viva-200 border-l-4 border-l-viva-500 bg-white shadow-lg px-4 py-3 animate-slide-in-right"
-      >
-        <p className="text-sm font-semibold text-viva-900 font-display">{escalaSuccessToast.title}</p>
-        {escalaSuccessToast.detail ? (
-          <p className="text-xs text-viva-700 mt-1.5 leading-snug font-serif">{escalaSuccessToast.detail}</p>
-        ) : null}
-      </div>
-    );
-
   if (viewEscalas === 'grupos') {
     const equipePanelTabs: { id: typeof equipePanelTab; label: string }[] = [
       { id: 'calendario', label: 'Calendário' },
@@ -1644,7 +1626,6 @@ const Escalas = () => {
     ];
     return (
       <>
-        {escalaToastEl}
         <div className="flex flex-col h-full">
         <div className="flex-1 bg-white rounded-lg border border-viva-200/80 flex flex-col overflow-hidden">
           <div className="pb-4 border-b border-viva-200 px-4 sm:px-5 flex-shrink-0">
@@ -2719,7 +2700,6 @@ const Escalas = () => {
 
   return (
     <>
-      {escalaToastEl}
     <div className="space-y-6">
       {/* Hero */}
       <div className="card dashboard-hero col-span-full stagger-1 py-8 md:py-10">
@@ -3143,7 +3123,12 @@ const Escalas = () => {
                           await invalidateEscalas();
                           await queryClient.invalidateQueries({ queryKey: ['admin', 'equipes'] });
                           setGradeEdicaoLiberada(false);
-                          setEscalaSuccessToast({ title: 'Escala publicada' });
+                          notify({
+                            kind: 'success',
+                            title: 'Escala publicada',
+                            message: 'A escala foi publicada com sucesso.',
+                            source: 'escala',
+                          });
                         } finally {
                           setLoadingAction(false);
                         }

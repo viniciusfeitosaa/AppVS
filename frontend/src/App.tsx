@@ -23,6 +23,7 @@ import ValoresPonto from './pages/ValoresPonto';
 import PontoEletronico from './pages/PontoEletronico';
 import MeuCalendarioPlantoes from './pages/MeuCalendarioPlantoes';
 import Relatorios from './pages/Relatorios';
+import RelatoriosPontoEletronico from './pages/RelatoriosPontoEletronico';
 import Perfil from './pages/Perfil';
 import EnvioDocumentos from './pages/EnvioDocumentos';
 import MeusDocumentos from './pages/MeusDocumentos';
@@ -162,6 +163,10 @@ function AppRoutes() {
         <Route
           path="/relatorios"
           element={<Relatorios />}
+        />
+        <Route
+          path="/relatorios-ponto-eletronico"
+          element={<RelatoriosPontoEletronico />}
         />
         <Route
           path="/configuracoes"

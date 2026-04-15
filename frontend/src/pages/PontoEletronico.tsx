@@ -9,6 +9,7 @@ import {
   inicioPlantaoCliente,
   type PlantaoAgendaInput,
 } from '../utils/plantao-agenda';
+import { notify } from '../lib/notificationEmitter';
 
 const formatDuration = (minutes: number) => {
   const h = Math.floor(minutes / 60);
@@ -578,6 +579,7 @@ const PontoEletronico = () => {
       setObservacao('');
       closeCheckinModal();
       await refresh();
+      notify({ kind: 'success', title: 'Check-in realizado', message: 'Ponto de entrada registrado com sucesso.', source: 'ponto' });
     } catch (err: any) {
       tratarErroCheckin(err);
     } finally {
@@ -612,6 +614,7 @@ const PontoEletronico = () => {
       setObservacao('');
       closeCheckinModal();
       await refresh();
+      notify({ kind: 'success', title: 'Check-in realizado', message: 'Ponto de entrada registrado sem foto.', source: 'ponto' });
     } catch (err: any) {
       tratarErroCheckin(err);
     } finally {
@@ -637,6 +640,7 @@ const PontoEletronico = () => {
       });
       setObservacao('');
       await refresh();
+      notify({ kind: 'success', title: 'Checkout realizado', message: 'Ponto de saída registrado com sucesso.', source: 'ponto' });
     } catch (err: any) {
       const status = err.response?.status;
       const msg = err.response?.data?.error;
