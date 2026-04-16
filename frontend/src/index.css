@@ -26,7 +26,8 @@
    Usa max(..., 44px) como fallback quando env(safe-area-inset-top) vem 0 no WebView. */
 .app-safe-root {
   box-sizing: border-box;
-  padding-top: max(constant(safe-area-inset-top), env(safe-area-inset-top), 44px);
+  /* Fallback ~59px: iPhones com Dynamic Island quando safe-area vem 0 no WebView. */
+  padding-top: max(constant(safe-area-inset-top), env(safe-area-inset-top), 59px);
 }
 
 @layer components {
