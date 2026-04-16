@@ -22,6 +22,13 @@
   }
 }
 
+/* Safe area global (Capacitor / Safari): empurra TODAS as rotas para baixo da status bar.
+   Usa max(..., 44px) como fallback quando env(safe-area-inset-top) vem 0 no WebView. */
+.app-safe-root {
+  box-sizing: border-box;
+  padding-top: max(constant(safe-area-inset-top), env(safe-area-inset-top), 44px);
+}
+
 @layer components {
   .btn {
     @apply px-4 py-2.5 rounded-xl font-semibold text-sm transition-all duration-200;

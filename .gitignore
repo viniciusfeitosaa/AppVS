@@ -14,6 +14,16 @@ yarn-error.log*
 # Build outputs
 dist/
 build/
+
+# Capacitor — artefactos locais (versionar ios/android é recomendado; ignorar builds)
+frontend/ios/App/Pods/
+frontend/ios/App/build/
+frontend/android/.gradle/
+frontend/android/app/build/
+frontend/android/build/
+
+# Gerado a partir de .env (ver scripts/write-capacitor-config.mjs)
+frontend/capacitor.config.json
 *.tsbuildinfo
 
 # IDE

@@ -216,7 +216,9 @@ function App() {
             basename={(import.meta.env.BASE_URL || '/').replace(/\/$/, '') || undefined}
             future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
           >
-            <AppRoutes />
+            <div className="app-safe-root min-h-dvh">
+              <AppRoutes />
+            </div>
           </BrowserRouter>
         </NotificationProvider>
       </MasterEscopoProvider>
