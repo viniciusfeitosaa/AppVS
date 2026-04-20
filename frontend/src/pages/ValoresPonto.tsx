@@ -123,9 +123,19 @@ const ValoresPonto = () => {
       .filter((s) => allowedSubgrupoIds.has(s.id));
   }, [allowedSubgrupoIds, contratoId, subgrupos]);
 
+  const contratoIdsSoPonto = useMemo(() => {
+    const subById = new Map(subgrupos.map((s: { id: string; usaEscala?: boolean; usaPonto?: boolean }) => [s.id, s]));
+    const ids = new Set<string>();
+    for (const cs of contratoSubgrupos as { contratoAtivoId: string; subgrupoId: string }[]) {
+      const sg = subById.get(cs.subgrupoId) as { usaEscala?: boolean; usaPonto?: boolean } | undefined;
+      if (sg?.usaPonto && !sg?.usaEscala) ids.add(cs.contratoAtivoId);
+    }
+    return ids;
+  }, [contratoSubgrupos, subgrupos]);
+
   const contratosPontoSemEscala = useMemo(
-    () => contratos.filter((c: any) => !(c?.usaEscala && c?.usaPonto)),
-    [contratos]
+    () => contratos.filter((c: { id: string }) => contratoIdsSoPonto.has(c.id)),
+    [contratos, contratoIdsSoPonto]
   );
 
   const equipesDoSubgrupo = useMemo(

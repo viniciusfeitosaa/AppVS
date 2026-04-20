@@ -1,16 +1,38 @@
-/** Profissões da saúde (cadastro público) */
+/**
+ * Profissões da saúde (cadastro público e formulários).
+ * Cada item deve caber em `medicos.profissao` (VarChar(80) no Prisma).
+ */
 export const PROFISSOES_SAUDE = [
   'Médico',
-  'Enfermeiro',
-  'Fonoaudiólogo',
-  'Nutricionista',
-  'Terapeuta Ocupacional',
-  'Psicólogo',
-  'Educador Físico',
-  'Musicoterapeuta',
-  'Fisioterapeuta',
+  'Acupunturista',
+  'Assistente Social',
+  'Auxiliar de Enfermagem',
   'Biomédico',
-  'Outro',
+  'Cirurgião-Dentista',
+  'Educador Físico',
+  'Enfermeiro',
+  'Enfermeiro Obstétrico',
+  'Farmacêutico',
+  'Fisioterapeuta',
+  'Fonoaudiólogo',
+  'Instrumentador Cirúrgico',
+  'Musicoterapeuta',
+  'Nutricionista',
+  'Optometrista',
+  'Ortoptista',
+  'Perfusionista',
+  'Podólogo',
+  'Psicólogo',
+  'Quiropraxista',
+  'Sanitarista',
+  'Técnico de Laboratório',
+  'Técnico em Enfermagem',
+  'Técnico em Farmácia',
+  'Técnico em Nutrição e Dietética',
+  'Técnico em Radiologia',
+  'Técnico em Saúde Bucal',
+  'Técnico em Ótica',
+  'Terapeuta Ocupacional',
 ] as const;
 
 /** Especialidades médicas (multi-select). Clínica Médica = formação base. */

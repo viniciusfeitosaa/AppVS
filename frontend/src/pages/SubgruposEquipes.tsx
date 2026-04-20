@@ -22,6 +22,7 @@ const SubgruposEquipes = () => {
   const [subgrupoNome, setSubgrupoNome] = useState('');
   const [equipeNome, setEquipeNome] = useState('');
   const [membrosEquipeBusca, setMembrosEquipeBusca] = useState('');
+  const [membrosNaEquipeBusca, setMembrosNaEquipeBusca] = useState('');
   const [membrosEquipePickIds, setMembrosEquipePickIds] = useState<string[]>([]);
   const [membrosEquipeError, setMembrosEquipeError] = useState<string | null>(null);
   const [membrosEquipeActionLoading, setMembrosEquipeActionLoading] = useState(false);
@@ -30,6 +31,10 @@ const SubgruposEquipes = () => {
   const [confirmExcluir, setConfirmExcluir] = useState<{ tipo: 'subgrupo' | 'equipe' | 'escala'; id: string; nome: string } | null>(null);
   const [editEscala, setEditEscala] = useState<{ id: string; nome: string } | null>(null);
   const [editEscalaNome, setEditEscalaNome] = useState('');
+  const [producaoSubgrupoDraft, setProducaoSubgrupoDraft] = useState<{ usaEscala: boolean; usaPonto: boolean }>({
+    usaEscala: true,
+    usaPonto: true,
+  });
 
   /** Ao vir da página Escalas pelo link "Ir para Subgrupos e Equipes" ou "Criar escala e vincular", pré-selecionar subgrupo e/ou equipe. */
   useEffect(() => {
@@ -79,6 +84,15 @@ const SubgruposEquipes = () => {
   const subgrupos = useMemo(() => subgruposResp?.data || [], [subgruposResp]);
   const equipes = useMemo(() => equipesResp?.data || [], [equipesResp]);
   const equipeMedicos = useMemo(() => equipeMedicosResp?.data || [], [equipeMedicosResp]);
+  const equipeMedicosFiltradosNaLista = useMemo(() => {
+    const q = membrosNaEquipeBusca.trim().toLowerCase();
+    if (!q) return equipeMedicos;
+    return equipeMedicos.filter((a: { medico?: { nomeCompleto?: string; crm?: string | null } }) => {
+      const nome = (a.medico?.nomeCompleto ?? '').toLowerCase();
+      const crm = (a.medico?.crm ?? '').toLowerCase();
+      return nome.includes(q) || crm.includes(q);
+    });
+  }, [equipeMedicos, membrosNaEquipeBusca]);
   const equipeEscalas = useMemo(() => equipeEscalasResp?.data || [], [equipeEscalasResp]);
   const idsNaEquipe = useMemo(
     () => new Set(equipeMedicos.map((a: { medicoId: string }) => a.medicoId)),
@@ -118,6 +132,7 @@ const SubgruposEquipes = () => {
   useEffect(() => {
     setMembrosEquipePickIds([]);
     setMembrosEquipeBusca('');
+    setMembrosNaEquipeBusca('');
     setMembrosEquipeError(null);
   }, [selectedEquipeId]);
 
@@ -130,12 +145,23 @@ const SubgruposEquipes = () => {
     if (selectedEquipeId) queryClient.invalidateQueries({ queryKey: ['admin', 'equipes', selectedEquipeId, 'medicos'] });
   };
   const selectedSubgrupo = useMemo(() => subgrupos.find((s) => s.id === selectedSubgrupoId), [subgrupos, selectedSubgrupoId]);
-  /** Contrato do subgrupo selecionado que usa escala (para criar escala já associada). */
+
+  useEffect(() => {
+    const s = subgrupos.find((x) => x.id === selectedSubgrupoId);
+    if (!s) return;
+    setProducaoSubgrupoDraft({
+      usaEscala: s.usaEscala !== false,
+      usaPonto: s.usaPonto !== false,
+    });
+  }, [selectedSubgrupoId, subgrupos]);
+
+  /** Contrato (no escopo atual) para criar escala quando o subgrupo usa plantões. */
   const contratoEscalaDoSubgrupo = useMemo(() => {
+    if (!selectedSubgrupo?.usaEscala) return '';
     const list = selectedSubgrupo?.contratoSubgrupos ?? [];
-    const cs = list.find((c: { contratoAtivo?: { id: string; usaEscala: boolean } }) => c.contratoAtivo?.usaEscala);
-    return cs?.contratoAtivo?.id ?? '';
-  }, [selectedSubgrupo]);
+    const match = list.find((c: { contratoAtivo?: { id: string } }) => c.contratoAtivo?.id === selectedContratoId);
+    return match?.contratoAtivo?.id ?? list[0]?.contratoAtivo?.id ?? '';
+  }, [selectedSubgrupo, selectedContratoId]);
 
   const criarSubgrupo = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -394,13 +420,87 @@ const SubgruposEquipes = () => {
                   >
                     <div className="min-w-0">
                       <p className="font-semibold text-viva-900">{s.nome}</p>
-                      <p className="text-xs text-gray-600">Equipes: {s._count?.equipes ?? 0}</p>
+                      <p className="text-xs text-gray-600">
+                        Equipes: {s._count?.equipes ?? 0}
+                        {s.usaEscala !== false && s.usaPonto !== false
+                          ? ' · Escala + ponto'
+                          : s.usaEscala !== false
+                            ? ' · Só escala'
+                            : s.usaPonto !== false
+                              ? ' · Só ponto'
+                              : ''}
+                      </p>
                     </div>
                     <button type="button" className="btn btn-secondary shrink-0" onClick={(e) => openConfirmExcluirSubgrupo(e, s.id, s.nome)} disabled={loadingAction}>Excluir</button>
                   </div>
                 ))
               )}
             </div>
+            {selectedSubgrupoId && selectedSubgrupo && (
+              <div className="mt-4 rounded-lg border border-viva-200 bg-viva-50/40 p-3 space-y-3">
+                <p className="text-sm font-semibold text-viva-900">Estilo de produção — {selectedSubgrupo.nome}</p>
+                <p className="text-xs text-gray-600">
+                  Define se este subgrupo usa grade de plantões na escala e/ou ponto eletrônico (independente de outros
+                  subgrupos do mesmo contrato).
+                </p>
+                <div className="flex flex-wrap gap-6">
+                  <label className="flex items-center gap-2 text-sm text-viva-900">
+                    <input
+                      type="checkbox"
+                      checked={producaoSubgrupoDraft.usaEscala}
+                      onChange={(e) => setProducaoSubgrupoDraft((p) => ({ ...p, usaEscala: e.target.checked }))}
+                      disabled={loadingAction}
+                    />
+                    Usar escalas (plantões)
+                  </label>
+                  <label className="flex items-center gap-2 text-sm text-viva-900">
+                    <input
+                      type="checkbox"
+                      checked={producaoSubgrupoDraft.usaPonto}
+                      onChange={(e) => setProducaoSubgrupoDraft((p) => ({ ...p, usaPonto: e.target.checked }))}
+                      disabled={loadingAction}
+                    />
+                    Usar ponto eletrônico
+                  </label>
+                </div>
+                <button
+                  type="button"
+                  className="btn btn-primary text-sm"
+                  disabled={
+                    loadingAction || (!producaoSubgrupoDraft.usaEscala && !producaoSubgrupoDraft.usaPonto)
+                  }
+                  onClick={async () => {
+                    if (!selectedSubgrupoId) return;
+                    if (!producaoSubgrupoDraft.usaEscala && !producaoSubgrupoDraft.usaPonto) return;
+                    setLoadingAction(true);
+                    try {
+                      await adminService.updateSubgrupo(selectedSubgrupoId, {
+                        usaEscala: producaoSubgrupoDraft.usaEscala,
+                        usaPonto: producaoSubgrupoDraft.usaPonto,
+                      });
+                      await invalidateSubgrupos();
+                      notify({
+                        kind: 'success',
+                        title: 'Subgrupo',
+                        message: 'Estilo de produção atualizado.',
+                        source: 'subgrupo',
+                      });
+                    } catch (err: any) {
+                      notify({
+                        kind: 'error',
+                        title: 'Erro',
+                        message: err.response?.data?.error || err.message || 'Tente novamente.',
+                        source: 'subgrupo',
+                      });
+                    } finally {
+                      setLoadingAction(false);
+                    }
+                  }}
+                >
+                  Salvar estilo
+                </button>
+              </div>
+            )}
           </>
         )}
       </div>
@@ -514,29 +614,49 @@ const SubgruposEquipes = () => {
                 {equipeMedicos.length === 0 ? (
                   <p className="text-sm text-gray-500">Nenhum profissional vinculado a esta equipe.</p>
                 ) : (
-                  <ul className="space-y-2">
-                    {equipeMedicos.map(
-                      (a: { id: string; medicoId: string; medico?: { nomeCompleto: string; crm?: string | null } }) => (
-                        <li
-                          key={a.id}
-                          className="flex items-center justify-between gap-2 border border-viva-200 rounded-lg px-3 py-2 bg-white"
-                        >
-                          <div className="min-w-0">
-                            <p className="font-medium text-viva-900 text-sm">{a.medico?.nomeCompleto ?? '—'}</p>
-                            {a.medico?.crm ? <p className="text-xs text-viva-600">CRM: {a.medico.crm}</p> : null}
-                          </div>
-                          <button
-                            type="button"
-                            className="btn btn-secondary text-sm shrink-0"
-                            disabled={membrosEquipeActionLoading}
-                            onClick={() => removerMedicoDaEquipe(a.medicoId)}
-                          >
-                            Remover
-                          </button>
-                        </li>
-                      )
+                  <>
+                    <label htmlFor="busca-membros-na-equipe" className="sr-only">
+                      Pesquisar profissionais já na equipe por nome ou CRM
+                    </label>
+                    <input
+                      id="busca-membros-na-equipe"
+                      type="search"
+                      className="input w-full text-sm mb-2"
+                      placeholder="Pesquisar na lista (nome ou CRM)…"
+                      value={membrosNaEquipeBusca}
+                      onChange={(e) => setMembrosNaEquipeBusca(e.target.value)}
+                      disabled={membrosEquipeActionLoading}
+                      autoComplete="off"
+                      spellCheck={false}
+                    />
+                    {equipeMedicosFiltradosNaLista.length === 0 ? (
+                      <p className="text-sm text-gray-500">Nenhum resultado para a pesquisa.</p>
+                    ) : (
+                      <ul className="space-y-2 max-h-[min(50vh,360px)] overflow-y-auto pr-0.5">
+                        {equipeMedicosFiltradosNaLista.map(
+                          (a: { id: string; medicoId: string; medico?: { nomeCompleto: string; crm?: string | null } }) => (
+                            <li
+                              key={a.id}
+                              className="flex items-center justify-between gap-2 border border-viva-200 rounded-lg px-3 py-2 bg-white"
+                            >
+                              <div className="min-w-0">
+                                <p className="font-medium text-viva-900 text-sm">{a.medico?.nomeCompleto ?? '—'}</p>
+                                {a.medico?.crm ? <p className="text-xs text-viva-600">CRM: {a.medico.crm}</p> : null}
+                              </div>
+                              <button
+                                type="button"
+                                className="btn btn-secondary text-sm shrink-0"
+                                disabled={membrosEquipeActionLoading}
+                                onClick={() => removerMedicoDaEquipe(a.medicoId)}
+                              >
+                                Remover
+                              </button>
+                            </li>
+                          )
+                        )}
+                      </ul>
                     )}
-                  </ul>
+                  </>
                 )}
               </div>
             )}

@@ -3,6 +3,10 @@ import { Request, Response, NextFunction } from 'express';
 import { body, param, query, validationResult } from 'express-validator';
 import { PONTO_SEM_ESCALA_ESCALA_ID } from '../constants/ponto.const';
 import { validateCPF, validateCRM } from '../utils/validation.util';
+import {
+  normalizeRegistroConselhoParaProfissao,
+  profissaoExigeRegistroConselho,
+} from '../utils/profissao-registro.util';
 
 const UUID_ANY_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -157,28 +161,61 @@ export const validateRegisterMedico = [
     .withMessage('Profissão é obrigatória')
     .isLength({ max: 80 })
     .withMessage('Profissão inválida'),
-  body('crm')
-    .optional({ values: 'null', checkFalsy: true })
-    .isString()
+  body('crm').custom((value, { req }) => {
+    const profissao = (req.body?.profissao || '').trim();
+    if (!profissaoExigeRegistroConselho(profissao)) {
+      if (value === undefined || value === null || String(value).trim() === '') return true;
+      if (typeof value !== 'string') throw new Error('Registro no conselho inválido');
+      const n = normalizeRegistroConselhoParaProfissao(profissao, value);
+      if (!n) throw new Error('Registro no conselho inválido');
+      return true;
+    }
+    if (value === undefined || value === null || String(value).trim() === '') {
+      throw new Error('Registro no conselho é obrigatório para esta profissão');
+    }
+    if (typeof value !== 'string') throw new Error('Registro no conselho inválido');
+    if (profissao === 'Médico' && !validateCRM(value)) {
+      throw new Error('CRM inválido. Use o formato número-UF (ex.: 12345-SP).');
+    }
+    const n = normalizeRegistroConselhoParaProfissao(profissao, value);
+    if (!n) throw new Error('Registro no conselho inválido para esta profissão');
+    return true;
+  }),
+  body('especialidades')
+    .optional({ values: 'null' })
     .custom((value, { req }) => {
-      const profissao = (req.body?.profissao || '').trim();
-      if (profissao === 'Médico') {
-        if (!value || !validateCRM(value)) {
-          throw new Error('CRM inválido');
+      if (value === undefined || value === null || value === '') {
+        (req as any).body.especialidades = [];
+        return true;
+      }
+      let arr: unknown;
+      if (Array.isArray(value)) {
+        arr = value;
+      } else if (typeof value === 'string') {
+        const t = value.trim();
+        if (!t) {
+          (req as any).body.especialidades = [];
+          return true;
+        }
+        try {
+          arr = JSON.parse(t);
+        } catch {
+          throw new Error('Especialidades inválidas (use uma lista ou JSON array)');
+        }
+      } else {
+        throw new Error('Especialidades inválidas');
+      }
+      if (!Array.isArray(arr)) {
+        throw new Error('Especialidades deve ser uma lista');
+      }
+      for (const item of arr) {
+        if (typeof item !== 'string' || item.trim().length > 100) {
+          throw new Error('Cada especialidade deve ser texto com no máximo 100 caracteres');
         }
       }
+      (req as any).body.especialidades = arr.map((e: string) => e.trim()).filter(Boolean);
       return true;
     }),
-  body('especialidades')
-    .optional({ values: 'null', checkFalsy: true })
-    .isArray()
-    .withMessage('Especialidades deve ser uma lista'),
-  body('especialidades.*')
-    .optional()
-    .isString()
-    .trim()
-    .isLength({ max: 100 })
-    .withMessage('Cada especialidade deve ter no máximo 100 caracteres'),
   body('telefone')
     .isString()
     .trim()
@@ -186,6 +223,38 @@ export const validateRegisterMedico = [
     .withMessage('Telefone é obrigatório')
     .isLength({ max: 20 })
     .withMessage('Telefone inválido'),
+  body('estadoCivil')
+    .optional({ values: 'falsy' })
+    .isString()
+    .trim()
+    .isLength({ max: 60 })
+    .withMessage('Estado civil inválido'),
+  body('enderecoResidencial')
+    .optional({ values: 'falsy' })
+    .isString()
+    .trim()
+    .isLength({ max: 5000 })
+    .withMessage('Endereço inválido'),
+  body('dadosBancarios')
+    .optional({ values: 'falsy' })
+    .isString()
+    .trim()
+    .isLength({ max: 5000 })
+    .withMessage('Dados bancários inválidos'),
+  body('chavePix')
+    .optional({ values: 'falsy' })
+    .isString()
+    .trim()
+    .isLength({ max: 120 })
+    .withMessage('Chave Pix inválida'),
+  body('aceitouTermos').custom((value) => {
+    if (value === true || value === 1) return true;
+    if (typeof value === 'string') {
+      const t = value.trim().toLowerCase();
+      if (t === 'true' || t === '1' || t === 'on' || t === 'yes') return true;
+    }
+    throw new Error('É necessário aceitar a declaração e os termos de cadastro para concluir o pedido');
+  }),
   handleValidationErrors,
 ];
 

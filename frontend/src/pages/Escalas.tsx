@@ -221,6 +221,7 @@ const Escalas = () => {
   const [equipePanelTab, setEquipePanelTab] = useState<'calendario' | 'editar' | 'membros' | 'historico' | 'relatorio'>('calendario');
   /** Aba Membros: busca e seleção para adicionar profissionais à equipe. */
   const [membrosEquipeBusca, setMembrosEquipeBusca] = useState('');
+  const [membrosNaEquipeBusca, setMembrosNaEquipeBusca] = useState('');
   const [membrosEquipePickIds, setMembrosEquipePickIds] = useState<string[]>([]);
   const [membrosEquipeActionLoading, setMembrosEquipeActionLoading] = useState(false);
   const [membrosEquipeError, setMembrosEquipeError] = useState<string | null>(null);
@@ -282,6 +283,7 @@ const Escalas = () => {
   useEffect(() => {
     setMembrosEquipePickIds([]);
     setMembrosEquipeBusca('');
+    setMembrosNaEquipeBusca('');
     setMembrosEquipeError(null);
   }, [selectedEquipeId]);
 
@@ -890,14 +892,22 @@ const Escalas = () => {
       if (snFb && !hasNight) byId.set('sn', { ...snFb });
     }
 
+    const inicioMinCol = (g: GradeColDef) => {
+      const t = tipos.find((x) => x.id === g.id);
+      const hm = (t?.horaInicio ?? g.regua?.[0] ?? '00:00').slice(0, 5);
+      const p = hm.split(':').map((x) => parseInt(x, 10));
+      const h = Number.isFinite(p[0]) ? p[0] : 0;
+      const m = Number.isFinite(p[1]) ? p[1] : 0;
+      return h * 60 + m;
+    };
     const sortCols = (cols: GradeColDef[]) =>
       [...cols].sort((a, b) => {
-        const ta = tipos.find((x) => x.id === a.id);
-        const tb = tipos.find((x) => x.id === b.id);
-        const oa = ta?.ordem ?? 9999;
-        const ob = tb?.ordem ?? 9999;
-        if (oa !== ob) return oa - ob;
-        return (ta?.horaInicio ?? '').localeCompare(tb?.horaInicio ?? '');
+        const da = inicioMinCol(a);
+        const db = inicioMinCol(b);
+        if (da !== db) return da - db;
+        const na = tipos.find((x) => x.id === a.id)?.nome ?? a.label;
+        const nb = tipos.find((x) => x.id === b.id)?.nome ?? b.label;
+        return na.localeCompare(nb, 'pt-BR');
       });
 
     if (byId.size === 0) {
@@ -983,11 +993,11 @@ const Escalas = () => {
   const equipes = useMemo(() => equipesResp?.data || [], [equipesResp]);
 
   const searchGruposLower = searchGrupos.trim().toLowerCase();
-  /** Na página Escalas: só subgrupos vinculados a contratos que usam escala (plantões). */
+  /** Na página Escalas: só subgrupos que usam escala (plantões), vinculados a algum contrato. */
   const subgruposComEscala = useMemo(
     () =>
-      subgrupos.filter((s) =>
-        (s.contratoSubgrupos ?? []).some((cs) => cs.contratoAtivo?.usaEscala === true)
+      subgrupos.filter(
+        (s) => s.usaEscala !== false && (s.contratoSubgrupos ?? []).some((cs) => !!cs.contratoAtivo?.id)
       ),
     [subgrupos]
   );
@@ -997,7 +1007,7 @@ const Escalas = () => {
     for (const s of subgruposComEscala) {
       for (const cs of s.contratoSubgrupos ?? []) {
         const ca = cs.contratoAtivo;
-        if (ca?.usaEscala && ca?.id) map.set(ca.id, fixMojibake(ca.nome));
+        if (ca?.id) map.set(ca.id, fixMojibake(ca.nome));
       }
     }
     return Array.from(map.entries())
@@ -1008,9 +1018,7 @@ const Escalas = () => {
   const subgruposAposFiltroContrato = useMemo(() => {
     if (!filtroListaContratoId) return subgruposComEscala;
     return subgruposComEscala.filter((s) =>
-      (s.contratoSubgrupos ?? []).some(
-        (cs) => cs.contratoAtivo?.id === filtroListaContratoId && cs.contratoAtivo?.usaEscala
-      )
+      (s.contratoSubgrupos ?? []).some((cs) => cs.contratoAtivo?.id === filtroListaContratoId)
     );
   }, [subgruposComEscala, filtroListaContratoId]);
 
@@ -1703,7 +1711,7 @@ const Escalas = () => {
               <div className="p-6 text-center text-viva-700">
                 {searchGrupos.trim()
                   ? 'Nenhum subgrupo corresponde à busca. Ajuste o texto em "Procurar grupo".'
-                  : 'Nenhum subgrupo com escalas neste contrato. Vincule subgrupos em Contratos ativos (e marque "Usar escalas") ou crie em Subgrupos e Equipes.'}
+                  : 'Nenhum subgrupo com escalas neste contrato. Vincule subgrupos em Contratos ativos e ative “Usar escalas” no subgrupo em Subgrupos e Equipes.'}
               </div>
             ) : (
               <>
@@ -1714,8 +1722,8 @@ const Escalas = () => {
                       const countEquipes = s._count?.equipes ?? 0;
                       const isSelected = selectedSubgrupoId === s.id;
                       const contratosComEscala = (s.contratoSubgrupos ?? [])
-                        .filter((cs) => cs.contratoAtivo?.usaEscala)
-                        .map((cs) => cs.contratoAtivo.nome);
+                        .map((cs) => cs.contratoAtivo?.nome)
+                        .filter(Boolean) as string[];
                       const contratosLabel =
                         contratosComEscala.length === 0
                           ? ''
@@ -1746,7 +1754,7 @@ const Escalas = () => {
                 {selectedSubgrupoId && selectedSubgrupo && (
                   <div>
                     <h2 className="sticky top-0 px-4 py-3 bg-white border-b border-viva-100 text-lg font-bold text-viva-800 shadow-sm z-10">
-                      Equipes de {selectedSubgrupo.nome}
+                      Escala de {selectedSubgrupo.nome}
                     </h2>
                     <div className="flex flex-col gap-0 p-4">
                       {equipesDoSubgrupoSelecionado.length === 0 ? (
@@ -2061,6 +2069,14 @@ const Escalas = () => {
                   const crm = (m.crm ?? '').toLowerCase();
                   return nome.includes(qBusca) || crm.includes(qBusca);
                 });
+                const qNaEquipeLista = membrosNaEquipeBusca.trim().toLowerCase();
+                const equipeMedicosFiltradosNaLista = !qNaEquipeLista
+                  ? equipeMedicos
+                  : equipeMedicos.filter((em: { medico?: { nomeCompleto?: string; crm?: string | null } }) => {
+                      const nome = (em.medico?.nomeCompleto ?? '').toLowerCase();
+                      const crm = (em.medico?.crm ?? '').toLowerCase();
+                      return nome.includes(qNaEquipeLista) || crm.includes(qNaEquipeLista);
+                    });
                 const equipeIdAlvo = selectedEquipeId!;
                 return (
                   <div className="py-2">
@@ -2142,34 +2158,56 @@ const Escalas = () => {
                         {equipeMedicos.length === 0 ? (
                           <p className="text-sm text-gray-500">Nenhum profissional vinculado a esta equipe.</p>
                         ) : (
-                          <ul className="space-y-2">
-                            {equipeMedicos.map((em: { id: string; medicoId: string; medico?: { nomeCompleto: string; crm?: string | null } }) => (
-                              <li
-                                key={em.id}
-                                className="flex items-center justify-between gap-2 border border-viva-200 rounded-lg px-3 py-2 bg-white"
-                              >
-                                <div className="min-w-0">
-                                  <p className="font-medium text-viva-900 text-sm">{em.medico?.nomeCompleto ?? '—'}</p>
-                                  {em.medico?.crm && <p className="text-xs text-viva-600">CRM: {em.medico.crm}</p>}
-                                </div>
-                                <div className="flex items-center gap-2 shrink-0">
-                                  {escalaAtualDaEquipe && alocadosIds.has(em.medicoId) && (
-                                    <span className="text-[10px] font-medium text-viva-600 bg-viva-100 px-2 py-0.5 rounded whitespace-nowrap">
-                                      Alocado na escala
-                                    </span>
-                                  )}
-                                  <button
-                                    type="button"
-                                    className="btn btn-secondary text-xs py-1 px-2"
-                                    disabled={membrosEquipeActionLoading}
-                                    onClick={() => removerMedicoDaEquipePainel(equipeIdAlvo, em.medicoId)}
-                                  >
-                                    Remover
-                                  </button>
-                                </div>
-                              </li>
-                            ))}
-                          </ul>
+                          <>
+                            <label htmlFor="busca-membros-na-equipe-escalas" className="sr-only">
+                              Pesquisar profissionais já na equipe por nome ou CRM
+                            </label>
+                            <input
+                              id="busca-membros-na-equipe-escalas"
+                              type="search"
+                              className="input w-full text-sm mb-2"
+                              placeholder="Pesquisar na lista (nome ou CRM)…"
+                              value={membrosNaEquipeBusca}
+                              onChange={(e) => setMembrosNaEquipeBusca(e.target.value)}
+                              disabled={membrosEquipeActionLoading}
+                              autoComplete="off"
+                              spellCheck={false}
+                            />
+                            {equipeMedicosFiltradosNaLista.length === 0 ? (
+                              <p className="text-sm text-gray-500">Nenhum resultado para a pesquisa.</p>
+                            ) : (
+                              <ul className="space-y-2 max-h-[min(50vh,360px)] overflow-y-auto pr-0.5">
+                                {equipeMedicosFiltradosNaLista.map(
+                                  (em: { id: string; medicoId: string; medico?: { nomeCompleto: string; crm?: string | null } }) => (
+                                    <li
+                                      key={em.id}
+                                      className="flex items-center justify-between gap-2 border border-viva-200 rounded-lg px-3 py-2 bg-white"
+                                    >
+                                      <div className="min-w-0">
+                                        <p className="font-medium text-viva-900 text-sm">{em.medico?.nomeCompleto ?? '—'}</p>
+                                        {em.medico?.crm && <p className="text-xs text-viva-600">CRM: {em.medico.crm}</p>}
+                                      </div>
+                                      <div className="flex items-center gap-2 shrink-0">
+                                        {escalaAtualDaEquipe && alocadosIds.has(em.medicoId) && (
+                                          <span className="text-[10px] font-medium text-viva-600 bg-viva-100 px-2 py-0.5 rounded whitespace-nowrap">
+                                            Alocado na escala
+                                          </span>
+                                        )}
+                                        <button
+                                          type="button"
+                                          className="btn btn-secondary text-xs py-1 px-2"
+                                          disabled={membrosEquipeActionLoading}
+                                          onClick={() => removerMedicoDaEquipePainel(equipeIdAlvo, em.medicoId)}
+                                        >
+                                          Remover
+                                        </button>
+                                      </div>
+                                    </li>
+                                  )
+                                )}
+                              </ul>
+                            )}
+                          </>
                         )}
                       </>
                     )}

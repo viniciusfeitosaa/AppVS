@@ -210,7 +210,7 @@ const PontoEletronico = () => {
     return selectedEscalaId;
   }, [listaEscalas, registroAbertoPainel?.escalaId, plantoesHojePainel, agora, selectedEscalaId]);
 
-  const { data: canCheckInResp } = useQuery({
+  const { data: canCheckInResp, isPending: canCheckInPending, isError: canCheckInErro } = useQuery({
     queryKey: ['ponto', 'can-checkin', escalaIdEfetivo],
     queryFn: () => pontoService.canCheckIn(escalaIdEfetivo!),
     enabled:
@@ -219,13 +219,18 @@ const PontoEletronico = () => {
       !!escalaIdEfetivo &&
       painelResp != null &&
       !registroAbertoPainel,
-    refetchInterval:
-      painelResp != null &&
-      !registroAbertoPainel &&
-      escalaIdEfetivo &&
-      escalaIdEfetivo !== PONTO_SEM_ESCALA_ESCALA_ID
-        ? 30000
-        : false,
+    /**
+     * Polling só com última tentativa bem-sucedida e sem erro pendente.
+     * Evita requisições a cada 30s quando o backend cai (ERR_CONNECTION_RESET) ou após falha em segundo plano.
+     */
+    refetchInterval: (q) => {
+      if (q.state.status !== 'success' || q.state.error) return false;
+      const id = q.queryKey[2] as string | undefined;
+      if (!id || id === PONTO_SEM_ESCALA_ESCALA_ID) return false;
+      return 30_000;
+    },
+    retry: 2,
+    retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 8_000),
     staleTime: 10 * 1000,
   });
 
@@ -363,9 +368,23 @@ const PontoEletronico = () => {
   const canCheckIn = !!canCheckInResp?.data?.allowed;
   const canCheckInReason: string | null = canCheckInResp?.data?.reason ?? null;
 
+  /** Não duplicar com o motivo da API nem sugerir “sem plantão” quando o check-in já está liberado ou ainda está sendo verificado. */
+  const mostrarAvisoCalendarioSemPlantaoHoje =
+    !loadingPainel &&
+    painelResp != null &&
+    !!escalaIdEfetivo &&
+    escalaIdEfetivo !== PONTO_SEM_ESCALA_ESCALA_ID &&
+    !plantaoHojeExibir &&
+    !registroAberto &&
+    !canCheckIn &&
+    !canCheckInReason &&
+    !canCheckInPending &&
+    !canCheckInErro;
+
   const refresh = async () => {
     await queryClient.invalidateQueries({ queryKey: ['ponto', 'painel-inicial'] });
     await queryClient.invalidateQueries({ queryKey: ['ponto', 'meu-dia'] });
+    await queryClient.invalidateQueries({ queryKey: ['ponto', 'can-checkin'] });
   };
 
   const pararStreamCamera = () => {
@@ -708,7 +727,7 @@ const PontoEletronico = () => {
                 {plantaoHojeExibir.faixaHorario?.trim() || '—'}
               </span>
             </p>
-          ) : escalaIdEfetivo ? (
+          ) : mostrarAvisoCalendarioSemPlantaoHoje ? (
             <p className="text-xs text-viva-600 font-serif">
               Você não tem plantão nesta escala hoje (conforme seu calendário de escalas).
             </p>
@@ -739,7 +758,13 @@ const PontoEletronico = () => {
               </button>
             ) : (
               <p className="text-xs text-viva-600 font-serif">
-                {canCheckInReason ? canCheckInReason : 'Sem plantão disponível para registrar ponto.'}
+                {loadingPainel || canCheckInPending
+                  ? 'Carregando dados do ponto…'
+                  : canCheckInErro
+                    ? 'Não foi possível verificar o registro de ponto (servidor ou rede). Confirme se o backend está em execução e atualize a página.'
+                    : canCheckInReason
+                      ? canCheckInReason
+                      : 'Sem plantão disponível para registrar ponto.'}
               </p>
             )
           ) : (

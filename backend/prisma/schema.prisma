@@ -33,6 +33,12 @@ enum DocumentoPerfilTipo {
   TITULO_ESPECIALISTA
 }
 
+enum StatusCadastroMedico {
+  PENDENTE_ANALISE
+  ATIVO
+  REJEITADO
+}
+
 enum ModuloSistema {
   DASHBOARD
   MEDICOS
@@ -46,6 +52,7 @@ enum ModuloSistema {
   VAGAS
   CONFIGURACOES
   ENVIO_DOCUMENTOS
+  AVALIACAO
   PERFIL
 }
 
@@ -167,7 +174,7 @@ model Medico {
   tenantId      String   @map("tenant_id")
   cpf           String   @db.VarChar(11) // CPF sem formatação (11 dígitos)
   profissao     String   @db.VarChar(80) // Médico, Enfermeiro, Fonoaudiólogo, etc.
-  crm           String?  @db.VarChar(20) // Ex: "12345-SP" (obrigatório apenas para médicos)
+  crm           String?  @db.VarChar(60) // CRM, CRO, COREN, CRP, etc. (obrigatório conforme profissão)
   nomeCompleto  String   @db.VarChar(255)
   email         String?  @db.VarChar(255)
   senhaHash     String   @db.VarChar(255) // Hash bcrypt
@@ -181,6 +188,12 @@ model Medico {
   inviteTokenHash String?  @map("invite_token_hash") @db.VarChar(255)
   inviteExpiresAt DateTime? @map("invite_expires_at")
   inviteAcceptedAt DateTime? @map("invite_accepted_at")
+  /// Cadastro público: PENDENTE_ANALISE até aprovação no módulo Avaliação; convites/admin criam ATIVO.
+  statusCadastro StatusCadastroMedico @default(ATIVO) @map("status_cadastro")
+  /// Momento em que o utilizador aceitou a declaração/termos no formulário de cadastro público (se aplicável).
+  termosCadastroAceitosEm DateTime? @map("termos_cadastro_aceitos_em")
+  /// Identificador da versão dos textos legais aceites (ex.: 2026.1).
+  termosCadastroVersao   String?   @map("termos_cadastro_versao") @db.VarChar(24)
   ativo         Boolean  @default(true)
   createdAt     DateTime @default(now()) @map("created_at")
   updatedAt     DateTime @updatedAt @map("updated_at")
@@ -211,6 +224,7 @@ model Medico {
   @@index([tenantId, email])
   @@index([tenantId, nomeCompleto])
   @@index([tenantId, ativo])
+  @@index([tenantId, statusCadastro])
 }
 
 model MedicoDocumento {
@@ -360,6 +374,10 @@ model Subgrupo {
   nome      String   @db.VarChar(180)
   descricao String?  @db.Text
   ativo     Boolean  @default(true)
+  /// Quando true, o subgrupo usa grade de plantões (escalas) no app.
+  usaEscala Boolean  @default(true) @map("usa_escala")
+  /// Quando true, o subgrupo usa registro de ponto eletrônico (com ou sem escala).
+  usaPonto  Boolean  @default(true) @map("usa_ponto")
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 

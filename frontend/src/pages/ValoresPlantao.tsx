@@ -79,7 +79,7 @@ const ValoresPlantao = () => {
   const [editarTipoModal, setEditarTipoModal] = useState<TipoPlantaoConfig | null>(null);
   const [salvandoEdicaoTipo, setSalvandoEdicaoTipo] = useState(false);
 
-  const { data: opcoesResp, isLoading: loadingOpcoes } = useQuery({
+  const { data: opcoesResp, isLoading: loadingOpcoes, isError: erroOpcoes } = useQuery({
     queryKey: ['admin', 'valores-plantao', 'opcoes'],
     queryFn: () => adminService.getValoresPlantaoOpcoes(),
     enabled: !!user && isMaster,
@@ -120,32 +120,72 @@ const ValoresPlantao = () => {
     if (!contratoId) return [];
     return subgrupos
       .filter((s) => s.ativo !== false)
-      .filter((s) => allowedSubgrupoIds.has(s.id));
+      .filter((s) => allowedSubgrupoIds.has(s.id))
+      .filter((s) => {
+        const x = s as { usaEscala?: boolean; usaPonto?: boolean };
+        return Boolean(x.usaEscala && x.usaPonto);
+      });
   }, [allowedSubgrupoIds, contratoId, subgrupos]);
 
+  const contratoIdsComSubgrupoEscalaEPonto = useMemo(() => {
+    const subById = new Map(subgrupos.map((s: { id: string; usaEscala?: boolean; usaPonto?: boolean }) => [s.id, s]));
+    const ids = new Set<string>();
+    for (const cs of contratoSubgrupos as { contratoAtivoId: string; subgrupoId: string }[]) {
+      const sg = subById.get(cs.subgrupoId) as { usaEscala?: boolean; usaPonto?: boolean } | undefined;
+      if (sg?.usaEscala && sg?.usaPonto) ids.add(cs.contratoAtivoId);
+    }
+    return ids;
+  }, [contratoSubgrupos, subgrupos]);
+
   const contratosEscalaEPonto = useMemo(
-    () => contratos.filter((c: any) => Boolean(c?.usaEscala && c?.usaPonto)),
-    [contratos]
+    () => contratos.filter((c: { id: string }) => contratoIdsComSubgrupoEscalaEPonto.has(c.id)),
+    [contratos, contratoIdsComSubgrupoEscalaEPonto]
   );
 
-  const { data: tiposResp, isLoading: loadingTipos } = useQuery({
+  const { data: tiposResp, isLoading: loadingTipos, isError: erroTipos } = useQuery({
     queryKey: ['admin', 'tipos-plantao', contratoId],
     queryFn: () => adminService.listTiposPlantao(contratoId),
     enabled: !!user && isMaster && temEscopoCompleto,
   });
-  const tiposPlantao = tiposResp?.data ?? [];
 
-  const { data: resp, isLoading: loadingValores } = useQuery({
+  const tiposPlantao = useMemo(() => {
+    const arr = [...(tiposResp?.data ?? [])];
+    const inicioMin = (t: TipoPlantaoConfig) => {
+      const p = t.horaInicio?.slice(0, 5).split(':').map((x) => parseInt(x, 10)) ?? [0, 0];
+      const h = Number.isFinite(p[0]) ? p[0] : 0;
+      const m = Number.isFinite(p[1]) ? p[1] : 0;
+      return h * 60 + m;
+    };
+    arr.sort((a, b) => {
+      const d = inicioMin(a) - inicioMin(b);
+      if (d !== 0) return d;
+      return (a.nome ?? '').localeCompare(b.nome ?? '', 'pt-BR');
+    });
+    return arr;
+  }, [tiposResp?.data]);
+
+  const { data: resp, isLoading: loadingValores, isError: erroValores } = useQuery({
     queryKey: ['admin', 'valores-plantao', contratoId, subgrupoId, equipeId],
     queryFn: () => adminService.getValoresPlantao(contratoId, subgrupoId, equipeId),
     enabled: !!user && isMaster && temEscopoCompleto,
   });
 
-  const { data: configPontoResp, isLoading: loadingConfigPonto } = useQuery({
+  const { data: configPontoResp, isLoading: loadingConfigPonto, isError: erroConfigPonto } = useQuery({
     queryKey: ['admin', 'config-ponto', contratoId, subgrupoId, equipeId || null],
     queryFn: () => adminService.getConfigPonto(contratoId, subgrupoId, equipeId || null),
     enabled: !!user && isMaster && temEscopoCompleto,
   });
+
+  const erroApiRede =
+    erroOpcoes || (temEscopoCompleto && (erroTipos || erroValores || erroConfigPonto));
+
+  const tentarRecarregarApi = () => {
+    void Promise.all([
+      queryClient.invalidateQueries({ queryKey: ['admin', 'valores-plantao'] }),
+      queryClient.invalidateQueries({ queryKey: ['admin', 'tipos-plantao'] }),
+      queryClient.invalidateQueries({ queryKey: ['admin', 'config-ponto'] }),
+    ]);
+  };
 
   const valores = resp?.data ?? [];
   const configPonto: ConfigPontoEletronico | null = configPontoResp?.data ?? null;
@@ -390,6 +430,19 @@ const ValoresPlantao = () => {
         </div>
       )}
 
+      {erroApiRede && !loadingOpcoes && (
+        <div className="card border-l-4 border-amber-500 bg-amber-50/50">
+          <p className="text-sm text-amber-950 mb-3">
+            A API não respondeu (por exemplo <strong>ECONNREFUSED</strong> em <code className="text-xs bg-white px-1 rounded">localhost:3001</code>
+            ). Inicie o backend ou confira <code className="text-xs bg-white px-1 rounded">VITE_API_URL</code> no build do
+            frontend.
+          </p>
+          <button type="button" className="btn btn-secondary text-sm" onClick={tentarRecarregarApi}>
+            Tentar novamente
+          </button>
+        </div>
+      )}
+
       <div className="card">
         <h3 className="text-lg font-bold text-viva-900 mb-4">Contrato, subgrupo e equipe</h3>
         {loadingOpcoes ? (
@@ -459,8 +512,10 @@ const ValoresPlantao = () => {
         <div className="card">
           <h3 className="text-lg font-bold text-viva-900 mb-4">Tipos de plantão (contrato)</h3>
           <p className="text-sm text-viva-700 mb-4">
-            Cada tipo tem nome e faixa de horário (usada na grade, calendário, troca e ponto). Os padrões MT/SN são
-            criados automaticamente na primeira carga.
+            Cada tipo tem nome e faixa de horário (usada na grade, calendário, troca e ponto). O horário define-se ao
+            criar o tipo; depois só o <span className="font-semibold text-viva-800">nome</span> pode ser alterado. A
+            lista ordena-se automaticamente pelo <span className="font-semibold text-viva-800">início</span> do
+            plantão. Os padrões MT/SN são criados na primeira carga.
           </p>
           {loadingTipos ? (
             <p className="text-sm text-gray-600">Carregando tipos...</p>
@@ -766,7 +821,8 @@ const ValoresPlantao = () => {
               Editar tipo de plantão
             </h3>
             <p className="text-xs text-viva-600">
-              O identificador na escala não muda; calendário, troca e ponto passam a usar o novo nome e horários.
+              O identificador na escala (ligação aos plantões) não muda. Só o nome de exibição é editável; horários
+              permanecem os definidos na criação do tipo.
             </p>
             <div className="space-y-3">
               <div>
@@ -777,42 +833,17 @@ const ValoresPlantao = () => {
                   onChange={(e) => setEditarTipoModal((m) => (m ? { ...m, nome: e.target.value } : m))}
                 />
               </div>
-              <div className="flex flex-wrap gap-3">
-                <div className="min-w-[8.75rem]">
-                  <label className="block text-xs font-semibold text-viva-800 mb-1">Início</label>
-                  <input
-                    type="time"
-                    step={60}
-                    className="input-time"
-                    value={editarTipoModal.horaInicio.slice(0, 5)}
-                    onChange={(e) =>
-                      setEditarTipoModal((m) => (m ? { ...m, horaInicio: e.target.value } : m))
-                    }
-                  />
-                </div>
-                <div className="min-w-[8.75rem]">
-                  <label className="block text-xs font-semibold text-viva-800 mb-1">Fim</label>
-                  <input
-                    type="time"
-                    step={60}
-                    className="input-time"
-                    value={editarTipoModal.horaFim.slice(0, 5)}
-                    onChange={(e) =>
-                      setEditarTipoModal((m) => (m ? { ...m, horaFim: e.target.value } : m))
-                    }
-                  />
-                </div>
+              <div className="rounded-lg border border-viva-200 bg-viva-50/50 px-3 py-2.5">
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-viva-600 mb-1">Horário (fixo)</p>
+                <p className="text-sm text-viva-900">
+                  {editarTipoModal.horaInicio.slice(0, 5)} – {editarTipoModal.horaFim.slice(0, 5)}
+                  {editarTipoModal.cruzaMeiaNoite ? ' (cruza meia-noite)' : ''}
+                </p>
+                <p className="text-[11px] text-viva-600 mt-1">
+                  Para mudar início/fim ou “cruza meia-noite”, exclua este tipo e crie outro (sem plantões na escala
+                  usando este tipo).
+                </p>
               </div>
-              <label className="flex items-center gap-2 text-sm text-viva-800 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={editarTipoModal.cruzaMeiaNoite}
-                  onChange={(e) =>
-                    setEditarTipoModal((m) => (m ? { ...m, cruzaMeiaNoite: e.target.checked } : m))
-                  }
-                />
-                Cruza meia-noite
-              </label>
             </div>
             <div className="flex flex-wrap justify-end gap-3 pt-2">
               <button
@@ -829,17 +860,12 @@ const ValoresPlantao = () => {
                 disabled={salvandoEdicaoTipo || !editarTipoModal.nome.trim()}
                 onClick={async () => {
                   const m = editarTipoModal;
-                  const hi = m.horaInicio.length >= 5 ? m.horaInicio.slice(0, 5) : m.horaInicio;
-                  const hf = m.horaFim.length >= 5 ? m.horaFim.slice(0, 5) : m.horaFim;
                   setSalvandoEdicaoTipo(true);
                   setError(null);
                   setSuccess(null);
                   try {
                     await adminService.updateTipoPlantao(m.id, {
                       nome: m.nome.trim(),
-                      horaInicio: hi,
-                      horaFim: hf,
-                      cruzaMeiaNoite: m.cruzaMeiaNoite,
                     });
                     await queryClient.invalidateQueries({ queryKey: ['admin', 'tipos-plantao'] });
                     setEditarTipoModal(null);

@@ -1,6 +1,11 @@
 import { prisma } from '../config/database';
 import { hashPassword } from '../utils/password.util';
-import { normalizeCRM, validateCPF, validateCRM } from '../utils/validation.util';
+import { validateCPF } from '../utils/validation.util';
+import {
+  normalizeRegistroConselhoParaProfissao,
+  profissaoExigeRegistroConselho,
+  resolveRegistroConselhoParaCadastro,
+} from '../utils/profissao-registro.util';
 import { fileExistsSafe, resolveStoredFileToAbsolute } from '../utils/upload-path.util';
 import { createAuditLog } from './auditoria.service';
 import {
@@ -20,7 +25,7 @@ import {
   docusealDocumentosPainelPorMedicoService,
 } from './docuseal.service';
 import crypto from 'crypto';
-import { Prisma } from '@prisma/client';
+import { Prisma, StatusCadastroMedico } from '@prisma/client';
 
 interface ListMedicosParams {
   tenantId: string;
@@ -147,8 +152,9 @@ export async function listMedicosService(params: ListMedicosParams) {
       ]
     : [];
 
-  const where = {
+  const where: Prisma.MedicoWhereInput = {
     tenantId: params.tenantId,
+    statusCadastro: { not: StatusCadastroMedico.PENDENTE_ANALISE },
     ...(searchFilters.length ? { OR: searchFilters } : {}),
     ...(params.ativo !== undefined ? { ativo: params.ativo } : {}),
   };
@@ -236,16 +242,7 @@ export async function createMedicoService(input: CreateMedicoInput) {
   const profissao = (input.profissao || 'Médico').trim();
   const isMedico = profissao === 'Médico';
 
-  let crm: string | null = null;
-  if (isMedico && input.crm) {
-    const crmNorm = normalizeCRM(input.crm);
-    if (crmNorm === null || !validateCRM(crmNorm)) {
-      throw { statusCode: 400, message: 'CRM inválido' };
-    }
-    crm = crmNorm;
-  } else if (isMedico) {
-    throw { statusCode: 400, message: 'CRM é obrigatório para médicos' };
-  }
+  const crm = resolveRegistroConselhoParaCadastro(profissao, input.crm ?? null);
 
   if (!validateCPF(cpf)) {
     throw { statusCode: 400, message: 'CPF inválido' };
@@ -263,7 +260,7 @@ export async function createMedicoService(input: CreateMedicoInput) {
   }
 
   if (existingByCrm) {
-    throw { statusCode: 409, message: 'Já existe médico com este CRM' };
+    throw { statusCode: 409, message: 'Já existe cadastro com este número de registro profissional' };
   }
 
   if (email) {
@@ -292,6 +289,7 @@ export async function createMedicoService(input: CreateMedicoInput) {
       telefone: input.telefone?.trim() || null,
       senhaHash,
       ativo: true,
+      statusCadastro: StatusCadastroMedico.ATIVO,
     },
   });
 
@@ -315,15 +313,31 @@ export async function updateMedicoService(input: UpdateMedicoInput) {
   }
 
   const cpf = input.cpf ? input.cpf.replace(/\D/g, '') : undefined;
-  const crm = input.crm ? normalizeCRM(input.crm) || undefined : undefined;
   const email = input.email === undefined ? undefined : input.email?.trim().toLowerCase() || null;
+
+  let crm: string | null | undefined = undefined;
+  if (input.crm !== undefined) {
+    const prof = (medico.profissao || 'Médico').trim();
+    const trimmed = String(input.crm ?? '').trim();
+    if (!trimmed) {
+      if (profissaoExigeRegistroConselho(prof)) {
+        throw { statusCode: 400, message: 'Registro no conselho é obrigatório para esta profissão' };
+      }
+      crm = null;
+    } else {
+      const n = normalizeRegistroConselhoParaProfissao(prof, trimmed);
+      if (!n) {
+        throw {
+          statusCode: 400,
+          message: prof === 'Médico' ? 'CRM inválido' : 'Registro no conselho inválido',
+        };
+      }
+      crm = n;
+    }
+  }
 
   if (cpf && !validateCPF(cpf)) {
     throw { statusCode: 400, message: 'CPF inválido' };
-  }
-
-  if (crm && !validateCRM(crm)) {
-    throw { statusCode: 400, message: 'CRM inválido' };
   }
 
   if (cpf && cpf !== medico.cpf) {
@@ -340,7 +354,7 @@ export async function updateMedicoService(input: UpdateMedicoInput) {
       where: { tenantId: input.tenantId, crm, NOT: { id: medico.id } },
     });
     if (existingByCrm) {
-      throw { statusCode: 409, message: 'Já existe médico com este CRM' };
+      throw { statusCode: 409, message: 'Já existe cadastro com este número de registro profissional' };
     }
   }
 
@@ -577,12 +591,7 @@ export async function createContratoAtivoService(input: CreateContratoAtivoInput
     throw { statusCode: 400, message: 'Data de início é obrigatória' };
   }
 
-  const usaEscala = input.usaEscala ?? true;
-  const usaPonto = input.usaPonto ?? true;
-  if (!usaEscala && !usaPonto) {
-    throw { statusCode: 400, message: 'Selecione ao menos uma opção: usar escalas ou usar ponto eletrônico' };
-  }
-
+  /** Colunas legadas no contrato: mantidas como true; estilo de produção é por subgrupo. */
   const contrato = await prisma.contratoAtivo.create({
     data: {
       tenantId: input.tenantId,
@@ -591,8 +600,8 @@ export async function createContratoAtivoService(input: CreateContratoAtivoInput
       dataInicio: new Date(input.dataInicio),
       dataFim: input.dataFim ? new Date(input.dataFim) : null,
       ativo: input.ativo ?? true,
-      usaEscala,
-      usaPonto,
+      usaEscala: true,
+      usaPonto: true,
       permiteTrocaPlantao: input.permiteTrocaPlantao ?? false,
     },
   });
@@ -616,10 +625,6 @@ export async function updateContratoAtivoService(input: UpdateContratoAtivoInput
     throw { statusCode: 404, message: 'Contrato não encontrado' };
   }
 
-  if (input.usaEscala === false && input.usaPonto === false) {
-    throw { statusCode: 400, message: 'Selecione ao menos uma opção: usar escalas ou usar ponto eletrônico' };
-  }
-
   const updated = await prisma.contratoAtivo.update({
     where: { id: contrato.id },
     data: {
@@ -628,8 +633,6 @@ export async function updateContratoAtivoService(input: UpdateContratoAtivoInput
       dataInicio: input.dataInicio ? new Date(input.dataInicio) : undefined,
       dataFim: input.dataFim === undefined ? undefined : input.dataFim ? new Date(input.dataFim) : null,
       ativo: input.ativo,
-      usaEscala: input.usaEscala,
-      usaPonto: input.usaPonto,
       permiteTrocaPlantao: input.permiteTrocaPlantao,
     },
   });
@@ -681,7 +684,7 @@ export async function listContratoSubgruposService(tenantId: string, contratoAti
   try {
     return await prisma.contratoSubgrupo.findMany({
       where: { tenantId, contratoAtivoId },
-      include: { subgrupo: { select: { id: true, nome: true, ativo: true } } },
+      include: { subgrupo: { select: { id: true, nome: true, ativo: true, usaEscala: true, usaPonto: true } } },
       orderBy: { subgrupo: { nome: 'asc' } },
     });
   } catch (e: any) {

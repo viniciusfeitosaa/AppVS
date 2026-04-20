@@ -21,6 +21,7 @@ import {
   validateRegisterMedico,
 } from '../middleware/validation.middleware';
 import { authenticateToken } from '../middleware/auth.middleware';
+import { maybeRegisterPublicUploadMiddleware } from '../middleware/upload.middleware';
 
 const router = Router();
 
@@ -31,7 +32,7 @@ router.post('/accept-invite', validateAcceptInvite, acceptInviteController);
 router.post('/esqueci-senha', validateEsqueciSenha, esqueciSenhaController);
 router.post('/redefinir-senha', validateRedefinirSenha, redefinirSenhaController);
 router.get('/preview-reset-email', previewResetEmailController);
-router.post('/register', validateRegisterMedico, registerPublicController);
+router.post('/register', maybeRegisterPublicUploadMiddleware, validateRegisterMedico, registerPublicController);
 router.get('/modulos-acesso', authenticateToken, getMeModulosAcessoController);
 
 // Compatibilidade explícita para clientes legados CPF/CRM

@@ -307,8 +307,42 @@ const Relatorios = () => {
     () => (contratoId ? contratos.find((c: any) => c.id === contratoId) : null),
     [contratoId, contratos]
   );
-  const usaEscalaEPonto = Boolean(contratoSelecionado?.usaEscala && contratoSelecionado?.usaPonto);
-  const apenasPonto = Boolean(contratoSelecionado?.usaPonto && !contratoSelecionado?.usaEscala);
+
+  const subgrupoSelecionadoMeta = useMemo(() => {
+    if (!subgrupoId) return null;
+    const row = (subgruposList as { subgrupo?: { id: string; usaEscala?: boolean; usaPonto?: boolean } }[]).find(
+      (r) => r.subgrupo?.id === subgrupoId
+    );
+    return row?.subgrupo ?? null;
+  }, [subgrupoId, subgruposList]);
+
+  /** Regras de relatório alinhadas ao estilo de produção por subgrupo (com fallback ao contrato até carregar subgrupos). */
+  const { usaEscalaEPonto, apenasPonto, mostrarRepasseECobranca } = useMemo(() => {
+    if (subgrupoSelecionadoMeta) {
+      const sg = subgrupoSelecionadoMeta;
+      return {
+        usaEscalaEPonto: Boolean(sg.usaEscala && sg.usaPonto),
+        apenasPonto: Boolean(sg.usaPonto && !sg.usaEscala),
+        mostrarRepasseECobranca: Boolean(sg.usaPonto),
+      };
+    }
+    const sgList = (subgruposList as { subgrupo?: { usaEscala?: boolean; usaPonto?: boolean } }[])
+      .map((r) => r.subgrupo)
+      .filter(Boolean) as { usaEscala?: boolean; usaPonto?: boolean }[];
+    if (contratoId && sgList.length > 0) {
+      return {
+        usaEscalaEPonto: sgList.some((s) => s.usaEscala && s.usaPonto),
+        apenasPonto:
+          sgList.some((s) => s.usaPonto && !s.usaEscala) && !sgList.some((s) => s.usaEscala && s.usaPonto),
+        mostrarRepasseECobranca: sgList.some((s) => s.usaPonto),
+      };
+    }
+    return {
+      usaEscalaEPonto: Boolean(contratoSelecionado?.usaEscala && contratoSelecionado?.usaPonto),
+      apenasPonto: Boolean(contratoSelecionado?.usaPonto && !contratoSelecionado?.usaEscala),
+      mostrarRepasseECobranca: Boolean(contratoSelecionado?.usaPonto),
+    };
+  }, [subgrupoSelecionadoMeta, subgruposList, contratoId, contratoSelecionado]);
 
   const { data: valoresPlantaoResp } = useQuery({
     queryKey: ['admin', 'valores-plantao', contratoId, subgrupoId || '__all__', equipeId || '__none__', 'relatorio'],
@@ -325,8 +359,6 @@ const Relatorios = () => {
       }),
     enabled: isMaster && usaEscalaEPonto && Boolean(contratoId && dataInicio && dataFim),
   });
-
-  const mostrarRepasseECobranca = Boolean(contratoSelecionado?.usaPonto);
 
   const valoresPlantaoPorGrade = useMemo(() => {
     const map = new Map<

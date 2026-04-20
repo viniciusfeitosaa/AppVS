@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../context/AuthContext';
-import { adminService, type AdminMedico } from '../services/admin.service';
+import { adminService, type AdminMedico, type Equipe } from '../services/admin.service';
 import { notify } from '../lib/notificationEmitter';
 import { formatCRM, fixMojibake } from '../utils/validation.util';
 
@@ -14,6 +14,23 @@ function emailChaveDocuseal(email: string | null | undefined): string {
 }
 
 const PAGE_SIZE = 20;
+
+/** Nomes de contratos ligados ao subgrupo e/ou à equipe (únicos, ordem de aparição). */
+function nomesContratosEquipe(eq: Equipe): string[] {
+  const fromSub =
+    eq.subgrupo?.contratoSubgrupos?.map((l) => l.contratoAtivo?.nome).filter((n): n is string => !!n?.trim()) ?? [];
+  const fromEq =
+    eq.contratoEquipes?.map((l) => l.contratoAtivo?.nome).filter((n): n is string => !!n?.trim()) ?? [];
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const n of [...fromSub, ...fromEq]) {
+    const key = n.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(n);
+  }
+  return out;
+}
 
 type StatusFilter = 'all' | 'active' | 'inactive';
 
@@ -34,6 +51,7 @@ const Medicos = () => {
   );
   const [equipesModalMedico, setEquipesModalMedico] = useState<AdminMedico | null>(null);
   const [buscaEquipesModal, setBuscaEquipesModal] = useState('');
+  const [confirmAddMedicoEquipe, setConfirmAddMedicoEquipe] = useState<{ equipeId: string; equipeNome: string } | null>(null);
 
   const ativoParam =
     statusFilter === 'all' ? undefined : statusFilter === 'active';
@@ -55,6 +73,7 @@ const Medicos = () => {
   const modalEquipesMedicoId = equipesModalMedico?.id ?? null;
   useEffect(() => {
     setBuscaEquipesModal('');
+    setConfirmAddMedicoEquipe(null);
   }, [modalEquipesMedicoId]);
 
   useEffect(() => {
@@ -85,7 +104,10 @@ const Medicos = () => {
     return todasEquipesOrdenadas.filter((eq) => {
       const nome = fixMojibake(eq.nome).toLowerCase();
       const sub = eq.subgrupo ? fixMojibake(eq.subgrupo.nome).toLowerCase() : '';
-      return nome.includes(q) || sub.includes(q);
+      const contrHay = nomesContratosEquipe(eq)
+        .map((c) => fixMojibake(c).toLowerCase())
+        .join(' ');
+      return nome.includes(q) || sub.includes(q) || contrHay.includes(q);
     });
   }, [todasEquipesOrdenadas, buscaEquipesModal]);
 
@@ -621,12 +643,23 @@ const Medicos = () => {
                               removeMedicoEquipeMutation.isPending &&
                               removeMedicoEquipeMutation.variables?.equipeId === eq.id &&
                               removeMedicoEquipeMutation.variables?.medicoId === mid;
+                            const contratosEq = nomesContratosEquipe(eq);
                             return (
                               <li key={eq.id} className="flex flex-wrap items-center justify-between gap-2 py-3 first:pt-0">
                                 <div className="min-w-0 flex-1">
                                   <p className="text-sm font-semibold text-viva-900">{fixMojibake(eq.nome)}</p>
                                   {eq.subgrupo ? (
-                                    <p className="text-[11px] text-viva-600 mt-0.5">{fixMojibake(eq.subgrupo.nome)}</p>
+                                    <p className="text-[11px] text-viva-600 mt-0.5">
+                                      <span>{fixMojibake(eq.subgrupo.nome)}</span>
+                                      {contratosEq.length > 0 ? (
+                                        <>
+                                          <span className="text-viva-400"> · </span>
+                                          <span>{contratosEq.map((n) => fixMojibake(n)).join(', ')}</span>
+                                        </>
+                                      ) : null}
+                                    </p>
+                                  ) : contratosEq.length > 0 ? (
+                                    <p className="text-[11px] text-viva-600 mt-0.5">{contratosEq.map((n) => fixMojibake(n)).join(', ')}</p>
                                   ) : null}
                                   {!eq.ativo ? (
                                     <span className="mt-1 inline-block text-[10px] font-bold uppercase text-amber-900 bg-amber-100 px-2 py-0.5 rounded-full">
@@ -654,7 +687,9 @@ const Medicos = () => {
                                           ? 'Reative o profissional para poder adicionar a equipes.'
                                           : undefined
                                       }
-                                      onClick={() => addMedicoEquipeMutation.mutate({ equipeId: eq.id, medicoId: mid })}
+                                      onClick={() =>
+                                        setConfirmAddMedicoEquipe({ equipeId: eq.id, equipeNome: fixMojibake(eq.nome) })
+                                      }
                                     >
                                       {addPending ? 'A adicionar…' : 'Adicionar'}
                                     </button>
@@ -670,6 +705,55 @@ const Medicos = () => {
                 )}
               </div>
             </div>
+            {confirmAddMedicoEquipe && equipesModalMedico ? (
+              <div
+                className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/50"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="confirm-add-equipe-title"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setConfirmAddMedicoEquipe(null);
+                }}
+              >
+                <div
+                  className="card w-full max-w-sm border border-viva-200/90 shadow-xl"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <h3 id="confirm-add-equipe-title" className="text-base font-bold text-viva-900 font-display px-4 pt-4">
+                    Adicionar à equipe?
+                  </h3>
+                  <p className="text-sm text-viva-700 font-serif px-4 pt-2 pb-1">
+                    Adicionar <strong>{fixMojibake(equipesModalMedico.nomeCompleto)}</strong> à equipe{' '}
+                    <strong>{confirmAddMedicoEquipe.equipeNome}</strong>?
+                  </p>
+                  <p className="text-xs text-viva-600 font-serif px-4 pb-4">Confirme para evitar alterações por engano.</p>
+                  <div className="flex flex-wrap justify-end gap-2 border-t border-viva-100 px-4 py-3">
+                    <button
+                      type="button"
+                      className="btn btn-secondary"
+                      disabled={addMedicoEquipeMutation.isPending}
+                      onClick={() => setConfirmAddMedicoEquipe(null)}
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-primary"
+                      disabled={addMedicoEquipeMutation.isPending}
+                      onClick={() =>
+                        addMedicoEquipeMutation.mutate(
+                          { equipeId: confirmAddMedicoEquipe.equipeId, medicoId: equipesModalMedico.id },
+                          { onSettled: () => setConfirmAddMedicoEquipe(null) }
+                        )
+                      }
+                    >
+                      {addMedicoEquipeMutation.isPending ? 'A adicionar…' : 'Confirmar'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ) : null}
           </div>,
           document.body
         )}

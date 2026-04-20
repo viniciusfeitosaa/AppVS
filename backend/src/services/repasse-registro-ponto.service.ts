@@ -6,6 +6,7 @@ import {
   scheduleFromTipoRow,
 } from '../utils/plantao-horario';
 import { isMissingDatabaseColumnError } from '../utils/prisma-column-error';
+import { resolveProducaoMedicoNaEscala } from '../utils/producao-subgrupo.util';
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
@@ -42,11 +43,14 @@ export async function calcularRepasseCongeladoCheckout(
   const escala = await prisma.escala.findFirst({
     where: { id: escalaId, tenantId },
     select: {
-      contratoAtivo: { select: { id: true, usaEscala: true, usaPonto: true } },
+      contratoAtivo: { select: { id: true } },
     },
   });
   const c = escala?.contratoAtivo;
-  if (!c?.usaEscala || !c.usaPonto) return null;
+  if (!c?.id) return null;
+
+  const prod = await resolveProducaoMedicoNaEscala(tenantId, medicoId, escalaId);
+  if (!prod.allowPonto || !prod.requireJanelaPlantao) return null;
 
   const aloc = await prisma.escalaMedico.findFirst({
     where: { tenantId, escalaId, medicoId },

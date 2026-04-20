@@ -1,3 +1,4 @@
+import type { Prisma } from '@prisma/client';
 import { prisma } from '../config/database';
 import { DOCUMENTO_TIPO_BY_FIELD, DOCUMENTOS_PERFIL_FIELDS } from '../constants/documentos.const';
 import { fileExistsSafe, resolveStoredFileToAbsolute } from '../utils/upload-path.util';
@@ -9,6 +10,46 @@ interface UpdatePerfilInput {
   enderecoResidencial?: string;
   dadosBancarios?: string;
   chavePix?: string;
+}
+
+/** Grava ficheiros de perfil (multer) em `medico_documentos` — usado no update de perfil e no cadastro público. */
+export async function upsertMedicoDocumentosFromMulter(
+  prismaClient: Prisma.TransactionClient | typeof prisma,
+  tenantId: string,
+  medicoId: string,
+  files: Record<string, Express.Multer.File[] | undefined> | undefined | null
+) {
+  if (!files) return;
+  await Promise.all(
+    DOCUMENTOS_PERFIL_FIELDS.map(async (fieldName) => {
+      const file = files[fieldName]?.[0];
+      if (!file) return;
+      await prismaClient.medicoDocumento.upsert({
+        where: {
+          tenantId_medicoId_tipo: {
+            tenantId,
+            medicoId,
+            tipo: DOCUMENTO_TIPO_BY_FIELD[fieldName],
+          },
+        },
+        update: {
+          nomeArquivo: file.originalname,
+          caminhoArquivo: file.path.replace(/\\/g, '/'),
+          mimeType: file.mimetype,
+          tamanhoBytes: file.size,
+        },
+        create: {
+          tenantId,
+          medicoId,
+          tipo: DOCUMENTO_TIPO_BY_FIELD[fieldName],
+          nomeArquivo: file.originalname,
+          caminhoArquivo: file.path.replace(/\\/g, '/'),
+          mimeType: file.mimetype,
+          tamanhoBytes: file.size,
+        },
+      });
+    })
+  );
 }
 
 const perfilSelectSemDocumentos = {
@@ -124,36 +165,7 @@ export const updatePerfilService = async (
     },
   });
 
-  await Promise.all(
-    DOCUMENTOS_PERFIL_FIELDS.map(async (fieldName) => {
-      const file = files[fieldName]?.[0];
-      if (!file) return;
-      await prisma.medicoDocumento.upsert({
-        where: {
-          tenantId_medicoId_tipo: {
-            tenantId,
-            medicoId: medico.id,
-            tipo: DOCUMENTO_TIPO_BY_FIELD[fieldName],
-          },
-        },
-        update: {
-          nomeArquivo: file.originalname,
-          caminhoArquivo: file.path.replace(/\\/g, '/'),
-          mimeType: file.mimetype,
-          tamanhoBytes: file.size,
-        },
-        create: {
-          tenantId,
-          medicoId: medico.id,
-          tipo: DOCUMENTO_TIPO_BY_FIELD[fieldName],
-          nomeArquivo: file.originalname,
-          caminhoArquivo: file.path.replace(/\\/g, '/'),
-          mimeType: file.mimetype,
-          tamanhoBytes: file.size,
-        },
-      });
-    })
-  );
+  await upsertMedicoDocumentosFromMulter(prisma, tenantId, medico.id, files);
 
   return getPerfilService(medico.id, tenantId);
 };

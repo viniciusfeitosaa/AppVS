@@ -31,6 +31,7 @@ import EsqueciSenha from './pages/EsqueciSenha';
 import RedefinirSenha from './pages/RedefinirSenha';
 import AcessoNegado from './pages/AcessoNegado';
 import Vagas from './pages/Vagas';
+import Avaliacao from './pages/Avaliacao';
 
 /** Animação de carregamento. variant white = fundo branco + vídeo (tela de login). */
 const PageLoadingScreen = ({ variant = 'default' }: { variant?: 'default' | 'white' }) => {
@@ -160,6 +161,7 @@ function AppRoutes() {
           }
         />
         <Route path="/vagas" element={<Vagas />} />
+        <Route path="/avaliacao" element={<Avaliacao />} />
         <Route
           path="/relatorios"
           element={<Relatorios />}

@@ -102,12 +102,16 @@ api.interceptors.response.use(
 
     if (!skipNotify) {
       if (!error.response) {
-        notify({
-          kind: 'error',
-          title: 'Conexão',
-          message: 'Não foi possível conectar ao servidor. Verifique a internet e tente novamente.',
-          source: routeLabel(requestUrl),
-        });
+        const method = (error.config?.method || 'get').toUpperCase();
+        /** GET em paralelo (ex.: React Query) com API offline gerava vários toasts iguais; a UI trata loading/erro. */
+        if (method !== 'GET') {
+          notify({
+            kind: 'error',
+            title: 'Conexão',
+            message: 'Não foi possível conectar ao servidor. Verifique a internet e tente novamente.',
+            source: routeLabel(requestUrl),
+          });
+        }
       } else if (status && status >= 500) {
         const raw =
           (error.response?.data?.error as string) ||

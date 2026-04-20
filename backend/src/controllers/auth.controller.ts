@@ -79,7 +79,7 @@ export const loginEmailController = async (req: Request, res: Response) => {
     const rawMsg = err?.message ?? String(error);
     console.error('[auth/login]', rawMsg);
 
-    if (err?.statusCode === 401 || err?.statusCode === 400) {
+    if (err?.statusCode === 401 || err?.statusCode === 400 || err?.statusCode === 403) {
       return res.status(err.statusCode).json({
         success: false,
         error: err.message || 'Erro ao fazer login',
@@ -127,7 +127,8 @@ export const acceptInviteController = async (req: Request, res: Response) => {
 
 export const registerPublicController = async (req: Request, res: Response) => {
   try {
-    const result = await registerPublicMedicoService(req.body);
+    const files = (req.files as Record<string, Express.Multer.File[]> | undefined) || undefined;
+    const result = await registerPublicMedicoService(req.body, files);
     return res.status(201).json({
       success: true,
       data: result,

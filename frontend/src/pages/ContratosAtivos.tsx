@@ -8,8 +8,6 @@ interface FormState {
   dataInicio: string;
   dataFim: string;
   ativo: boolean;
-  usaEscala: boolean;
-  usaPonto: boolean;
   permiteTrocaPlantao: boolean;
 }
 
@@ -19,8 +17,6 @@ const emptyForm: FormState = {
   dataInicio: '',
   dataFim: '',
   ativo: true,
-  usaEscala: true,
-  usaPonto: true,
   permiteTrocaPlantao: true,
 };
 
@@ -297,8 +293,6 @@ const ContratosAtivos = () => {
       dataInicio: toDateInput(contrato.dataInicio),
       dataFim: toDateInput(contrato.dataFim),
       ativo: contrato.ativo,
-      usaEscala: contrato.usaEscala !== false,
-      usaPonto: contrato.usaPonto !== false,
       permiteTrocaPlantao: !!contrato.permiteTrocaPlantao,
     });
     setError(null);
@@ -320,16 +314,11 @@ const ContratosAtivos = () => {
         dataInicio: form.dataInicio,
         dataFim: form.dataFim || null,
         ativo: form.ativo,
-        usaEscala: form.usaEscala,
-        usaPonto: form.usaPonto,
         permiteTrocaPlantao: form.permiteTrocaPlantao,
       };
 
       if (!payload.nome || !payload.dataInicio) {
         throw new Error('Preencha nome e data de início.');
-      }
-      if (!payload.usaEscala && !payload.usaPonto) {
-        throw new Error('Selecione ao menos uma opção: usar escalas ou usar ponto eletrônico.');
       }
 
       if (editingId) {
@@ -392,29 +381,12 @@ const ContratosAtivos = () => {
             value={form.dataFim}
             onChange={(e) => setForm((prev) => ({ ...prev, dataFim: e.target.value }))}
           />
-          <div className="md:col-span-2 space-y-2">
-            <p className="text-sm font-semibold text-viva-800">Estilo de produção</p>
-            <p className="text-xs text-gray-600">
-              Você pode usar escala + ponto ou somente ponto.
+          <div className="md:col-span-2 rounded-lg border border-viva-100 bg-viva-50/50 px-3 py-2 text-xs text-viva-800">
+            <p className="font-semibold text-viva-900 mb-1">Estilo de produção (escala / ponto)</p>
+            <p>
+              Configure por <strong>subgrupo</strong> em <strong>Subgrupos e Equipes</strong> ao selecionar o subgrupo
+              (escalas + ponto, só escala ou só ponto). Cada subgrupo do mesmo contrato pode ter uma combinação diferente.
             </p>
-            <div className="flex flex-wrap gap-6">
-              <label className="flex items-center gap-2 text-sm text-viva-900">
-                <input
-                  type="checkbox"
-                  checked={form.usaEscala}
-                  onChange={(e) => setForm((prev) => ({ ...prev, usaEscala: e.target.checked }))}
-                />
-                Usar escalas (plantões)
-              </label>
-              <label className="flex items-center gap-2 text-sm text-viva-900">
-                <input
-                  type="checkbox"
-                  checked={form.usaPonto}
-                  onChange={(e) => setForm((prev) => ({ ...prev, usaPonto: e.target.checked }))}
-                />
-                Usar ponto eletrônico
-              </label>
-            </div>
           </div>
           <div className="md:col-span-2 space-y-2">
             <p className="text-sm font-semibold text-viva-800">Troca de plantão</p>
@@ -483,7 +455,7 @@ const ContratosAtivos = () => {
                   <th className="py-2 pr-4">Nome</th>
                   <th className="py-2 pr-4">Início</th>
                   <th className="py-2 pr-4">Fim</th>
-                  <th className="py-2 pr-4">Estilo</th>
+                  <th className="py-2 pr-4">Produção</th>
                   <th className="py-2 pr-4">Status</th>
                   <th className="py-2 pr-4">Ações</th>
                 </tr>
@@ -498,13 +470,7 @@ const ContratosAtivos = () => {
                     <td className="py-2 pr-4 text-gray-700">{toDateInput(contrato.dataInicio)}</td>
                     <td className="py-2 pr-4 text-gray-700">{toDateInput(contrato.dataFim) || '-'}</td>
                     <td className="py-2 pr-4">
-                      <span className="text-xs text-viva-700">
-                        {contrato.usaEscala !== false && contrato.usaPonto !== false
-                          ? 'Escala + Ponto'
-                          : contrato.usaEscala !== false
-                            ? 'Apenas escala'
-                            : 'Apenas ponto'}
-                      </span>
+                      <span className="text-xs text-viva-700">Por subgrupo</span>
                     </td>
                     <td className="py-2 pr-4">
                       <span

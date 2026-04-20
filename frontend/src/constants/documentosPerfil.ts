@@ -13,8 +13,26 @@ export const DOCUMENTOS_PERFIL_FIELDS = [
 
 export type DocumentoPerfilField = (typeof DOCUMENTOS_PERFIL_FIELDS)[number];
 
+/** Cadastro público: só estes são obrigatórios; o perfil pode pedir envio dos demais depois. */
+export const DOCUMENTOS_PERFIL_OBRIGATORIOS_CADASTRO = [
+  'cedulaIdentidadeCrm',
+  'certidaoRegularidadeFiscalCrm',
+  'comprovanteEnderecoResidencia',
+  'rgCpfOuCnh',
+] as const satisfies readonly DocumentoPerfilField[];
+
+export function isDocumentoObrigatorioNoCadastro(field: DocumentoPerfilField): boolean {
+  return (DOCUMENTOS_PERFIL_OBRIGATORIOS_CADASTRO as readonly DocumentoPerfilField[]).includes(field);
+}
+
+/** Ordem na etapa Documentos: críticos primeiro, depois opcionais. */
+export const DOCUMENTOS_PERFIL_CADASTRO_ORDEM: DocumentoPerfilField[] = [
+  ...DOCUMENTOS_PERFIL_OBRIGATORIOS_CADASTRO,
+  ...DOCUMENTOS_PERFIL_FIELDS.filter((f) => !isDocumentoObrigatorioNoCadastro(f)),
+];
+
 export const DOCUMENTO_LABEL_BY_FIELD: Record<DocumentoPerfilField, string> = {
-  cedulaIdentidadeCrm: 'Cédula de Identidade de Médico (CRM)',
+  cedulaIdentidadeCrm: 'Documento do conselho profissional (cédula ou registro — CRM, COREN, CRP, etc.)',
   certidaoRegularidadeFiscalCrm: 'Certidão de Regularidade Fiscal no Conselho Regional',
   comprovanteEnderecoResidencia: 'Comprovante de Endereço / Residência',
   dadosBancariosPfPix: 'Dados bancários pessoa física e chave PIX',

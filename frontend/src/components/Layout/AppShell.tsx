@@ -84,6 +84,12 @@ const getMobileIcon = (label: string) => {
           <path d="M12 12v4M10 14h4" />
         </svg>
       );
+    case 'Avaliação':
+      return (
+        <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
+          <path d="M12 3l2.4 5.5L20 9.3l-4.5 3.9L16.6 20 12 16.9 7.4 20l1.1-6.8L4 9.3l5.6-.8L12 3z" />
+        </svg>
+      );
     case 'Minha Conta':
     case 'Perfil':
       return (
@@ -148,7 +154,13 @@ const AppShell = () => {
   const menuGroupsBase: MenuGroup[] = isMaster
     ? [
         { title: 'Escalas', items: [{ to: '/escalas', label: 'Escalas' }, { to: '/subgrupos-equipes', label: 'Subgrupos e Equipes' }] },
-        { title: 'Corpo Clínico', items: [{ to: '/medicos', label: 'Médicos' }] },
+        {
+          title: 'Corpo Clínico',
+          items: [
+            { to: '/medicos', label: 'Médicos' },
+            { to: '/avaliacao', label: 'Avaliação' },
+          ],
+        },
         {
           title: 'Relatórios',
           items: [
@@ -173,7 +185,13 @@ const AppShell = () => {
           title: 'Ponto',
           items: pontoMenuItemsMedico,
         },
-        { title: 'Produtividade', items: [{ to: '/atendimentos', label: 'Atendimentos' }] },
+        {
+          title: 'Produtividade',
+          items: [
+            { to: '/atendimentos', label: 'Atendimentos' },
+            { to: '/avaliacao', label: 'Avaliação' },
+          ],
+        },
         {
           title: 'Conta',
           items: [
@@ -201,6 +219,7 @@ const AppShell = () => {
     '/meu-calendario-plantoes': 'PONTO_ELETRONICO',
     '/atendimentos': 'ATENDIMENTOS',
     '/vagas': 'VAGAS',
+    '/avaliacao': 'AVALIACAO',
   };
 
   const menuGroups: MenuGroup[] = menuGroupsBase

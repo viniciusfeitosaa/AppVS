@@ -1,5 +1,7 @@
 import { prisma } from '../config/database';
 import { createAuditLog } from './auditoria.service';
+import { clearPontoCaches } from './ponto.service';
+import { isMissingDatabaseColumnError } from '../utils/prisma-column-error';
 
 export async function listSubgruposService(tenantId: string) {
   return prisma.subgrupo.findMany({
@@ -8,7 +10,7 @@ export async function listSubgruposService(tenantId: string) {
       _count: { select: { subgrupoMedicos: true, escalaSubgrupos: true, equipes: true } },
       contratoSubgrupos: {
         include: {
-          contratoAtivo: { select: { id: true, nome: true, usaEscala: true, usaPonto: true } },
+          contratoAtivo: { select: { id: true, nome: true } },
         },
       },
     },
@@ -19,15 +21,22 @@ export async function listSubgruposService(tenantId: string) {
 export async function createSubgrupoService(
   tenantId: string,
   masterId: string,
-  input: { nome: string; descricao?: string | null; ativo?: boolean }
+  input: { nome: string; descricao?: string | null; ativo?: boolean; usaEscala?: boolean; usaPonto?: boolean }
 ) {
   if (!input.nome?.trim()) throw { statusCode: 400, message: 'Nome do subgrupo é obrigatório' };
+  const usaEscala = input.usaEscala ?? true;
+  const usaPonto = input.usaPonto ?? true;
+  if (!usaEscala && !usaPonto) {
+    throw { statusCode: 400, message: 'Selecione ao menos uma opção: usar escalas ou usar ponto eletrônico' };
+  }
   const created = await prisma.subgrupo.create({
     data: {
       tenantId,
       nome: input.nome.trim(),
       descricao: input.descricao?.trim() || null,
       ativo: input.ativo ?? true,
+      usaEscala,
+      usaPonto,
     },
   });
   await createAuditLog({
@@ -43,25 +52,45 @@ export async function updateSubgrupoService(
   tenantId: string,
   masterId: string,
   subgrupoId: string,
-  input: { nome?: string; descricao?: string | null; ativo?: boolean }
+  input: { nome?: string; descricao?: string | null; ativo?: boolean; usaEscala?: boolean; usaPonto?: boolean }
 ) {
   const found = await prisma.subgrupo.findFirst({ where: { id: subgrupoId, tenantId } });
   if (!found) throw { statusCode: 404, message: 'Subgrupo não encontrado' };
-  const updated = await prisma.subgrupo.update({
-    where: { id: found.id },
-    data: {
-      nome: input.nome?.trim() || undefined,
-      descricao: input.descricao === undefined ? undefined : input.descricao?.trim() || null,
-      ativo: input.ativo,
-    },
-  });
-  await createAuditLog({
-    acao: 'ATUALIZAR_SUBGRUPO',
-    tenantId,
-    masterId,
-    detalhes: { subgrupoId: updated.id },
-  });
-  return updated;
+  const nextUsaEscala = input.usaEscala !== undefined ? input.usaEscala : found.usaEscala;
+  const nextUsaPonto = input.usaPonto !== undefined ? input.usaPonto : found.usaPonto;
+  if (input.usaEscala !== undefined || input.usaPonto !== undefined) {
+    if (!nextUsaEscala && !nextUsaPonto) {
+      throw { statusCode: 400, message: 'Selecione ao menos uma opção: usar escalas ou usar ponto eletrônico' };
+    }
+  }
+  try {
+    const updated = await prisma.subgrupo.update({
+      where: { id: found.id },
+      data: {
+        nome: input.nome?.trim() || undefined,
+        descricao: input.descricao === undefined ? undefined : input.descricao?.trim() || null,
+        ativo: input.ativo,
+        usaEscala: input.usaEscala,
+        usaPonto: input.usaPonto,
+      },
+    });
+    await createAuditLog({
+      acao: 'ATUALIZAR_SUBGRUPO',
+      tenantId,
+      masterId,
+      detalhes: { subgrupoId: updated.id },
+    });
+    return updated;
+  } catch (e: unknown) {
+    if (isMissingDatabaseColumnError(e, 'usa_escala') || isMissingDatabaseColumnError(e, 'usa_ponto')) {
+      throw {
+        statusCode: 503,
+        message:
+          'Base de dados sem as colunas de estilo de produção no subgrupo. Na pasta backend execute: npx prisma migrate deploy — depois reinicie a API.',
+      };
+    }
+    throw e;
+  }
 }
 
 export async function deleteSubgrupoService(tenantId: string, masterId: string, subgrupoId: string) {
@@ -129,6 +158,7 @@ export async function addMedicoToSubgrupoService(
     medicoId,
     detalhes: { subgrupoId, subgrupoMedicoId: row.id },
   });
+  clearPontoCaches(tenantId, medicoId);
   return row;
 }
 
@@ -148,6 +178,7 @@ export async function removeMedicoFromSubgrupoService(
     medicoId,
     detalhes: { subgrupoId },
   });
+  clearPontoCaches(tenantId, medicoId);
 }
 
 export async function listEquipesService(tenantId: string, subgrupoId?: string | null) {
@@ -158,7 +189,22 @@ export async function listEquipesService(tenantId: string, subgrupoId?: string |
     },
     include: {
       _count: { select: { equipeMedicos: true, escalaEquipes: true } },
-      subgrupo: { select: { id: true, nome: true } },
+      subgrupo: {
+        select: {
+          id: true,
+          nome: true,
+          contratoSubgrupos: {
+            select: {
+              contratoAtivo: { select: { id: true, nome: true } },
+            },
+          },
+        },
+      },
+      contratoEquipes: {
+        select: {
+          contratoAtivo: { select: { id: true, nome: true } },
+        },
+      },
     },
     orderBy: { nome: 'asc' },
   });
@@ -281,6 +327,7 @@ export async function addMedicoToEquipeService(
     medicoId,
     detalhes: { equipeId, equipeMedicoId: row.id },
   });
+  clearPontoCaches(tenantId, medicoId);
   return row;
 }
 
@@ -300,6 +347,7 @@ export async function removeMedicoFromEquipeService(
     medicoId,
     detalhes: { equipeId },
   });
+  clearPontoCaches(tenantId, medicoId);
 }
 
 export async function listEscalaSubgruposService(tenantId: string, escalaId: string) {

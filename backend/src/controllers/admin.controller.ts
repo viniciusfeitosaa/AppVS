@@ -63,6 +63,13 @@ import {
   docusealResumoPorEmailsService,
   listDocusealPendentesAssinaturaService,
 } from '../services/docuseal.service';
+import {
+  aprovarCadastroPendenteService,
+  downloadCadastroPendenteDocumentoService,
+  getCadastroPendenteDetalheService,
+  listCadastrosPendentesService,
+  rejeitarCadastroPendenteService,
+} from '../services/cadastro-pendente.service';
 import { ModuloSistema, UserRole } from '@prisma/client';
 
 export const listMedicosController = async (req: Request, res: Response) => {
@@ -854,7 +861,13 @@ export const getValoresPlantaoOpcoesController = async (req: Request, res: Respo
       success: true,
       data: {
         contratos: contratosResult.items,
-        subgrupos: subgrupos.map((s) => ({ id: s.id, nome: s.nome, ativo: s.ativo })),
+        subgrupos: subgrupos.map((s) => ({
+          id: s.id,
+          nome: s.nome,
+          ativo: s.ativo,
+          usaEscala: s.usaEscala,
+          usaPonto: s.usaPonto,
+        })),
         equipes: equipes.map((e) => ({
           id: e.id,
           nome: e.nome,
@@ -1102,7 +1115,13 @@ export const getConfigPontoOpcoesController = async (req: Request, res: Response
       success: true,
       data: {
         contratos: contratosResult.items,
-        subgrupos: subgrupos.map((s) => ({ id: s.id, nome: s.nome, ativo: s.ativo })),
+        subgrupos: subgrupos.map((s) => ({
+          id: s.id,
+          nome: s.nome,
+          ativo: s.ativo,
+          usaEscala: s.usaEscala,
+          usaPonto: s.usaPonto,
+        })),
         equipes: equipes.map((e) => ({
           id: e.id,
           nome: e.nome,
@@ -1402,6 +1421,91 @@ export const deleteDocumentoEnviadoController = async (req: Request, res: Respon
     return res.status(error.statusCode || 500).json({
       success: false,
       error: error.message || 'Erro ao remover documento',
+    });
+  }
+};
+
+export const listCadastrosPendentesController = async (req: Request, res: Response) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ success: false, error: 'Não autenticado' });
+    }
+    const data = await listCadastrosPendentesService(req.user.tenantId);
+    return res.status(200).json({ success: true, data });
+  } catch (error: any) {
+    return res.status(error.statusCode || 500).json({
+      success: false,
+      error: error.message || 'Erro ao listar cadastros pendentes',
+    });
+  }
+};
+
+export const getCadastroPendenteDetalheController = async (req: Request, res: Response) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ success: false, error: 'Não autenticado' });
+    }
+    const medicoId = req.params.medicoId;
+    const data = await getCadastroPendenteDetalheService(req.user.tenantId, medicoId);
+    return res.status(200).json({ success: true, data });
+  } catch (error: any) {
+    return res.status(error.statusCode || 500).json({
+      success: false,
+      error: error.message || 'Erro ao carregar cadastro pendente',
+    });
+  }
+};
+
+export const downloadCadastroPendenteDocumentoController = async (req: Request, res: Response) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ success: false, error: 'Não autenticado' });
+    }
+    const { medicoId, documentoId } = req.params;
+    const { path: filePath, nomeArquivo, mimeType } = await downloadCadastroPendenteDocumentoService(
+      req.user.tenantId,
+      medicoId,
+      documentoId
+    );
+    res.setHeader('Content-Type', mimeType);
+    res.setHeader('Content-Disposition', `inline; filename="${nomeArquivo.replace(/"/g, '\\"')}"`);
+    return res.sendFile(filePath);
+  } catch (error: any) {
+    return res.status(error.statusCode || 500).json({
+      success: false,
+      error: error.message || 'Erro ao baixar documento',
+    });
+  }
+};
+
+export const aprovarCadastroPendenteController = async (req: Request, res: Response) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ success: false, error: 'Não autenticado' });
+    }
+    const medicoId = req.params.medicoId;
+    const data = await aprovarCadastroPendenteService(req.user.tenantId, req.user.id, medicoId);
+    return res.status(200).json({ success: true, data, message: 'Cadastro aprovado' });
+  } catch (error: any) {
+    return res.status(error.statusCode || 500).json({
+      success: false,
+      error: error.message || 'Erro ao aprovar cadastro',
+    });
+  }
+};
+
+export const rejeitarCadastroPendenteController = async (req: Request, res: Response) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ success: false, error: 'Não autenticado' });
+    }
+    const medicoId = req.params.medicoId;
+    const data = await rejeitarCadastroPendenteService(req.user.tenantId, req.user.id, medicoId);
+    return res.status(200).json({ success: true, data, message: 'Cadastro rejeitado' });
+  } catch (error: any) {
+    return res.status(error.statusCode || 500).json({
+      success: false,
+      error: error.message || 'Erro ao rejeitar cadastro',
     });
   }
 };

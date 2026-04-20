@@ -1,10 +1,14 @@
 import { prisma } from '../config/database';
 import env from '../config/env';
 import { normalizeCRM, validateCPF, validateCRM } from '../utils/validation.util';
+import { resolveRegistroConselhoParaCadastro } from '../utils/profissao-registro.util';
 import { comparePassword, hashPassword } from '../utils/password.util';
 import { generateTokens } from '../utils/jwt.util';
 import { createAuditLog } from './auditoria.service';
-import { UserRole } from '@prisma/client';
+import { StatusCadastroMedico, UserRole } from '@prisma/client';
+import { upsertMedicoDocumentosFromMulter } from './medico.service';
+import { TERMOS_CADASTRO_VERSAO } from '../constants/termos-cadastro.const';
+import { enviarEmailsPosCadastroPublico } from './cadastro-publico-email.service';
 import crypto from 'crypto';
 import tls from 'tls';
 import nodemailer from 'nodemailer';
@@ -284,6 +288,15 @@ export interface LoginResult {
   refreshToken: string;
 }
 
+function parseAceitouTermosCadastro(v: unknown): boolean {
+  if (v === true) return true;
+  if (typeof v === 'string') {
+    const t = v.trim().toLowerCase();
+    return t === 'true' || t === '1' || t === 'on' || t === 'yes';
+  }
+  return false;
+}
+
 interface RegisterPublicMedicoInput {
   nomeCompleto: string;
   email: string;
@@ -293,6 +306,12 @@ interface RegisterPublicMedicoInput {
   crm?: string;
   especialidades?: string[];
   telefone: string;
+  estadoCivil?: string;
+  enderecoResidencial?: string;
+  dadosBancarios?: string;
+  chavePix?: string;
+  /** Aceite explícito dos termos e declaração do cadastro público. */
+  aceitouTermos?: boolean | string;
 }
 
 const getDefaultTenant = async () => {
@@ -354,18 +373,15 @@ export const loginMedicoService = async (
     throw { statusCode: 400, message: 'CRM inválido' };
   }
 
-  // Buscar médico
   const medico = await prisma.medico.findFirst({
     where: {
       tenantId: tenant.id,
-      cpf: cpf.replace(/\D/g, ''), // Remove formatação
+      cpf: cpf.replace(/\D/g, ''),
       crm: normalizedCRM!,
-      ativo: true,
     },
   });
 
   if (!medico) {
-    // Log de tentativa de login inválida
     await createAuditLog({
       acao: 'TENTATIVA_LOGIN_INVALIDA',
       tenantId: tenant.id,
@@ -376,6 +392,22 @@ export const loginMedicoService = async (
     });
 
     throw { statusCode: 401, message: 'CPF ou CRM inválidos' };
+  }
+
+  if (medico.statusCadastro === StatusCadastroMedico.PENDENTE_ANALISE) {
+    throw {
+      statusCode: 403,
+      message: 'Seu cadastro está em análise. Você receberá acesso após aprovação da instituição.',
+    };
+  }
+  if (medico.statusCadastro === StatusCadastroMedico.REJEITADO) {
+    throw {
+      statusCode: 403,
+      message: 'Seu cadastro não foi aprovado. Entre em contato com a instituição.',
+    };
+  }
+  if (!medico.ativo) {
+    throw { statusCode: 403, message: 'Conta inativa. Entre em contato com a instituição.' };
   }
 
   // Gerar tokens
@@ -523,12 +555,10 @@ export const loginByEmailService = async (
     };
   }
 
-  // 2) Senão, tenta médico por e-mail/senha
   const medico = await prisma.medico.findFirst({
     where: {
       tenantId: tenant.id,
       email: normalizedEmail,
-      ativo: true,
     },
   });
 
@@ -539,6 +569,22 @@ export const loginByEmailService = async (
   const ok = await comparePassword(password, medico.senhaHash);
   if (!ok) {
     throw { statusCode: 401, message: 'E-mail ou senha inválidos' };
+  }
+
+  if (medico.statusCadastro === StatusCadastroMedico.PENDENTE_ANALISE) {
+    throw {
+      statusCode: 403,
+      message: 'Seu cadastro está em análise. Você receberá acesso após aprovação da instituição.',
+    };
+  }
+  if (medico.statusCadastro === StatusCadastroMedico.REJEITADO) {
+    throw {
+      statusCode: 403,
+      message: 'Seu cadastro não foi aprovado. Entre em contato com a instituição.',
+    };
+  }
+  if (!medico.ativo) {
+    throw { statusCode: 403, message: 'Conta inativa. Entre em contato com a instituição.' };
   }
 
   const { accessToken, refreshToken } = await generateTokens(
@@ -597,6 +643,7 @@ export const acceptInviteService = async (
         inviteExpiresAt: null,
         inviteAcceptedAt: new Date(),
         ativo: true,
+        statusCadastro: StatusCadastroMedico.ATIVO,
       },
     });
 
@@ -643,16 +690,15 @@ export const acceptInviteService = async (
   return result;
 };
 
-const PROFISSAO_MEDICO = 'Médico';
-
 export const registerPublicMedicoService = async (
-  input: RegisterPublicMedicoInput
+  input: RegisterPublicMedicoInput,
+  files?: Record<string, Express.Multer.File[] | undefined> | null
 ) => {
   const tenant = await getDefaultTenant();
   const cpf = input.cpf.replace(/\D/g, '');
   const email = input.email.trim().toLowerCase();
   const profissao = (input.profissao || '').trim();
-  const isMedico = profissao === PROFISSAO_MEDICO;
+  const isMedico = profissao === 'Médico';
 
   if (!validateCPF(cpf)) {
     throw { statusCode: 400, message: 'CPF inválido' };
@@ -662,14 +708,14 @@ export const registerPublicMedicoService = async (
     throw { statusCode: 400, message: 'Profissão é obrigatória' };
   }
 
-  let crm: string | null = null;
-  if (isMedico) {
-    const crmNorm = input.crm ? normalizeCRM(input.crm) : '';
-    if (!crmNorm || !validateCRM(crmNorm)) {
-      throw { statusCode: 400, message: 'CRM inválido' };
-    }
-    crm = crmNorm;
+  if (!parseAceitouTermosCadastro(input.aceitouTermos)) {
+    throw {
+      statusCode: 400,
+      message: 'É necessário aceitar a declaração e os termos de cadastro para concluir o pedido.',
+    };
   }
+
+  const crm = resolveRegistroConselhoParaCadastro(profissao, input.crm);
 
   // Médico sem especialidades = [Clínica Médica]; senão usa as enviadas (várias permitidas)
   const especialidades = (input.especialidades || []).filter((e) => (e || '').trim()).map((e) => (e || '').trim());
@@ -690,7 +736,7 @@ export const registerPublicMedicoService = async (
   }
 
   if (existingByCrm) {
-    throw { statusCode: 409, message: 'Já existe cadastro com este CRM' };
+    throw { statusCode: 409, message: 'Já existe cadastro com este número de registro profissional' };
   }
 
   if (existingByEmail) {
@@ -698,6 +744,8 @@ export const registerPublicMedicoService = async (
   }
 
   const senhaHash = await hashPassword(input.password);
+
+  const trimOpt = (v: string | undefined) => (v && String(v).trim()) || undefined;
 
   const medico = await prisma.$transaction(async (tx: any) => {
     const created = await tx.medico.create({
@@ -712,10 +760,17 @@ export const registerPublicMedicoService = async (
         especialidades: especialidadesFinal,
         vinculo: 'Associado',
         telefone: input.telefone.trim(),
-        ativo: true,
+        estadoCivil: trimOpt(input.estadoCivil),
+        enderecoResidencial: trimOpt(input.enderecoResidencial),
+        dadosBancarios: trimOpt(input.dadosBancarios),
+        chavePix: trimOpt(input.chavePix),
+        termosCadastroAceitosEm: new Date(),
+        termosCadastroVersao: TERMOS_CADASTRO_VERSAO,
+        ativo: false,
+        statusCadastro: StatusCadastroMedico.PENDENTE_ANALISE,
         inviteTokenHash: null,
         inviteExpiresAt: null,
-        inviteAcceptedAt: new Date(),
+        inviteAcceptedAt: null,
       },
       select: {
         id: true,
@@ -726,6 +781,8 @@ export const registerPublicMedicoService = async (
       },
     });
 
+    await upsertMedicoDocumentosFromMulter(tx, tenant.id, created.id, files);
+
     await createAuditLog(
       {
         acao: 'CADASTRO_PUBLICO_MEDICO',
@@ -735,6 +792,8 @@ export const registerPublicMedicoService = async (
           email: created.email,
           crm: created.crm,
           vinculo: created.vinculo ?? null,
+          statusCadastro: StatusCadastroMedico.PENDENTE_ANALISE,
+          termosCadastroVersao: TERMOS_CADASTRO_VERSAO,
         },
       },
       tx
@@ -744,15 +803,19 @@ export const registerPublicMedicoService = async (
   });
 
   try {
-    const { notificarBoasVindasMedico } = await import('./notificacao-medico.service');
-    await notificarBoasVindasMedico(tenant.id, medico.id, medico.nomeCompleto);
+    await enviarEmailsPosCadastroPublico({
+      to: medico.email || email,
+      nomeCompleto: medico.nomeCompleto,
+      versaoTermos: TERMOS_CADASTRO_VERSAO,
+    });
   } catch (err) {
-    console.error('[notificacao] boas-vindas (cadastro público):', err);
+    console.error('[cadastro-publico] envio de e-mails pós-cadastro:', err);
   }
 
   return {
     medico,
-    message: 'Cadastro realizado com sucesso. Você já pode fazer login.',
+    message:
+      'Cadastro recebido com sucesso. Sua conta está em análise; você será notificado quando for aprovada. Enviamos dois e-mails para o endereço cadastrado (confirmação de receção e boas-vindas), se o servidor de e-mail estiver configurado.',
   };
 };
 
@@ -778,7 +841,7 @@ export async function esqueciSenhaService(email: string): Promise<{
   });
   const medico = !master
     ? await prisma.medico.findFirst({
-        where: { tenantId: tenant.id, email: normalizedEmail, ativo: true },
+        where: { tenantId: tenant.id, email: normalizedEmail },
         select: { id: true, telefone: true },
       })
     : null;

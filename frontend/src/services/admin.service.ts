@@ -1,6 +1,45 @@
 import api from './api';
 import { ModuloSistema } from '../constants/modulos';
 
+export interface CadastroPendenteListItem {
+  id: string;
+  nomeCompleto: string;
+  email: string | null;
+  profissao: string;
+  crm: string | null;
+  cpf: string;
+  telefone: string | null;
+  createdAt: string;
+}
+
+export interface CadastroPendenteDocumento {
+  id: string;
+  tipo: string;
+  nomeArquivo: string;
+  mimeType: string;
+  tamanhoBytes: number;
+  createdAt: string;
+}
+
+export interface CadastroPendenteDetalhe {
+  id: string;
+  nomeCompleto: string;
+  email: string | null;
+  profissao: string;
+  crm: string | null;
+  cpf: string;
+  telefone: string | null;
+  especialidades: string[];
+  vinculo: string | null;
+  estadoCivil: string | null;
+  enderecoResidencial: string | null;
+  dadosBancarios: string | null;
+  chavePix: string | null;
+  createdAt: string;
+  updatedAt: string;
+  documentos: CadastroPendenteDocumento[];
+}
+
 /** Equipes do profissional (listagem em `/admin/medicos`). */
 export interface MedicoEquipeResumo {
   id: string;
@@ -181,10 +220,12 @@ export interface Subgrupo {
   nome: string;
   descricao: string | null;
   ativo: boolean;
+  usaEscala: boolean;
+  usaPonto: boolean;
   createdAt: string;
   updatedAt: string;
   _count?: { subgrupoMedicos: number; escalaSubgrupos: number; equipes?: number };
-  contratoSubgrupos?: { contratoAtivo: { id: string; nome: string; usaEscala: boolean; usaPonto: boolean } }[];
+  contratoSubgrupos?: { contratoAtivo: { id: string; nome: string } }[];
 }
 
 export interface Equipe {
@@ -197,7 +238,14 @@ export interface Equipe {
   createdAt: string;
   updatedAt: string;
   _count?: { equipeMedicos: number; escalaEquipes: number };
-  subgrupo?: { id: string; nome: string } | null;
+  subgrupo?: {
+    id: string;
+    nome: string;
+    usaEscala?: boolean;
+    usaPonto?: boolean;
+    contratoSubgrupos?: { contratoAtivo: { id: string; nome: string } }[];
+  } | null;
+  contratoEquipes?: { contratoAtivo: { id: string; nome: string } }[];
 }
 
 export interface DocusealPendenteSubmitter {
@@ -764,11 +812,20 @@ export const adminService = {
     const response = await api.get<{ success: boolean; data: Subgrupo[] }>('/admin/subgrupos');
     return response.data;
   },
-  createSubgrupo: async (payload: { nome: string; descricao?: string | null; ativo?: boolean }) => {
+  createSubgrupo: async (payload: {
+    nome: string;
+    descricao?: string | null;
+    ativo?: boolean;
+    usaEscala?: boolean;
+    usaPonto?: boolean;
+  }) => {
     const response = await api.post('/admin/subgrupos', payload);
     return response.data;
   },
-  updateSubgrupo: async (id: string, payload: { nome?: string; descricao?: string | null; ativo?: boolean }) => {
+  updateSubgrupo: async (
+    id: string,
+    payload: { nome?: string; descricao?: string | null; ativo?: boolean; usaEscala?: boolean; usaPonto?: boolean }
+  ) => {
     const response = await api.put(`/admin/subgrupos/${id}`, payload);
     return response.data;
   },
@@ -863,6 +920,42 @@ export const adminService = {
   },
   deleteDocumentoEnviado: async (id: string) => {
     const response = await api.delete(`/admin/documentos-enviados/${id}`);
+    return response.data;
+  },
+
+  listCadastrosPendentes: async () => {
+    const response = await api.get<{ success: boolean; data: CadastroPendenteListItem[] }>(
+      '/admin/cadastros-pendentes'
+    );
+    return response.data;
+  },
+
+  getCadastroPendenteDetalhe: async (medicoId: string) => {
+    const response = await api.get<{ success: boolean; data: CadastroPendenteDetalhe }>(
+      `/admin/cadastros-pendentes/${medicoId}`
+    );
+    return response.data;
+  },
+
+  downloadCadastroPendenteDocumento: async (medicoId: string, documentoId: string): Promise<Blob> => {
+    const response = await api.get<Blob>(
+      `/admin/cadastros-pendentes/${medicoId}/documentos/${documentoId}/download`,
+      { responseType: 'blob' }
+    );
+    return response.data;
+  },
+
+  aprovarCadastroPendente: async (medicoId: string) => {
+    const response = await api.post<{ success: boolean; message?: string }>(
+      `/admin/cadastros-pendentes/${medicoId}/aprovar`
+    );
+    return response.data;
+  },
+
+  rejeitarCadastroPendente: async (medicoId: string) => {
+    const response = await api.post<{ success: boolean; message?: string }>(
+      `/admin/cadastros-pendentes/${medicoId}/rejeitar`
+    );
     return response.data;
   },
 };

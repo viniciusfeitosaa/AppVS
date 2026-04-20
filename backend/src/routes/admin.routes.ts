@@ -42,6 +42,11 @@ import {
   listDocumentosEnviadosController,
   uploadDocumentoEnviadoController,
   deleteDocumentoEnviadoController,
+  listCadastrosPendentesController,
+  getCadastroPendenteDetalheController,
+  downloadCadastroPendenteDocumentoController,
+  aprovarCadastroPendenteController,
+  rejeitarCadastroPendenteController,
   removerEscalaPlantaoController,
   removerMedicoEscalaController,
   removeContratoEquipeController,
@@ -211,6 +216,37 @@ router.get(
   validateUUIDParam('id'),
   downloadRegistroPontoFotoAdminController
 );
+router.get(
+  '/cadastros-pendentes',
+  requireModuleAccess(ModuloSistema.AVALIACAO),
+  listCadastrosPendentesController
+);
+router.get(
+  '/cadastros-pendentes/:medicoId',
+  requireModuleAccess(ModuloSistema.AVALIACAO),
+  validateUUIDParam('medicoId'),
+  getCadastroPendenteDetalheController
+);
+router.get(
+  '/cadastros-pendentes/:medicoId/documentos/:documentoId/download',
+  requireModuleAccess(ModuloSistema.AVALIACAO),
+  validateUUIDParam('medicoId'),
+  validateUUIDParam('documentoId'),
+  downloadCadastroPendenteDocumentoController
+);
+router.post(
+  '/cadastros-pendentes/:medicoId/aprovar',
+  requireModuleAccess(ModuloSistema.AVALIACAO),
+  validateUUIDParam('medicoId'),
+  aprovarCadastroPendenteController
+);
+router.post(
+  '/cadastros-pendentes/:medicoId/rejeitar',
+  requireModuleAccess(ModuloSistema.AVALIACAO),
+  validateUUIDParam('medicoId'),
+  rejeitarCadastroPendenteController
+);
+
 router.get('/documentos-enviados', requireModuleAccess(ModuloSistema.ENVIO_DOCUMENTOS), listDocumentosEnviadosController);
 router.post('/documentos-enviados', requireModuleAccess(ModuloSistema.ENVIO_DOCUMENTOS), uploadDocumentoEnviado.single('arquivo'), uploadDocumentoEnviadoController);
 router.delete('/documentos-enviados/:id', requireModuleAccess(ModuloSistema.ENVIO_DOCUMENTOS), deleteDocumentoEnviadoController);

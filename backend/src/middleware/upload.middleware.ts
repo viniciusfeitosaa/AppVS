@@ -2,6 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import multer from 'multer';
 import type { Request, Response, NextFunction } from 'express';
+import { DOCUMENTOS_PERFIL_FIELDS } from '../constants/documentos.const';
 
 const uploadBaseDir = path.resolve(process.cwd(), 'uploads', 'medicos');
 if (!fs.existsSync(uploadBaseDir)) {
@@ -30,6 +31,26 @@ export const uploadPerfilDocumentos = multer({
     files: 12,
   },
 });
+
+/** Campos opcionais do cadastro público (mesmos tipos do perfil). */
+export const registerPublicUploadFields = DOCUMENTOS_PERFIL_FIELDS.map((name) => ({ name, maxCount: 1 }));
+
+/** Só processa multipart em `/auth/register`; JSON continua sem multer. */
+export function maybeRegisterPublicUploadMiddleware(req: Request, res: Response, next: NextFunction): void {
+  const ct = (req.headers['content-type'] || '').toLowerCase();
+  if (!ct.includes('multipart/form-data')) {
+    next();
+    return;
+  }
+  uploadPerfilDocumentos.fields(registerPublicUploadFields)(req, res, (err: unknown) => {
+    if (err) {
+      const msg = err instanceof Error ? err.message : 'Erro no upload dos arquivos';
+      res.status(400).json({ success: false, error: msg });
+      return;
+    }
+    next();
+  });
+}
 
 const uploadDocEnviadoDir = path.resolve(process.cwd(), 'uploads', 'documentos-enviados');
 if (!fs.existsSync(uploadDocEnviadoDir)) {

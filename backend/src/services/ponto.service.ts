@@ -17,12 +17,13 @@ import {
   pickGeoConfigSemEscala,
   type MedicoEquipeGeoLinha,
 } from '../utils/ponto-geo-config.util';
+import { batchResolveProducaoMedicoNasEscalas, resolveProducaoMedicoNaEscala } from '../utils/producao-subgrupo.util';
 
 function isPontoSemEscalaEscalaId(escalaId: string) {
   return escalaId === PONTO_SEM_ESCALA_ESCALA_ID;
 }
 
-/** Contrato com usaPonto e sem usaEscala (ponto sem grade de plantão). */
+/** Subgrupo com ponto habilitado e sem escala de plantão (ponto sem grade). */
 export async function medicoTemContratoSoPonto(tenantId: string, medicoId: string): Promise<boolean> {
   const row = await prisma.equipeMedico.findFirst({
     where: {
@@ -30,9 +31,7 @@ export async function medicoTemContratoSoPonto(tenantId: string, medicoId: strin
       medicoId,
       equipe: {
         subgrupo: {
-          contratoSubgrupos: {
-            some: { contratoAtivo: { usaPonto: true, usaEscala: false } },
-          },
+          AND: [{ usaPonto: true }, { usaEscala: false }],
         },
       },
     },
@@ -41,16 +40,14 @@ export async function medicoTemContratoSoPonto(tenantId: string, medicoId: strin
   return !!row;
 }
 
-/** Pelo menos um contrato vinculado às equipes do médico usa escala de plantão. */
+/** Pelo menos uma equipe do médico está em subgrupo que usa escala de plantão. */
 export async function medicoTemContratoComEscala(tenantId: string, medicoId: string): Promise<boolean> {
   const row = await prisma.equipeMedico.findFirst({
     where: {
       tenantId,
       medicoId,
       equipe: {
-        subgrupo: {
-          contratoSubgrupos: { some: { contratoAtivo: { usaEscala: true } } },
-        },
+        subgrupo: { usaEscala: true },
       },
     },
     select: { id: true },
@@ -308,7 +305,7 @@ function setCached<T>(m: Map<string, CacheEntry<T>>, key: string, value: T) {
   m.set(key, { exp: Date.now() + CACHE_TTL_MS, value });
 }
 
-function clearPontoCaches(tenantId: string, medicoId: string) {
+export function clearPontoCaches(tenantId: string, medicoId: string) {
   const key = cacheKey(tenantId, medicoId);
   meuDiaCache.delete(key);
   minhasEscalasCache.delete(key);
@@ -423,19 +420,20 @@ export async function checkInService(
     });
   }
 
-  // Com escala real: check-in vinculado à escala (e plantão hoje se o contrato usa escala).
+  // Com escala real: regras por subgrupo das equipes do médico nesta escala.
   const escala = await prisma.escala.findFirst({
     where: { id: escalaId, tenantId, ativo: true },
-    select: { id: true, nome: true, contratoAtivo: { select: { usaEscala: true, usaPonto: true } } },
+    select: { id: true, nome: true },
   });
   if (!escala) {
     throw { statusCode: 404, message: 'Escala não encontrada ou inativa' };
   }
-  if (!escala.contratoAtivo?.usaPonto) {
-    throw { statusCode: 403, message: 'Ponto eletrônico não está habilitado para este contrato' };
+  const prod = await resolveProducaoMedicoNaEscala(tenantId, medicoId, escalaId);
+  if (!prod.allowPonto) {
+    throw { statusCode: 403, message: 'Ponto eletrônico não está habilitado para o seu vínculo nesta escala' };
   }
 
-  if (escala.contratoAtivo?.usaEscala) {
+  if (prod.requireJanelaPlantao) {
     const janela = await validarJanelaCheckinPlantaoEscalaHoje(tenantId, medicoId, escalaId);
     if (!janela.ok) {
       throw { statusCode: 403, message: janela.message };
@@ -695,7 +693,7 @@ export async function getMeuDiaPontoService(tenantId: string, medicoId: string) 
       tenantId,
       medicoId,
       data: { gte: hojeInicio, lte: hojeFim },
-      escala: { ativo: true },
+      escala: escalaWhereMedicoNaEquipe(tenantId, medicoId),
     },
     select: {
       id: true,
@@ -797,9 +795,7 @@ export async function listMinhasEscalasService(tenantId: string, medicoId: strin
       tenantId,
       medicoId,
       ativo: true,
-      escala: {
-        ativo: true,
-      },
+      escala: escalaWhereMedicoNaEquipe(tenantId, medicoId),
     },
     select: {
       escala: {
@@ -820,7 +816,11 @@ export async function listMinhasEscalasService(tenantId: string, medicoId: strin
   /** groupBy evita varrer todos os plantões do médico (findMany+distinct ficava O(n) com histórico grande). */
   const plantoesEscalaIdsP = prisma.escalaPlantao.groupBy({
     by: ['escalaId'],
-    where: { tenantId, medicoId },
+    where: {
+      tenantId,
+      medicoId,
+      escala: escalaWhereMedicoNaEquipe(tenantId, medicoId),
+    },
   });
 
   const equipesDoMedicoP = prisma.equipeMedico.findMany({
@@ -862,6 +862,7 @@ export async function listMinhasEscalasService(tenantId: string, medicoId: strin
     const escalasPorEquipe = await prisma.escalaEquipe.findMany({
       where: { tenantId, equipeId: { in: meuEquipeIds } },
       select: {
+        equipe: { select: { subgrupo: { select: { usaPonto: true } } } },
         escala: {
           select: {
             id: true,
@@ -869,14 +870,14 @@ export async function listMinhasEscalasService(tenantId: string, medicoId: strin
             dataInicio: true,
             dataFim: true,
             ativo: true,
-            contratoAtivo: { select: { usaPonto: true } },
           },
         },
       },
     });
     for (const row of escalasPorEquipe) {
       const e = row.escala;
-      if (!e?.ativo || !e.contratoAtivo?.usaPonto) continue;
+      const podePonto = row.equipe?.subgrupo?.usaPonto === true;
+      if (!e?.ativo || !podePonto) continue;
       if (!uniqueByEscala.has(e.id)) {
         uniqueByEscala.set(e.id, {
           id: e.id,
@@ -1109,6 +1110,23 @@ const startOfDay = (d: Date) => {
   return x;
 };
 
+/**
+ * Escala onde o médico ainda participa de alguma equipe ligada à escala.
+ * Evita exibir plantões/alocações de escalas das quais já foi removido (linhas órfãs em escala_plantoes / escala_medicos).
+ */
+function escalaWhereMedicoNaEquipe(tenantId: string, medicoId: string) {
+  return {
+    ativo: true,
+    escalaEquipes: {
+      some: {
+        equipe: {
+          equipeMedicos: { some: { tenantId, medicoId } },
+        },
+      },
+    },
+  };
+}
+
 /** Próximos plantões do médico (data >= hoje), ordenados por data, no máximo 2. Apenas escalas ativas. */
 export async function listProximosPlantoesService(tenantId: string, medicoId: string, limit = 2) {
   const hoje = startOfDay(new Date());
@@ -1117,7 +1135,7 @@ export async function listProximosPlantoesService(tenantId: string, medicoId: st
       tenantId,
       medicoId,
       data: { gte: hoje },
-      escala: { ativo: true },
+      escala: escalaWhereMedicoNaEquipe(tenantId, medicoId),
     },
     select: {
       id: true,
@@ -1128,7 +1146,7 @@ export async function listProximosPlantoesService(tenantId: string, medicoId: st
         select: {
           nome: true,
           contratoAtivoId: true,
-          contratoAtivo: { select: { permiteTrocaPlantao: true, usaPonto: true, usaEscala: true } },
+          contratoAtivo: { select: { permiteTrocaPlantao: true } },
         },
       },
     },
@@ -1138,9 +1156,12 @@ export async function listProximosPlantoesService(tenantId: string, medicoId: st
 
   const cids = [...new Set(plantoes.map((p) => p.escala?.contratoAtivoId).filter(Boolean) as string[])];
   const tipoMaps = await loadTiposMapPorContratoLeitura(tenantId, cids);
+  const escalaIds = [...new Set(plantoes.map((p) => p.escalaId))];
+  const prodMap = await batchResolveProducaoMedicoNasEscalas(tenantId, medicoId, escalaIds);
 
   return plantoes.map((p) => {
     const cid = p.escala?.contratoAtivoId ?? '';
+    const prod = prodMap.get(p.escalaId) ?? { allowPonto: false, requireJanelaPlantao: false };
     const base = {
       id: p.id,
       data: p.data.toISOString().slice(0, 10),
@@ -1148,8 +1169,9 @@ export async function listProximosPlantoesService(tenantId: string, medicoId: st
       escalaId: p.escalaId,
       escalaNome: p.escala?.nome ?? null,
       permiteTrocaPlantao: !!p.escala?.contratoAtivo?.permiteTrocaPlantao,
-      usaPonto: !!p.escala?.contratoAtivo?.usaPonto,
-      usaEscala: !!p.escala?.contratoAtivo?.usaEscala,
+      usaPonto: prod.allowPonto,
+      /** UI: true = respeita janela do plantão para o link “Bater ponto”; false = fluxo só ponto na escala. */
+      usaEscala: prod.requireJanelaPlantao,
     };
     return enrichPlantaoComTipo(base, cid, tipoMaps);
   });
@@ -1200,7 +1222,7 @@ export async function listMeusPlantoesMesCalendarioService(
       tenantId,
       medicoId,
       data: { gte: inicio, lte: fim },
-      escala: { ativo: true },
+      escala: escalaWhereMedicoNaEquipe(tenantId, medicoId),
       ...(escalaIdFilter ? { escalaId: { in: escalaIdFilter } } : {}),
     },
     select: {
@@ -2169,18 +2191,16 @@ export async function canCheckInService(tenantId: string, medicoId: string, esca
 
   const escala = await prisma.escala.findFirst({
     where: { id: escalaId, tenantId, ativo: true },
-    select: {
-      id: true,
-      contratoAtivo: { select: { usaEscala: true, usaPonto: true } },
-    },
+    select: { id: true },
   });
   if (!escala) {
     return { allowed: false, reason: 'Escala não encontrada ou inativa' as const };
   }
-  if (!escala.contratoAtivo?.usaPonto) {
-    return { allowed: false, reason: 'Ponto eletrônico não está habilitado para este contrato' as const };
+  const prod = await resolveProducaoMedicoNaEscala(tenantId, medicoId, escalaId);
+  if (!prod.allowPonto) {
+    return { allowed: false, reason: 'Ponto eletrônico não está habilitado para o seu vínculo nesta escala' as const };
   }
-  if (escala.contratoAtivo?.usaEscala) {
+  if (prod.requireJanelaPlantao) {
     const janela = await validarJanelaCheckinPlantaoEscalaHoje(tenantId, medicoId, escalaId);
     if (!janela.ok) {
       return { allowed: false, reason: janela.message };

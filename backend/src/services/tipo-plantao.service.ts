@@ -131,7 +131,7 @@ export async function ensureTiposLegadoMigrados(tenantId: string, contratoAtivoI
 
     let tipos = await tx.tipoPlantao.findMany({
       where: { tenantId, contratoAtivoId },
-      orderBy: [{ ordem: 'asc' }, { createdAt: 'asc' }],
+      orderBy: [{ horaInicio: 'asc' }, { nome: 'asc' }],
     });
 
     const legacyGradesTx = ['mt', 'sn', 'MT', 'SN'] as const;
@@ -298,7 +298,7 @@ export async function listTiposPlantaoService(tenantId: string, contratoAtivoId:
   await ensureTiposLegadoMigrados(tenantId, contratoAtivoId);
   return prisma.tipoPlantao.findMany({
     where: { tenantId, contratoAtivoId },
-    orderBy: [{ ordem: 'asc' }, { nome: 'asc' }],
+    orderBy: [{ horaInicio: 'asc' }, { nome: 'asc' }],
   });
 }
 
@@ -625,7 +625,7 @@ export async function resolveGradeIdParaContrato(
   if (g === 'mt' || g === 'sn') {
     const tipos = await prisma.tipoPlantao.findMany({
       where: { tenantId, contratoAtivoId },
-      orderBy: [{ ordem: 'asc' }, { createdAt: 'asc' }],
+      orderBy: [{ horaInicio: 'asc' }, { nome: 'asc' }],
     });
     const mtTipo =
       tipos.find((t) => t.horaInicio === '07:00' && t.horaFim === '19:00' && !t.cruzaMeiaNoite) ?? tipos[0];

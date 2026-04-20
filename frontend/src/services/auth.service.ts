@@ -1,5 +1,6 @@
 import api from './api';
 import { ModuloSistema } from '../constants/modulos';
+import type { DocumentoPerfilField } from '../constants/documentosPerfil';
 
 export interface LoginCredentials {
   email: string;
@@ -52,7 +53,15 @@ export interface RegisterPayload {
   telefone: string;
   password: string;
   confirmPassword: string;
+  estadoCivil?: string;
+  enderecoResidencial?: string;
+  dadosBancarios?: string;
+  chavePix?: string;
+  /** Obrigatório no cadastro público (aceite de termos e declaração). */
+  aceitouTermos: boolean;
 }
+
+export type RegisterDocumentFiles = Partial<Record<DocumentoPerfilField, File>>;
 
 export const authService = {
   login: async (credentials: LoginCredentials): Promise<LoginResponse> => {
@@ -65,8 +74,38 @@ export const authService = {
     return response.data;
   },
 
-  register: async (payload: RegisterPayload) => {
-    const response = await api.post('/auth/register', payload);
+  register: async (payload: RegisterPayload, files?: RegisterDocumentFiles) => {
+    const hasFile = files && Object.values(files).some((f) => f instanceof File);
+    if (!hasFile) {
+      const response = await api.post('/auth/register', payload);
+      return response.data;
+    }
+    const fd = new FormData();
+    const appendScalar = (key: string, val: string | undefined) => {
+      if (val !== undefined && val !== null) fd.append(key, String(val));
+    };
+    appendScalar('nomeCompleto', payload.nomeCompleto);
+    appendScalar('email', payload.email);
+    appendScalar('cpf', payload.cpf);
+    appendScalar('telefone', payload.telefone);
+    appendScalar('profissao', payload.profissao);
+    appendScalar('password', payload.password);
+    appendScalar('confirmPassword', payload.confirmPassword);
+    if (payload.crm !== undefined && payload.crm !== null) {
+      fd.append('crm', String(payload.crm).trim());
+    }
+    if (payload.estadoCivil) appendScalar('estadoCivil', payload.estadoCivil);
+    if (payload.enderecoResidencial) appendScalar('enderecoResidencial', payload.enderecoResidencial);
+    if (payload.dadosBancarios) appendScalar('dadosBancarios', payload.dadosBancarios);
+    if (payload.chavePix) appendScalar('chavePix', payload.chavePix);
+    fd.append('aceitouTermos', payload.aceitouTermos ? 'true' : 'false');
+    (payload.especialidades || []).forEach((e) => fd.append('especialidades', e));
+    Object.entries(files || {}).forEach(([k, file]) => {
+      if (file instanceof File) fd.append(k, file);
+    });
+    const response = await api.post('/auth/register', fd, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
     return response.data;
   },
 
