@@ -122,7 +122,10 @@ export async function aprovarCadastroPendenteService(tenantId: string, masterId:
       nomeCompleto: m.nomeCompleto,
       nomeInstituicao,
     });
-    console.log('[cadastro-pendente] E-mail de cadastro aprovado enviado para:', m.email.trim().toLowerCase());
+    const emailLog = (m.email ?? '').trim().toLowerCase();
+    if (emailLog) {
+      console.log('[cadastro-pendente] E-mail de cadastro aprovado enviado para:', emailLog);
+    }
   } catch (err) {
     console.error('[cadastro-pendente] Falha no e-mail de cadastro aprovado (SMTP/Resend não configurado ou erro de envio):', err);
   }
