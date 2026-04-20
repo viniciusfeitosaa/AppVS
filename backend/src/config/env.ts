@@ -39,7 +39,7 @@ const envSchema = z.object({
   MASTER_INITIAL_NAME: z.string().default('Administrador Master'),
   MASTER_INITIAL_PASSWORD: z.string().min(8, 'MASTER_INITIAL_PASSWORD deve ter pelo menos 8 caracteres').optional(),
 
-  // E-mail – esqueci senha: Resend (prioridade) ou SMTP
+  // E-mail: SMTP próprio (ex.: Maddy) tem prioridade; Resend só se SMTP não estiver configurado
   RESEND_API_KEY: z.string().optional(),
   RESEND_FROM: z.string().optional(), // ex: noreply@sejavivasaude.com.br ou Viva Saúde <onboarding@resend.dev>
   SMTP_HOST: z.string().optional(),

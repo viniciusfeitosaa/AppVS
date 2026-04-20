@@ -216,6 +216,15 @@ const Avaliacao = () => {
                   >
                     Rejeitar
                   </button>
+                  <button
+                    type="button"
+                    className="btn btn-secondary text-sm py-2 px-4 rounded-lg shrink-0 border-viva-300 text-viva-900 hover:bg-viva-50"
+                    onClick={() => {
+                      window.open('https://portal.cfm.org.br/busca-medicos', '_blank');
+                    }}
+                  >
+                    Busca médicos (CFM)
+                  </button>
                 </div>
               </div>
 

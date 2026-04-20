@@ -1,6 +1,12 @@
-import { useState, useEffect, lazy, Suspense } from 'react';
+import { useState, useEffect, lazy, Suspense, type ReactNode } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
+
+function MasterOnly({ children }: { children: ReactNode }) {
+  const { user } = useAuth();
+  if (user?.role !== 'MASTER') return <Navigate to="/acesso-negado" replace />;
+  return <>{children}</>;
+}
 import { MasterEscopoProvider } from './context/MasterEscopoContext';
 import { NotificationProvider } from './context/NotificationContext';
 import ProtectedRoute from './components/Layout/ProtectedRoute';
@@ -161,7 +167,14 @@ function AppRoutes() {
           }
         />
         <Route path="/vagas" element={<Vagas />} />
-        <Route path="/avaliacao" element={<Avaliacao />} />
+        <Route
+          path="/avaliacao"
+          element={
+            <MasterOnly>
+              <Avaliacao />
+            </MasterOnly>
+          }
+        />
         <Route
           path="/relatorios"
           element={<Relatorios />}
@@ -169,15 +182,6 @@ function AppRoutes() {
         <Route
           path="/relatorios-ponto-eletronico"
           element={<RelatoriosPontoEletronico />}
-        />
-        <Route
-          path="/configuracoes"
-          element={
-            <FeaturePlaceholder
-              title="Configurações"
-              description="Parametrize regras de negócio e preferências do tenant."
-            />
-          }
         />
         <Route
           path="/contratos-ativos"

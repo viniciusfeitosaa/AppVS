@@ -12,6 +12,7 @@ import {
 } from '../constants/profissaoConselho';
 import { TERMOS_CADASTRO_TEXTO_COMPLETO, TERMOS_CADASTRO_TITULO, TERMOS_CADASTRO_VERSAO } from '../constants/termosCadastro';
 import {
+  CADASTRO_MAX_BYTES_PER_FILE,
   DOCUMENTOS_PERFIL_CADASTRO_ORDEM,
   DOCUMENTOS_PERFIL_FIELDS,
   DOCUMENTOS_PERFIL_OBRIGATORIOS_CADASTRO,
@@ -19,6 +20,12 @@ import {
   isDocumentoObrigatorioNoCadastro,
   type DocumentoPerfilField,
 } from '../constants/documentosPerfil';
+
+function formatBytes(n: number): string {
+  if (n < 1024) return `${n} B`;
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
+  return `${(n / (1024 * 1024)).toFixed(1)} MB`;
+}
 
 const ESTADOS_CIVIS = ['Solteiro(a)', 'Casado(a)', 'União estável', 'Divorciado(a)', 'Viúvo(a)', 'Outro'] as const;
 
@@ -394,6 +401,16 @@ const Cadastro = () => {
         const f = docFiles[k];
         if (f instanceof File) files[k] = f;
       }
+      for (const k of DOCUMENTOS_PERFIL_FIELDS) {
+        const f = files[k];
+        if (f instanceof File && f.size > CADASTRO_MAX_BYTES_PER_FILE) {
+          setError(
+            `${DOCUMENTO_LABEL_BY_FIELD[k]}: ficheiro demasiado grande (máximo ${formatBytes(CADASTRO_MAX_BYTES_PER_FILE)}; este tem ${formatBytes(f.size)}). Comprima o PDF ou reduza a resolução da foto.`
+          );
+          setIsLoading(false);
+          return;
+        }
+      }
 
       const response = await authService.register(payload, files) as {
         success?: boolean;
@@ -402,8 +419,24 @@ const Cadastro = () => {
       setSuccessMsg(response?.data?.message || 'Cadastro recebido com sucesso.');
       setDone(true);
     } catch (err: unknown) {
-      const e = err as { response?: { data?: { error?: string } } };
-      setError(e.response?.data?.error || 'Não foi possível concluir o cadastro.');
+      const e = err as {
+        response?: { status?: number; data?: { error?: string; errors?: Array<{ msg?: string }> } | string };
+      };
+      const status = e.response?.status;
+      const raw = e.response?.data;
+      let msg = 'Não foi possível concluir o cadastro.';
+      if (typeof raw === 'object' && raw) {
+        if (typeof raw.error === 'string' && raw.error.trim()) msg = raw.error.trim();
+        else if (Array.isArray(raw.errors) && raw.errors.length) {
+          const parts = raw.errors.map((x) => x?.msg).filter((m): m is string => typeof m === 'string' && !!m.trim());
+          if (parts.length) msg = parts.join(' · ');
+        }
+      }
+      if (status === 413) {
+        msg =
+          'O envio total excede o limite do proxy (Nginx). No Nginx Proxy Manager, no host da API, aumente "Advanced" → Custom Nginx Configuration: client_max_body_size 50m; (ou peça ao administrador).';
+      }
+      setError(msg);
     } finally {
       setIsLoading(false);
     }

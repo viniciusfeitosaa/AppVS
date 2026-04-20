@@ -80,11 +80,17 @@ export async function downloadCadastroPendenteDocumentoService(
 export async function aprovarCadastroPendenteService(tenantId: string, masterId: string, medicoId: string) {
   const m = await prisma.medico.findFirst({
     where: { id: medicoId, tenantId, statusCadastro: StatusCadastroMedico.PENDENTE_ANALISE },
-    select: { id: true, nomeCompleto: true },
+    select: { id: true, nomeCompleto: true, email: true },
   });
   if (!m) {
     throw { statusCode: 404, message: 'Cadastro pendente não encontrado ou já processado' };
   }
+
+  const tenant = await prisma.tenant.findUnique({
+    where: { id: tenantId },
+    select: { nome: true },
+  });
+  const nomeInstituicao = tenant?.nome?.trim() || null;
 
   await prisma.medico.update({
     where: { id: medicoId },
@@ -107,6 +113,18 @@ export async function aprovarCadastroPendenteService(tenantId: string, masterId:
     await notificarBoasVindasMedico(tenantId, medicoId, m.nomeCompleto);
   } catch (err) {
     console.error('[notificacao] boas-vindas (aprovação cadastro):', err);
+  }
+
+  try {
+    const { enviarEmailCadastroAprovado } = await import('./cadastro-publico-email.service');
+    await enviarEmailCadastroAprovado({
+      to: m.email,
+      nomeCompleto: m.nomeCompleto,
+      nomeInstituicao,
+    });
+    console.log('[cadastro-pendente] E-mail de cadastro aprovado enviado para:', m.email.trim().toLowerCase());
+  } catch (err) {
+    console.error('[cadastro-pendente] Falha no e-mail de cadastro aprovado (SMTP/Resend não configurado ou erro de envio):', err);
   }
 
   return { ok: true as const };

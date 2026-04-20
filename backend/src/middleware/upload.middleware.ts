@@ -4,6 +4,31 @@ import multer from 'multer';
 import type { Request, Response, NextFunction } from 'express';
 import { DOCUMENTOS_PERFIL_FIELDS } from '../constants/documentos.const';
 
+/** Por ficheiro (PDF/imagem escaneada). Alinhar com frontend `CADASTRO_MAX_BYTES_PER_FILE`. */
+const PERFIL_UPLOAD_MAX_FILE_BYTES = 25 * 1024 * 1024;
+/** Campos de texto no multipart (endereço, dados bancários, etc.) — evita falso “file too large” em texto longo. */
+const PERFIL_UPLOAD_MAX_FIELD_BYTES = 8 * 1024 * 1024;
+
+type MulterErr = Error & { code?: string };
+
+function multerErrorToMessage(err: MulterErr): string {
+  const maxMb = Math.round(PERFIL_UPLOAD_MAX_FILE_BYTES / (1024 * 1024));
+  switch (err.code) {
+    case 'LIMIT_FILE_SIZE':
+      return `Um dos ficheiros excede ${maxMb} MB. Comprima o PDF ou reduza a resolução da imagem e tente novamente.`;
+    case 'LIMIT_FIELD_VALUE':
+      return 'Um dos campos de texto do formulário é demasiado grande. Encurte endereço ou dados bancários, ou envie documentos em anexo em vez de colar textos muito longos.';
+    case 'LIMIT_FILE_COUNT':
+    case 'LIMIT_FIELD_COUNT':
+    case 'LIMIT_PART_COUNT':
+      return 'Número de partes no envio excedeu o limite. Tente com menos ficheiros de uma vez.';
+    case 'LIMIT_UNEXPECTED_FILE':
+      return 'Campo de ficheiro não reconhecido. Atualize a página e use apenas os anexos pedidos no formulário.';
+    default:
+      return err.message || 'Erro no upload dos arquivos';
+  }
+}
+
 const uploadBaseDir = path.resolve(process.cwd(), 'uploads', 'medicos');
 if (!fs.existsSync(uploadBaseDir)) {
   fs.mkdirSync(uploadBaseDir, { recursive: true });
@@ -27,7 +52,8 @@ const storage = multer.diskStorage({
 export const uploadPerfilDocumentos = multer({
   storage,
   limits: {
-    fileSize: 10 * 1024 * 1024, // 10MB por arquivo
+    fileSize: PERFIL_UPLOAD_MAX_FILE_BYTES,
+    fieldSize: PERFIL_UPLOAD_MAX_FIELD_BYTES,
     files: 12,
   },
 });
@@ -44,7 +70,12 @@ export function maybeRegisterPublicUploadMiddleware(req: Request, res: Response,
   }
   uploadPerfilDocumentos.fields(registerPublicUploadFields)(req, res, (err: unknown) => {
     if (err) {
-      const msg = err instanceof Error ? err.message : 'Erro no upload dos arquivos';
+      const msg =
+        err instanceof Error && typeof (err as MulterErr).code === 'string'
+          ? multerErrorToMessage(err as MulterErr)
+          : err instanceof Error
+            ? err.message
+            : 'Erro no upload dos arquivos';
       res.status(400).json({ success: false, error: msg });
       return;
     }

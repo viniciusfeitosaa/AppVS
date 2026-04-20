@@ -717,8 +717,29 @@ export const registerPublicMedicoService = async (
 
   const crm = resolveRegistroConselhoParaCadastro(profissao, input.crm);
 
+  // Multipart pode entregar especialidades como string simples (1 item), array ou JSON string.
+  const rawEspecialidades = input.especialidades as unknown;
+  let especialidadesArr: string[] = [];
+  if (Array.isArray(rawEspecialidades)) {
+    especialidadesArr = rawEspecialidades.map((e) => String(e ?? ''));
+  } else if (typeof rawEspecialidades === 'string') {
+    const t = rawEspecialidades.trim();
+    if (t) {
+      if (t.startsWith('[')) {
+        try {
+          const parsed = JSON.parse(t);
+          if (Array.isArray(parsed)) especialidadesArr = parsed.map((e) => String(e ?? ''));
+          else especialidadesArr = [t];
+        } catch {
+          especialidadesArr = [t];
+        }
+      } else {
+        especialidadesArr = [t];
+      }
+    }
+  }
   // Médico sem especialidades = [Clínica Médica]; senão usa as enviadas (várias permitidas)
-  const especialidades = (input.especialidades || []).filter((e) => (e || '').trim()).map((e) => (e || '').trim());
+  const especialidades = especialidadesArr.filter((e) => (e || '').trim()).map((e) => (e || '').trim());
   const especialidadesFinal = isMedico
     ? (especialidades.length > 0 ? especialidades : ['Clínica Médica'])
     : especialidades;
@@ -886,17 +907,18 @@ export async function esqueciSenhaService(email: string): Promise<{
     }
   } else {
     const sendEmail = async () => {
-      if (hasResendConfig()) {
-        console.log('[esqueci-senha] Enviando e-mail via Resend para:', normalizedEmail);
-        await sendResetPasswordEmailResend(normalizedEmail, resetLink);
-        return;
-      }
+      // SMTP próprio (ex.: Maddy) tem prioridade sobre Resend quando ambos existem no .env
       if (hasSmtpConfig()) {
         console.log('[esqueci-senha] Enviando e-mail via SMTP para:', normalizedEmail);
         await sendResetPasswordEmailSmtp(normalizedEmail, resetLink);
         return;
       }
-      throw new Error('Nenhum provedor de e-mail configurado (RESEND_API_KEY ou SMTP)');
+      if (hasResendConfig()) {
+        console.log('[esqueci-senha] Enviando e-mail via Resend para:', normalizedEmail);
+        await sendResetPasswordEmailResend(normalizedEmail, resetLink);
+        return;
+      }
+      throw new Error('Nenhum provedor de e-mail configurado (SMTP ou RESEND_API_KEY)');
     };
     try {
       await sendEmail();

@@ -134,6 +134,13 @@ export const registerPublicController = async (req: Request, res: Response) => {
       data: result,
     });
   } catch (error: any) {
+    console.error('[auth/register] erro:', {
+      statusCode: error?.statusCode || 500,
+      message: error?.message || 'Erro ao cadastrar usuário',
+      stack: error?.stack || null,
+      bodyKeys: Object.keys(req.body || {}),
+      fileFields: Object.keys((req.files as Record<string, unknown>) || {}),
+    });
     return res.status(error.statusCode || 500).json({
       success: false,
       error: error.message || 'Erro ao cadastrar usuário',

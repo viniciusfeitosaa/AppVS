@@ -103,10 +103,18 @@ export const authService = {
     Object.entries(files || {}).forEach(([k, file]) => {
       if (file instanceof File) fd.append(k, file);
     });
-    const response = await api.post('/auth/register', fd, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    });
-    return response.data;
+    // Não usar axios aqui: o cliente global força JSON e o transformRequest pode estragar FormData.
+    // fetch deixa o browser definir multipart/form-data com boundary correto.
+    const base = String(api.defaults.baseURL || '').replace(/\/$/, '');
+    const url = `${base}/auth/register`;
+    const res = await fetch(url, { method: 'POST', body: fd });
+    const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+    if (!res.ok) {
+      const err = new Error('Request failed') as Error & { response?: { status: number; data: unknown } };
+      err.response = { status: res.status, data };
+      throw err;
+    }
+    return data;
   },
 
   getModulosAcesso: async (): Promise<{

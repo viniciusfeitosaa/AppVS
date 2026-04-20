@@ -911,12 +911,25 @@ export const adminService = {
     formData.append('arquivo', arquivo);
     formData.append('medicoId', medicoId);
     if (titulo != null && titulo.trim()) formData.append('titulo', titulo.trim());
-    const response = await api.post<{ success: boolean; data: DocumentoEnviado; message?: string }>(
-      '/admin/documentos-enviados',
-      formData,
-      { headers: { 'Content-Type': 'multipart/form-data' } }
-    );
-    return response.data;
+    const base = String(api.defaults.baseURL || '').replace(/\/$/, '');
+    const token = typeof localStorage !== 'undefined' ? localStorage.getItem('accessToken') : null;
+    const res = await fetch(`${base}/admin/documentos-enviados`, {
+      method: 'POST',
+      body: formData,
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    const data = (await res.json().catch(() => ({}))) as {
+      success?: boolean;
+      data?: DocumentoEnviado;
+      message?: string;
+      error?: string;
+    };
+    if (!res.ok) {
+      const err = new Error('Request failed') as Error & { response?: { status: number; data: unknown } };
+      err.response = { status: res.status, data };
+      throw err;
+    }
+    return data;
   },
   deleteDocumentoEnviado: async (id: string) => {
     const response = await api.delete(`/admin/documentos-enviados/${id}`);

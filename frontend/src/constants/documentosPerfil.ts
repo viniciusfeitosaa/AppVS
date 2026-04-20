@@ -1,3 +1,6 @@
+/** Alinhar com `backend/src/middleware/upload.middleware.ts` (uploadPerfilDocumentos). */
+export const CADASTRO_MAX_BYTES_PER_FILE = 25 * 1024 * 1024; // 25 MiB por ficheiro
+
 export const DOCUMENTOS_PERFIL_FIELDS = [
   'cedulaIdentidadeCrm',
   'certidaoRegularidadeFiscalCrm',

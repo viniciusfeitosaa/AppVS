@@ -123,7 +123,11 @@ const AppShell = () => {
   });
 
   const modulosMap = modulosAcessoResp?.data?.map || ({} as Record<ModuloSistema, boolean>);
-  const hasAccess = (modulo: ModuloSistema) => modulosMap[modulo] ?? true;
+  /** Cadastros pendentes / Avaliação: só Master (independente do mapa da API). */
+  const hasAccess = (modulo: ModuloSistema) => {
+    if (modulo === 'AVALIACAO' && !isMaster) return false;
+    return modulosMap[modulo] ?? true;
+  };
 
   /** Evita 2× GET /ponto/meu-dia: o dashboard já inclui meuDia (mesma query key que a página Dashboard). */
   const medicoComDashboard = !!user && user?.role === 'MEDICO' && hasAccess('DASHBOARD');
@@ -175,7 +179,6 @@ const AppShell = () => {
             { to: '/valores-plantao', label: 'Valores Hora/Plantão' },
             { to: '/valores-ponto', label: 'Horas/Valor Ponto Eletrônico' },
             { to: '/envio-documentos', label: 'Envio de Documentos' },
-            { to: '/configuracoes', label: 'Configurações' },
             { to: '/perfil', label: 'Minha Conta' },
           ],
         },
@@ -187,10 +190,7 @@ const AppShell = () => {
         },
         {
           title: 'Produtividade',
-          items: [
-            { to: '/atendimentos', label: 'Atendimentos' },
-            { to: '/avaliacao', label: 'Avaliação' },
-          ],
+          items: [{ to: '/atendimentos', label: 'Atendimentos' }],
         },
         {
           title: 'Conta',
@@ -212,7 +212,6 @@ const AppShell = () => {
     '/valores-plantao': 'VALORES_PLANTAO',
     '/valores-ponto': 'PONTO_ELETRONICO',
     '/envio-documentos': 'ENVIO_DOCUMENTOS',
-    '/configuracoes': 'CONFIGURACOES',
     '/perfil': 'PERFIL',
     '/documentos': 'PERFIL',
     '/ponto-eletronico': 'PONTO_ELETRONICO',

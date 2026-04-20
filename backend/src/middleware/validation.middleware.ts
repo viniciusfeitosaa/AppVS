@@ -23,9 +23,27 @@ const escalaIdPontoBody = body('escalaId')
 const handleValidationErrors = (req: Request, res: Response, next: NextFunction) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
+    const list = errors.array();
+    const isRegister = (req.originalUrl || '').includes('/auth/register');
+    if (isRegister) {
+      console.error('[auth/register] validation-errors:', {
+        bodyKeys: Object.keys(req.body || {}),
+        bodyPreview: Object.fromEntries(
+          Object.entries(req.body || {}).map(([k, v]) => [k, typeof v === 'string' ? String(v).slice(0, 120) : v])
+        ),
+        errorCount: list.length,
+        errors: list,
+      });
+    }
+    const error =
+      list
+        .map((e) => ('msg' in e && typeof e.msg === 'string' ? e.msg : null))
+        .filter(Boolean)
+        .join(' · ') || 'Dados inválidos';
     return res.status(400).json({
       success: false,
-      errors: errors.array(),
+      error,
+      errors: list,
     });
   }
   return next();
@@ -197,10 +215,15 @@ export const validateRegisterMedico = [
           (req as any).body.especialidades = [];
           return true;
         }
-        try {
-          arr = JSON.parse(t);
-        } catch {
-          throw new Error('Especialidades inválidas (use uma lista ou JSON array)');
+        if (t.startsWith('[')) {
+          try {
+            arr = JSON.parse(t);
+          } catch {
+            throw new Error('Especialidades inválidas (use uma lista ou JSON array)');
+          }
+        } else {
+          // Multipart com apenas 1 valor costuma chegar como string simples.
+          arr = [t];
         }
       } else {
         throw new Error('Especialidades inválidas');

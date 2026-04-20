@@ -82,6 +82,7 @@ function p(text: string): string {
 
 const SUBJECT_CONFIRMACAO = 'Cadastro recebido — Viva Saúde';
 const SUBJECT_BOAS_VINDAS = 'Bem-vindo à Viva Saúde — o seu pedido de associação';
+const SUBJECT_CADASTRO_APROVADO = 'Cadastro aprovado — análise concluída | Viva Saúde';
 
 function buildConfirmacaoHtml(primeiroNome: string, versaoTermos: string): string {
   const loginHref = escapeHtmlAttr(`${getAppBaseUrl()}/login`);
@@ -174,16 +175,61 @@ function buildBoasVindasText(primeiroNome: string): string {
   ].join('\n');
 }
 
+function buildCadastroAprovadoHtml(primeiroNome: string, nomeInstituicao?: string): string {
+  const loginHref = escapeHtmlAttr(`${getAppBaseUrl()}/login`);
+  const inst = (nomeInstituicao || '').trim();
+  const blocoInstituicao = inst
+    ? p(
+        `A <strong style="color:#0f172a;">análise do seu cadastro</strong> pela equipe da instituição <strong style="color:#0f172a;">${escapeHtmlText(
+          inst
+        )}</strong> foi <strong style="color:#166534;">concluída</strong> e o seu perfil profissional foi <strong style="color:#166534;">aprovado</strong>.`
+      )
+    : p(
+        'A <strong style="color:#0f172a;">análise do seu cadastro</strong> foi <strong style="color:#166534;">concluída</strong> e o seu perfil profissional foi <strong style="color:#166534;">aprovado</strong>.'
+      );
+  return buildEmailShell({
+    preheader: 'A análise do seu cadastro foi concluída e o seu acesso está ativo.',
+    headline: 'Cadastro aprovado',
+    bodyParagraphsHtml: [
+      p(`Olá, <strong style="color:#0f172a;">${escapeHtmlText(primeiroNome)}</strong>,`),
+      blocoInstituicao,
+      p(
+        'Já pode entrar na plataforma com o <strong style="color:#0f172a;">e-mail</strong> e a <strong style="color:#0f172a;">senha</strong> que definiu no pedido de associação.'
+      ),
+      p(
+        `Acesse o painel: <a href="${loginHref}" style="color:#166534;font-weight:600;">${escapeHtmlText(
+          `${getAppBaseUrl()}/login`
+        )}</a>`
+      ),
+    ],
+  });
+}
+
+function buildCadastroAprovadoText(primeiroNome: string, nomeInstituicao?: string): string {
+  const login = `${getAppBaseUrl()}/login`;
+  const inst = (nomeInstituicao || '').trim();
+  const linhaAnalise = inst
+    ? `A análise do seu cadastro pela instituição "${inst}" foi concluída e o seu perfil profissional foi aprovado.`
+    : 'A análise do seu cadastro foi concluída e o seu perfil profissional foi aprovado.';
+  return [
+    'VIVA SAÚDE — Cadastro aprovado',
+    '─'.repeat(44),
+    '',
+    `Olá, ${primeiroNome},`,
+    '',
+    linhaAnalise,
+    '',
+    'Já pode entrar na plataforma com o e-mail e a senha que definiu no pedido de associação.',
+    '',
+    `Página de login: ${login}`,
+    '',
+    'Com os melhores cumprimentos,',
+    'Equipe Viva Saúde',
+  ].join('\n');
+}
+
 async function sendEmailHtml(to: string, subject: string, html: string, text: string): Promise<void> {
-  if (hasResendConfig()) {
-    const apiKey = process.env.RESEND_API_KEY!;
-    const from = process.env.RESEND_FROM || 'Viva Saúde <onboarding@resend.dev>';
-    const resend = new Resend(apiKey);
-    const { data, error } = await resend.emails.send({ from, to, subject, html, text });
-    if (error) throw new Error(error.message || 'Resend falhou');
-    console.log('[cadastro-publico-email] Resend enviado. id:', data?.id ?? 'n/a', 'para:', to, 'assunto:', subject);
-    return;
-  }
+  // SMTP próprio (ex.: Maddy) tem prioridade sobre Resend quando ambos existem no .env
   if (hasSmtpConfig()) {
     const host = process.env.SMTP_HOST!;
     const user = process.env.SMTP_USER!;
@@ -221,7 +267,16 @@ async function sendEmailHtml(to: string, subject: string, html: string, text: st
     console.log('[cadastro-publico-email] SMTP enviado para:', to, 'assunto:', subject);
     return;
   }
-  throw new Error('Nenhum provedor de e-mail configurado (RESEND_API_KEY ou SMTP)');
+  if (hasResendConfig()) {
+    const apiKey = process.env.RESEND_API_KEY!;
+    const from = process.env.RESEND_FROM || 'Viva Saúde <onboarding@resend.dev>';
+    const resend = new Resend(apiKey);
+    const { data, error } = await resend.emails.send({ from, to, subject, html, text });
+    if (error) throw new Error(error.message || 'Resend falhou');
+    console.log('[cadastro-publico-email] Resend enviado. id:', data?.id ?? 'n/a', 'para:', to, 'assunto:', subject);
+    return;
+  }
+  throw new Error('Nenhum provedor de e-mail configurado (SMTP ou RESEND_API_KEY)');
 }
 
 /**
@@ -248,4 +303,25 @@ export async function enviarEmailsPosCadastroPublico(params: {
   } catch (err) {
     console.error('[cadastro-publico-email] Falha no e-mail de boas-vindas:', err);
   }
+}
+
+/**
+ * E-mail ao profissional após aprovação do cadastro público (análise concluída).
+ * Falhas são registadas em log e não impedem a operação no serviço de aprovação.
+ */
+export async function enviarEmailCadastroAprovado(params: {
+  to: string | null | undefined;
+  nomeCompleto: string;
+  nomeInstituicao?: string | null;
+}): Promise<void> {
+  const to = (params.to ?? '').trim().toLowerCase();
+  if (!to) return;
+  const primeiro = params.nomeCompleto.trim().split(/\s+/)[0] || 'Profissional';
+  const nomeInstituicao = params.nomeInstituicao?.trim() || undefined;
+  await sendEmailHtml(
+    to,
+    SUBJECT_CADASTRO_APROVADO,
+    buildCadastroAprovadoHtml(primeiro, nomeInstituicao),
+    buildCadastroAprovadoText(primeiro, nomeInstituicao)
+  );
 }
