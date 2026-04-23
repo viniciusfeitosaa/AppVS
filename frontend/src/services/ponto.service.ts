@@ -147,6 +147,32 @@ export const pontoService = {
     return response.data;
   },
 
+  getHistorico: async (params?: { ano?: number; mes?: number }) => {
+    const response = await api.get('/ponto/historico', { params });
+    return response.data as {
+      success: boolean;
+      data: {
+        referencia: { ano: number; mes: number };
+        totalRegistros: number;
+        totalMinutos: number;
+        totalValorCentavos: number;
+        totalValor: number;
+        registros: Array<{
+          id: string;
+          checkInAt: string;
+          checkOutAt: string | null;
+          duracaoMinutos: number | null;
+          checkInAtrasado: boolean;
+          minutosAtrasoCheckin: number | null;
+          valor: number | null;
+          escalaId: string | null;
+          escala?: { id: string; nome: string } | null;
+          equipe?: string | null;
+        }>;
+      };
+    };
+  },
+
   solicitarTrocaPlantao: async (
     payload:
       | { plantaoId: string; paraEquipeInteira: true; tipoSolicitacao?: 'PERMUTA' | 'CEDER' }

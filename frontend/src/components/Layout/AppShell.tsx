@@ -69,6 +69,8 @@ const getMobileIcon = (label: string) => {
       );
     case 'Ponto Eletrônico':
       return getMobileIcon('Ponto');
+    case 'Histórico de pontos':
+      return getMobileIcon('Relatórios');
     case 'Calendário de escalas':
       return (
         <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
@@ -88,6 +90,13 @@ const getMobileIcon = (label: string) => {
       return (
         <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
           <path d="M12 3l2.4 5.5L20 9.3l-4.5 3.9L16.6 20 12 16.9 7.4 20l1.1-6.8L4 9.3l5.6-.8L12 3z" />
+        </svg>
+      );
+    case 'Módulo Escala':
+      return (
+        <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
+          <rect x="3" y="4" width="18" height="17" rx="2" />
+          <path d="M8 3v4M16 3v4M3 10h18M8 14h8M8 18h5" />
         </svg>
       );
     case 'Minha Conta':
@@ -153,6 +162,7 @@ const AppShell = () => {
   const showVagasInNavbar = !isMaster && user?.role === 'MEDICO' && hasAccess('VAGAS');
   const pontoMenuItemsMedico: MenuItem[] = [
     { to: '/ponto-eletronico', label: 'Ponto Eletrônico' },
+    { to: '/historico-pontos', label: 'Histórico de pontos' },
     ...(mostrarCalendarioEscalasNoMenu ? [{ to: '/meu-calendario-plantoes', label: 'Calendário de escalas' } as MenuItem] : []),
   ];
   const menuGroupsBase: MenuGroup[] = isMaster
@@ -178,6 +188,7 @@ const AppShell = () => {
             { to: '/contratos-ativos', label: 'Contratos Ativos' },
             { to: '/valores-plantao', label: 'Valores Hora/Plantão' },
             { to: '/valores-ponto', label: 'Horas/Valor Ponto Eletrônico' },
+            { to: '/modulo-escala-master', label: 'Módulo Escala' },
             { to: '/envio-documentos', label: 'Envio de Documentos' },
             { to: '/perfil', label: 'Minha Conta' },
           ],
@@ -215,10 +226,12 @@ const AppShell = () => {
     '/perfil': 'PERFIL',
     '/documentos': 'PERFIL',
     '/ponto-eletronico': 'PONTO_ELETRONICO',
+    '/historico-pontos': 'PONTO_ELETRONICO',
     '/meu-calendario-plantoes': 'PONTO_ELETRONICO',
     '/atendimentos': 'ATENDIMENTOS',
     '/vagas': 'VAGAS',
     '/avaliacao': 'AVALIACAO',
+    '/modulo-escala-master': 'CONFIGURACOES',
   };
 
   const menuGroups: MenuGroup[] = menuGroupsBase

@@ -730,6 +730,10 @@ model RegistroPonto {
   duracaoMinutos Int?                @map("duracao_minutos")
   /// Valor de repasse (escala+ponto proporcional) congelado no checkout; relatório usa isto em vez de recalcular com tipos/valores atuais.
   repasseValorCongelado Decimal?     @map("repasse_valor_congelado") @db.Decimal(12, 2)
+  /// True quando o check-in ocorreu após o horário de início + tolerância configurada.
+  checkInAtrasado Boolean            @default(false) @map("checkin_atrasado")
+  /// Minutos que excederam a tolerância no momento do check-in.
+  minutosAtrasoCheckin Int?          @map("minutos_atraso_checkin")
   fotoCheckinCaminho String?         @map("foto_checkin_caminho") @db.VarChar(512)
   motivoCheckinSemFoto String?      @map("motivo_checkin_sem_foto") @db.VarChar(500)
   createdAt      DateTime            @default(now()) @map("created_at")

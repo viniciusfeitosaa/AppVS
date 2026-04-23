@@ -11,6 +11,7 @@ import {
   scheduleForGradeId,
 } from './tipo-plantao.service';
 import { calcularRepasseCongeladoCheckout } from './repasse-registro-ponto.service';
+import { getValoresPlantaoService, listRegistrosPontoAdminService } from './admin.service';
 import { isMissingDatabaseColumnError } from '../utils/prisma-column-error';
 import {
   pickGeoConfigParaEscala,
@@ -170,6 +171,7 @@ const endOfToday = () => {
 
 /** Contratos com escala + ponto: check-in só entre (início − 10 min) e o fim do plantão do dia. */
 const MINUTOS_ANTES_INICIO_CHECKIN_PONTO_ESCALA = 10;
+const TOLERANCIA_PADRAO_ATRASO_CHECKIN_MINUTOS = 30;
 
 type ResultadoJanelaCheckinEscala = { ok: true } | { ok: false; message: string };
 
@@ -178,6 +180,12 @@ type LinhaPlantaoJanelaCheckin = {
   data: Date;
   gradeId: string;
   escala: { contratoAtivoId: string | null };
+};
+
+type ResultadoAtrasoCheckin = {
+  checkInAtrasado: boolean;
+  minutosAtrasoCheckin: number | null;
+  minutosTolerancia: number;
 };
 
 /**
@@ -266,6 +274,96 @@ async function validarJanelaCheckinPlantaoEscalaHoje(
   return { ok: true };
 }
 
+async function calcularAtrasoCheckinPlantaoEscalaHoje(
+  tenantId: string,
+  medicoId: string,
+  escalaId: string,
+  instanteCheckIn: Date
+): Promise<ResultadoAtrasoCheckin> {
+  const plantoesHoje = await prisma.escalaPlantao.findMany({
+    where: {
+      tenantId,
+      escalaId,
+      medicoId,
+      data: { gte: startOfToday(), lte: endOfToday() },
+    },
+    select: {
+      id: true,
+      data: true,
+      gradeId: true,
+      escala: { select: { contratoAtivoId: true } },
+    },
+  });
+  if (!plantoesHoje.length) {
+    return {
+      checkInAtrasado: false,
+      minutosAtrasoCheckin: null,
+      minutosTolerancia: TOLERANCIA_PADRAO_ATRASO_CHECKIN_MINUTOS,
+    };
+  }
+  const cid = plantoesHoje[0].escala?.contratoAtivoId;
+  if (!cid) {
+    return {
+      checkInAtrasado: false,
+      minutosAtrasoCheckin: null,
+      minutosTolerancia: TOLERANCIA_PADRAO_ATRASO_CHECKIN_MINUTOS,
+    };
+  }
+
+  const tipoMaps = await loadTiposMapPorContratoLeitura(tenantId, [cid]);
+  const plantaoHoje = escolherPlantaoParaJanelaCheckinHoje(plantoesHoje, tipoMaps, instanteCheckIn);
+  if (!plantaoHoje) {
+    return {
+      checkInAtrasado: false,
+      minutosAtrasoCheckin: null,
+      minutosTolerancia: TOLERANCIA_PADRAO_ATRASO_CHECKIN_MINUTOS,
+    };
+  }
+
+  const equipeIdsRows = await prisma.escalaEquipe.findMany({
+    where: {
+      tenantId,
+      escalaId,
+      equipe: {
+        equipeMedicos: {
+          some: { tenantId, medicoId },
+        },
+      },
+    },
+    select: { equipeId: true },
+  });
+  const equipeIds = equipeIdsRows.map((r) => r.equipeId);
+  const configTolerancia = equipeIds.length
+    ? await prisma.configPontoEletronico.findFirst({
+        where: {
+          tenantId,
+          equipeId: { in: equipeIds },
+          toleranciaMinutos: { not: null },
+        },
+        select: { toleranciaMinutos: true },
+      })
+    : null;
+  const minutosTolerancia = Math.max(
+    0,
+    configTolerancia?.toleranciaMinutos ?? TOLERANCIA_PADRAO_ATRASO_CHECKIN_MINUTOS
+  );
+
+  const schedule = scheduleForGradeId(plantaoHoje.gradeId, tipoMaps.get(cid));
+  const dataStr = plantaoHoje.data.toISOString().slice(0, 10);
+  const inicio = inicioPlantaoAsDate(dataStr, schedule);
+  const limiteSemAtraso = new Date(inicio.getTime() + minutosTolerancia * 60 * 1000);
+  const minutosAtraso =
+    instanteCheckIn.getTime() > limiteSemAtraso.getTime()
+      ? Math.floor((instanteCheckIn.getTime() - limiteSemAtraso.getTime()) / 60000)
+      : 0;
+
+  return {
+    checkInAtrasado: minutosAtraso > 0,
+    minutosAtrasoCheckin: minutosAtraso > 0 ? minutosAtraso : null,
+    minutosTolerancia,
+  };
+}
+
 const startOfWeek = () => {
   const date = new Date();
   const day = date.getDay(); // 0 domingo, 1 segunda...
@@ -338,6 +436,7 @@ export async function checkInService(
       throw { statusCode: 400, message: 'O motivo deve ter no máximo 500 caracteres.' };
     }
   }
+  const instanteCheckIn = new Date();
   const registroAberto = await prisma.registroPonto.findFirst({
     where: { tenantId, medicoId, checkOutAt: null },
     orderBy: { checkInAt: 'desc' },
@@ -393,9 +492,11 @@ export async function checkInService(
           tenantId,
           escalaId: null,
           medicoId,
-          checkInAt: new Date(),
+          checkInAt: instanteCheckIn,
           origem: OrigemRegistroPonto.APP_MEDICO,
           observacao: observacao?.trim() || null,
+          checkInAtrasado: false,
+          minutosAtrasoCheckin: null,
           fotoCheckinCaminho: hasFoto ? fotoCheckinCaminho!.trim() : null,
           motivoCheckinSemFoto: hasFoto ? null : motivo!,
         },
@@ -439,6 +540,12 @@ export async function checkInService(
       throw { statusCode: 403, message: janela.message };
     }
   }
+  const atrasoCheckin = await calcularAtrasoCheckinPlantaoEscalaHoje(
+    tenantId,
+    medicoId,
+    escalaId,
+    instanteCheckIn
+  );
 
   const configGeo = await getConfigPontoParaMedico(tenantId, medicoId, escalaId);
   if (configGeo) {
@@ -468,9 +575,11 @@ export async function checkInService(
         tenantId,
         escalaId,
         medicoId,
-        checkInAt: new Date(),
+        checkInAt: instanteCheckIn,
         origem: OrigemRegistroPonto.APP_MEDICO,
         observacao: observacao?.trim() || null,
+        checkInAtrasado: atrasoCheckin.checkInAtrasado,
+        minutosAtrasoCheckin: atrasoCheckin.minutosAtrasoCheckin,
         fotoCheckinCaminho: hasFoto ? fotoCheckinCaminho!.trim() : null,
         motivoCheckinSemFoto: hasFoto ? null : motivo!,
       },
@@ -484,6 +593,9 @@ export async function checkInService(
         detalhes: {
           escalaId: registro.escalaId,
           registroPontoId: registro.id,
+          checkInAtrasado: atrasoCheckin.checkInAtrasado,
+          minutosAtrasoCheckin: atrasoCheckin.minutosAtrasoCheckin,
+          minutosToleranciaCheckin: atrasoCheckin.minutosTolerancia,
           checkInSemFoto: !hasFoto,
           ...(hasFoto ? {} : { motivoResumo: motivo!.slice(0, 120) }),
         },
@@ -1040,6 +1152,175 @@ export async function getPainelPontoEletronicoInicialService(tenantId: string, m
     console.log(`[medico/dashboard] painel interno ${Date.now() - t0}ms (paralelo meuDia+escalas)`);
   }
   return { meuDia, escalas };
+}
+
+export async function getHistoricoPontosMedicoService(
+  tenantId: string,
+  medicoId: string,
+  ano?: number,
+  mes?: number
+) {
+  const now = new Date();
+  const anoRef = Number.isInteger(ano) && (ano as number) >= 2000 ? (ano as number) : now.getFullYear();
+  const mesRef = Number.isInteger(mes) && (mes as number) >= 1 && (mes as number) <= 12 ? (mes as number) : now.getMonth() + 1;
+
+  const inicioMes = new Date(anoRef, mesRef - 1, 1, 0, 0, 0, 0);
+  const fimMes = new Date(anoRef, mesRef, 0, 23, 59, 59, 999);
+
+  const relatorio = (await listRegistrosPontoAdminService(tenantId, {
+    medicoId,
+    dataInicio: inicioMes.toISOString(),
+    dataFim: fimMes.toISOString(),
+  })) as any;
+
+  const registros = (Array.isArray(relatorio?.data) ? relatorio.data : []) as Array<any>;
+  const escalaIds = [...new Set(registros.map((r) => r.escalaId).filter(Boolean))] as string[];
+
+  const escalas = escalaIds.length
+    ? await prisma.escala.findMany({
+        where: { tenantId, id: { in: escalaIds } },
+        select: { id: true, contratoAtivoId: true, nome: true },
+      })
+    : [];
+  const escalaById = new Map(escalas.map((e) => [e.id, e]));
+
+  const [equipesEscala, equipesMedico] = await Promise.all([
+    escalaIds.length
+      ? prisma.escalaEquipe.findMany({
+          where: { tenantId, escalaId: { in: escalaIds } },
+          select: {
+            escalaId: true,
+            equipeId: true,
+            equipe: { select: { id: true, nome: true, subgrupoId: true } },
+          },
+        })
+      : Promise.resolve([] as Array<any>),
+    prisma.equipeMedico.findMany({
+      where: { tenantId, medicoId },
+      select: { equipeId: true },
+    }),
+  ]);
+  const equipeIdsDoMedico = new Set(equipesMedico.map((x) => x.equipeId));
+  const contextoEscala = new Map<
+    string,
+    { equipeId: string; equipeNome: string; subgrupoId: string; contratoAtivoId: string }
+  >();
+  for (const row of equipesEscala) {
+    if (!equipeIdsDoMedico.has(row.equipeId)) continue;
+    if (!row.equipe?.subgrupoId) continue;
+    const escala = escalaById.get(row.escalaId);
+    if (!escala?.contratoAtivoId) continue;
+    if (!contextoEscala.has(row.escalaId)) {
+      contextoEscala.set(row.escalaId, {
+        equipeId: row.equipe.id,
+        equipeNome: row.equipe.nome,
+        subgrupoId: row.equipe.subgrupoId,
+        contratoAtivoId: escala.contratoAtivoId,
+      });
+    }
+  }
+
+  const valoresPorContexto = new Map<string, Map<string, { global: number | null; porDia: Record<string, number | null> }>>();
+  for (const ctx of contextoEscala.values()) {
+    const k = `${ctx.contratoAtivoId}::${ctx.subgrupoId}::${ctx.equipeId}`;
+    if (valoresPorContexto.has(k)) continue;
+    const rows = await getValoresPlantaoService(tenantId, ctx.contratoAtivoId, ctx.subgrupoId, ctx.equipeId);
+    const gradeMap = new Map<string, { global: number | null; porDia: Record<string, number | null> }>();
+    for (const r of rows as any[]) {
+      const gradeId = String(r.gradeId ?? '').trim().toLowerCase();
+      if (!gradeId) continue;
+      const global =
+        r.valorHora != null && Number.isFinite(Number(r.valorHora)) ? Number(r.valorHora) : null;
+      const porDia = (r.valorHoraPorDia ?? {}) as Record<string, number | null>;
+      gradeMap.set(gradeId, { global, porDia });
+    }
+    valoresPorContexto.set(k, gradeMap);
+  }
+
+  const diaKeyFromIso = (iso: string): 'seg' | 'ter' | 'qua' | 'qui' | 'sex' | 'sab' | 'dom' => {
+    const d = new Date(iso);
+    switch (d.getDay()) {
+      case 1:
+        return 'seg';
+      case 2:
+        return 'ter';
+      case 3:
+        return 'qua';
+      case 4:
+        return 'qui';
+      case 5:
+        return 'sex';
+      case 6:
+        return 'sab';
+      default:
+        return 'dom';
+    }
+  };
+
+  const valorPorRegistro = (r: any): number | null => {
+    if (r.repasseValorCongelado != null) return Number(r.repasseValorCongelado);
+    const duracaoHoras = Math.max(0, Number(r.duracaoMinutos ?? 0)) / 60;
+    if (duracaoHoras <= 0) return null;
+
+    const valorHoraDireto =
+      (r.id ? relatorio?.valorHoraPorRegistroPontoId?.[r.id] : undefined) ??
+      (r.medicoId && r.escalaId ? relatorio?.valorHoraPorMedicoEscala?.[`${r.medicoId}::${r.escalaId}`] : undefined) ??
+      (r.escalaId == null && r.medicoId ? relatorio?.valorHoraPorMedico?.[r.medicoId] : undefined);
+    if (valorHoraDireto != null && Number.isFinite(Number(valorHoraDireto))) {
+      return Math.round(Number(valorHoraDireto) * duracaoHoras * 100) / 100;
+    }
+
+    if (r.escalaId) {
+      const ctx = contextoEscala.get(r.escalaId);
+      if (ctx) {
+        const gradeId = r.id ? relatorio?.gradeIdPlantaoPorRegistroPontoId?.[r.id] : undefined;
+        if (gradeId) {
+          const ctxKey = `${ctx.contratoAtivoId}::${ctx.subgrupoId}::${ctx.equipeId}`;
+          const gradeMap = valoresPorContexto.get(ctxKey);
+          const row = gradeMap?.get(String(gradeId).toLowerCase());
+          if (row) {
+            const dk = diaKeyFromIso(r.checkInAt instanceof Date ? r.checkInAt.toISOString() : String(r.checkInAt));
+            const byDay = row.porDia?.[dk];
+            const rate = byDay != null && Number.isFinite(Number(byDay)) ? Number(byDay) : row.global;
+            if (rate != null && Number.isFinite(rate) && rate > 0) {
+              return Math.round(rate * duracaoHoras * 100) / 100;
+            }
+          }
+        }
+      }
+    }
+    return null;
+  };
+
+  const registrosComValor = registros.map((r) => ({
+    ...r,
+    valorCalculado: valorPorRegistro(r),
+  }));
+
+  const totalValorCentavos = registrosComValor.reduce((acc, item) => {
+    const v = item.valorCalculado != null ? Number(item.valorCalculado) : 0;
+    return acc + Math.round(v * 100);
+  }, 0);
+
+  return {
+    referencia: { ano: anoRef, mes: mesRef },
+    totalRegistros: registrosComValor.length,
+    totalMinutos: registrosComValor.reduce((acc, item) => acc + (item.duracaoMinutos || 0), 0),
+    totalValorCentavos,
+    totalValor: totalValorCentavos / 100,
+    registros: registrosComValor.map((r) => ({
+      id: r.id,
+      checkInAt: r.checkInAt,
+      checkOutAt: r.checkOutAt,
+      duracaoMinutos: r.duracaoMinutos,
+      checkInAtrasado: !!r.checkInAtrasado,
+      minutosAtrasoCheckin: r.minutosAtrasoCheckin ?? null,
+      valor: r.valorCalculado,
+      escalaId: r.escalaId,
+      escala: r.escala,
+      equipe: r.escalaId ? (contextoEscala.get(r.escalaId)?.equipeNome ?? null) : null,
+    })),
+  };
 }
 
 /** Lista colegas (outros médicos) das mesmas equipes do médico na escala informada, para troca de plantão. */

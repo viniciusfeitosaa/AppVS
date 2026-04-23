@@ -34,6 +34,7 @@ import {
   aceitarTrocaPlantaoController,
   recusarTrocaPlantaoController,
   canCheckInController,
+  getHistoricoPontosMedicoController,
 } from '../controllers/ponto.controller';
 
 const router = Router();
@@ -79,6 +80,7 @@ router.post(
 );
 router.post('/trocas-plantao/:id/recusar', validateUUIDParam('id'), recusarTrocaPlantaoController);
 router.get('/can-checkin', validateEscalaIdQueryPonto, canCheckInController);
+router.get('/historico', getHistoricoPontosMedicoController);
 router.get('/registros/:id/foto-checkin', validateUUIDParam('id'), downloadFotoCheckinMedicoController);
 
 export default router;

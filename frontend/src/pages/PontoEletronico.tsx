@@ -60,6 +60,8 @@ type MeuDiaPontoApi = {
     checkInAt: string;
     checkOutAt?: string | null;
     duracaoMinutos?: number | null;
+    checkInAtrasado?: boolean;
+    minutosAtrasoCheckin?: number | null;
     escalaId?: string | null;
     escala?: { nome?: string } | null;
   }>;
@@ -110,12 +112,20 @@ function escolherPlantaoMaisRelevante(lista: PlantaoHojeMeuDia[], at: Date): Pla
 }
 
 const PLANTOES_HOJE_VAZIO: PlantaoHojeMeuDia[] = [];
+const TOLERANCIA_MINUTOS_ATRASO_CHECKIN = 30;
 
 const formatDiaPlantaoCurto = (dataStr: string) => {
   const d = new Date(`${dataStr}T12:00:00`);
   return d
     .toLocaleDateString('pt-BR', { weekday: 'short', day: 'numeric', month: 'short' })
     .replace(/\./g, '');
+};
+
+const formatHoraCurta = (valor: string | null | undefined) => {
+  if (!valor) return '—';
+  const t = String(valor).trim();
+  if (!t) return '—';
+  return t.slice(0, 5);
 };
 
 /** Haversine (metros) — alinhado ao backend de ponto. */
@@ -367,6 +377,23 @@ const PontoEletronico = () => {
 
   const canCheckIn = !!canCheckInResp?.data?.allowed;
   const canCheckInReason: string | null = canCheckInResp?.data?.reason ?? null;
+  const mostrarAtrasoCheckin =
+    !!plantaoHojeExibir &&
+    !registroAberto &&
+    canCheckIn &&
+    (() => {
+      const inicio = inicioPlantaoCliente(plantaoHojeExibir.data, {
+        gradeId: plantaoHojeExibir.gradeId,
+        horaInicio: plantaoHojeExibir.horaInicio ?? null,
+        horaFim: plantaoHojeExibir.horaFim ?? null,
+        cruzaMeiaNoite: plantaoHojeExibir.cruzaMeiaNoite ?? null,
+      });
+      const limiteSemAtraso = new Date(inicio.getTime() + TOLERANCIA_MINUTOS_ATRASO_CHECKIN * 60 * 1000);
+      return agora.getTime() > limiteSemAtraso.getTime();
+    })();
+  const mensagemAtrasoCheckin = mostrarAtrasoCheckin
+    ? `Este check-in será registrado como atrasado (acima de ${TOLERANCIA_MINUTOS_ATRASO_CHECKIN} min de tolerância).`
+    : null;
 
   /** Não duplicar com o motivo da API nem sugerir “sem plantão” quando o check-in já está liberado ou ainda está sendo verificado. */
   const mostrarAvisoCalendarioSemPlantaoHoje =
@@ -589,7 +616,7 @@ const PontoEletronico = () => {
         setLoadingAction(false);
         return;
       }
-      await pontoService.checkIn({
+      const resposta = await pontoService.checkIn({
         ...(escalaIdEfetivo && { escalaId: escalaIdEfetivo }),
         observacao,
         ...(pos && { latitude: pos.latitude, longitude: pos.longitude }),
@@ -598,7 +625,16 @@ const PontoEletronico = () => {
       setObservacao('');
       closeCheckinModal();
       await refresh();
-      notify({ kind: 'success', title: 'Check-in realizado', message: 'Ponto de entrada registrado com sucesso.', source: 'ponto' });
+      const minutosAtraso = Number(resposta?.data?.minutosAtrasoCheckin ?? 0);
+      const atrasado = !!resposta?.data?.checkInAtrasado;
+      notify({
+        kind: atrasado ? 'warning' : 'success',
+        title: atrasado ? 'Check-in realizado com atraso' : 'Check-in realizado',
+        message: atrasado
+          ? `Ponto de entrada registrado com atraso de ${Math.max(1, minutosAtraso)} min.`
+          : 'Ponto de entrada registrado com sucesso.',
+        source: 'ponto',
+      });
     } catch (err: any) {
       tratarErroCheckin(err);
     } finally {
@@ -624,7 +660,7 @@ const PontoEletronico = () => {
         setLoadingAction(false);
         return;
       }
-      await pontoService.checkInSemFoto({
+      const resposta = await pontoService.checkInSemFoto({
         ...(escalaIdEfetivo && { escalaId: escalaIdEfetivo }),
         observacao,
         motivoSemFoto: m,
@@ -633,7 +669,16 @@ const PontoEletronico = () => {
       setObservacao('');
       closeCheckinModal();
       await refresh();
-      notify({ kind: 'success', title: 'Check-in realizado', message: 'Ponto de entrada registrado sem foto.', source: 'ponto' });
+      const minutosAtraso = Number(resposta?.data?.minutosAtrasoCheckin ?? 0);
+      const atrasado = !!resposta?.data?.checkInAtrasado;
+      notify({
+        kind: atrasado ? 'warning' : 'success',
+        title: atrasado ? 'Check-in sem foto (atrasado)' : 'Check-in realizado',
+        message: atrasado
+          ? `Ponto registrado sem foto, com atraso de ${Math.max(1, minutosAtraso)} min.`
+          : 'Ponto de entrada registrado sem foto.',
+        source: 'ponto',
+      });
     } catch (err: any) {
       tratarErroCheckin(err);
     } finally {
@@ -732,9 +777,18 @@ const PontoEletronico = () => {
               Você não tem plantão nesta escala hoje (conforme seu calendário de escalas).
             </p>
           ) : null}
-          {(configHorario.horarioEntrada || configHorario.horarioSaida) && (
+          {plantaoHojeExibir ? (
+            <p className="text-xs text-viva-600">
+              Entrada: {formatHoraCurta(plantaoHojeExibir.horaInicio)} · Saída: {formatHoraCurta(plantaoHojeExibir.horaFim)}
+            </p>
+          ) : (configHorario.horarioEntrada || configHorario.horarioSaida) && (
             <p className="text-xs text-viva-600">
               Entrada: {configHorario.horarioEntrada ?? '—'} · Saída: {configHorario.horarioSaida ?? '—'}
+            </p>
+          )}
+          {mostrarAtrasoCheckin && (
+            <p className="text-xs text-amber-700 font-medium">
+              Check-in em atraso (acima de {TOLERANCIA_MINUTOS_ATRASO_CHECKIN} min de tolerância).
             </p>
           )}
         </div>
@@ -894,6 +948,9 @@ const PontoEletronico = () => {
                     <p className="text-[11px] text-viva-600 font-serif text-center">
                       Quando estiver pronto, confirme — a captura ocorre no momento do clique.
                     </p>
+                  )}
+                  {mensagemAtrasoCheckin && (
+                    <p className="text-[11px] text-amber-700 font-medium text-center">{mensagemAtrasoCheckin}</p>
                   )}
                 </>
               ) : (

@@ -482,6 +482,16 @@ const Relatorios = () => {
           : NaN;
       const temRepasseCongelado =
         Number.isFinite(repasseCongeladoNum) && repasseCongeladoNum > 0;
+      const repasseRateBackendRaw = item.id ? valorHoraPorRegistroPontoId[item.id] : undefined;
+      const repasseRateBackend =
+        repasseRateBackendRaw != null && Number.isFinite(Number(repasseRateBackendRaw))
+          ? Number(repasseRateBackendRaw)
+          : null;
+      const cobrancaRateBackendRaw = item.id ? valorHoraCobrancaPorRegistroPontoId[item.id] : undefined;
+      const cobrancaRateBackend =
+        cobrancaRateBackendRaw != null && Number.isFinite(Number(cobrancaRateBackendRaw))
+          ? Number(cobrancaRateBackendRaw)
+          : null;
       const diaKey = diaKeyFromIso(item.checkInAt);
       const gradeKey = gradeResolvido != null ? String(gradeResolvido).trim().toLowerCase() : '';
       const cadResolvido = gradeKey ? valoresPlantaoPorGrade.get(gradeKey) ?? null : null;
@@ -511,17 +521,23 @@ const Relatorios = () => {
           ? pickRate(cadInferido.cobrancaPorDia, diaKey, cadInferido.cobrancaGlobal)
           : null;
 
-      const repasseRate = temValorHoraAlocacao ? valorHoraAlocacao : repasseRateCad;
-      const repasseRegistro =
-        usaEscalaEPonto && contratoId && temRepasseCongelado
-          ? round2(repasseCongeladoNum)
-          : usaEscalaEPonto && contratoId && repasseRate != null && repasseRate > 0
-            ? round2(horasTrabalhadas * repasseRate)
-            : null;
+      const repasseRate = temValorHoraAlocacao
+        ? valorHoraAlocacao
+        : repasseRateBackend != null && repasseRateBackend > 0
+          ? repasseRateBackend
+          : repasseRateCad;
+      const cobrancaRate = cobrancaRateBackend != null && cobrancaRateBackend > 0
+        ? cobrancaRateBackend
+        : cobrancaRateCad;
+      const repasseRegistro = temRepasseCongelado
+        ? round2(repasseCongeladoNum)
+        : repasseRate != null && repasseRate > 0
+          ? round2(horasTrabalhadas * repasseRate)
+          : null;
 
       const cobrancaRegistro =
-        usaEscalaEPonto && contratoId && cobrancaRateCad != null && cobrancaRateCad > 0
-          ? round2(horasTrabalhadas * cobrancaRateCad)
+        cobrancaRate != null && cobrancaRate > 0
+          ? round2(horasTrabalhadas * cobrancaRate)
           : null;
 
       const adicionalPercentual =
@@ -533,26 +549,26 @@ const Relatorios = () => {
         cobrancaRegistro != null ? round2(cobrancaRegistro * fatorAdicional) : null;
 
       const metodoCalculo: DetalheCalculoRegistroPonto['metodo'] =
-        usaEscalaEPonto && contratoId && temRepasseCongelado
+        temRepasseCongelado
           ? 'REPASSE_CONGELADO'
-          : usaEscalaEPonto && contratoId && temValorHoraAlocacao
+          : temValorHoraAlocacao
             ? 'VALOR_HORA_ALOCACAO_ESCALA'
-            : usaEscalaEPonto && contratoId && repasseRegistro != null
+            : repasseRegistro != null
               ? 'VALOR_HORA_PLANTAO'
               : 'SEM_VALOR';
 
       const resumoCalculo =
-        usaEscalaEPonto && contratoId && temRepasseCongelado
+        temRepasseCongelado
           ? `Congelado no checkout: ${formatValor(repasseCongeladoNum)}`
-          : usaEscalaEPonto && contratoId && temValorHoraAlocacao
+          : temValorHoraAlocacao
             ? `Repasse: ${horasTrabalhadas.toFixed(2)} h × ${formatValor(valorHoraAlocacao)}/h = ${repasseRegistro != null ? formatValor(repasseRegistro) : '—'}. ` +
-              `Cobrança: ${horasTrabalhadas.toFixed(2)} h × ${cobrancaRateCad != null ? `${formatValor(cobrancaRateCad)}/h` : '—'} = ${cobrancaRegistro != null ? formatValor(cobrancaRegistro) : '—'}.` +
+              `Cobrança: ${horasTrabalhadas.toFixed(2)} h × ${cobrancaRate != null ? `${formatValor(cobrancaRate)}/h` : '—'} = ${cobrancaRegistro != null ? formatValor(cobrancaRegistro) : '—'}.` +
               (adicionalPercentual > 0 ? ` Adicional +${adicionalPercentual}% aplicado.` : '')
-              : usaEscalaEPonto && contratoId
-                ? `Repasse: ${horasTrabalhadas.toFixed(2)} h × ${repasseRateCad != null ? `${formatValor(repasseRateCad)}/h` : '—'} = ${repasseRegistro != null ? formatValor(repasseRegistro) : '—'}. ` +
-                  `Cobrança: ${horasTrabalhadas.toFixed(2)} h × ${cobrancaRateCad != null ? `${formatValor(cobrancaRateCad)}/h` : '—'} = ${cobrancaRegistro != null ? formatValor(cobrancaRegistro) : '—'}.` +
-                  (adicionalPercentual > 0 ? ` Adicional +${adicionalPercentual}% aplicado.` : '')
-                : '—';
+            : repasseRegistro != null || cobrancaRegistro != null
+              ? `Repasse: ${horasTrabalhadas.toFixed(2)} h × ${repasseRate != null ? `${formatValor(repasseRate)}/h` : '—'} = ${repasseRegistro != null ? formatValor(repasseRegistro) : '—'}. ` +
+                `Cobrança: ${horasTrabalhadas.toFixed(2)} h × ${cobrancaRate != null ? `${formatValor(cobrancaRate)}/h` : '—'} = ${cobrancaRegistro != null ? formatValor(cobrancaRegistro) : '—'}.` +
+                (adicionalPercentual > 0 ? ` Adicional +${adicionalPercentual}% aplicado.` : '')
+              : '—';
 
       const detalheLinha: DetalheCalculoRegistroPonto = {
         registroId: item.id,
@@ -580,7 +596,7 @@ const Relatorios = () => {
         if (escNome && escNome !== 'Escala não identificada' && prev.escalaNome === 'Escala não identificada') {
           prev.escalaNome = escNome;
         }
-        if (usaEscalaEPonto && contratoId) {
+        if (usaEscalaEPonto && mostrarDetalheCalculo) {
           if (!prev.calculoPorRegistro) prev.calculoPorRegistro = [];
           prev.calculoPorRegistro.push(detalheLinha);
         }
@@ -597,7 +613,7 @@ const Relatorios = () => {
           valorRepasse: repasseComAdicional != null ? round2(repasseComAdicional) : undefined,
           valorCobranca: cobrancaComAdicional != null ? round2(cobrancaComAdicional) : undefined,
           calculoPorRegistro:
-            usaEscalaEPonto && contratoId ? [detalheLinha] : undefined,
+            usaEscalaEPonto && mostrarDetalheCalculo ? [detalheLinha] : undefined,
         });
       }
 
@@ -613,7 +629,6 @@ const Relatorios = () => {
     // Fallback: só quando não há base de plantão/grade no período; nunca sobrescreve linha já calculada no loop principal.
     if (
       !usaEscalaEPonto ||
-      !contratoId ||
       (!temValorBaseGrade &&
         !temValorPlantaoGravadoNoPeriodo &&
         !temValorPorRegistro &&
@@ -643,29 +658,29 @@ const Relatorios = () => {
           }
         } else if (row.medicoId !== 'sem-medico') {
           const vhLegado = valorHoraPorMedico[row.medicoId];
-          if (apenasPonto) {
-            // Com valor por dia da semana, o valor/h pode variar dentro do período.
-            // Preferir resolução por registro (backend). Fallback para mapa por médico (legado).
-            let rep: number | null = null;
-            let cob: number | null = null;
-            for (const reg of registros.filter((r) => r.escala == null && r.medico?.id === row.medicoId)) {
-              const mins = Number(reg.duracaoMinutos ?? 0);
-              if (!mins || mins <= 0) continue;
-              const vh = reg.id && valorHoraPorRegistroPontoId[reg.id] != null ? Number(valorHoraPorRegistroPontoId[reg.id]) : valorHoraPorMedico[row.medicoId];
-              const vhCob =
-                reg.id && valorHoraCobrancaPorRegistroPontoId[reg.id] != null
-                  ? Number(valorHoraCobrancaPorRegistroPontoId[reg.id])
-                  : valorHoraCobrancaPorMedico[row.medicoId];
-              if (vh != null && Number.isFinite(vh) && vh > 0) {
-                rep = (rep ?? 0) + (mins / 60) * vh;
-              }
-              if (vhCob != null && Number.isFinite(vhCob) && vhCob > 0) {
-                cob = (cob ?? 0) + (mins / 60) * vhCob;
-              }
+          // Com valor por dia da semana, o valor/h pode variar dentro do período.
+          // Preferir resolução por registro (backend). Fallback para mapa por médico (legado).
+          let rep: number | null = null;
+          let cob: number | null = null;
+          for (const reg of registros.filter((r) => r.escala == null && r.medico?.id === row.medicoId)) {
+            const mins = Number(reg.duracaoMinutos ?? 0);
+            if (!mins || mins <= 0) continue;
+            const vh = reg.id && valorHoraPorRegistroPontoId[reg.id] != null ? Number(valorHoraPorRegistroPontoId[reg.id]) : valorHoraPorMedico[row.medicoId];
+            const vhCob =
+              reg.id && valorHoraCobrancaPorRegistroPontoId[reg.id] != null
+                ? Number(valorHoraCobrancaPorRegistroPontoId[reg.id])
+                : valorHoraCobrancaPorMedico[row.medicoId];
+            if (vh != null && Number.isFinite(vh) && vh > 0) {
+              rep = (rep ?? 0) + (mins / 60) * vh;
             }
+            if (vhCob != null && Number.isFinite(vhCob) && vhCob > 0) {
+              cob = (cob ?? 0) + (mins / 60) * vhCob;
+            }
+          }
+          if (rep != null || cob != null) {
             row.valorRepasse = rep != null ? round2(rep) : undefined;
             row.valorCobranca = cob != null ? round2(cob) : undefined;
-          } else if (vhLegado != null && vhLegado > 0) {
+          } else if (!apenasPonto && vhLegado != null && vhLegado > 0) {
             row.valorHora = vhLegado;
             row.valorRepasse = round2((row.totalMinutos / 60) * vhLegado);
           }

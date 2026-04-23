@@ -1175,6 +1175,8 @@ export async function listRegistrosPontoAdminService(
     origem: true,
     observacao: true,
     duracaoMinutos: true,
+    checkInAtrasado: true,
+    minutosAtrasoCheckin: true,
     fotoCheckinCaminho: true,
     motivoCheckinSemFoto: true,
     createdAt: true,
@@ -1195,10 +1197,34 @@ export async function listRegistrosPontoAdminService(
       orderBy: { checkInAt: 'desc' },
     });
   } catch (e: any) {
-    if (isMissingDatabaseColumnError(e, 'repasse_valor_congelado')) {
+    if (
+      isMissingDatabaseColumnError(e, 'repasse_valor_congelado') ||
+      isMissingDatabaseColumnError(e, 'checkin_atrasado') ||
+      isMissingDatabaseColumnError(e, 'minutos_atraso_checkin')
+    ) {
       registros = await prisma.registroPonto.findMany({
         where,
-        select: { ...registroSelectSemCongelado },
+        select: {
+          id: true,
+          tenantId: true,
+          escalaId: true,
+          medicoId: true,
+          checkInAt: true,
+          checkOutAt: true,
+          origem: true,
+          observacao: true,
+          duracaoMinutos: true,
+          fotoCheckinCaminho: true,
+          motivoCheckinSemFoto: true,
+          createdAt: true,
+          updatedAt: true,
+          medico: {
+            select: { id: true, nomeCompleto: true, crm: true, email: true },
+          },
+          escala: {
+            select: { id: true, nome: true, dataInicio: true, dataFim: true },
+          },
+        },
         orderBy: { checkInAt: 'desc' },
       });
     } else {

@@ -36,6 +36,12 @@ const SubgruposEquipes = () => {
     usaPonto: true,
   });
 
+  const estiloProducaoSelecionado = useMemo(() => {
+    if (producaoSubgrupoDraft.usaEscala && producaoSubgrupoDraft.usaPonto) return 'ESCALA_E_PONTO' as const;
+    if (producaoSubgrupoDraft.usaEscala && !producaoSubgrupoDraft.usaPonto) return 'SOMENTE_ESCALA' as const;
+    return 'SOMENTE_PONTO' as const;
+  }, [producaoSubgrupoDraft]);
+
   /** Ao vir da página Escalas pelo link "Ir para Subgrupos e Equipes" ou "Criar escala e vincular", pré-selecionar subgrupo e/ou equipe. */
   useEffect(() => {
     const state = location.state as { subgrupoId?: string; equipeId?: string } | null;
@@ -443,35 +449,53 @@ const SubgruposEquipes = () => {
                   Define se este subgrupo usa grade de plantões na escala e/ou ponto eletrônico (independente de outros
                   subgrupos do mesmo contrato).
                 </p>
-                <div className="flex flex-wrap gap-6">
-                  <label className="flex items-center gap-2 text-sm text-viva-900">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                  <label className="flex items-start gap-2 text-sm text-viva-900 rounded-lg border border-viva-200 bg-white p-2">
                     <input
-                      type="checkbox"
-                      checked={producaoSubgrupoDraft.usaEscala}
-                      onChange={(e) => setProducaoSubgrupoDraft((p) => ({ ...p, usaEscala: e.target.checked }))}
+                      type="radio"
+                      name="estilo-producao-subgrupo"
+                      checked={estiloProducaoSelecionado === 'ESCALA_E_PONTO'}
+                      onChange={() => setProducaoSubgrupoDraft({ usaEscala: true, usaPonto: true })}
                       disabled={loadingAction}
                     />
-                    Usar escalas (plantões)
+                    <span>
+                      <span className="font-semibold">Escala + ponto</span>
+                      <span className="block text-xs text-viva-600">Usa grade de plantões e ponto eletrônico.</span>
+                    </span>
                   </label>
-                  <label className="flex items-center gap-2 text-sm text-viva-900">
+                  <label className="flex items-start gap-2 text-sm text-viva-900 rounded-lg border border-viva-200 bg-white p-2">
                     <input
-                      type="checkbox"
-                      checked={producaoSubgrupoDraft.usaPonto}
-                      onChange={(e) => setProducaoSubgrupoDraft((p) => ({ ...p, usaPonto: e.target.checked }))}
+                      type="radio"
+                      name="estilo-producao-subgrupo"
+                      checked={estiloProducaoSelecionado === 'SOMENTE_ESCALA'}
+                      onChange={() => setProducaoSubgrupoDraft({ usaEscala: true, usaPonto: false })}
                       disabled={loadingAction}
                     />
-                    Usar ponto eletrônico
+                    <span>
+                      <span className="font-semibold">Somente escala</span>
+                      <span className="block text-xs text-viva-600">Usa só grade de plantões, sem ponto eletrônico.</span>
+                    </span>
+                  </label>
+                  <label className="flex items-start gap-2 text-sm text-viva-900 rounded-lg border border-viva-200 bg-white p-2">
+                    <input
+                      type="radio"
+                      name="estilo-producao-subgrupo"
+                      checked={estiloProducaoSelecionado === 'SOMENTE_PONTO'}
+                      onChange={() => setProducaoSubgrupoDraft({ usaEscala: false, usaPonto: true })}
+                      disabled={loadingAction}
+                    />
+                    <span>
+                      <span className="font-semibold">Somente ponto</span>
+                      <span className="block text-xs text-viva-600">Usa apenas ponto eletrônico (sem grade).</span>
+                    </span>
                   </label>
                 </div>
                 <button
                   type="button"
                   className="btn btn-primary text-sm"
-                  disabled={
-                    loadingAction || (!producaoSubgrupoDraft.usaEscala && !producaoSubgrupoDraft.usaPonto)
-                  }
+                  disabled={loadingAction}
                   onClick={async () => {
                     if (!selectedSubgrupoId) return;
-                    if (!producaoSubgrupoDraft.usaEscala && !producaoSubgrupoDraft.usaPonto) return;
                     setLoadingAction(true);
                     try {
                       await adminService.updateSubgrupo(selectedSubgrupoId, {

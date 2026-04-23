@@ -20,6 +20,7 @@ import {
   recusarTrocaPlantaoService,
   canCheckInService,
   getPainelPontoEletronicoInicialService,
+  getHistoricoPontosMedicoService,
 } from '../services/ponto.service';
 
 export const checkInController = async (req: Request, res: Response) => {
@@ -268,6 +269,33 @@ export const canCheckInController = async (req: Request, res: Response) => {
     return res.status(error.statusCode || 500).json({
       success: false,
       error: error.message || 'Erro ao validar check-in',
+    });
+  }
+};
+
+export const getHistoricoPontosMedicoController = async (req: Request, res: Response) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ success: false, error: 'Não autenticado' });
+    }
+    const anoRaw = req.query.ano;
+    const mesRaw = req.query.mes;
+    const ano = anoRaw != null && String(anoRaw).trim() !== '' ? Number(anoRaw) : undefined;
+    const mes = mesRaw != null && String(mesRaw).trim() !== '' ? Number(mesRaw) : undefined;
+
+    if (ano != null && (!Number.isInteger(ano) || ano < 2000 || ano > 2100)) {
+      return res.status(400).json({ success: false, error: 'Ano inválido' });
+    }
+    if (mes != null && (!Number.isInteger(mes) || mes < 1 || mes > 12)) {
+      return res.status(400).json({ success: false, error: 'Mês inválido' });
+    }
+
+    const data = await getHistoricoPontosMedicoService(req.user.tenantId, req.user.id, ano, mes);
+    return res.status(200).json({ success: true, data });
+  } catch (error: any) {
+    return res.status(error.statusCode || 500).json({
+      success: false,
+      error: error.message || 'Erro ao carregar histórico de pontos',
     });
   }
 };

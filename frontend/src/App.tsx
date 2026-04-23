@@ -27,6 +27,7 @@ import SubgruposEquipes from './pages/SubgruposEquipes';
 import ValoresPlantao from './pages/ValoresPlantao';
 import ValoresPonto from './pages/ValoresPonto';
 import PontoEletronico from './pages/PontoEletronico';
+import HistoricoPontos from './pages/HistoricoPontos';
 import MeuCalendarioPlantoes from './pages/MeuCalendarioPlantoes';
 import Relatorios from './pages/Relatorios';
 import RelatoriosPontoEletronico from './pages/RelatoriosPontoEletronico';
@@ -38,6 +39,7 @@ import RedefinirSenha from './pages/RedefinirSenha';
 import AcessoNegado from './pages/AcessoNegado';
 import Vagas from './pages/Vagas';
 import Avaliacao from './pages/Avaliacao';
+import ModuloEscalaMaster from './pages/ModuloEscalaMaster';
 
 /** Animação de carregamento. variant white = fundo branco + vídeo (tela de login). */
 const PageLoadingScreen = ({ variant = 'default' }: { variant?: 'default' | 'white' }) => {
@@ -156,6 +158,7 @@ function AppRoutes() {
           path="/ponto-eletronico"
           element={<PontoEletronico />}
         />
+        <Route path="/historico-pontos" element={<HistoricoPontos />} />
         <Route path="/meu-calendario-plantoes" element={<MeuCalendarioPlantoes />} />
         <Route
           path="/atendimentos"
@@ -172,6 +175,14 @@ function AppRoutes() {
           element={
             <MasterOnly>
               <Avaliacao />
+            </MasterOnly>
+          }
+        />
+        <Route
+          path="/modulo-escala-master"
+          element={
+            <MasterOnly>
+              <ModuloEscalaMaster />
             </MasterOnly>
           }
         />

@@ -15,6 +15,8 @@ type RegistroPontoLinha = {
   checkInAt: string;
   checkOutAt: string | null;
   duracaoMinutos: number | null;
+  checkInAtrasado?: boolean;
+  minutosAtrasoCheckin?: number | null;
   medico?: { nomeCompleto?: string | null } | null;
 };
 
@@ -171,6 +173,8 @@ const RelatoriosPontoEletronico = () => {
       entrada: formatDateTimePtBr(r.checkInAt),
       saida: formatDateTimePtBr(r.checkOutAt),
       minutos: Math.max(0, Number(r.duracaoMinutos ?? 0)),
+      atrasado: !!r.checkInAtrasado,
+      minutosAtraso: Math.max(0, Number(r.minutosAtrasoCheckin ?? 0)),
     }));
   }, [registros]);
 
@@ -184,12 +188,14 @@ const RelatoriosPontoEletronico = () => {
       Profissional: row.profissional,
       Entrada: row.entrada,
       Saida: row.saida,
+      Situação: row.atrasado ? `Atrasado (${row.minutosAtraso} min)` : 'No horário',
       'Total do dia': formatDuration(row.minutos),
     }));
     rows.push({
       Profissional: 'TOTAL DO MÊS',
       Entrada: '',
       Saida: '',
+      Situação: '',
       'Total do dia': formatDuration(totalMinutosMes),
     });
     const ws = XLSX.utils.json_to_sheet(rows);
@@ -211,16 +217,19 @@ const RelatoriosPontoEletronico = () => {
         textoSeguroPdf('Profissional'),
         textoSeguroPdf('Entrada'),
         textoSeguroPdf('Saída'),
+        textoSeguroPdf('Situação'),
         textoSeguroPdf('Total do dia'),
       ]],
       body: linhasTabela.map((row) => [
         textoSeguroPdf(row.profissional),
         textoSeguroPdf(row.entrada),
         textoSeguroPdf(row.saida),
+        textoSeguroPdf(row.atrasado ? `Atrasado (${row.minutosAtraso} min)` : 'No horário'),
         textoSeguroPdf(formatDuration(row.minutos)),
       ]),
       foot: [[
         textoSeguroPdf('TOTAL DO MÊS'),
+        '',
         '',
         '',
         textoSeguroPdf(formatDuration(totalMinutosMes)),
@@ -388,6 +397,7 @@ const RelatoriosPontoEletronico = () => {
                     <th className="py-2 pr-4">Profissional</th>
                     <th className="py-2 pr-4">Hora da entrada</th>
                     <th className="py-2 pr-4">Hora da saída</th>
+                    <th className="py-2 pr-4">Situação na entrada</th>
                     <th className="py-2 pr-4">Total de horas do dia</th>
                   </tr>
                 </thead>
@@ -397,6 +407,17 @@ const RelatoriosPontoEletronico = () => {
                       <td className="py-2 pr-4 font-medium text-viva-900">{row.profissional}</td>
                       <td className="py-2 pr-4 text-viva-900">{row.entrada}</td>
                       <td className="py-2 pr-4 text-viva-900">{row.saida}</td>
+                      <td className="py-2 pr-4 text-viva-900">
+                        {row.atrasado ? (
+                          <span className="inline-flex items-center rounded-full bg-amber-100 text-amber-800 px-2 py-0.5 text-xs font-medium">
+                            Atrasado ({row.minutosAtraso} min)
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center rounded-full bg-emerald-100 text-emerald-800 px-2 py-0.5 text-xs font-medium">
+                            No horário
+                          </span>
+                        )}
+                      </td>
                       <td className="py-2 pr-4 text-viva-900">{formatDuration(row.minutos)}</td>
                     </tr>
                   ))}
