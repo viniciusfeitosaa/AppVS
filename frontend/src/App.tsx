@@ -31,6 +31,7 @@ import HistoricoPontos from './pages/HistoricoPontos';
 import MeuCalendarioPlantoes from './pages/MeuCalendarioPlantoes';
 import Relatorios from './pages/Relatorios';
 import RelatoriosPontoEletronico from './pages/RelatoriosPontoEletronico';
+import RelatoriosProcedimentos from './pages/RelatoriosProcedimentos';
 import Perfil from './pages/Perfil';
 import EnvioDocumentos from './pages/EnvioDocumentos';
 import MeusDocumentos from './pages/MeusDocumentos';
@@ -193,6 +194,10 @@ function AppRoutes() {
         <Route
           path="/relatorios-ponto-eletronico"
           element={<RelatoriosPontoEletronico />}
+        />
+        <Route
+          path="/relatorios-procedimentos"
+          element={<RelatoriosProcedimentos />}
         />
         <Route
           path="/contratos-ativos"

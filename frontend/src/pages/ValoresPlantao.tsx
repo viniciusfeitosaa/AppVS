@@ -52,7 +52,21 @@ function buildMapaValorPorDiaComFallback(draft: Record<string, string>): {
   return { map, fallbackGlobal };
 }
 
-const ValoresPlantao = () => {
+type ValoresPlantaoModo = 'escala_e_ponto' | 'somente_escala';
+
+interface ValoresPlantaoProps {
+  modo?: ValoresPlantaoModo;
+  titulo?: string;
+  descricao?: string;
+  exibirLocalizacaoPonto?: boolean;
+}
+
+const ValoresPlantao = ({
+  modo = 'escala_e_ponto',
+  titulo = 'Valores Hora/Plantão',
+  descricao = 'Escolha contrato, subgrupo e equipe. Os valores por tipo valem para essa equipe no contrato; o relatório converte em valor/hora usando a duração do turno. Opcional: local do ponto (mesmo escopo da equipe).',
+  exibirLocalizacaoPonto = true,
+}: ValoresPlantaoProps) => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const isMaster = user?.role === 'MASTER';
@@ -118,28 +132,37 @@ const ValoresPlantao = () => {
 
   const subgruposDoContrato = useMemo(() => {
     if (!contratoId) return [];
+    const matchModo = (s: { usaEscala?: boolean; usaPonto?: boolean }) => {
+      if (modo === 'somente_escala') return Boolean(s.usaEscala && !s.usaPonto);
+      return Boolean(s.usaEscala && s.usaPonto);
+    };
     return subgrupos
       .filter((s) => s.ativo !== false)
       .filter((s) => allowedSubgrupoIds.has(s.id))
       .filter((s) => {
         const x = s as { usaEscala?: boolean; usaPonto?: boolean };
-        return Boolean(x.usaEscala && x.usaPonto);
+        return matchModo(x);
       });
-  }, [allowedSubgrupoIds, contratoId, subgrupos]);
+  }, [allowedSubgrupoIds, contratoId, modo, subgrupos]);
 
-  const contratoIdsComSubgrupoEscalaEPonto = useMemo(() => {
+  const contratoIdsComSubgrupoDoModo = useMemo(() => {
     const subById = new Map(subgrupos.map((s: { id: string; usaEscala?: boolean; usaPonto?: boolean }) => [s.id, s]));
     const ids = new Set<string>();
+    const matchModo = (sg?: { usaEscala?: boolean; usaPonto?: boolean }) => {
+      if (!sg) return false;
+      if (modo === 'somente_escala') return Boolean(sg.usaEscala && !sg.usaPonto);
+      return Boolean(sg.usaEscala && sg.usaPonto);
+    };
     for (const cs of contratoSubgrupos as { contratoAtivoId: string; subgrupoId: string }[]) {
       const sg = subById.get(cs.subgrupoId) as { usaEscala?: boolean; usaPonto?: boolean } | undefined;
-      if (sg?.usaEscala && sg?.usaPonto) ids.add(cs.contratoAtivoId);
+      if (matchModo(sg)) ids.add(cs.contratoAtivoId);
     }
     return ids;
-  }, [contratoSubgrupos, subgrupos]);
+  }, [contratoSubgrupos, modo, subgrupos]);
 
-  const contratosEscalaEPonto = useMemo(
-    () => contratos.filter((c: { id: string }) => contratoIdsComSubgrupoEscalaEPonto.has(c.id)),
-    [contratos, contratoIdsComSubgrupoEscalaEPonto]
+  const contratosFiltrados = useMemo(
+    () => contratos.filter((c: { id: string }) => contratoIdsComSubgrupoDoModo.has(c.id)),
+    [contratos, contratoIdsComSubgrupoDoModo]
   );
 
   const { data: tiposResp, isLoading: loadingTipos, isError: erroTipos } = useQuery({
@@ -411,12 +434,8 @@ const ValoresPlantao = () => {
   return (
     <div className="space-y-6">
       <div className="card border-l-4 border-viva-500">
-        <h2 className="text-2xl font-bold text-viva-900 mb-1">Valores Hora/Plantão</h2>
-        <p className="text-gray-600">
-          Escolha <strong>contrato</strong>, <strong>subgrupo</strong> e <strong>equipe</strong>. Os valores por tipo
-          valem para essa equipe no contrato; o relatório converte em valor/hora usando a duração do turno. Opcional:
-          local do ponto (mesmo escopo da equipe).
-        </p>
+        <h2 className="text-2xl font-bold text-viva-900 mb-1">{titulo}</h2>
+        <p className="text-gray-600">{descricao}</p>
       </div>
 
       {error && (
@@ -457,7 +476,7 @@ const ValoresPlantao = () => {
                 onChange={(e) => onContratoChange(e.target.value)}
               >
                 <option value="">Selecione o contrato</option>
-                {contratosEscalaEPonto.map((c: any) => (
+                {contratosFiltrados.map((c: any) => (
                   <option key={c.id} value={c.id}>
                     {c.nome}
                   </option>
@@ -508,7 +527,7 @@ const ValoresPlantao = () => {
         )}
       </div>
 
-      {temEscopoCompleto && (
+      {temEscopoCompleto && exibirLocalizacaoPonto && (
         <div className="card">
           <h3 className="text-lg font-bold text-viva-900 mb-4">Tipos de plantão (contrato)</h3>
           <p className="text-sm text-viva-700 mb-4">

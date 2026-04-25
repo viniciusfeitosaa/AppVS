@@ -33,6 +33,7 @@ const getMobileIcon = (label: string) => {
     case 'Relatórios':
     case 'Relatório financeiro':
     case 'Relatórios de ponto eletrônico':
+    case 'Relatório de procedimentos':
       return (
         <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
           <path d="M4 4h16v16H4z" />
@@ -92,7 +93,7 @@ const getMobileIcon = (label: string) => {
           <path d="M12 3l2.4 5.5L20 9.3l-4.5 3.9L16.6 20 12 16.9 7.4 20l1.1-6.8L4 9.3l5.6-.8L12 3z" />
         </svg>
       );
-    case 'Módulo Escala':
+    case 'Somente escala':
       return (
         <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
           <rect x="3" y="4" width="18" height="17" rx="2" />
@@ -180,6 +181,7 @@ const AppShell = () => {
           items: [
             { to: '/relatorios', label: 'Relatório financeiro' },
             { to: '/relatorios-ponto-eletronico', label: 'Relatórios de ponto eletrônico' },
+            { to: '/relatorios-procedimentos', label: 'Relatório de procedimentos' },
           ],
         },
         {
@@ -188,7 +190,7 @@ const AppShell = () => {
             { to: '/contratos-ativos', label: 'Contratos Ativos' },
             { to: '/valores-plantao', label: 'Valores Hora/Plantão' },
             { to: '/valores-ponto', label: 'Horas/Valor Ponto Eletrônico' },
-            { to: '/modulo-escala-master', label: 'Módulo Escala' },
+            { to: '/modulo-escala-master', label: 'Somente escala' },
             { to: '/envio-documentos', label: 'Envio de Documentos' },
             { to: '/perfil', label: 'Minha Conta' },
           ],
@@ -219,6 +221,7 @@ const AppShell = () => {
     '/medicos': 'MEDICOS',
     '/relatorios': 'RELATORIOS',
     '/relatorios-ponto-eletronico': 'RELATORIOS',
+    '/relatorios-procedimentos': 'RELATORIOS',
     '/contratos-ativos': 'CONTRATOS_ATIVOS',
     '/valores-plantao': 'VALORES_PLANTAO',
     '/valores-ponto': 'PONTO_ELETRONICO',

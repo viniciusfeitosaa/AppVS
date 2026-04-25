@@ -317,13 +317,14 @@ const Relatorios = () => {
   }, [subgrupoId, subgruposList]);
 
   /** Regras de relatório alinhadas ao estilo de produção por subgrupo (com fallback ao contrato até carregar subgrupos). */
-  const { usaEscalaEPonto, apenasPonto, mostrarRepasseECobranca } = useMemo(() => {
+  const { usaEscalaEPonto, usaSomenteEscala, apenasPonto, mostrarRepasseECobranca } = useMemo(() => {
     if (subgrupoSelecionadoMeta) {
       const sg = subgrupoSelecionadoMeta;
       return {
         usaEscalaEPonto: Boolean(sg.usaEscala && sg.usaPonto),
+        usaSomenteEscala: Boolean(sg.usaEscala && !sg.usaPonto),
         apenasPonto: Boolean(sg.usaPonto && !sg.usaEscala),
-        mostrarRepasseECobranca: Boolean(sg.usaPonto),
+        mostrarRepasseECobranca: Boolean(sg.usaEscala || sg.usaPonto),
       };
     }
     const sgList = (subgruposList as { subgrupo?: { usaEscala?: boolean; usaPonto?: boolean } }[])
@@ -332,22 +333,27 @@ const Relatorios = () => {
     if (contratoId && sgList.length > 0) {
       return {
         usaEscalaEPonto: sgList.some((s) => s.usaEscala && s.usaPonto),
+        usaSomenteEscala:
+          sgList.some((s) => s.usaEscala && !s.usaPonto) && !sgList.some((s) => s.usaEscala && s.usaPonto),
         apenasPonto:
           sgList.some((s) => s.usaPonto && !s.usaEscala) && !sgList.some((s) => s.usaEscala && s.usaPonto),
-        mostrarRepasseECobranca: sgList.some((s) => s.usaPonto),
+        mostrarRepasseECobranca: sgList.some((s) => s.usaEscala || s.usaPonto),
       };
     }
     return {
       usaEscalaEPonto: Boolean(contratoSelecionado?.usaEscala && contratoSelecionado?.usaPonto),
+      usaSomenteEscala: Boolean(contratoSelecionado?.usaEscala && !contratoSelecionado?.usaPonto),
       apenasPonto: Boolean(contratoSelecionado?.usaPonto && !contratoSelecionado?.usaEscala),
-      mostrarRepasseECobranca: Boolean(contratoSelecionado?.usaPonto),
+      mostrarRepasseECobranca: Boolean(contratoSelecionado?.usaEscala || contratoSelecionado?.usaPonto),
     };
   }, [subgrupoSelecionadoMeta, subgruposList, contratoId, contratoSelecionado]);
+
+  const usaEscalaComValoresPlantao = usaEscalaEPonto || usaSomenteEscala;
 
   const { data: valoresPlantaoResp } = useQuery({
     queryKey: ['admin', 'valores-plantao', contratoId, subgrupoId || '__all__', equipeId || '__none__', 'relatorio'],
     queryFn: () => adminService.getValoresPlantao(contratoId, subgrupoId || undefined, equipeId || undefined),
-    enabled: isMaster && usaEscalaEPonto && Boolean(contratoId),
+    enabled: isMaster && usaEscalaComValoresPlantao && Boolean(contratoId),
   });
   const { data: adicionaisResp } = useQuery({
     queryKey: ['admin', 'adicionais-plantao', contratoId, dataInicio, dataFim],
@@ -357,7 +363,7 @@ const Relatorios = () => {
         dataInicio,
         dataFim,
       }),
-    enabled: isMaster && usaEscalaEPonto && Boolean(contratoId && dataInicio && dataFim),
+    enabled: isMaster && usaEscalaComValoresPlantao && Boolean(contratoId && dataInicio && dataFim),
   });
 
   const valoresPlantaoPorGrade = useMemo(() => {
@@ -628,7 +634,7 @@ const Relatorios = () => {
     const temGradeResolvido = Object.keys(gradeIdPlantaoPorRegistroPontoId).length > 0;
     // Fallback: só quando não há base de plantão/grade no período; nunca sobrescreve linha já calculada no loop principal.
     if (
-      !usaEscalaEPonto ||
+      !usaEscalaComValoresPlantao ||
       (!temValorBaseGrade &&
         !temValorPlantaoGravadoNoPeriodo &&
         !temValorPorRegistro &&
@@ -697,6 +703,7 @@ const Relatorios = () => {
     registrosDerived,
     contratoId,
     usaEscalaEPonto,
+    usaEscalaComValoresPlantao,
     valoresPlantaoPorGrade,
     apenasPonto,
     adicionaisPorDataGrade,
