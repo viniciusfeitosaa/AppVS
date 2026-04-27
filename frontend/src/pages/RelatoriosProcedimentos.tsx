@@ -130,6 +130,24 @@ function IconEyeOff({ className }: { className?: string }) {
   );
 }
 
+function IconPencil({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <path d="M12 20h9" />
+      <path d="M16.5 3.5a2.12 2.12 0 1 1 3 3L7 19l-4 1 1-4 12.5-12.5z" />
+    </svg>
+  );
+}
+
 const textoSeguroPdf = (s: string) =>
   String(s)
     .replace(/\u202f/g, ' ')
@@ -787,9 +805,12 @@ const RelatoriosProcedimentos = () => {
     const L = localRef.current;
     const comRepasse: LinhaProcedimento = { ...linhaPendente, quemRepasse: { ...rascunhoProfs } };
     const limpo = rascunhoNomesVazios(rascunhoProfs);
+    const jaExiste = L.procedimentos.some((p) => p.id === comRepasse.id);
     persist({
       ...L,
-      procedimentos: [...L.procedimentos, comRepasse],
+      procedimentos: jaExiste
+        ? L.procedimentos.map((p) => (p.id === comRepasse.id ? comRepasse : p))
+        : [...L.procedimentos, comRepasse],
       profissional1Nome: '',
       profissional1Crm: '',
       profissional2Nome: '',
@@ -806,6 +827,19 @@ const RelatoriosProcedimentos = () => {
   const remover = (id: string) => {
     const L = localRef.current;
     persist({ ...L, procedimentos: L.procedimentos.filter((l) => l.id !== id) });
+  };
+
+  const editar = (id: string) => {
+    const L = localRef.current;
+    const alvo = L.procedimentos.find((l) => l.id === id);
+    if (!alvo) return;
+    setLinhaPendente({ ...alvo });
+    setRascunhoProfs(quemRepasseEfetivo(alvo, L));
+    setBusca('');
+    setAbrirSugestoes(false);
+    requestAnimationFrame(() => {
+      document.getElementById('secao-lancamentos-mes')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
   };
 
   const lancPesoTotal = useMemo(() => {
@@ -1504,7 +1538,9 @@ const RelatoriosProcedimentos = () => {
                   Descartar
                 </button>
                 <button type="button" className="btn btn-primary btn-sm" onClick={salvarLinhaPendente}>
-                  Incluir na tabela de lançamentos
+                  {linhaPendente && local.procedimentos.some((p) => p.id === linhaPendente.id)
+                    ? 'Salvar edição'
+                    : 'Incluir na tabela de lançamentos'}
                 </button>
               </div>
             </div>
@@ -1655,7 +1691,16 @@ const RelatoriosProcedimentos = () => {
                   {linhasTotais.map((l, i) => (
                     <tr key={l.id} className={i % 2 ? 'bg-viva-50/20' : 'bg-white border-t border-slate-100/90'}>
                       <td className="p-0.5 sm:p-1 align-middle min-w-0">
-                        <div className="flex justify-center">
+                        <div className="flex items-center justify-center gap-1">
+                          <button
+                            type="button"
+                            onClick={() => editar(l.id)}
+                            className="text-viva-700 text-[10px] sm:text-[11px] min-w-0 px-1.5 h-7 rounded hover:bg-viva-50 shrink-0 inline-flex items-center gap-1"
+                            title="Editar"
+                          >
+                            <IconPencil className="h-3 w-3 shrink-0" />
+                            Editar
+                          </button>
                           <button
                             type="button"
                             onClick={() => remover(l.id)}
