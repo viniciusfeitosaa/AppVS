@@ -1472,7 +1472,15 @@ const RelatoriosProcedimentos = () => {
                   >
                     <span className="font-mono text-amber-900/90 font-medium">{b.instrumento}</span>
                     <span className="text-viva-500 mx-1">|</span>
-                    <span className="text-viva-800">{b.nome1.slice(0, 64)}{b.nome1.length > 64 ? '…' : ''}</span>
+                    <span className="text-viva-800">
+                      {b.nome1.slice(0, 56)}
+                      {b.nome1.length > 56 ? '…' : ''}
+                      {' '}
+                      <span className="text-viva-500">|</span>
+                      {' '}
+                      {b.nome2.slice(0, 56)}
+                      {b.nome2.length > 56 ? '…' : ''}
+                    </span>
                     <span className="block text-viva-500 text-[10px] mt-0.5 pl-0 font-serif">{b.codigo1}</span>
                   </button>
                 </li>
