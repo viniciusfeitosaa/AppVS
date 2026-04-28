@@ -1715,17 +1715,18 @@ const RelatoriosProcedimentos = () => {
                           <button
                             type="button"
                             onClick={() => editar(l.id)}
-                            className="text-viva-700 text-[10px] sm:text-[11px] min-w-0 px-1.5 h-7 rounded hover:bg-viva-50 shrink-0 inline-flex items-center gap-1"
+                            className="text-viva-700 text-xs w-7 h-7 rounded hover:bg-viva-50 shrink-0 inline-flex items-center justify-center"
                             title="Editar"
+                            aria-label="Editar"
                           >
                             <IconPencil className="h-3 w-3 shrink-0" />
-                            Editar
                           </button>
                           <button
                             type="button"
                             onClick={() => remover(l.id)}
-                            className="text-rose-600 text-xs w-7 h-7 rounded hover:bg-rose-50 shrink-0"
+                            className="text-rose-600 text-xs w-7 h-7 rounded hover:bg-rose-50 shrink-0 inline-flex items-center justify-center"
                             title="Excluir"
+                            aria-label="Excluir"
                           >
                             ×
                           </button>
