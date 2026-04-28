@@ -317,6 +317,12 @@ const parseNumeroBr = (s: string, fallback: number = 0): number => {
 };
 
 const parseBrl = (s: string) => parseNumeroBr(s, 0);
+const formatarDataISO = (iso: string): string => {
+  if (!iso) return '—';
+  const [y, m, d] = iso.split('-');
+  if (!y || !m || !d) return iso;
+  return `${d}/${m}/${y}`;
+};
 const parsePercent = (s: string, fallback: number) => {
   const n = parseNumeroBr(s, NaN);
   return Number.isNaN(n) ? fallback : n;
@@ -787,9 +793,11 @@ const RelatoriosProcedimentos = () => {
       if (!atual) return base;
       return {
         ...base,
+        id: atual.id,
         dataProcedimento: atual.dataProcedimento ?? '',
         nomePaciente: atual.nomePaciente ?? '',
         prontuario: atual.prontuario ?? '',
+        quemRepasse: atual.quemRepasse,
       };
     });
     setBusca('');
@@ -1640,6 +1648,8 @@ const RelatoriosProcedimentos = () => {
               >
                 <colgroup>
                   <col style={{ width: `${lancWidthPct('acoes')}%` }} />
+                  <col style={{ width: '3.8%' }} />
+                  <col style={{ width: '6.8%' }} />
                   {LANC_COL_ORDER.map((k) => (
                     <col key={k} style={{ width: `${lancWidthPct(k)}%` }} />
                   ))}
@@ -1647,6 +1657,8 @@ const RelatoriosProcedimentos = () => {
                 <thead>
                   <tr className="bg-slate-800/95 text-white text-[8px] sm:text-[9px] font-display">
                     <th className="py-1 px-0.5 sm:px-1 align-bottom font-medium">—</th>
+                    <th className="py-1 px-0.5 sm:px-1 align-bottom font-medium text-center">#</th>
+                    <th className="py-1 px-0.5 sm:px-1 align-bottom font-medium text-center">Data</th>
                     {LANC_TH.map(({ key, label, thTitle, borderL }) => {
                       const vis = colsLanc[key];
                       return (
@@ -1717,6 +1729,16 @@ const RelatoriosProcedimentos = () => {
                           >
                             ×
                           </button>
+                        </div>
+                      </td>
+                      <td className="p-0.5 sm:p-1 align-middle min-w-0">
+                        <div className="w-full min-w-0 max-w-full h-6 flex items-center justify-center text-[9px] sm:text-[10px] font-semibold text-viva-900 py-0 px-0.5">
+                          {i + 1}
+                        </div>
+                      </td>
+                      <td className="p-0.5 sm:p-1 align-middle min-w-0">
+                        <div className="w-full min-w-0 max-w-full h-6 flex items-center justify-center text-[9px] sm:text-[10px] text-viva-900 py-0 px-0.5">
+                          {formatarDataISO(l.dataProcedimento)}
                         </div>
                       </td>
                       {LANC_COL_ORDER.map((k) => {
