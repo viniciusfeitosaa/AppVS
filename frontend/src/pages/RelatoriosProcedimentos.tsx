@@ -46,7 +46,7 @@ const loadColsLanc = (): Record<ColLancKey, boolean> => {
 
 /** Pesos relativos para `table-layout: fixed` (largura % soma 100 com colunas visíveis). Inclui ações. */
 const PESO_COL_LANC: Record<'acoes' | ColLancKey, number> = {
-  acoes: 2.2,
+  acoes: 3.4,
   ins: 2.8,
   cod1: 3.6,
   proc1: 16,
@@ -1641,7 +1641,7 @@ const RelatoriosProcedimentos = () => {
               </p>
             )}
             {modoVisualLanc === 'detalhado' ? (
-            <div className="w-full min-w-0 max-w-full rounded-b-lg overflow-auto max-h-[68vh]">
+            <div className="w-full min-w-0 max-w-full rounded-b-lg overflow-auto max-h-[68vh] px-1 sm:px-2 pb-1">
               <table
                 className="w-full min-w-[1550px] table-fixed border-collapse text-left text-[9px] sm:text-[11px] [word-break:break-word]"
                 id="tabela-lancamentos-mes"
