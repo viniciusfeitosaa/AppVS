@@ -623,12 +623,21 @@ const RelatoriosProcedimentos = () => {
 
   const linhasTotais = useMemo(
     () =>
-      local.procedimentos.map((l) => {
-        const p1 = parseBrl(l.valorPrimeiro);
-        const p2 = parseBrl(l.valorSegundo);
-        const bruto = p1 + 0.5 * p2;
-        return { ...l, p1, p2, bruto: round2(bruto) };
-      }),
+      [...local.procedimentos]
+        .sort((a, b) => {
+          const da = (a.dataProcedimento || '').trim();
+          const db = (b.dataProcedimento || '').trim();
+          if (!da && !db) return 0;
+          if (!da) return 1;
+          if (!db) return -1;
+          return da.localeCompare(db);
+        })
+        .map((l) => {
+          const p1 = parseBrl(l.valorPrimeiro);
+          const p2 = parseBrl(l.valorSegundo);
+          const bruto = p1 + 0.5 * p2;
+          return { ...l, p1, p2, bruto: round2(bruto) };
+        }),
     [local.procedimentos]
   );
 
