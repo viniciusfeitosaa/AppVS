@@ -1643,7 +1643,7 @@ const RelatoriosProcedimentos = () => {
             {modoVisualLanc === 'detalhado' ? (
             <div className="w-full min-w-0 max-w-full rounded-b-lg overflow-auto max-h-[68vh]">
               <table
-                className="w-full table-fixed border-collapse text-left text-[9px] sm:text-[11px] [word-break:break-word]"
+                className="w-full min-w-[1550px] table-fixed border-collapse text-left text-[9px] sm:text-[11px] [word-break:break-word]"
                 id="tabela-lancamentos-mes"
               >
                 <colgroup>
