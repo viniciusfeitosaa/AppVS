@@ -173,6 +173,18 @@
   .cadastro-btn-row a.btn-secondary {
     @apply rounded-full py-3.5 font-medium tracking-tight;
   }
+
+  /* Landing institucional (rota /landing-v2) — vidro e ícones Material */
+  .landing-v2-root .material-symbols-outlined {
+    font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+    display: inline-block;
+    vertical-align: middle;
+  }
+  .landing-v2-root .glass-card {
+    background: rgba(255, 255, 255, 0.7);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(226, 232, 240, 0.8);
+  }
 }
 
 @keyframes fadeInUp {

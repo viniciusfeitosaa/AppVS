@@ -12,9 +12,12 @@ import { NotificationProvider } from './context/NotificationContext';
 import ProtectedRoute from './components/Layout/ProtectedRoute';
 import AppShell from './components/Layout/AppShell';
 import LandingLayout from './components/Layout/LandingLayout';
+import LandingV2Layout from './components/Layout/LandingV2Layout';
 import Landing from './pages/Landing';
+import LandingV2 from './pages/LandingV2';
 import Sobre from './pages/Sobre';
 import Contato from './pages/Contato';
+import PoliticaPrivacidade from './pages/PoliticaPrivacidade';
 import Login from './pages/Login';
 import Cadastro from './pages/Cadastro';
 import Dashboard from './pages/Dashboard';
@@ -116,6 +119,10 @@ function AppRoutes() {
         <Route path="/" element={<Landing />} />
         <Route path="/sobre" element={<Sobre />} />
         <Route path="/contato" element={<Contato />} />
+        <Route path="/politica-privacidade" element={<PoliticaPrivacidade />} />
+      </Route>
+      <Route element={<LandingV2Layout />}>
+        <Route path="/landing-v2" element={<LandingV2 />} />
       </Route>
       <Route 
         path="/login" 

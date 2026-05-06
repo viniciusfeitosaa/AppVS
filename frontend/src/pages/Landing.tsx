@@ -26,6 +26,11 @@ export default function Landing() {
               Conheça mais
             </Link>
           </div>
+          <p className="mt-6 text-center">
+            <Link to="/landing-v2" className="text-sm text-viva-600/90 underline hover:text-viva-800">
+              Prévia da landing institucional
+            </Link>
+          </p>
         </div>
       </section>
       <section className="py-16 bg-viva-50 border-y border-viva-100">
