@@ -70,6 +70,10 @@ import {
   listCadastrosPendentesService,
   rejeitarCadastroPendenteService,
 } from '../services/cadastro-pendente.service';
+import {
+  getRelatorioProcedimentosMesService,
+  upsertRelatorioProcedimentosMesService,
+} from '../services/relatorio-procedimentos.service';
 import { ModuloSistema, UserRole } from '@prisma/client';
 
 export const listMedicosController = async (req: Request, res: Response) => {
@@ -284,6 +288,39 @@ export const toggleMedicoAtivoController = async (req: Request, res: Response) =
     return res.status(error.statusCode || 500).json({
       success: false,
       error: error.message || 'Erro ao alterar status do médico',
+    });
+  }
+};
+
+// Relatório de procedimentos (Lançamentos do mês) — persistência por mês no backend
+export const getRelatorioProcedimentosMesController = async (req: Request, res: Response) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ success: false, error: 'Não autenticado' });
+    }
+    const mesRef = String(req.params.mesRef || '');
+    const dados = await getRelatorioProcedimentosMesService(req.user.tenantId, mesRef);
+    return res.status(200).json({ success: true, data: dados });
+  } catch (error: any) {
+    return res.status(error.statusCode || 500).json({
+      success: false,
+      error: error.message || 'Erro ao buscar relatório de procedimentos',
+    });
+  }
+};
+
+export const upsertRelatorioProcedimentosMesController = async (req: Request, res: Response) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ success: false, error: 'Não autenticado' });
+    }
+    const mesRef = String(req.params.mesRef || '');
+    await upsertRelatorioProcedimentosMesService(req.user.tenantId, mesRef, req.body?.dados);
+    return res.status(200).json({ success: true });
+  } catch (error: any) {
+    return res.status(error.statusCode || 500).json({
+      success: false,
+      error: error.message || 'Erro ao salvar relatório de procedimentos',
     });
   }
 };

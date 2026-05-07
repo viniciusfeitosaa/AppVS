@@ -8,6 +8,7 @@ import {
   createEscalaPlantaoController,
   replicarEscalaPlantoesMesController,
   createMedicoController,
+  getRelatorioProcedimentosMesController,
   deleteEscalaController,
   deleteContratoAtivoController,
   listAdicionaisPlantaoController,
@@ -59,6 +60,7 @@ import {
   updateEscalaController,
   updateContratoAtivoController,
   updateMedicoController,
+  upsertRelatorioProcedimentosMesController,
 } from '../controllers/admin.controller';
 import {
   addEquipeToEscalaController,
@@ -93,6 +95,10 @@ router.use(authenticateToken);
 router.use(requireRole([UserRole.MASTER]));
 
 router.get('/medicos', requireModuleAccess(ModuloSistema.MEDICOS), listMedicosController);
+// Relatório de procedimentos (Lançamentos do mês): persistência por mês no backend.
+// Mantemos apenas autenticação + role MASTER (sem gate por módulo) para evitar "parece que salvou mas some" em outros PCs.
+router.get('/relatorios/procedimentos/:mesRef', getRelatorioProcedimentosMesController);
+router.put('/relatorios/procedimentos/:mesRef', upsertRelatorioProcedimentosMesController);
 router.get(
   '/integrations/docuseal/pending-submissions',
   requireModuleAccess(ModuloSistema.MEDICOS),
