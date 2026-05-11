@@ -10,7 +10,8 @@ import procedimentosBase from '../data/procedimentosBase.json';
 const BRL = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
 const PCT = new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 3 });
 
-const defaultDeflatorPct = 23.021;
+/** Com custo adm. 25% e rep. 2.º 30% do pool (1.º+2.º), (1−d)×0,75×1,3 = 0,75 ⇒ margem 25% da cobrança. d = 3/13. */
+const defaultDeflatorPct = 300 / 13;
 const defaultCustoAdmPct = 25;
 const defaultRepasse2MedPct = 30;
 const STORAGE_KEY = 'relatorioProcedimentosCalc_v1';
@@ -503,6 +504,17 @@ const RelatoriosProcedimentos = () => {
     staleTime: 60_000,
   });
 
+  const {
+    data: remotoMesResp,
+  } = useQuery({
+    queryKey: ['admin', 'relatorio-procedimentos', 'mes', mesChave],
+    queryFn: () => adminService.getRelatorioProcedimentosMes(mesChave),
+    enabled: isMaster,
+    staleTime: 0,
+    refetchOnWindowFocus: false,
+    retry: 1,
+  });
+
   useEffect(() => {
     setStore(loadStore());
   }, []);
@@ -546,6 +558,30 @@ const RelatoriosProcedimentos = () => {
     setBusca('');
     setLinhaPendente(null);
   }, [mesChave]);
+
+  // Backend é a fonte de verdade (entre PCs). Se houver dados remotos para o mês, rehidrata o estado local.
+  useEffect(() => {
+    if (!isMaster) return;
+    const resp = remotoMesResp;
+    if (!resp || resp.success === false) return;
+    if (!resp.data || typeof resp.data !== 'object') return;
+    const remotoRaw = resp.data as unknown as DadosMes;
+    const remotoNorm = normalizarDadosMes({
+      ...remotoRaw,
+      deflatorPct: (remotoRaw as any).deflatorPct ?? String(defaultDeflatorPct),
+      custoAdmPct: (remotoRaw as any).custoAdmPct ?? String(defaultCustoAdmPct),
+      repasse2MedPct: (remotoRaw as any).repasse2MedPct ?? String(defaultRepasse2MedPct),
+      procedimentos: migrarProcedimentos((remotoRaw as any).procedimentos),
+    });
+    const { dados } = enriquecerLinhasComQuemRepasseAusente(remotoNorm);
+    setLocal(dados);
+    setRascunhoProfs(pickRascunhoProfs(dados));
+    setStore((prev) => {
+      const next = { ...prev, [mesChave]: dados };
+      saveStore(next);
+      return next;
+    });
+  }, [isMaster, remotoMesResp, mesChave]);
 
   const persist = useCallback(
     (a: DadosMes) => {
@@ -635,7 +671,7 @@ const RelatoriosProcedimentos = () => {
         .map((l) => {
           const p1 = parseBrl(l.valorPrimeiro);
           const p2 = parseBrl(l.valorSegundo);
-          const bruto = p1 + 0.5 * p2;
+          const bruto = p1 + p2;
           return { ...l, p1, p2, bruto: round2(bruto) };
         }),
     [local.procedimentos]
@@ -1545,7 +1581,7 @@ const RelatoriosProcedimentos = () => {
                 Contrib. bruta:{' '}
                 {BRL.format(
                   round2(
-                    parseBrl(linhaPendente.valorPrimeiro) + 0.5 * parseBrl(linhaPendente.valorSegundo)
+                    parseBrl(linhaPendente.valorPrimeiro) + parseBrl(linhaPendente.valorSegundo)
                   )
                 )}
               </p>
@@ -1996,10 +2032,12 @@ const RelatoriosProcedimentos = () => {
         )}
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <div
+        className={`grid gap-3 ${dPct > 0 ? 'grid-cols-2 md:grid-cols-4' : 'grid-cols-2 md:grid-cols-3'}`}
+      >
         {[
           { t: 'Valor cobrança', v: BRL.format(valorBruto) },
-          { t: 'Base deflatada', v: BRL.format(baseDeflada) },
+          ...(dPct > 0 ? [{ t: 'Base deflatada', v: BRL.format(baseDeflada) }] : []),
           { t: 'Repasse total', v: BRL.format(repasseTotal) },
           { t: 'Margem coop.', v: BRL.format(margemCoop) },
         ].map((c) => (
@@ -2038,29 +2076,38 @@ const RelatoriosProcedimentos = () => {
             <tbody className="text-viva-800 font-serif text-xs sm:text-sm">
               <tr className="border-b border-viva-100">
                 <td className="px-3 py-2 font-bold font-display">Valor cobrança</td>
-                <td className="px-3 py-2">Soma por linha: 1.º + 50% × 2.º</td>
+                <td className="px-3 py-2">Soma por linha: 1.º + 2.º</td>
                 <td className="px-3 py-2 text-right font-mono font-semibold">{BRL.format(valorBruto)}</td>
               </tr>
-              <tr className="border-b border-viva-100">
-                <td className="px-3 py-2 font-bold font-display">Deflator</td>
-                <td className="px-3 py-2">
-                  Por linha: −{PCT.format(dPct * 100)}% do bruto · Parâmetros
-                </td>
-                <td className="px-3 py-2 text-right font-mono">−{BRL.format(descontoDeflator)}</td>
-              </tr>
-              <tr className="border-b border-viva-100">
-                <td className="px-3 py-2 font-bold font-display">Base deflatada</td>
-                <td className="px-3 py-2">Soma por linha após deflator</td>
-                <td className="px-3 py-2 text-right font-mono font-semibold">{BRL.format(baseDeflada)}</td>
-              </tr>
+              {dPct > 0 && (
+                <>
+                  <tr className="border-b border-viva-100">
+                    <td className="px-3 py-2 font-bold font-display">Deflator</td>
+                    <td className="px-3 py-2">
+                      Por linha: −{PCT.format(dPct * 100)}% do bruto · Parâmetros
+                    </td>
+                    <td className="px-3 py-2 text-right font-mono">−{BRL.format(descontoDeflator)}</td>
+                  </tr>
+                  <tr className="border-b border-viva-100">
+                    <td className="px-3 py-2 font-bold font-display">Base deflatada</td>
+                    <td className="px-3 py-2">Soma por linha após deflator</td>
+                    <td className="px-3 py-2 text-right font-mono font-semibold">{BRL.format(baseDeflada)}</td>
+                  </tr>
+                </>
+              )}
               <tr className="border-b border-viva-100">
                 <td className="px-3 py-2 font-bold font-display">Custo ad.</td>
-                <td className="px-3 py-2">Soma, por linha, de {PCT.format(admPct * 100)}% da base de cada linha</td>
+                <td className="px-3 py-2">
+                  Soma, por linha, de {PCT.format(admPct * 100)}% da base de cada linha
+                  {dPct > 0 ? ' (após deflator)' : ' (cobrança bruta da linha)'}
+                </td>
                 <td className="px-3 py-2 text-right font-mono">−{BRL.format(custoAdm)}</td>
               </tr>
               <tr className="border-b border-viva-100">
                 <td className="px-3 py-2 font-bold font-display">Pool repasse</td>
-                <td className="px-3 py-2">Soma por linha: base deflat. − custo · Parâmetros</td>
+                <td className="px-3 py-2">
+                  Soma por linha: {dPct > 0 ? 'base deflatada' : 'cobrança bruta'} − custo · Parâmetros
+                </td>
                 <td className="px-3 py-2 text-right font-mono font-semibold">{BRL.format(poolAposCusto)}</td>
               </tr>
               <tr className="border-b border-viva-100">
@@ -2125,6 +2172,9 @@ const RelatoriosProcedimentos = () => {
                   value={rascunho.deflatorPct}
                   onChange={(e) => setRascunho((d) => ({ ...d, deflatorPct: e.target.value }))}
                 />
+                <p className="text-xs text-viva-600 mt-1">
+                  Use <span className="font-mono">0</span> para desativar: o detalhe do cálculo deixa de mostrar deflator e base deflatada.
+                </p>
               </div>
               <div>
                 <label className="text-sm font-semibold text-viva-800">Custo admin. %</label>

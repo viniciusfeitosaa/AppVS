@@ -409,11 +409,26 @@ export interface AcessoModuloItem {
   permitido: boolean;
 }
 
+export interface RelatorioProcedimentosMesApiResponse {
+  success: boolean;
+  data: Record<string, unknown> | null;
+}
+
 export const adminService = {
   listMedicos: async (params?: { page?: number; limit?: number; search?: string; ativo?: boolean }) => {
     const response = await api.get<ListMedicosResponse>('/admin/medicos', {
       params,
     });
+    return response.data;
+  },
+
+  getRelatorioProcedimentosMes: async (mesRef: string): Promise<RelatorioProcedimentosMesApiResponse> => {
+    const response = await api.get<RelatorioProcedimentosMesApiResponse>(`/admin/relatorios/procedimentos/${mesRef}`);
+    return response.data;
+  },
+
+  saveRelatorioProcedimentosMes: async (mesRef: string, dados: Record<string, unknown>) => {
+    const response = await api.put<{ success: boolean }>(`/admin/relatorios/procedimentos/${mesRef}`, { dados });
     return response.data;
   },
 
