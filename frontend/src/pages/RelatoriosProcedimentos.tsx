@@ -10,9 +10,9 @@ import procedimentosBase from '../data/procedimentosBase.json';
 const BRL = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
 const PCT = new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 3 });
 
-/** Com custo adm. 25% e rep. 2.º 30% do pool (1.º+2.º), (1−d)×0,75×1,3 = 0,75 ⇒ margem 25% da cobrança. d = 3/13. */
-const defaultDeflatorPct = 300 / 13;
-const defaultCustoAdmPct = 25;
+/** Margem fixa da cooperativa sobre a contribuição bruta da linha (1.º + 2.º). Repasse = cobrança da linha × (1 − margem). */
+const MARGEM_COOP_PCT = 25;
+const REPASSE_FRAC_LINHA = 1 - MARGEM_COOP_PCT / 100;
 const defaultRepasse2MedPct = 30;
 const STORAGE_KEY = 'relatorioProcedimentosCalc_v1';
 const COLS_LANC_KEY = 'relatorioProcedLancColunas_v1';
@@ -257,8 +257,8 @@ const linhaPendenteVazia = (): LinhaProcedimento => ({
 
 const defaultDadosMes = (): DadosMes => ({
   concluido: false,
-  deflatorPct: String(defaultDeflatorPct),
-  custoAdmPct: String(defaultCustoAdmPct),
+  deflatorPct: '0',
+  custoAdmPct: '0',
   repasse2MedPct: String(defaultRepasse2MedPct),
   incluirProfissional1: true,
   incluirProfissional2: true,
@@ -279,6 +279,10 @@ const normalizarDadosMes = (s: DadosMes): DadosMes => {
     if (typeof s.segundoMedico === 'boolean') p2 = s.segundoMedico;
     else p2 = true;
   }
+  const r2Med =
+    s.repasse2MedPct != null && String(s.repasse2MedPct).trim() !== ''
+      ? String(s.repasse2MedPct)
+      : String(defaultRepasse2MedPct);
   return {
     ...s,
     incluirProfissional1: p1,
@@ -287,6 +291,9 @@ const normalizarDadosMes = (s: DadosMes): DadosMes => {
     profissional1Crm: s.profissional1Crm ?? '',
     profissional2Nome: s.profissional2Nome ?? '',
     profissional2Crm: s.profissional2Crm ?? '',
+    deflatorPct: '0',
+    custoAdmPct: '0',
+    repasse2MedPct: r2Med,
     mostrarDetalheCalculo: s.mostrarDetalheCalculo !== false,
   };
 };
@@ -376,28 +383,23 @@ const round2 = (n: number) => Math.round(n * 100) / 100;
 
 const quemRepasseEfetivo = (l: LinhaProcedimento, mes: DadosMes): RascunhoProfsT => l.quemRepasse ?? pickRascunhoProfs(mes);
 
-const repasseBrutoUmaLinha = (
-  bruto: number,
-  d: number,
-  adm: number,
-  r2F: number,
-  q: RascunhoProfsT
-) => {
-  const desconto = round2(bruto * d);
-  const baseDefl = round2(bruto * (1 - d));
-  const custo = round2(baseDefl * adm);
-  const pool = round2(baseDefl - custo);
+/** Repasse da linha = (100% − margem coop.) × bruto; margem = bruto − repasse. Divisão 1.º/2.º com o mesmo peso relativo de antes (2.º = % do 1.º). */
+const repassePorLinhaMargemFixa = (bruto: number, r2F: number, q: RascunhoProfsT) => {
+  const repasseLinha = round2(bruto * REPASSE_FRAC_LINHA);
+  const margemLinha = round2(bruto - repasseLinha);
   const p1 = q.incluirProfissional1;
   const p2 = q.incluirProfissional2;
+  let r1 = 0;
+  let r2 = 0;
   if (p1 && p2) {
-    const r2 = round2(pool * r2F);
-    // Regra solicitada: 1.º recebe 100% do pool; 2.º recebe percentual adicional do pool.
-    const r1 = pool;
-    return { desconto, baseDefl, custo, pool, r1, r2 };
+    r1 = round2(repasseLinha / (1 + r2F));
+    r2 = round2(repasseLinha - r1);
+  } else if (p1) {
+    r1 = repasseLinha;
+  } else if (p2) {
+    r2 = repasseLinha;
   }
-  if (p1) return { desconto, baseDefl, custo, pool, r1: pool, r2: 0 };
-  if (p2) return { desconto, baseDefl, custo, pool, r1: 0, r2: pool };
-  return { desconto, baseDefl, custo, pool, r1: 0, r2: 0 };
+  return { margemLinha, repasseLinha, r1, r2 };
 };
 
 const lancarRepassePermitido = (q: RascunhoProfsT): boolean => {
@@ -537,9 +539,6 @@ const RelatoriosProcedimentos = () => {
     if (s) {
       const n = normalizarDadosMes({
         ...s,
-        deflatorPct: s.deflatorPct ?? String(defaultDeflatorPct),
-        custoAdmPct: s.custoAdmPct ?? String(defaultCustoAdmPct),
-        repasse2MedPct: s.repasse2MedPct ?? String(defaultRepasse2MedPct),
         procedimentos: migrarProcedimentos(s.procedimentos),
       });
       const { dados, mudou } = enriquecerLinhasComQuemRepasseAusente(n);
@@ -568,9 +567,6 @@ const RelatoriosProcedimentos = () => {
     const remotoRaw = resp.data as unknown as DadosMes;
     const remotoNorm = normalizarDadosMes({
       ...remotoRaw,
-      deflatorPct: (remotoRaw as any).deflatorPct ?? String(defaultDeflatorPct),
-      custoAdmPct: (remotoRaw as any).custoAdmPct ?? String(defaultCustoAdmPct),
-      repasse2MedPct: (remotoRaw as any).repasse2MedPct ?? String(defaultRepasse2MedPct),
       procedimentos: migrarProcedimentos((remotoRaw as any).procedimentos),
     });
     const { dados } = enriquecerLinhasComQuemRepasseAusente(remotoNorm);
@@ -585,9 +581,10 @@ const RelatoriosProcedimentos = () => {
 
   const persist = useCallback(
     (a: DadosMes) => {
-      setLocal(a);
+      const norm = normalizarDadosMes(a);
+      setLocal(norm);
       setStore((prev) => {
-        const n = { ...prev, [mesChave]: a };
+        const n = { ...prev, [mesChave]: norm };
         saveStore(n);
         return n;
       });
@@ -682,65 +679,41 @@ const RelatoriosProcedimentos = () => {
     [linhasTotais]
   );
 
-  const dPct = useMemo(
-    () => parsePercent(local.deflatorPct, defaultDeflatorPct) / 100,
-    [local.deflatorPct]
-  );
-  const admPct = useMemo(
-    () => parsePercent(local.custoAdmPct, defaultCustoAdmPct) / 100,
-    [local.custoAdmPct]
-  );
   const r2Pct = useMemo(
     () => parsePercent(local.repasse2MedPct, defaultRepasse2MedPct) / 100,
     [local.repasse2MedPct]
   );
 
-  const { descontoDeflator, baseDeflada, custoAdm, poolAposCusto, repasse1, repasse2, repasseTotal, margemCoop, margemPctBruto } = useMemo(() => {
+  const { margemRetidaTotal, repasse1, repasse2, repasseTotal } = useMemo(() => {
     if (linhasTotais.length === 0) {
       return {
-        descontoDeflator: 0,
-        baseDeflada: 0,
-        custoAdm: 0,
-        poolAposCusto: 0,
+        margemRetidaTotal: 0,
         repasse1: 0,
         repasse2: 0,
         repasseTotal: 0,
-        margemCoop: 0,
-        margemPctBruto: 0,
       };
     }
-    let sDes = 0;
-    let sBase = 0;
-    let sCusto = 0;
-    let sPool = 0;
+    let sMargem = 0;
     let sR1 = 0;
     let sR2 = 0;
     for (const l of linhasTotais) {
       const q = quemRepasseEfetivo(l, local);
-      const r = repasseBrutoUmaLinha(l.bruto, dPct, admPct, r2Pct, q);
-      sDes += r.desconto;
-      sBase += r.baseDefl;
-      sCusto += r.custo;
-      sPool += r.pool;
+      const r = repassePorLinhaMargemFixa(l.bruto, r2Pct, q);
+      sMargem += r.margemLinha;
       sR1 += r.r1;
       sR2 += r.r2;
     }
     const r1a = round2(sR1);
     const r2a = round2(sR2);
     const rTot = round2(r1a + r2a);
-    const m = round2(valorBruto - rTot);
+    const m = round2(sMargem);
     return {
-      descontoDeflator: round2(sDes),
-      baseDeflada: round2(sBase),
-      custoAdm: round2(sCusto),
-      poolAposCusto: round2(sPool),
+      margemRetidaTotal: m,
       repasse1: r1a,
       repasse2: r2a,
       repasseTotal: rTot,
-      margemCoop: m,
-      margemPctBruto: valorBruto > 0.0001 ? (m / valorBruto) * 100 : 0,
     };
-  }, [linhasTotais, local, dPct, admPct, r2Pct, valorBruto]);
+  }, [linhasTotais, local, r2Pct, valorBruto]);
 
   const resumoMedicos = useMemo(() => {
     const mapa = new Map<
@@ -766,7 +739,7 @@ const RelatoriosProcedimentos = () => {
 
     for (const l of linhasTotais) {
       const q = quemRepasseEfetivo(l, local);
-      const r = repasseBrutoUmaLinha(l.bruto, dPct, admPct, r2Pct, q);
+      const r = repassePorLinhaMargemFixa(l.bruto, r2Pct, q);
 
       if (q.incluirProfissional1) {
         const m1 = rotuloQuem(q.profissional1Nome, q.profissional1Crm);
@@ -786,7 +759,7 @@ const RelatoriosProcedimentos = () => {
         repasseTxt: Array.from(r.repasses).sort().join(' + '),
       }))
       .sort((a, b) => a.medico.localeCompare(b.medico, 'pt-BR', { sensitivity: 'base' }));
-  }, [linhasTotais, local, dPct, admPct, r2Pct]);
+  }, [linhasTotais, local, r2Pct]);
 
   const tabelaPacientes = useMemo(() => {
     const fmtData = (iso: string) => {
@@ -1127,6 +1100,10 @@ const RelatoriosProcedimentos = () => {
       <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
         <div>
           <h1 className="text-xl sm:text-2xl font-bold text-viva-900 font-display">Relatório de procedimentos</h1>
+          <p className="text-xs sm:text-sm text-viva-600 font-serif mt-1 max-w-xl">
+            Repasse total = {PCT.format(REPASSE_FRAC_LINHA * 100)}% da contribuição bruta por linha (1.º + 2.º); margem da
+            cooperativa = {MARGEM_COOP_PCT}% da mesma base. Sem deflator nem custo administrativo no cálculo.
+          </p>
         </div>
         <button type="button" onClick={abrirParametros} className="btn btn-primary shrink-0 w-full sm:w-auto">
           Parâmetros do cálculo
@@ -2032,14 +2009,11 @@ const RelatoriosProcedimentos = () => {
         )}
       </div>
 
-      <div
-        className={`grid gap-3 ${dPct > 0 ? 'grid-cols-2 md:grid-cols-4' : 'grid-cols-2 md:grid-cols-3'}`}
-      >
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
         {[
           { t: 'Valor cobrança', v: BRL.format(valorBruto) },
-          ...(dPct > 0 ? [{ t: 'Base deflatada', v: BRL.format(baseDeflada) }] : []),
-          { t: 'Repasse total', v: BRL.format(repasseTotal) },
-          { t: 'Margem coop.', v: BRL.format(margemCoop) },
+          { t: `Margem coop. (${MARGEM_COOP_PCT}%)`, v: BRL.format(margemRetidaTotal) },
+          { t: `Repasse (${PCT.format(REPASSE_FRAC_LINHA * 100)}%)`, v: BRL.format(repasseTotal) },
         ].map((c) => (
           <div key={c.t} className="rounded-2xl border border-viva-200/50 bg-gradient-to-b from-viva-50/40 to-white p-3">
             <p className="text-[10px] font-semibold uppercase text-viva-500 font-display tracking-wide">{c.t}</p>
@@ -2076,63 +2050,43 @@ const RelatoriosProcedimentos = () => {
             <tbody className="text-viva-800 font-serif text-xs sm:text-sm">
               <tr className="border-b border-viva-100">
                 <td className="px-3 py-2 font-bold font-display">Valor cobrança</td>
-                <td className="px-3 py-2">Soma por linha: 1.º + 2.º</td>
+                <td className="px-3 py-2">Soma por linha: 1.º + 2.º (contribuição bruta)</td>
                 <td className="px-3 py-2 text-right font-mono font-semibold">{BRL.format(valorBruto)}</td>
               </tr>
-              {dPct > 0 && (
-                <>
-                  <tr className="border-b border-viva-100">
-                    <td className="px-3 py-2 font-bold font-display">Deflator</td>
-                    <td className="px-3 py-2">
-                      Por linha: −{PCT.format(dPct * 100)}% do bruto · Parâmetros
-                    </td>
-                    <td className="px-3 py-2 text-right font-mono">−{BRL.format(descontoDeflator)}</td>
-                  </tr>
-                  <tr className="border-b border-viva-100">
-                    <td className="px-3 py-2 font-bold font-display">Base deflatada</td>
-                    <td className="px-3 py-2">Soma por linha após deflator</td>
-                    <td className="px-3 py-2 text-right font-mono font-semibold">{BRL.format(baseDeflada)}</td>
-                  </tr>
-                </>
-              )}
               <tr className="border-b border-viva-100">
-                <td className="px-3 py-2 font-bold font-display">Custo ad.</td>
+                <td className="px-3 py-2 font-bold font-display">Margem cooperativa</td>
                 <td className="px-3 py-2">
-                  Soma, por linha, de {PCT.format(admPct * 100)}% da base de cada linha
-                  {dPct > 0 ? ' (após deflator)' : ' (cobrança bruta da linha)'}
+                  Por linha: margem = {MARGEM_COOP_PCT}% do bruto; repasse da linha = {PCT.format(REPASSE_FRAC_LINHA * 100)}% do
+                  mesmo bruto
                 </td>
-                <td className="px-3 py-2 text-right font-mono">−{BRL.format(custoAdm)}</td>
+                <td className="px-3 py-2 text-right font-mono">−{BRL.format(margemRetidaTotal)}</td>
               </tr>
               <tr className="border-b border-viva-100">
-                <td className="px-3 py-2 font-bold font-display">Pool repasse</td>
+                <td className="px-3 py-2 font-bold font-display">Repasse aos médicos</td>
                 <td className="px-3 py-2">
-                  Soma por linha: {dPct > 0 ? 'base deflatada' : 'cobrança bruta'} − custo · Parâmetros
+                  Soma por linha: {PCT.format(REPASSE_FRAC_LINHA * 100)}% do bruto (valor a dividir entre 1.º e 2.º)
                 </td>
-                <td className="px-3 py-2 text-right font-mono font-semibold">{BRL.format(poolAposCusto)}</td>
+                <td className="px-3 py-2 text-right font-mono font-semibold">{BRL.format(repasseTotal)}</td>
               </tr>
               <tr className="border-b border-viva-100">
                 <td className="px-3 py-2 font-bold font-display">Rep. 1.º méd.</td>
                 <td className="px-3 py-2">
-                  1.º recebe 100% do pool por linha. Ver <span className="font-display">Lançamentos do mês</span>.
+                  Parte do repasse da linha quando incluído. Ver <span className="font-display">Lançamentos do mês</span>.
                 </td>
                 <td className="px-3 py-2 text-right font-mono">{BRL.format(repasse1)}</td>
               </tr>
               <tr className="border-b border-viva-100">
                 <td className="px-3 py-2 font-bold font-display">Rep. 2.º méd.</td>
                 <td className="px-3 py-2">
-                  2.º recebe até {PCT.format(r2Pct * 100)}% do pool de cada linha, quando aplicável
+                  Quando há 1.º e 2.º: 2.º recebe até {PCT.format(r2Pct * 100)}% do que couber ao 1.º na mesma linha
+                  (parâmetro abaixo).
                 </td>
                 <td className="px-3 py-2 text-right font-mono">{BRL.format(repasse2)}</td>
               </tr>
               <tr className="bg-viva-50/30">
                 <td className="px-3 py-2 font-bold font-display">Repasse total</td>
-                <td className="px-3 py-2" />
+                <td className="px-3 py-2">Soma dos repasses 1.º + 2.º (equivale ao total «Repasse aos médicos», salvo arredondamentos)</td>
                 <td className="px-3 py-2 text-right font-mono font-bold">{BRL.format(repasseTotal)}</td>
-              </tr>
-              <tr className="bg-amber-50/40">
-                <td className="px-3 py-2 font-bold font-display">Margem da cooperativa</td>
-                <td className="px-3 py-2">Cobrança − repasse total · {PCT.format(margemPctBruto)}% da cobrança</td>
-                <td className="px-3 py-2 text-right font-mono font-bold">{BRL.format(margemCoop)}</td>
               </tr>
             </tbody>
           </table>
@@ -2165,27 +2119,13 @@ const RelatoriosProcedimentos = () => {
               <h2 className="text-lg font-bold text-viva-900 font-display">Parâmetros do cálculo</h2>
             </div>
             <div className="p-5 space-y-4 overflow-y-auto">
+              <p className="text-sm text-viva-700 leading-snug">
+                O repasse por linha é <strong>{PCT.format(REPASSE_FRAC_LINHA * 100)}% da contribuição bruta</strong> (soma dos
+                valores 1.º e 2.º); a cooperativa retém <strong>{MARGEM_COOP_PCT}%</strong>. Não há deflator nem custo
+                administrativo no cálculo.
+              </p>
               <div>
-                <label className="text-sm font-semibold text-viva-800">Deflator %</label>
-                <input
-                  className="input w-full mt-0.5"
-                  value={rascunho.deflatorPct}
-                  onChange={(e) => setRascunho((d) => ({ ...d, deflatorPct: e.target.value }))}
-                />
-                <p className="text-xs text-viva-600 mt-1">
-                  Use <span className="font-mono">0</span> para desativar: o detalhe do cálculo deixa de mostrar deflator e base deflatada.
-                </p>
-              </div>
-              <div>
-                <label className="text-sm font-semibold text-viva-800">Custo admin. %</label>
-                <input
-                  className="input w-full mt-0.5"
-                  value={rascunho.custoAdmPct}
-                  onChange={(e) => setRascunho((d) => ({ ...d, custoAdmPct: e.target.value }))}
-                />
-              </div>
-              <div>
-                <label className="text-sm font-semibold text-viva-800">Rep. 2.º no pool %</label>
+                <label className="text-sm font-semibold text-viva-800">Rep. 2.º no repasse da linha %</label>
                 <input
                   className="input w-full mt-0.5"
                   value={rascunho.repasse2MedPct}
