@@ -327,13 +327,1353 @@ const parseNumeroBr = (s: string, fallback: number = 0): number => {
 const parseBrl = (s: string) => parseNumeroBr(s, 0);
 const formatarDataISO = (iso: string): string => {
   if (!iso) return '—';
-  const [y, m, d] = iso.split('-');
+  const head = iso.includes('T') ? iso.split('T')[0]!.trim() : iso.trim();
+  const [y, m, d] = head.split('-');
   if (!y || !m || !d) return iso;
-  return `${d}/${m}/${y}`;
+  return `${d.padStart(2, '0')}/${m.padStart(2, '0')}/${y}`;
 };
 const parsePercent = (s: string, fallback: number) => {
   const n = parseNumeroBr(s, NaN);
   return Number.isNaN(n) ? fallback : n;
+};
+
+/** Normaliza texto de cabeçalho de planilha (acentos, espaços, underscore). */
+const stripHeaderKey = (s: string) =>
+  String(s ?? '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/_/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+const normalizarCodigoProcedImport = (s: string) =>
+  String(s ?? '')
+    .trim()
+    .replace(/\s/g, '')
+    .replace(/,/g, '.')
+    .toUpperCase();
+
+const findProcedimentoBaseImport = (ins: string, c1: string, c2: string): ProcedimentoBase | undefined => {
+  const insN = ins.trim().toUpperCase();
+  const n1 = normalizarCodigoProcedImport(c1);
+  const n2 = normalizarCodigoProcedImport(c2);
+  return (
+    procedimentosBase.find(
+      (b) =>
+        b.instrumento.trim().toUpperCase() === insN &&
+        normalizarCodigoProcedImport(b.codigo1) === n1 &&
+        normalizarCodigoProcedImport(b.codigo2) === n2
+    ) ??
+    procedimentosBase.find(
+      (b) =>
+        normalizarCodigoProcedImport(b.codigo1) === n1 && normalizarCodigoProcedImport(b.codigo2) === n2
+    )
+  );
+};
+
+const somaValoresBase = (b: ProcedimentoBase) => (Number(b.valor1) || 0) + (Number(b.valor2) || 0);
+
+/** Palavras vazias para comparação por tokens (Cirurgia vs TUSS). */
+const STOPWORDS_PROC = new Set([
+  'de',
+  'da',
+  'do',
+  'dos',
+  'das',
+  'e',
+  'ou',
+  'em',
+  'no',
+  'na',
+  'nos',
+  'nas',
+  'ao',
+  'aos',
+  'com',
+  'por',
+  'a',
+  'o',
+  'os',
+  'as',
+]);
+
+/**
+ * Alinha texto da coluna «Cirurgia» (hospital) com descrições TUSS da base:
+ * TRATAMENTO → TRAT, remove pontos, sinónimos comuns (planalto/pilão, supracondiliana/supracondileana, etc.).
+ */
+const normalizarNucleoProcedimento = (raw: string): string => {
+  let s = stripHeaderKey(raw);
+  if (!s) return '';
+  s = s.replace(/\btratamento\b/g, 'trat');
+  s = s.replace(/\./g, ' ');
+  s = s.replace(/\s*\/\s*/g, ' ');
+  s = s.replace(/\([^)]*\)/g, ' ');
+  s = s.replace(/\s+/g, ' ').trim();
+  s = s.replace(/\btrat cirurgico de fratura\b/g, 'trat cirurgico fratura');
+  s = s.replace(/\b(supracondileana|transtrocateriana|transcoterciana) do femur\b/g, '$1 femur');
+  const pairs: [RegExp, string][] = [
+    [/\bplanalto tibial\b/g, 'pilao tibial'],
+    [/\bsupracondiliana\b/g, 'supracondileana'],
+    [/\bsupracondiliano\b/g, 'supracondileano'],
+    [
+      /\bde fratura lesao fisaria ao nivel de joelho\b/g,
+      'fratura ao nivel do joelho',
+    ],
+    [/\bde fratura lesao fisaria ao nivel do joelho\b/g, 'fratura ao nivel do joelho'],
+    [/\bfratura lesao fisaria ao nivel de joelho\b/g, 'fratura ao nivel do joelho'],
+    [/\blesao fisaria ao nivel de joelho\b/g, 'fratura ao nivel do joelho'],
+    [/\bfratura intercondiliana dos condilos do femur\b/g, 'fratura condilos do femur'],
+    [/\bintercondiliana dos condilos do femur\b/g, 'fratura condilos do femur'],
+    [/\bintercondiliana dos condilos\b/g, 'condilos'],
+    [/\bda extremidade metafise dos ossos do antebraco\b/g, 'fratura distal antebraco'],
+    [/\bextremidade metafise dos ossos do antebraco\b/g, 'distal antebraco'],
+  ];
+  for (const [re, to] of pairs) s = s.replace(re, to);
+  s = s.replace(/\s+/g, ' ').trim();
+  return s;
+};
+
+const tokensProcedOverlap = (raw: string): string[] =>
+  normalizarNucleoProcedimento(raw)
+    .split(/[^a-z0-9]+/)
+    .filter((w) => w.length >= 3 && !STOPWORDS_PROC.has(w));
+
+/** Cobertura dos tokens da consulta no candidato (0–1). */
+const scoreOverlapProced = (queryRaw: string, candRaw: string): number => {
+  const qArr = tokensProcedOverlap(queryRaw);
+  if (qArr.length === 0) return 0;
+  const cArr = tokensProcedOverlap(candRaw);
+  const cset = new Set(cArr);
+  let hit = 0;
+  for (const w of qArr) {
+    if (cset.has(w)) hit += 1;
+    else {
+      let sub = false;
+      for (const c of cArr) {
+        if ((c.includes(w) || w.includes(c)) && (w.length >= 5 || c.length >= 5)) {
+          sub = true;
+          break;
+        }
+      }
+      if (sub) hit += 0.65;
+    }
+  }
+  return hit / qArr.length;
+};
+
+const escolherUnicoPorScore = (
+  term: string,
+  cands: ProcedimentoBase[],
+  campo: 'nome1' | 'nome2'
+): ProcedimentoBase | undefined => {
+  if (cands.length === 0) return undefined;
+  if (cands.length === 1) return cands[0];
+  let best = cands[0];
+  let bestS = scoreOverlapProced(term, best[campo]);
+  let nTie = 1;
+  for (let i = 1; i < cands.length; i++) {
+    const b = cands[i];
+    const s = scoreOverlapProced(term, b[campo]);
+    if (s > bestS + 1e-6) {
+      best = b;
+      bestS = s;
+      nTie = 1;
+    } else if (Math.abs(s - bestS) < 1e-6) nTie++;
+  }
+  if (nTie === 1 && bestS >= 0.48) return best;
+  return undefined;
+};
+
+const findProcedimentoBasePorOverlapTokensGlobal = (
+  term: string
+): { ok: ProcedimentoBase } | { err: 'notfound' | 'ambiguous' } => {
+  const scored = procedimentosBase.map((b) => ({
+    b,
+    s: Math.max(scoreOverlapProced(term, b.nome1), scoreOverlapProced(term, b.nome2)),
+  }));
+  scored.sort((a, z) => z.s - a.s);
+  const top = scored[0];
+  if (!top || top.s < 0.52) return { err: 'notfound' };
+  const second = scored[1]?.s ?? -1;
+  if (second >= top.s - 0.07 && second > 0.48) return { err: 'ambiguous' };
+  return { ok: top.b };
+};
+
+/**
+ * Vários registos podem partilhar o mesmo texto (ex.: mesmo 1.º com 2.º diferentes).
+ * Se a planilha trouxer o total de honorários ≈ soma TUSS de um deles, escolhe esse par.
+ */
+const unicoParPorTotalHonorarios = (cands: ProcedimentoBase[], total: number): ProcedimentoBase | undefined => {
+  if (!Number.isFinite(total) || total <= 0 || cands.length < 2) return undefined;
+  const tol = 0.06;
+  const hits = cands.filter((b) => Math.abs(somaValoresBase(b) - total) <= tol);
+  if (hits.length === 1) return hits[0];
+  return undefined;
+};
+
+/** «Cirurgia» com dois nomes unidos por « / » (1.º e 2.º procedimento na mesma célula). */
+const splitNomesProcedimentoPlanilha = (raw: string): string[] =>
+  raw
+    .split(/\s*\/\s*/)
+    .map((p) => p.trim())
+    .filter(Boolean);
+
+/**
+ * Casa par 1.º+2.º na base pelos textos da planilha; o total de honorários desambigua quando há vários pares.
+ */
+const findProcedimentoBasePorParNomes = (
+  nome1Text: string,
+  nome2Text: string,
+  totalHonorarios?: number
+): { ok: ProcedimentoBase } | { err: 'notfound' | 'ambiguous' } => {
+  const scorePar = (b: ProcedimentoBase): number => {
+    const s1 = scoreOverlapProced(nome1Text, b.nome1);
+    const s2 = scoreOverlapProced(nome2Text, b.nome2);
+    if (s1 < 0.38 || s2 < 0.38) return -1;
+    return (s1 + s2) / 2;
+  };
+
+  let ranked = procedimentosBase
+    .map((b) => ({ b, s: scorePar(b) }))
+    .filter((x) => x.s >= 0)
+    .sort((a, z) => z.s - a.s);
+
+  if (ranked.length === 0) {
+    const n1 = normalizarNucleoProcedimento(nome1Text);
+    const n2 = normalizarNucleoProcedimento(nome2Text);
+    if (!n1 || !n2) return { err: 'notfound' };
+    ranked = procedimentosBase
+      .filter((b) => {
+        const bn1 = normalizarNucleoProcedimento(b.nome1);
+        const bn2 = normalizarNucleoProcedimento(b.nome2);
+        return (bn1.includes(n1) || n1.includes(bn1)) && (bn2.includes(n2) || n2.includes(bn2));
+      })
+      .map((b) => ({ b, s: 0.55 }));
+  }
+
+  const list = ranked.map((x) => x.b);
+  if (totalHonorarios != null && Number.isFinite(totalHonorarios) && totalHonorarios > 0) {
+    const u = unicoParPorTotalHonorarios(list, totalHonorarios);
+    if (u) return { ok: u };
+    const sumHit = findProcedimentoBasePorSomaValoresUnica(totalHonorarios);
+    if (!('err' in sumHit)) {
+      if (list.length === 0) return { ok: sumHit.ok };
+      if (list.some((b) => b === sumHit.ok)) return { ok: sumHit.ok };
+    }
+  }
+
+  if (list.length === 1) return { ok: list[0]! };
+  if (ranked.length >= 2 && ranked[0]!.s - ranked[1]!.s >= 0.1) return { ok: ranked[0]!.b };
+  if (list.length > 1) return { err: 'ambiguous' };
+  return { err: 'notfound' };
+};
+
+/** Único registo na base cuja soma TUSS (valor1+valor2) coincide com o total importado (±R$0,02). */
+const findProcedimentoBasePorSomaValoresUnica = (
+  total: number
+): { ok: ProcedimentoBase } | { err: 'notfound' | 'ambiguous' } => {
+  if (!Number.isFinite(total) || total <= 0) return { err: 'notfound' };
+  const tol = 0.02;
+  const hits = procedimentosBase.filter((b) => Math.abs(somaValoresBase(b) - total) <= tol);
+  if (hits.length === 0) return { err: 'notfound' };
+  if (hits.length === 1) return { ok: hits[0] };
+  return { err: 'ambiguous' };
+};
+
+/** Localiza na base pelo nome do 1.º (ou 2.º) procedimento — texto da coluna Cirurgia/Procedimento vs. nomes TUSS. */
+const findProcedimentoBasePorNomeProcedimento = (
+  term: string,
+  totalHonorarios?: number
+): { ok: ProcedimentoBase } | { err: 'notfound' | 'ambiguous' } => {
+  const partes = splitNomesProcedimentoPlanilha(term);
+  if (partes.length >= 2) {
+    const parHit = findProcedimentoBasePorParNomes(partes[0]!, partes.slice(1).join(' / '), totalHonorarios);
+    if (!('err' in parHit)) return parHit;
+    if (totalHonorarios != null && Number.isFinite(totalHonorarios) && totalHonorarios > 0) {
+      const sumHit = findProcedimentoBasePorSomaValoresUnica(totalHonorarios);
+      if (!('err' in sumHit)) return sumHit;
+    }
+    if (parHit.err === 'ambiguous') return parHit;
+  }
+
+  const t = normalizarNucleoProcedimento(term);
+  if (!t) return { err: 'notfound' };
+
+  const resolveMulti = (cands: ProcedimentoBase[], campo: 'nome1' | 'nome2'): ProcedimentoBase | undefined => {
+    if (cands.length === 0) return undefined;
+    if (cands.length === 1) return cands[0];
+    const u = totalHonorarios != null ? unicoParPorTotalHonorarios(cands, totalHonorarios) : undefined;
+    if (u) return u;
+    return escolherUnicoPorScore(term, cands, campo);
+  };
+
+  const exact1 = procedimentosBase.filter((b) => normalizarNucleoProcedimento(b.nome1) === t);
+  const r1 = resolveMulti(exact1, 'nome1');
+  if (r1) return { ok: r1 };
+  if (exact1.length > 1) return { err: 'ambiguous' };
+
+  const exact2 = procedimentosBase.filter((b) => normalizarNucleoProcedimento(b.nome2) === t);
+  const r2 = resolveMulti(exact2, 'nome2');
+  if (r2) return { ok: r2 };
+  if (exact2.length > 1) return { err: 'ambiguous' };
+
+  const sub1 = procedimentosBase.filter((b) => {
+    const n1 = normalizarNucleoProcedimento(b.nome1);
+    return n1.includes(t) || t.includes(n1);
+  });
+  const r3 = resolveMulti(sub1, 'nome1');
+  if (r3) return { ok: r3 };
+  if (sub1.length > 1) return { err: 'ambiguous' };
+
+  const sub2 = procedimentosBase.filter((b) => {
+    const n2 = normalizarNucleoProcedimento(b.nome2);
+    return n2.includes(t) || t.includes(n2);
+  });
+  const r4 = resolveMulti(sub2, 'nome2');
+  if (r4) return { ok: r4 };
+  if (sub2.length > 1) return { err: 'ambiguous' };
+
+  return findProcedimentoBasePorOverlapTokensGlobal(term);
+};
+
+type XlsxCell = { t?: string; v?: unknown; w?: string; z?: string };
+
+/** Texto de data como o Excel exibe (pt-BR: dd/mm/aaaa ou dd/mm/aa). */
+const RE_TEXTO_DATA_PT = /^(\d{1,2})[/.-](\d{1,2})[/.-](\d{2,4})\b/;
+
+const excelSerialParaIso = (n: number): string => {
+  const whole = Math.trunc(n);
+  if (whole < 29500 || whole > 56000) return '';
+  const ssf = (XLSX as { SSF?: { parse_date_code?: (v: number) => { y: number; m: number; d: number } } }).SSF;
+  const pd = ssf?.parse_date_code?.(n);
+  if (pd && pd.y >= 1900 && pd.y <= 2100 && pd.m >= 1 && pd.m <= 12 && pd.d >= 1 && pd.d <= 31) {
+    return `${pd.y}-${String(pd.m).padStart(2, '0')}-${String(pd.d).padStart(2, '0')}`;
+  }
+  return '';
+};
+
+/** Número serial típico de data no Excel (1900 system). Independente do locale de exibição. */
+const pareceSerialDataExcel = (n: number): boolean => {
+  const whole = Math.trunc(n);
+  return whole >= 29500 && whole <= 56000;
+};
+
+const celulaFormatoDataExcel = (cell: XlsxCell): boolean => {
+  const z = (cell.z ?? '').toLowerCase();
+  return (
+    /(?:dd|mm|yyyy|yy|d\/|m\/)/.test(z) ||
+    (z.includes('/') && !z.includes('#') && !z.includes('[$'))
+  );
+};
+
+const dateObjectParaIsoLocal = (d: Date): string => {
+  if (Number.isNaN(d.getTime())) return '';
+  const y = d.getFullYear();
+  const m = d.getMonth() + 1;
+  const day = d.getDate();
+  return `${y}-${String(m).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+};
+
+/** dd/mm/aaaa — primeiro número = dia, segundo = mês (planilhas hospitalares BR). */
+const parseTextoDataDiaPrimeiro = (texto: string): string => {
+  const m = RE_TEXTO_DATA_PT.exec(String(texto).trim());
+  if (!m) return '';
+  let y = parseInt(m[3], 10);
+  if (y < 100) y += y >= 50 ? 1900 : 2000;
+  return isoDataValida(parseInt(m[1], 10), parseInt(m[2], 10), y);
+};
+
+/**
+ * Coluna Data no layout hospital: prioriza o texto exibido (dd/mm) porque o serial do Excel
+ * pode estar em locale US (ex. 02/03 visível como 2-mar mas serial = fevereiro).
+ */
+const readDateImportCellHospital = (cell: XlsxCell | undefined): string => {
+  if (!cell) return '';
+  const w = cell.w != null ? String(cell.w).trim() : '';
+  if (w) {
+    const isoW = parseTextoDataDiaPrimeiro(w);
+    if (isoW) return isoW;
+  }
+  if (cell.v != null && cell.v !== '') {
+    const isoV = parseTextoDataDiaPrimeiro(String(cell.v));
+    if (isoV) return isoV;
+  }
+  if (cell.t === 'n' && typeof cell.v === 'number' && Number.isFinite(cell.v) && pareceSerialDataExcel(cell.v)) {
+    return excelSerialParaIso(cell.v);
+  }
+  if (cell.t === 'd' && cell.v instanceof Date) {
+    return dateObjectParaIsoLocal(cell.v as Date);
+  }
+  return '';
+};
+
+/** Coluna Data (import genérico): serial primeiro, depois texto. */
+const readDateImportCell = (cell: XlsxCell | undefined, mesReferencia?: string): unknown => {
+  if (!cell) return '';
+
+  if (cell.t === 'n' && typeof cell.v === 'number' && Number.isFinite(cell.v)) {
+    if (pareceSerialDataExcel(cell.v) || celulaFormatoDataExcel(cell)) {
+      const isoSerial = excelSerialParaIso(cell.v);
+      if (isoSerial) return isoSerial;
+    }
+  }
+  if (cell.t === 'd' && cell.v instanceof Date) {
+    const isoDate = dateObjectParaIsoLocal(cell.v as Date);
+    if (isoDate) return isoDate;
+  }
+
+  const w = cell.w != null ? String(cell.w).trim() : '';
+  if (w) {
+    const isoW = parseCelulaDataISO(w, mesReferencia);
+    if (isoW) return isoW;
+    if (RE_TEXTO_DATA_PT.test(w)) return w;
+  }
+  if (cell.v != null && cell.v !== '') {
+    if (typeof cell.v === 'number' && pareceSerialDataExcel(cell.v)) {
+      const iso = excelSerialParaIso(cell.v);
+      if (iso) return iso;
+    }
+    const s = String(cell.v).trim();
+    if (RE_TEXTO_DATA_PT.test(s)) return s;
+    const iso = parseCelulaDataISO(cell.v, mesReferencia);
+    if (iso) return iso;
+    return cell.v;
+  }
+  return w;
+};
+
+/** Demais colunas: texto exibido (cell.w); serial de data vira ISO na matriz (fallback sem folha). */
+const readImportCellValue = (cell: XlsxCell | undefined): unknown => {
+  if (!cell) return '';
+  if (cell.t === 'n' && typeof cell.v === 'number' && Number.isFinite(cell.v)) {
+    if (pareceSerialDataExcel(cell.v) || celulaFormatoDataExcel(cell)) {
+      const iso = excelSerialParaIso(cell.v);
+      if (iso) return iso;
+    }
+  }
+  if (cell.t === 'd' && cell.v instanceof Date) {
+    const iso = dateObjectParaIsoLocal(cell.v as Date);
+    if (iso) return iso;
+  }
+  const w = cell.w != null ? String(cell.w).trim() : '';
+  if (w && RE_TEXTO_DATA_PT.test(w)) return w;
+  if (w) return w;
+  if (cell.v != null && cell.v !== '') return cell.v;
+  return '';
+};
+
+/** Remove linhas vazias no início (folha com margem ou título acima da tabela). */
+const trimLeadingEmptyRows = (aoa: unknown[][]): unknown[][] => {
+  let start = 0;
+  while (start < aoa.length) {
+    const row = aoa[start] ?? [];
+    const has = row.some((c) => {
+      if (c == null || c === '') return false;
+      return String(c).trim() !== '';
+    });
+    if (has) break;
+    start++;
+  }
+  return start > 0 ? aoa.slice(start) : aoa;
+};
+
+/** Remove linhas vazias no fim da folha (o Excel alarga o intervalo e o SheetJS devolve centenas de linhas em branco). */
+const trimAoaRemoveTrailingEmptyRows = (aoa: unknown[][]): unknown[][] => {
+  if (!aoa?.length) return aoa;
+  let end = aoa.length - 1;
+  while (end > 0) {
+    const row = aoa[end] ?? [];
+    const hasCell = row.some((c) => {
+      if (c == null || c === '') return false;
+      if (typeof c === 'number') return c !== 0;
+      return String(c).trim() !== '';
+    });
+    if (hasCell) break;
+    end--;
+  }
+  return aoa.slice(0, end + 1);
+};
+
+/** Linhas que não são cirurgias (subtítulos, totais, repetir cabeçalho). */
+const NOME_PROC_IMPORT_IGNORAR = new Set([
+  'cirurgia',
+  'procedimento',
+  'nome do procedimento',
+  'nome do paciente',
+  'prontuario',
+  'total',
+  'subtotal',
+  'soma',
+  'honorarios medicos',
+  'honorarios',
+]);
+
+const isoDataValida = (day: number, month: number, y: number): string => {
+  if (month < 1 || month > 12 || day < 1 || day > 31) return '';
+  const dt = new Date(y, month - 1, day);
+  if (dt.getFullYear() !== y || dt.getMonth() !== month - 1 || dt.getDate() !== day) return '';
+  return `${y}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+};
+
+/**
+ * Data em ISO (yyyy-mm-dd). `mesReferencia` só desambigua dd/mm vs mm/dd em texto — não descarta datas.
+ * O filtro por mês aberto no app é feito em `parsePlanilhaLancamentos`.
+ */
+const parseCelulaDataISO = (cell: unknown, mesReferencia?: string): string => {
+  if (cell == null || cell === '') return '';
+
+  if (cell instanceof Date && !Number.isNaN(cell.getTime())) {
+    return dateObjectParaIsoLocal(cell);
+  }
+  if (typeof cell === 'number' && Number.isFinite(cell)) {
+    return excelSerialParaIso(cell);
+  }
+  let s = String(cell).trim();
+  if (!s) return '';
+  if (s.includes('T')) s = s.split('T')[0]!.trim();
+  const mIso = /^(\d{4})-(\d{1,2})-(\d{1,2})/.exec(s);
+  if (mIso) {
+    const mm = mIso[2].padStart(2, '0');
+    const dd = mIso[3].padStart(2, '0');
+    return `${mIso[1]}-${mm}-${dd}`;
+  }
+  const serialTxt = /^(\d{4,5})(\.\d+)?$/.exec(s.replace(/\s/g, ''));
+  if (serialTxt) {
+    const isoSerial = excelSerialParaIso(parseFloat(serialTxt[0]));
+    if (isoSerial) return isoSerial;
+  }
+  const mBr = RE_TEXTO_DATA_PT.exec(s);
+  if (mBr) {
+    const a = parseInt(mBr[1], 10);
+    const b = parseInt(mBr[2], 10);
+    let y = parseInt(mBr[3], 10);
+    if (y < 100) y += y >= 50 ? 1900 : 2000;
+    const isoBr = isoDataValida(a, b, y);
+    const isoUs = isoDataValida(b, a, y);
+    if (mesReferencia && isoBr && isoUs && isoBr !== isoUs) {
+      if (isoBr.slice(0, 7) === mesReferencia) return isoBr;
+      if (isoUs.slice(0, 7) === mesReferencia) return isoUs;
+    }
+    return isoBr || isoUs || '';
+  }
+  return '';
+};
+
+const LANC_IMPORT_COLS: { id: string; normKeys: string[] }[] = [
+  { id: 'data', normKeys: ['data', 'data procedimento', 'data da cirurgia', 'data cirurgia', 'dt cirurgia', 'data atendimento'] },
+  { id: 'paciente', normKeys: ['paciente', 'nome do paciente', 'nome paciente', 'nome pac'] },
+  { id: 'prontuario', normKeys: ['prontuario', 'pront', 'numero prontuario', 'n prontuario', 'matricula'] },
+  {
+    id: 'nomeProcedimento',
+    normKeys: [
+      'procedimento',
+      'cirurgia',
+      'nome da cirurgia',
+      'nome cirurgia',
+      'procedimento cirurgico',
+      'nome procedimento',
+      'nome do procedimento',
+      '1 procedimento',
+      '1. procedimento',
+      'primeiro procedimento',
+      'procedimento principal',
+      'descricao procedimento',
+    ],
+  },
+  { id: 'instrumento', normKeys: ['ins', 'ins.', 'instrumento'] },
+  { id: 'codigo1', normKeys: ['codigo 1', 'cod 1', 'cod. 1', 'cod1', 'codigo1'] },
+  { id: 'codigo2', normKeys: ['codigo 2', 'cod 2', 'cod. 2', 'cod2', 'codigo2'] },
+  {
+    id: 'valor1',
+    normKeys: ['valor 1', 'valor1', 'r$ 1', 'rs 1'],
+  },
+  { id: 'valor2', normKeys: ['valor 2', 'valor2', 'r$ 2', 'rs 2'] },
+  {
+    id: 'honorariosTotalPar',
+    normKeys: [
+      'honorarios medicos',
+      'honorarios medicos, codigo da proposta aproximado',
+      'honorarios medicos codigo da proposta aproximado',
+      'honorarios',
+      'honorario',
+      'valor total procedimento',
+      'total honorarios',
+      'vl honorarios',
+      'valor',
+      'vl procedimento',
+      'valor procedimento',
+      'valor cirurgia',
+    ],
+  },
+  {
+    id: 'med1Nome',
+    normKeys: [
+      'medico 1 nome',
+      'nome medico 1',
+      'medico 1',
+      'cirurgiao principal',
+      'cirurgiao',
+      'medico principal',
+      'medico',
+    ],
+  },
+  { id: 'med1Crm', normKeys: ['medico 1 crm', 'crm medico 1', 'crm 1', 'crm medico', 'crm cirurgiao'] },
+  {
+    id: 'med2Nome',
+    normKeys: [
+      'medico 2 nome',
+      'nome medico 2',
+      'medico 2',
+      'medico auxiliar',
+      'auxiliar',
+      '2 medico',
+      'segundo medico',
+    ],
+  },
+  { id: 'med2Crm', normKeys: ['medico 2 crm', 'crm medico 2', 'crm 2', 'crm auxiliar'] },
+];
+
+/** Cabeçalho da planilha: igualdade ou inclusão para rótulos longos do hospital. */
+const headerNormMatchesColumn = (norm: string, keys: string[]): boolean => {
+  if (!norm) return false;
+  if (keys.includes(norm)) return true;
+  for (const k of keys) {
+    if (k.length >= 10 && norm.includes(k)) return true;
+    if (norm.length >= 10 && k.includes(norm)) return true;
+  }
+  return false;
+};
+
+const headerNormMatchesAny = (norms: string[], keys: string[]): boolean =>
+  norms.some((n) => headerNormMatchesColumn(n, keys));
+
+/** Lê a folha célula a célula (datas pelo tipo Excel, resto pelo texto visível). */
+const readSheetToAoa = (sheet: XLSX.WorkSheet): unknown[][] => {
+  const ref = sheet['!ref'];
+  if (!ref) return [];
+  const range = XLSX.utils.decode_range(ref);
+  const aoa: unknown[][] = [];
+  for (let R = range.s.r; R <= range.e.r; R++) {
+    const row: unknown[] = [];
+    for (let C = range.s.c; C <= range.e.c; C++) {
+      const addr = XLSX.utils.encode_cell({ r: R, c: C });
+      row.push(readImportCellValue(sheet[addr] as XlsxCell | undefined));
+    }
+    aoa.push(row);
+  }
+  return aoa;
+};
+
+/**
+ * Só propaga merges na vertical (mesma coluna).
+ * Merges horizontais (títulos) copiavam datas para colunas de honorários/valores — causa principal de datas erradas.
+ */
+const applySheetMergesToAoa = (
+  sheet: XLSX.WorkSheet,
+  aoa: unknown[][],
+  opts?: { skipCols?: Set<number>; aoaRowOffset?: number }
+): unknown[][] => {
+  const merges = sheet['!merges'];
+  if (!merges?.length) return aoa;
+  const skipCols = opts?.skipCols ?? new Set<number>();
+  const rowOff = opts?.aoaRowOffset ?? 0;
+  const out = aoa.map((row) => [...row]);
+  for (const m of merges) {
+    const sc = m.s.c;
+    if (sc !== m.e.c) continue;
+    if (skipCols.has(sc)) continue;
+    const sr = m.s.r - rowOff;
+    const er = m.e.r - rowOff;
+    if (er <= sr || sr < 0 || sr >= out.length) continue;
+    const v = out[sr]?.[sc];
+    if (v == null || v === '') continue;
+    for (let r = sr + 1; r <= er && r < out.length; r++) {
+      if (!out[r]) out[r] = [];
+      if (out[r][sc] == null || out[r][sc] === '') out[r][sc] = v;
+    }
+  }
+  return out;
+};
+
+const importColunasObrigatoriasOk = (col: Record<string, number>): boolean => {
+  if (col.data === undefined) return false;
+  const temTriplo =
+    col.instrumento !== undefined && col.codigo1 !== undefined && col.codigo2 !== undefined;
+  const temNome = col.nomeProcedimento !== undefined;
+  const temHonor = col.honorariosTotalPar !== undefined;
+  return temTriplo || temNome || temHonor;
+};
+
+/** Planilha hospitalar típica: prontuário | paciente | médico 1 | médico 2 | data | cirurgia | valor. */
+const MAP_COLUNAS_HOSPITAL_7: Record<string, number> = {
+  prontuario: 0,
+  paciente: 1,
+  med1Nome: 2,
+  med2Nome: 3,
+  data: 4,
+  nomeProcedimento: 5,
+  honorariosTotalPar: 6,
+};
+
+const parseBrlCelula = (cell: unknown): number => {
+  if (cell == null || cell === '') return NaN;
+  if (typeof cell === 'number' && Number.isFinite(cell)) return cell;
+  const s = String(cell).trim();
+  if (!s) return NaN;
+  return parseBrl(s);
+};
+
+const linhaPareceProntuario = (cell: unknown): boolean => {
+  if (typeof cell === 'number' && Number.isFinite(cell)) {
+    const n = Math.trunc(cell);
+    return n >= 10_000 && n <= 9_999_999;
+  }
+  return /^\d{5,8}$/.test(String(cell ?? '').trim());
+};
+
+const linhaPareceCabecalhoTexto = (row: unknown[]): boolean => {
+  const norms = row.map((c) => stripHeaderKey(String(c ?? '')));
+  if (headerNormMatchesAny(norms, ['data', 'data da cirurgia', 'data cirurgia', 'data procedimento'])) {
+    return true;
+  }
+  if (headerNormMatchesAny(norms, ['paciente', 'nome do paciente', 'prontuario', 'cirurgia', 'procedimento'])) {
+    return true;
+  }
+  return false;
+};
+
+/** Pontua se a linha segue o layout hospital (7 colunas). */
+const lerDataIsoNaColuna = (
+  row: unknown[],
+  sheet: XLSX.WorkSheet | undefined,
+  sheetRow: number,
+  colIdx: number,
+  mesReferencia?: string,
+  opts?: { hospital?: boolean }
+): string => {
+  if (opts?.hospital) {
+    if (sheet) {
+      const addr = XLSX.utils.encode_cell({ r: sheetRow, c: colIdx });
+      const iso = readDateImportCellHospital(sheet[addr] as XlsxCell | undefined);
+      if (iso) return iso;
+    }
+    const raw = row[colIdx];
+    if (raw == null || raw === '') return '';
+    if (typeof raw === 'string') return parseTextoDataDiaPrimeiro(raw) || parseCelulaDataISO(raw, mesReferencia);
+    return parseCelulaDataISO(raw, mesReferencia);
+  }
+
+  const lerCol = (c: number): string => {
+    if (sheet) {
+      const addr = XLSX.utils.encode_cell({ r: sheetRow, c });
+      const iso = parseCelulaDataISO(readDateImportCell(sheet[addr] as XlsxCell | undefined, mesReferencia), mesReferencia);
+      if (iso) return iso;
+    }
+    return parseCelulaDataISO(row[c], mesReferencia);
+  };
+
+  let iso = lerCol(colIdx);
+  if (iso) return iso;
+
+  if (mesReferencia) {
+    for (let c = 0; c < Math.min(row.length, 14); c++) {
+      if (c === colIdx) continue;
+      const alt = lerCol(c);
+      if (alt && alt.slice(0, 7) === mesReferencia) return alt;
+    }
+  }
+  return '';
+};
+
+/** Conta linhas com data legível na coluna 5 (layout hospital fixo 7 colunas). */
+const contarDatasLayoutHospital = (
+  aoa: unknown[][],
+  sheet: XLSX.WorkSheet | undefined,
+  sheetRowOffset: number,
+  dataStartRow: number,
+  maxRows = 35
+): number => {
+  const dataIdx = MAP_COLUNAS_HOSPITAL_7.data!;
+  let n = 0;
+  for (let r = dataStartRow; r < Math.min(dataStartRow + maxRows, aoa.length); r++) {
+    const row = aoa[r] ?? [];
+    if (!linhaPareceProntuario(row[0])) continue;
+    const iso = lerDataIsoNaColuna(row, sheet, sheetRowOffset + r, dataIdx, undefined, { hospital: true });
+    if (iso) n += 1;
+  }
+  return n;
+};
+
+const pontuarLinhaLayoutHospital = (
+  row: unknown[],
+  sheet?: XLSX.WorkSheet,
+  sheetRow?: number,
+  colMap: Record<string, number> = MAP_COLUNAS_HOSPITAL_7,
+  mesReferencia?: string
+): number => {
+  let score = 0;
+  if (linhaPareceProntuario(row[0])) score += 2;
+  const pac = String(row[1] ?? '').trim();
+  if (pac.length >= 4 && /[a-zA-ZÀ-ÿ]/.test(pac)) score += 2;
+  const m1 = String(row[2] ?? '').trim();
+  const m2 = String(row[3] ?? '').trim();
+  if ((m1.length >= 2 && /[a-zA-ZÀ-ÿ]/.test(m1)) || (m2.length >= 2 && /[a-zA-ZÀ-ÿ]/.test(m2))) score += 1;
+  const dataIdx = colMap.data ?? MAP_COLUNAS_HOSPITAL_7.data!;
+  const dataIso =
+    sheet && sheetRow !== undefined
+      ? lerDataIsoNaColuna(row, sheet, sheetRow, dataIdx, mesReferencia, { hospital: true })
+      : parseTextoDataDiaPrimeiro(String(row[dataIdx] ?? '')) ||
+        parseCelulaDataISO(row[dataIdx], mesReferencia);
+  if (dataIso) score += 3;
+  const procIdx = colMap.nomeProcedimento ?? MAP_COLUNAS_HOSPITAL_7.nomeProcedimento!;
+  const proc = String(row[procIdx] ?? '').trim();
+  if (proc.length >= 12) score += 2;
+  const honorIdx = colMap.honorariosTotalPar ?? MAP_COLUNAS_HOSPITAL_7.honorariosTotalPar!;
+  const honor = parseBrlCelula(row[honorIdx]);
+  if (Number.isFinite(honor) && honor >= 80) score += 2;
+  return score;
+};
+
+type ColunasImportResolvido = {
+  col: Record<string, number>;
+  headerRow: number;
+  dataStartRow: number;
+  layoutHospital: boolean;
+};
+
+const resolverColunasImportacao = (
+  aoa: unknown[][],
+  sheet?: XLSX.WorkSheet,
+  sheetRowOffset = 0,
+  mesReferencia?: string
+): ColunasImportResolvido => {
+  let bestHospital: { score: number; start: number } | null = null;
+  for (let r = 0; r < Math.min(aoa.length, 25); r++) {
+    if (linhaPareceCabecalhoTexto(aoa[r] ?? [])) continue;
+    const pts = pontuarLinhaLayoutHospital(aoa[r] ?? [], sheet, sheetRowOffset + r, MAP_COLUNAS_HOSPITAL_7, mesReferencia);
+    if (pts >= 9 && (!bestHospital || pts > bestHospital.score)) {
+      bestHospital = { score: pts, start: r };
+    }
+  }
+  if (bestHospital) {
+    let headerRow = bestHospital.start;
+    if (bestHospital.start > 0 && linhaPareceCabecalhoTexto(aoa[bestHospital.start - 1] ?? [])) {
+      headerRow = bestHospital.start - 1;
+    }
+    const datasLidas = contarDatasLayoutHospital(aoa, sheet, sheetRowOffset, bestHospital.start);
+    const colFixo = { ...MAP_COLUNAS_HOSPITAL_7 };
+    if (datasLidas >= 2) {
+      let confirm = 0;
+      for (let j = bestHospital.start; j < Math.min(bestHospital.start + 6, aoa.length); j++) {
+        if (pontuarLinhaLayoutHospital(aoa[j] ?? [], sheet, sheetRowOffset + j, colFixo, mesReferencia) >= 9)
+          confirm += 1;
+      }
+      if (confirm >= 2) {
+        return {
+          col: colFixo,
+          headerRow,
+          dataStartRow: bestHospital.start,
+          layoutHospital: true,
+        };
+      }
+    }
+    if (bestHospital.score >= 9 && linhaPareceProntuario((aoa[bestHospital.start] ?? [])[0])) {
+      return {
+        col: colFixo,
+        headerRow: headerRow >= 0 ? headerRow : 0,
+        dataStartRow: bestHospital.start,
+        layoutHospital: true,
+      };
+    }
+  }
+  const headerRow = detectHeaderRowIndex(aoa);
+  return {
+    col: resolveLancImportColumns(aoa[headerRow] ?? []),
+    headerRow,
+    dataStartRow: headerRow + 1,
+    layoutHospital: false,
+  };
+};
+
+/** Pontua candidato a cabeçalho e valida se as linhas seguintes parecem dados reais. */
+const scoreHeaderRowCandidate = (aoa: unknown[][], headerRow: number): number => {
+  const headerCells = aoa[headerRow] ?? [];
+  if (linhaPareceProntuario(headerCells[0])) return -1;
+  const norms = headerCells.map((c) => stripHeaderKey(String(c ?? '')));
+  if (!headerNormMatchesAny(norms, ['data', 'data da cirurgia', 'data cirurgia', 'data procedimento'])) {
+    return -1;
+  }
+  const col = resolveLancImportColumns(headerCells);
+  if (!importColunasObrigatoriasOk(col)) return -1;
+
+  let score = 0;
+  for (const def of LANC_IMPORT_COLS) {
+    if (headerNormMatchesAny(norms, def.normKeys)) score += 1;
+  }
+
+  let dataHits = 0;
+  for (let r = headerRow + 1; r < Math.min(headerRow + 12, aoa.length); r++) {
+    const row = aoa[r] ?? [];
+    const dataIso = parseCelulaDataISO(row[col.data!]);
+    if (!dataIso) continue;
+    const nomeProc = col.nomeProcedimento !== undefined ? String(row[col.nomeProcedimento] ?? '').trim() : '';
+    const honor =
+      col.honorariosTotalPar !== undefined ? String(row[col.honorariosTotalPar] ?? '').trim() : '';
+    const ins = col.instrumento !== undefined ? String(row[col.instrumento] ?? '').trim() : '';
+    if (nomeProc || honor || ins) dataHits += 1;
+  }
+  if (dataHits === 0) return -1;
+  return score + dataHits * 4;
+};
+
+/** Linha de cabeçalho: melhor pontuação entre as primeiras linhas, com validação nas linhas de dados. */
+const detectHeaderRowIndex = (aoa: unknown[][]): number => {
+  const maxScan = Math.min(aoa.length, 40);
+  let bestIdx = 0;
+  let bestScore = -1;
+  for (let r = 0; r < maxScan; r++) {
+    const s = scoreHeaderRowCandidate(aoa, r);
+    if (s > bestScore) {
+      bestScore = s;
+      bestIdx = r;
+    }
+  }
+  return bestScore >= 0 ? bestIdx : 0;
+};
+
+/** Corta filas após bloco sem paciente + data válidos (fim da tabela real). */
+const trimAoaAfterDataBlock = (
+  aoa: unknown[][],
+  headerRow: number,
+  col: Record<string, number>,
+  sheet?: XLSX.WorkSheet,
+  sheetRowOffset = 0,
+  dataStartRow = headerRow + 1,
+  mesReferencia?: string,
+  layoutHospital = false
+): unknown[][] => {
+  const dataIdx = col.data;
+  if (dataIdx === undefined) return aoa;
+  let lastData = Math.max(dataStartRow - 1, headerRow);
+  let emptyRun = 0;
+  for (let r = dataStartRow; r < aoa.length; r++) {
+    const row = aoa[r] ?? [];
+    const dataIso = lerDataIsoNaColuna(row, sheet, sheetRowOffset + r, dataIdx, mesReferencia, {
+      hospital: layoutHospital,
+    });
+    const paciente = col.paciente !== undefined ? String(row[col.paciente] ?? '').trim() : '';
+    const nome =
+      col.nomeProcedimento !== undefined ? String(row[col.nomeProcedimento] ?? '').trim() : '';
+    const substantive = !!(dataIso && paciente.length >= 3 && nome.length >= 8);
+    if (substantive) {
+      lastData = r;
+      emptyRun = 0;
+    } else {
+      emptyRun += 1;
+      if (emptyRun >= 3) return aoa.slice(0, lastData + 1);
+    }
+  }
+  return aoa;
+};
+
+const resolveLancImportColumns = (headerRow: unknown[]): Record<string, number> => {
+  const headers = headerRow.map((c, i) => ({ i, norm: stripHeaderKey(String(c ?? '')) }));
+  const map: Record<string, number> = {};
+  const used = new Set<number>();
+
+  for (const col of LANC_IMPORT_COLS) {
+    const hit = headers.find((h) => !used.has(h.i) && h.norm && col.normKeys.includes(h.norm));
+    if (hit) {
+      map[col.id] = hit.i;
+      used.add(hit.i);
+    }
+  }
+  for (const col of LANC_IMPORT_COLS) {
+    if (map[col.id] !== undefined) continue;
+    const hit = headers.find(
+      (h) => !used.has(h.i) && h.norm && headerNormMatchesColumn(h.norm, col.normKeys)
+    );
+    if (hit) {
+      map[col.id] = hit.i;
+      used.add(hit.i);
+    }
+  }
+  return map;
+};
+
+/** Escolhe a folha com tabela de lançamentos mais provável (não só a primeira). */
+const pickImportWorksheet = (
+  wb: XLSX.WorkBook
+): { sheetName: string; sheet: XLSX.WorkSheet } | null => {
+  let best: { sheetName: string; sheet: XLSX.WorkSheet; score: number } | null = null;
+  for (const sheetName of wb.SheetNames) {
+    const sheet = wb.Sheets[sheetName];
+    if (!sheet?.['!ref']) continue;
+    let aoa = readSheetToAoa(sheet);
+    aoa = applySheetMergesToAoa(sheet, aoa);
+    aoa = trimLeadingEmptyRows(aoa);
+    aoa = trimAoaRemoveTrailingEmptyRows(aoa);
+    if (!aoa.length) continue;
+    const headerRow = detectHeaderRowIndex(aoa);
+    const col = resolveLancImportColumns(aoa[headerRow] ?? []);
+    if (!importColunasObrigatoriasOk(col)) continue;
+    const headerScore = scoreHeaderRowCandidate(aoa, headerRow);
+    if (headerScore < 0) continue;
+    let dataRows = 0;
+    for (let r = headerRow + 1; r < aoa.length; r++) {
+      const row = aoa[r] ?? [];
+      if (parseCelulaDataISO(row[col.data!])) dataRows += 1;
+    }
+    const score = headerScore + dataRows;
+    if (!best || score > best.score) best = { sheetName, sheet, score };
+  }
+  if (!best) return null;
+  return { sheetName: best.sheetName, sheet: best.sheet };
+};
+
+const describeImportColumnMap = (headerRow: unknown[], col: Record<string, number>): string => {
+  const labels: string[] = [];
+  for (const def of LANC_IMPORT_COLS) {
+    const idx = col[def.id];
+    if (idx === undefined) continue;
+    const raw = String(headerRow[idx] ?? '').trim() || `col. ${idx + 1}`;
+    labels.push(`${def.id}←«${raw}»`);
+  }
+  return labels.join('; ');
+};
+
+type ImportPreviewLanc = {
+  linhas: LinhaProcedimento[];
+  errors: string[];
+};
+
+type AoaImportacaoPrep = {
+  aoa: unknown[][];
+  sheetRowOffset: number;
+};
+
+const prepararAoaImportacao = (sheet: XLSX.WorkSheet, mesReferencia?: string): AoaImportacaoPrep => {
+  const ref = sheet['!ref'];
+  const rangeStart = ref ? XLSX.utils.decode_range(ref).s.r : 0;
+  let aoa = readSheetToAoa(sheet);
+  let leading = 0;
+  while (leading < aoa.length) {
+    const row = aoa[leading] ?? [];
+    const has = row.some((c) => {
+      if (c == null || c === '') return false;
+      return String(c).trim() !== '';
+    });
+    if (has) break;
+    leading++;
+  }
+  const sheetRowOffset = rangeStart + leading;
+  aoa = aoa.slice(leading);
+  const skipCols = new Set<number>();
+  const probe = resolverColunasImportacao(aoa, sheet, sheetRowOffset, mesReferencia);
+  if (probe.layoutHospital && probe.col.data !== undefined) {
+    skipCols.add(probe.col.data);
+  } else {
+    const headerRow = detectHeaderRowIndex(aoa);
+    const col = resolveLancImportColumns(aoa[headerRow] ?? []);
+    if (col.data !== undefined) skipCols.add(col.data);
+    else if (linhaPareceProntuario((aoa[0] ?? [])[0])) skipCols.add(MAP_COLUNAS_HOSPITAL_7.data!);
+  }
+  aoa = applySheetMergesToAoa(sheet, aoa, { skipCols, aoaRowOffset: sheetRowOffset });
+  return { aoa: trimAoaRemoveTrailingEmptyRows(aoa), sheetRowOffset };
+};
+
+const cellStrImport = (row: unknown[], col: Record<string, number>, id: string): string => {
+  const i = col[id];
+  if (i === undefined) return '';
+  const v = row[i];
+  if (v == null || v === '') return '';
+  if (typeof v === 'number' && Number.isFinite(v)) {
+    if (id === 'valor1' || id === 'valor2' || id === 'honorariosTotalPar') return numBrl(v);
+    if (id === 'prontuario' || id.endsWith('Crm')) {
+      if (Math.abs(v - Math.round(v)) < 1e-9) return String(Math.round(v));
+    }
+    return String(v);
+  }
+  return String(v).trim();
+};
+
+/**
+ * «Honorários médicos» na planilha hospitalar = valor total do par (1.º + 2.º).
+ * Reparte na linha na proporção dos valores da base TUSS, para o total bater com a planilha e o repasse manter o peso 1/2.
+ */
+const repartirHonorariosTotalPorBase = (total: number, base: ProcedimentoBase): { v1: number; v2: number } => {
+  const b1 = Number(base.valor1) || 0;
+  const b2 = Number(base.valor2) || 0;
+  const sumB = b1 + b2;
+  const T = Number.isFinite(total) ? Math.max(0, total) : 0;
+  if (sumB <= 1e-9) {
+    return { v1: T, v2: 0 };
+  }
+  const cents = Math.round(T * 100);
+  const c1 = Math.round((b1 / sumB) * cents);
+  const c2 = cents - c1;
+  return { v1: c1 / 100, v2: c2 / 100 };
+};
+
+const MODELO_LANC_HEADERS = [
+  'Data',
+  'Paciente',
+  'Prontuario',
+  'Procedimento',
+  'Honorarios_medicos',
+  'Valor_1',
+  'Valor_2',
+  'Medico_1_nome',
+  'Medico_1_crm',
+  'Medico_2_nome',
+  'Medico_2_crm',
+] as const;
+
+const parsePlanilhaLancamentos = (
+  aoa: unknown[][],
+  sheet?: XLSX.WorkSheet,
+  sheetRowOffset = 0,
+  mesReferencia?: string
+): { linhas: LinhaProcedimento[]; errors: string[]; headerRow: number; layoutHospital: boolean } => {
+  const errors: string[] = [];
+  if (!aoa?.length) {
+    errors.push('Planilha vazia.');
+    return { linhas: [], errors, headerRow: 0, layoutHospital: false };
+  }
+  const resolved = resolverColunasImportacao(aoa, sheet, sheetRowOffset, mesReferencia);
+  const { col, headerRow, dataStartRow, layoutHospital } = resolved;
+  if (!layoutHospital && headerRow > 0) {
+    errors.push(`Cabeçalho detectado na linha ${headerRow + 1} da folha (não na primeira linha).`);
+  }
+  if (col.data === undefined) {
+    errors.push('Falta coluna «Data» (ou equivalente) no cabeçalho.');
+  }
+  const temTriploCab =
+    col.instrumento !== undefined && col.codigo1 !== undefined && col.codigo2 !== undefined;
+  const temNomeProcCab = col.nomeProcedimento !== undefined;
+  const temHonorCab = col.honorariosTotalPar !== undefined;
+  if (!temTriploCab && !temNomeProcCab && !temHonorCab) {
+    errors.push(
+      'Falta identificar o procedimento: coluna «Cirurgia»/«Procedimento», ou Ins.+Cód. 1+2, ou coluna com o total de honorários (soma TUSS 1.+2. do par, única na base).'
+    );
+  }
+  if (col.data === undefined || (!temTriploCab && !temNomeProcCab && !temHonorCab)) {
+    return { linhas: [], errors, headerRow, layoutHospital };
+  }
+
+  const aoaData = trimAoaAfterDataBlock(
+    aoa,
+    Math.max(headerRow, 0),
+    col,
+    sheet,
+    sheetRowOffset,
+    dataStartRow,
+    mesReferencia,
+    layoutHospital
+  );
+  const linhas: LinhaProcedimento[] = [];
+  let ignoradasSemData = 0;
+  let ignoradasOutroMes = 0;
+  const mesesEncontrados = new Set<string>();
+  for (let r = dataStartRow; r < aoaData.length; r++) {
+    const row = aoaData[r] ?? [];
+    if (layoutHospital && !linhaPareceProntuario(row[col.prontuario ?? 0])) continue;
+
+    const dataIso =
+      col.data !== undefined
+        ? lerDataIsoNaColuna(row, sheet, sheetRowOffset + r, col.data, mesReferencia, {
+            hospital: layoutHospital,
+          })
+        : '';
+    const paciente = cellStrImport(row, col, 'paciente');
+    const prontuario = cellStrImport(row, col, 'prontuario');
+    const nomeProc = cellStrImport(row, col, 'nomeProcedimento');
+    const instrumento = cellStrImport(row, col, 'instrumento');
+    const codigo1 = cellStrImport(row, col, 'codigo1');
+    const codigo2 = cellStrImport(row, col, 'codigo2');
+    const v1s = cellStrImport(row, col, 'valor1');
+    const v2s = cellStrImport(row, col, 'valor2');
+    let honorTotalStr = cellStrImport(row, col, 'honorariosTotalPar');
+    if (!honorTotalStr.trim() && nomeProc.includes('/') && !v2s.trim()) {
+      const v1Try = v1s.trim();
+      if (v1Try && parseBrl(v1Try) > 0) honorTotalStr = v1Try;
+    }
+    const honorT0Raw = honorTotalStr.trim() === '' ? NaN : parseBrl(honorTotalStr);
+    const temHonorParaId = Number.isFinite(honorT0Raw) && honorT0Raw > 0;
+    const m1n = cellStrImport(row, col, 'med1Nome');
+    const m1c = cellStrImport(row, col, 'med1Crm');
+    const m2n = cellStrImport(row, col, 'med2Nome');
+    const m2c = cellStrImport(row, col, 'med2Crm');
+
+    const nomeProcKey = stripHeaderKey(nomeProc);
+    if (nomeProcKey && NOME_PROC_IMPORT_IGNORAR.has(nomeProcKey)) continue;
+
+    const rawDataCel = row[col.data!];
+    if (typeof rawDataCel === 'string') {
+      const dk = stripHeaderKey(rawDataCel);
+      if (dk === 'data' || dk === 'data da cirurgia' || dk === 'data cirurgia') continue;
+    }
+
+    if (!instrumento && !codigo1 && !codigo2 && !dataIso && !paciente && !prontuario && !nomeProc && !temHonorParaId) {
+      continue;
+    }
+
+    const linhaN = r + 1;
+    if (!paciente.trim() || paciente.trim().length < 3) continue;
+    if (!dataIso) {
+      if (nomeProc.trim() || prontuario) ignoradasSemData += 1;
+      continue;
+    }
+    if (mesReferencia && dataIso.slice(0, 7) !== mesReferencia) {
+      ignoradasOutroMes += 1;
+      mesesEncontrados.add(dataIso.slice(0, 7));
+      continue;
+    }
+
+    let rowOk = true;
+
+    const temTriploCompleto = !!(instrumento && codigo1 && codigo2);
+    const temTriploParcial = !!(instrumento || codigo1 || codigo2) && !temTriploCompleto;
+    if (temTriploParcial) {
+      errors.push(
+        `Linha ${linhaN}: preencha Ins., Cód. 1 e Cód. 2 em conjunto, ou use a coluna «Procedimento» / «Cirurgia» (nome do 1.º na base).`
+      );
+      rowOk = false;
+    }
+    if (!temTriploCompleto && !nomeProc.trim()) {
+      errors.push(`Linha ${linhaN}: coluna «Cirurgia»/«Procedimento» em falta.`);
+      rowOk = false;
+    }
+    if (!temTriploCompleto && !nomeProc.trim() && !temHonorParaId) {
+      rowOk = false;
+    }
+
+    let base: ProcedimentoBase | undefined;
+    if (temTriploCompleto) {
+      base = findProcedimentoBaseImport(instrumento, codigo1, codigo2);
+      if (!base) {
+        errors.push(`Linha ${linhaN}: procedimento não encontrado na base (${instrumento} | ${codigo1} | ${codigo2}).`);
+        rowOk = false;
+      }
+    } else if (nomeProc) {
+      const honorDisamb = temHonorParaId ? honorT0Raw : undefined;
+      const hit = findProcedimentoBasePorNomeProcedimento(nomeProc, honorDisamb);
+      if (!('err' in hit)) {
+        base = hit.ok;
+      } else if (temHonorParaId) {
+        const sumHit = findProcedimentoBasePorSomaValoresUnica(honorT0Raw);
+        if (!('err' in sumHit)) {
+          base = sumHit.ok;
+        } else if (hit.err === 'ambiguous') {
+          errors.push(
+            `Linha ${linhaN}: várias hipóteses na base para «${nomeProc}» e o total ${honorTotalStr} não coincide com a soma TUSS de um único par. Use Ins.+Cód. 1+2 ou ajuste o texto/total.`
+          );
+          rowOk = false;
+        } else {
+          errors.push(
+            `Linha ${linhaN}: não foi possível casar «${nomeProc}» com a base (TUSS usa abreviações, ex.: TRAT.) nem encontrar par com soma = ${honorTotalStr}. Verifique Cirurgia e honorários.`
+          );
+          rowOk = false;
+        }
+      } else {
+        if (hit.err === 'ambiguous') {
+          errors.push(
+            `Linha ${linhaN}: várias hipóteses na base para «${nomeProc}». Use Ins.+Cód. 1+2, o total de honorários (soma TUSS única) ou um texto mais próximo do TUSS (ex.: TRAT. em vez de TRATAMENTO).`
+          );
+        } else {
+          errors.push(
+            `Linha ${linhaN}: não foi possível casar «${nomeProc}» com a base. Experimente o total de honorários (soma 1.+2.) se for único na base, ou Ins.+Cód. 1+2.`
+          );
+        }
+        rowOk = false;
+      }
+    } else if (temHonorParaId && nomeProc.trim()) {
+      const sumHit = findProcedimentoBasePorSomaValoresUnica(honorT0Raw);
+      if (!('err' in sumHit)) {
+        base = sumHit.ok;
+      } else {
+        if (sumHit.err === 'ambiguous') {
+          errors.push(
+            `Linha ${linhaN}: vários pares na base têm soma TUSS (1.+2.) igual a ${honorTotalStr}. Acrescente «Cirurgia»/códigos para desambiguar.`
+          );
+        } else {
+          errors.push(
+            `Linha ${linhaN}: nenhum par na base com soma TUSS (1.+2.) igual a ${honorTotalStr} (tolerância ±R$0,02).`
+          );
+        }
+        rowOk = false;
+      }
+    }
+
+    const incl1 = !!(m1n || m1c);
+    const incl2 = !!(m2n || m2c);
+    if (!incl1 && !incl2) {
+      errors.push(`Linha ${linhaN}: indique médico 1 e/ou 2 (nome ou CRM).`);
+      rowOk = false;
+    }
+    const quemRepasse: RascunhoProfsT = {
+      incluirProfissional1: incl1,
+      incluirProfissional2: incl2,
+      profissional1Nome: m1n,
+      profissional1Crm: m1c,
+      profissional2Nome: m2n,
+      profissional2Crm: m2c,
+    };
+    if (!lancarRepassePermitido(quemRepasse)) {
+      errors.push(
+        `Linha ${linhaN}: para cada médico indicado preencha nome e/ou CRM (como no formulário manual).`
+      );
+      rowOk = false;
+    }
+    if (!rowOk || !base || !dataIso) continue;
+
+    // Texto Cirurgia/Procedimento identifica o registo na base (em geral o 1.º); o par 1.º+2.º completo vem de `fromBase`.
+    const linha: LinhaProcedimento = {
+      ...fromBase(base),
+      dataProcedimento: dataIso,
+      nomePaciente: paciente,
+      prontuario,
+      quemRepasse,
+    };
+    if (honorTotalStr) {
+      const T = parseBrl(honorTotalStr);
+      const { v1, v2 } = repartirHonorariosTotalPorBase(T, base);
+      linha.valorPrimeiro = numBrl(v1);
+      linha.valorSegundo = numBrl(v2);
+    } else {
+      if (v1s) linha.valorPrimeiro = numBrl(parseBrl(v1s));
+      if (v2s) linha.valorSegundo = numBrl(parseBrl(v2s));
+    }
+    linhas.push(linha);
+  }
+
+  if (linhas.length === 0) {
+    if (ignoradasSemData > 0) {
+      errors.push(
+        `${ignoradasSemData} linha(s) com paciente/cirurgia mas sem data legível na coluna ${(col.data ?? 0) + 1}. Confira se a coluna Data no Excel está preenchida (dd/mm/aaaa) ou como data de calendário (não só texto).`
+      );
+    }
+    if (ignoradasOutroMes > 0) {
+      const lista = [...mesesEncontrados].sort().join(', ') || '—';
+      errors.push(
+        `${ignoradasOutroMes} linha(s) com data fora do mês ${mesReferencia ?? 'selecionado'} (encontrado: ${lista}). Ajuste o mês no topo ou as datas na planilha.`
+      );
+    }
+    const colInfo = layoutHospital
+      ? 'Layout hospital (fixo): col.1 prontuário, 2 paciente, 3–4 médicos, 5 data, 6 cirurgia, 7 valor.'
+      : col.data !== undefined
+        ? `Coluna Data detectada: ${col.data + 1}.`
+        : 'Coluna Data não detectada.';
+    errors.push(colInfo);
+    if (ignoradasSemData === 0 && ignoradasOutroMes === 0) {
+      errors.push(
+        'Nenhuma linha com paciente (≥3 caracteres), data e cirurgia/honorários. Verifique se a primeira linha de dados não é cabeçalho e se o mês no topo coincide com as datas.'
+      );
+    }
+  }
+
+  return { linhas, errors, headerRow, layoutHospital };
 };
 
 const loadStore = (): Record<string, DadosMes> => {
@@ -472,6 +1812,12 @@ const RelatoriosProcedimentos = () => {
     recebe: true,
   });
   const [modoVisualLanc, setModoVisualLanc] = useState<'detalhado' | 'resumo' | 'pacientes'>('detalhado');
+  const [modoEntradaLanc, setModoEntradaLanc] = useState<'upload' | 'manual'>('upload');
+  const [importMsg, setImportMsg] = useState<{ tipo: 'ok' | 'aviso' | 'erro'; texto: string } | null>(null);
+  const [importPreview, setImportPreview] = useState<ImportPreviewLanc | null>(null);
+  const [importProcessing, setImportProcessing] = useState(false);
+  const [importDragActive, setImportDragActive] = useState(false);
+  const xlsxImportRef = useRef<HTMLInputElement>(null);
   useEffect(() => {
     try {
       localStorage.setItem(COLS_LANC_KEY, JSON.stringify(colsLanc));
@@ -556,6 +1902,12 @@ const RelatoriosProcedimentos = () => {
     }
     setBusca('');
     setLinhaPendente(null);
+    setModoEntradaLanc('upload');
+    setImportMsg(null);
+    setImportPreview(null);
+    setImportProcessing(false);
+    setImportDragActive(false);
+    if (xlsxImportRef.current) xlsxImportRef.current.value = '';
   }, [mesChave]);
 
   // Backend é a fonte de verdade (entre PCs). Se houver dados remotos para o mês, rehidrata o estado local.
@@ -591,6 +1943,177 @@ const RelatoriosProcedimentos = () => {
     },
     [mesChave]
   );
+
+  const baixarModeloLancamentosXlsx = useCallback(() => {
+    const exemploComProcedimento = [
+      '2026-01-15',
+      'Maria Silva',
+      '12345',
+      'OSTECTOMIA DA CLAVÍCULA OU DA ESCÁPULA',
+      '',
+      '1201,89',
+      '360,57',
+      'Nome do médico',
+      '12345/CE',
+      'Outro médico',
+      '67890/CE',
+    ];
+    const exemploSoTotal = [
+      '2026-01-16',
+      'José Santos',
+      '99999',
+      '',
+      '801,19',
+      '',
+      '',
+      'Nome do médico',
+      '12345/CE',
+      'Auxiliar',
+      '67890/CE',
+    ];
+    const ws = XLSX.utils.aoa_to_sheet([
+      Array.from(MODELO_LANC_HEADERS),
+      exemploComProcedimento,
+      exemploSoTotal,
+    ]);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Lancamentos');
+    XLSX.writeFile(wb, 'modelo-lancamentos-procedimentos.xlsx');
+  }, []);
+
+  const processarFicheiroLancamentosXlsx = useCallback(
+    (file: File) => {
+      const lower = file.name.toLowerCase();
+      if (!lower.endsWith('.xlsx') && !lower.endsWith('.xls')) {
+        setImportPreview(null);
+        setImportMsg({ tipo: 'erro', texto: 'Use um ficheiro Excel (.xlsx ou .xls).' });
+        return;
+      }
+      const L = localRef.current;
+      if (L.concluido) {
+        setImportPreview(null);
+        setImportMsg({ tipo: 'erro', texto: 'Mês fechado. Reabra o mês antes de importar.' });
+        return;
+      }
+      setImportMsg(null);
+      setImportPreview(null);
+      setImportProcessing(true);
+
+      const runParse = (buf: string | ArrayBuffer | null | undefined) => {
+        try {
+          if (!(buf instanceof ArrayBuffer)) {
+            setImportPreview(null);
+            setImportMsg({ tipo: 'erro', texto: 'Não foi possível ler o ficheiro.' });
+            return;
+          }
+          // cellDates:false → datas como serial numérico (correto em qualquer locale do Excel)
+          const wb = XLSX.read(new Uint8Array(buf), { type: 'array', cellDates: false, cellNF: true });
+          const picked = pickImportWorksheet(wb);
+          if (!picked) {
+            setImportPreview(null);
+            setImportMsg({
+              tipo: 'erro',
+              texto:
+                'Não foi possível identificar uma folha com Data e Cirurgia/Procedimento (ou honorários totais). Verifique o cabeçalho.',
+            });
+            return;
+          }
+          const { aoa, sheetRowOffset } = prepararAoaImportacao(picked.sheet, mesChave);
+          const headerRow = detectHeaderRowIndex(aoa);
+          const colMap = describeImportColumnMap(
+            aoa[headerRow] ?? [],
+            resolveLancImportColumns(aoa[headerRow] ?? [])
+          );
+          const { linhas, errors, layoutHospital } = parsePlanilhaLancamentos(
+            aoa,
+            picked.sheet,
+            sheetRowOffset,
+            mesChave
+          );
+          const layoutNota = layoutHospital
+            ? 'Formato da planilha: prontuário, paciente, médicos, data, cirurgia e valor total.'
+            : '';
+          if (linhas.length === 0) {
+            setImportPreview(null);
+            const baseErro =
+              errors.length > 0
+                ? errors.slice(0, 25).join('\n') + (errors.length > 25 ? '\n…' : '')
+                : `Nenhuma linha válida para o mês ${mesChave}. Confirme o mês no topo da página e se a coluna Data está preenchida (ex.: 02/03/2026).`;
+            setImportMsg({
+              tipo: 'erro',
+              texto: layoutNota ? `${layoutNota}\n\n${baseErro}` : baseErro,
+            });
+            return;
+          }
+          setImportPreview({ linhas, errors });
+          const errosReais = errors.filter((e) => !e.startsWith('Layout hospital'));
+          setImportMsg(
+            errosReais.length
+              ? {
+                  tipo: 'aviso',
+                  texto: `${linhas.length} lançamento(s) reconhecido(s). Revise a pré-visualização — ${errosReais.length} aviso(s):\n${errosReais.slice(0, 12).join('\n')}${errosReais.length > 12 ? '\n…' : ''}`,
+                }
+              : {
+                  tipo: 'ok',
+                  texto: `${linhas.length} lançamento(s) pronto(s) para ${mesChave}. Confirme para gravar.${layoutNota ? `\n\n${layoutNota}` : ''}${colMap && !layoutHospital ? `\n\nColunas: ${colMap}` : ''}`,
+                }
+          );
+        } catch (e) {
+          setImportPreview(null);
+          setImportMsg({
+            tipo: 'erro',
+            texto: e instanceof Error ? e.message : 'Erro ao processar a planilha.',
+          });
+        } finally {
+          setImportProcessing(false);
+        }
+      };
+
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        const buf = ev.target?.result;
+        // Dois frames livres para pintar o indicador antes do trabalho síncrono (SheetJS).
+        window.requestAnimationFrame(() => window.requestAnimationFrame(() => runParse(buf)));
+      };
+      reader.onerror = () => {
+        setImportPreview(null);
+        setImportProcessing(false);
+        setImportMsg({ tipo: 'erro', texto: 'Falha ao ler o ficheiro.' });
+      };
+      reader.readAsArrayBuffer(file);
+    },
+    [mesChave]
+  );
+
+  const cancelarImportacaoPreview = useCallback(() => {
+    setImportPreview(null);
+    setImportMsg(null);
+    setImportProcessing(false);
+  }, []);
+
+  const confirmarImportacaoLancamentos = useCallback(() => {
+    const prev = importPreview;
+    if (!prev?.linhas.length) return;
+    const L = localRef.current;
+    if (L.concluido) {
+      setImportMsg({ tipo: 'erro', texto: 'Mês fechado. Reabra o mês antes de importar.' });
+      return;
+    }
+    persist({
+      ...L,
+      procedimentos: [...L.procedimentos, ...prev.linhas],
+    });
+    const n = prev.linhas.length;
+    setImportPreview(null);
+    setImportMsg({
+      tipo: 'ok',
+      texto: `${n} lançamento(s) importado(s) no mês.${prev.errors.length ? `\n\nAvisos da importação:\n${prev.errors.slice(0, 15).join('\n')}` : ''}`,
+    });
+    if (xlsxImportRef.current) xlsxImportRef.current.value = '';
+    requestAnimationFrame(() => {
+      document.getElementById('secao-lancamentos-mes')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  }, [importPreview, persist]);
 
   const abrirParametros = () => {
     setRascunho(normalizarDadosMes({ ...local, ...rascunhoProfs }));
@@ -824,11 +2347,17 @@ const RelatoriosProcedimentos = () => {
 
   const salvarLinhaPendente = useCallback(() => {
     if (!linhaPendente) return;
+    const L = localRef.current;
+    if (L.concluido) {
+      window.alert(
+        'Este mês está marcado como concluído. Reabra o mês (botão abaixo) para incluir ou alterar lançamentos.'
+      );
+      return;
+    }
     if (!lancarRepassePermitido(rascunhoProfs)) {
       window.alert('Indique 1.º e/ou 2.º ativos, nome e CRM de cada ativo, e adicione à tabela.');
       return;
     }
-    const L = localRef.current;
     const comRepasse: LinhaProcedimento = { ...linhaPendente, quemRepasse: { ...rascunhoProfs } };
     const limpo = rascunhoNomesVazios(rascunhoProfs);
     const jaExiste = L.procedimentos.some((p) => p.id === comRepasse.id);
@@ -852,11 +2381,23 @@ const RelatoriosProcedimentos = () => {
 
   const remover = (id: string) => {
     const L = localRef.current;
+    if (L.concluido) {
+      window.alert(
+        'Este mês está concluído. Reabra o mês para poder excluir lançamentos.'
+      );
+      return;
+    }
     persist({ ...L, procedimentos: L.procedimentos.filter((l) => l.id !== id) });
   };
 
   const editar = (id: string) => {
     const L = localRef.current;
+    if (L.concluido) {
+      window.alert(
+        'Este mês está concluído. Reabra o mês para poder editar lançamentos.'
+      );
+      return;
+    }
     const alvo = L.procedimentos.find((l) => l.id === id);
     if (!alvo) return;
     setLinhaPendente({ ...alvo });
@@ -1129,37 +2670,60 @@ const RelatoriosProcedimentos = () => {
           </div>
         </div>
         <div className="px-2 sm:px-3 py-3">
-          <div className="relative mx-auto max-w-5xl">
-            <div className="pointer-events-none absolute left-2 right-2 top-4 h-px bg-viva-200/80" />
-            <div className="relative flex items-start justify-between gap-1 overflow-x-auto pb-1">
+          <div className="relative mx-auto max-w-5xl px-1">
+            <div
+              className="pointer-events-none absolute left-6 right-6 top-[19px] h-[3px] rounded-full bg-gradient-to-r from-viva-100/30 via-viva-200/90 to-viva-100/30 shadow-[inset_0_1px_0_rgba(255,255,255,0.6)]"
+              aria-hidden
+            />
+            <div
+              role="group"
+              aria-label={`Meses de ${ano}`}
+              className="relative flex min-w-max sm:min-w-0 w-full items-start justify-between gap-1.5 sm:gap-1 overflow-x-auto pb-2 pt-0.5 [scrollbar-width:thin] [scrollbar-color:rgba(120,140,160,0.35)_transparent]"
+            >
             {timelineMeses.map((m) => {
               const at = m.key === mesMM;
               const ok = isDone(m.ch);
               return (
                 <button
                   type="button"
+                  aria-current={at ? true : undefined}
+                  aria-label={`${m.label} de ${ano}${ok ? ', mês concluído' : ', em aberto'}`}
                   key={m.key}
                   onClick={() => setMesMM(m.key)}
                   className={[
-                    'group relative min-w-[52px] sm:min-w-[58px] shrink-0 rounded-xl px-1.5 py-1',
-                    'flex flex-col items-center font-display font-bold transition',
-                    at ? 'bg-white/95 text-viva-900 shadow-sm' : 'text-viva-500 hover:bg-viva-50/70 hover:text-viva-700',
+                    'group relative shrink-0 flex min-w-[3.35rem] sm:min-w-[3.65rem] flex-col items-center rounded-2xl px-2 py-2',
+                    'font-display font-bold transition-all duration-200 ease-out',
+                    'outline-none focus-visible:ring-2 focus-visible:ring-viva-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white',
+                    'active:scale-[0.96] motion-reduce:transition-none motion-reduce:active:scale-100',
+                    at
+                      ? 'bg-gradient-to-b from-white via-white to-viva-50/70 text-viva-950 shadow-[0_6px_20px_-8px_rgba(15,23,42,0.18),inset_0_1px_0_rgba(255,255,255,0.95)] ring-1 ring-viva-200/90'
+                      : 'text-viva-500 hover:bg-white/70 hover:text-viva-800 hover:shadow-[0_3px_12px_-6px_rgba(15,23,42,0.12)]',
                   ]
                     .filter(Boolean)
                     .join(' ')}
                 >
+                  <span className="relative z-[1] flex h-[19px] w-[19px] items-center justify-center" title={ok ? 'Concluído' : 'Em aberto'}>
+                    {ok ? (
+                      <span className="flex h-[19px] w-[19px] items-center justify-center rounded-full bg-gradient-to-b from-emerald-400 to-emerald-600 text-[10px] text-white shadow-[0_3px_10px_-2px_rgba(16,185,129,0.65)] ring-[1.5px] ring-white">
+                        <svg viewBox="0 0 12 12" className="h-2 w-2" aria-hidden fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M2.5 6.2l2.4 2.3L9.6 3.7" />
+                        </svg>
+                      </span>
+                    ) : (
+                      <span
+                        className={[
+                          'h-[19px] w-[19px] rounded-full border-[2.5px] bg-white transition-colors duration-200',
+                          at
+                            ? 'border-viva-400/95 shadow-[inset_0_1px_3px_rgba(15,23,42,0.07)] ring-2 ring-viva-200/50 ring-offset-2 ring-offset-white'
+                            : 'border-slate-300/90 group-hover:border-viva-300/95 group-hover:shadow-[inset_0_1px_2px_rgba(15,23,42,0.04)]',
+                        ].join(' ')}
+                      />
+                    )}
+                  </span>
                   <span
                     className={[
-                      'block h-3 w-3 rounded-full border-2 transition',
-                      ok ? 'border-emerald-500 bg-emerald-500' : 'border-slate-400/90 bg-slate-400/85',
-                      at ? 'ring-2 ring-viva-300/80 ring-offset-1 ring-offset-white' : '',
-                    ].join(' ')}
-                    title={ok ? 'Concluído' : 'Em aberto'}
-                  />
-                  <span
-                    className={[
-                      'mt-1.5 block capitalize leading-tight text-[11px] sm:text-xs',
-                      at ? 'text-viva-900' : 'text-viva-500 group-hover:text-viva-700',
+                      'mt-2 block capitalize leading-none tracking-wide text-[10px] sm:text-[11px]',
+                      at ? 'text-viva-900 font-bold' : 'text-viva-500 group-hover:text-viva-800 font-semibold',
                     ].join(' ')}
                   >
                     {m.label}
@@ -1185,10 +2749,276 @@ const RelatoriosProcedimentos = () => {
             type="button"
             className="btn btn-primary btn-sm shrink-0"
             onClick={salvarRascunhoProfsMês}
+            disabled={local.concluido}
+            title={local.concluido ? 'Mês fechado' : undefined}
           >
             Salvar identificação
           </button>
           </div>
+
+          <div className="flex flex-wrap gap-2" role="tablist" aria-label="Forma de lançamento">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={modoEntradaLanc === 'upload'}
+              disabled={local.concluido}
+              onClick={() => {
+                setModoEntradaLanc('upload');
+                setImportMsg(null);
+                setImportPreview(null);
+                setImportProcessing(false);
+              }}
+              className={`btn btn-sm font-display shrink-0 ${
+                modoEntradaLanc === 'upload' ? 'btn-primary' : 'btn-secondary'
+              }`}
+            >
+              Importar Excel
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={modoEntradaLanc === 'manual'}
+              disabled={local.concluido}
+              onClick={() => {
+                setModoEntradaLanc('manual');
+                setImportMsg(null);
+                setImportPreview(null);
+                setImportProcessing(false);
+              }}
+              className={`btn btn-sm font-display shrink-0 ${
+                modoEntradaLanc === 'manual' ? 'btn-primary' : 'btn-secondary'
+              }`}
+            >
+              Preencher manualmente
+            </button>
+          </div>
+
+          {modoEntradaLanc === 'upload' && (
+            <div
+              className="rounded-xl border border-dashed border-viva-300/90 bg-gradient-to-b from-viva-50/50 to-white p-4 sm:p-5 space-y-3"
+              aria-busy={importProcessing}
+            >
+              <p className="text-xs font-bold text-viva-900 font-display">Planilha (.xlsx)</p>
+              <div className="flex flex-wrap gap-2">
+                <button type="button" className="btn btn-secondary btn-sm font-display" onClick={baixarModeloLancamentosXlsx}>
+                  Descarregar modelo
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-sm font-display"
+                  disabled={local.concluido || importProcessing}
+                  onClick={() => xlsxImportRef.current?.click()}
+                >
+                  Escolher ficheiro…
+                </button>
+                <input
+                  ref={xlsxImportRef}
+                  type="file"
+                  accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
+                  className="sr-only"
+                  disabled={local.concluido || importProcessing}
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (f) processarFicheiroLancamentosXlsx(f);
+                    e.target.value = '';
+                  }}
+                />
+              </div>
+              {importProcessing && (
+                <div
+                  role="status"
+                  aria-live="polite"
+                  className="flex items-start gap-3 rounded-lg border border-viva-400/70 bg-white/95 px-3 py-3 sm:px-4 shadow-[0_1px_0_rgba(0,0,0,0.04)]"
+                >
+                  <span
+                    className="mt-0.5 inline-block h-8 w-8 shrink-0 rounded-full border-2 border-viva-600 border-t-transparent animate-spin motion-reduce:animate-none motion-reduce:border-solid motion-reduce:border-viva-300"
+                    aria-hidden
+                  />
+                  <div className="min-w-0">
+                    <p className="text-sm font-display font-semibold text-viva-950">A ler e analisar a planilha…</p>
+                    <p className="text-[11px] text-viva-600 font-serif mt-1 leading-snug">
+                      Ficheiros grandes levam vários segundos. Este passo faz a leitura do Excel na totalidade antes de mostrar o resultado.
+                    </p>
+                  </div>
+                </div>
+              )}
+              <div
+                role="button"
+                aria-disabled={local.concluido || importProcessing}
+                tabIndex={
+                  local.concluido || importProcessing ? -1 : 0
+                }
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    if (!local.concluido && !importProcessing) xlsxImportRef.current?.click();
+                  }
+                }}
+                onDragEnter={(e) => {
+                  e.preventDefault();
+                  if (!local.concluido && !importProcessing) setImportDragActive(true);
+                }}
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  if (!local.concluido && !importProcessing) setImportDragActive(true);
+                }}
+                onDragLeave={(e) => {
+                  e.preventDefault();
+                  setImportDragActive(false);
+                }}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  setImportDragActive(false);
+                  if (local.concluido || importProcessing) return;
+                  const f = e.dataTransfer.files?.[0];
+                  if (f) processarFicheiroLancamentosXlsx(f);
+                }}
+                onClick={() => {
+                  if (!local.concluido && !importProcessing) xlsxImportRef.current?.click();
+                }}
+                className={[
+                  'rounded-lg border-2 border-dashed px-4 py-8 text-center transition relative',
+                  local.concluido || importProcessing
+                    ? 'border-slate-200 bg-slate-50 text-slate-400 cursor-not-allowed'
+                    : importDragActive
+                      ? 'border-viva-500 bg-viva-100/40 text-viva-900 cursor-pointer'
+                      : 'border-viva-200/90 bg-white/80 text-viva-700 hover:border-viva-400/80 cursor-pointer',
+                ].join(' ')}
+              >
+                <p className="text-sm font-display font-semibold text-viva-900">
+                  {importProcessing ? 'Aguarde, a processar o ficheiro…' : 'Largue aqui o ficheiro Excel ou clique para selecionar'}
+                </p>
+                <p className="text-[11px] text-viva-500 font-serif mt-1">
+                  {importProcessing
+                    ? 'Não feche esta página até aparecer mensagem ou pré-visualização.'
+                    : 'Cirurgia com dois nomes separados por « / » e valor total — identifica o par na base TUSS automaticamente'}
+                </p>
+              </div>
+
+              {importPreview && importPreview.linhas.length > 0 && (
+                <div className="rounded-lg border border-viva-200 bg-white overflow-hidden shadow-sm">
+                  <div className="border-b border-viva-200/80 bg-amber-50/50 px-3 py-2">
+                    <p className="text-xs font-display font-bold text-viva-900">
+                      Pré-visualização ({importPreview.linhas.length} lançamento
+                      {importPreview.linhas.length !== 1 ? 's' : ''}) — ainda não gravado
+                    </p>
+                  </div>
+                  <div className="overflow-x-auto max-h-[min(52vh,380px)] overflow-y-auto">
+                    <table className="w-full min-w-[960px] border-collapse text-left text-[10px] sm:text-[11px]">
+                      <thead className="sticky top-0 z-[1] bg-slate-800 text-white font-display">
+                        <tr>
+                          <th className="px-1.5 py-1.5 font-medium">#</th>
+                          <th className="px-1.5 py-1.5 font-medium">Data</th>
+                          <th className="px-1.5 py-1.5 font-medium">Paciente</th>
+                          <th className="px-1.5 py-1.5 font-medium">Pront.</th>
+                          <th className="px-1.5 py-1.5 font-medium">1.º proced.</th>
+                          <th className="px-1.5 py-1.5 font-medium">2.º proced.</th>
+                          <th className="px-1.5 py-1.5 font-medium">Ins.</th>
+                          <th className="px-1.5 py-1.5 font-medium">Cód. 1</th>
+                          <th className="px-1.5 py-1.5 font-medium">Cód. 2</th>
+                          <th className="px-1.5 py-1.5 font-medium text-right">V1</th>
+                          <th className="px-1.5 py-1.5 font-medium text-right">V2</th>
+                          <th className="px-1.5 py-1.5 font-medium">1.º rep.</th>
+                          <th className="px-1.5 py-1.5 font-medium">2.º rep.</th>
+                          <th className="px-1.5 py-1.5 font-medium text-right">Total</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {importPreview.linhas.map((l, i) => {
+                          const q = l.quemRepasse!;
+                          const m1 = q.incluirProfissional1
+                            ? rotuloQuem(q.profissional1Nome, q.profissional1Crm) ?? '—'
+                            : '—';
+                          const m2 = q.incluirProfissional2
+                            ? rotuloQuem(q.profissional2Nome, q.profissional2Crm) ?? '—'
+                            : '—';
+                          const bruto = round2(parseBrl(l.valorPrimeiro) + parseBrl(l.valorSegundo));
+                          return (
+                            <tr
+                              key={l.id}
+                              className={i % 2 ? 'bg-viva-50/30' : 'bg-white border-t border-slate-100'}
+                            >
+                              <td className="px-1.5 py-1 font-semibold text-viva-900">{i + 1}</td>
+                              <td className="px-1.5 py-1 text-viva-800">{formatarDataISO(l.dataProcedimento)}</td>
+                              <td
+                                className="px-1.5 py-1 font-serif text-viva-800 max-w-[7rem] truncate"
+                                title={l.nomePaciente || undefined}
+                              >
+                                {l.nomePaciente || '—'}
+                              </td>
+                              <td className="px-1.5 py-1 font-mono text-viva-700">{l.prontuario || '—'}</td>
+                              <td
+                                className="px-1.5 py-1 font-serif text-viva-800 max-w-[10rem] sm:max-w-[14rem] [overflow-wrap:anywhere] align-top"
+                                title={l.nome1 || undefined}
+                              >
+                                {l.nome1 || '—'}
+                              </td>
+                              <td
+                                className="px-1.5 py-1 font-serif text-viva-800 max-w-[10rem] sm:max-w-[14rem] [overflow-wrap:anywhere] align-top"
+                                title={l.nome2 || undefined}
+                              >
+                                {l.nome2 || '—'}
+                              </td>
+                              <td className="px-1.5 py-1 font-mono">{l.instrumento}</td>
+                              <td className="px-1.5 py-1 font-mono [overflow-wrap:anywhere]">{l.codigo1}</td>
+                              <td className="px-1.5 py-1 font-mono [overflow-wrap:anywhere]">{l.codigo2}</td>
+                              <td className="px-1.5 py-1 text-right tabular-nums">{l.valorPrimeiro}</td>
+                              <td className="px-1.5 py-1 text-right tabular-nums">{l.valorSegundo}</td>
+                              <td className="px-1.5 py-1 font-serif text-viva-800 max-w-[9rem] [overflow-wrap:anywhere]">
+                                {m1}
+                              </td>
+                              <td className="px-1.5 py-1 font-serif text-viva-800 max-w-[9rem] [overflow-wrap:anywhere]">
+                                {m2}
+                              </td>
+                              <td className="px-1.5 py-1 text-right font-mono font-semibold tabular-nums">
+                                {BRL.format(bruto)}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                  <div className="flex flex-wrap items-center justify-end gap-2 border-t border-viva-200/70 bg-viva-50/40 px-3 py-2.5">
+                    <button
+                      type="button"
+                      className="btn btn-secondary btn-sm font-display"
+                      onClick={cancelarImportacaoPreview}
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-primary btn-sm font-display"
+                      disabled={local.concluido}
+                      onClick={confirmarImportacaoLancamentos}
+                    >
+                      Confirmar lançamento
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {importMsg && (
+                <div
+                  role="status"
+                  className={[
+                    'rounded-lg border px-3 py-2.5 text-xs font-serif whitespace-pre-wrap',
+                    importMsg.tipo === 'erro'
+                      ? 'border-rose-200 bg-rose-50 text-rose-900'
+                      : importMsg.tipo === 'aviso'
+                        ? 'border-amber-200 bg-amber-50 text-amber-950'
+                        : 'border-emerald-200 bg-emerald-50/90 text-emerald-950',
+                  ].join(' ')}
+                >
+                  {importMsg.texto}
+                </div>
+              )}
+            </div>
+          )}
+
+          {modoEntradaLanc === 'manual' && (
+          <>
           <div className="rounded-xl border border-viva-200/70 bg-white/80 p-3 sm:p-3.5">
             <p className="text-[10px] font-semibold uppercase text-viva-500 font-display mb-2">Dados do procedimento</p>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
@@ -1448,12 +3278,15 @@ const RelatoriosProcedimentos = () => {
             </div>
           </div>
           </div>
+          </>
+          )}
         </div>
-        {!rascunhoProfs.incluirProfissional1 && !rascunhoProfs.incluirProfissional2 && (
+        {modoEntradaLanc === 'manual' && !rascunhoProfs.incluirProfissional1 && !rascunhoProfs.incluirProfissional2 && (
           <p className="text-sm text-amber-800 bg-amber-50 border border-amber-200/80 rounded-xl mx-4 sm:mx-5 mb-0 px-4 py-2.5 font-serif">
             Nenhum 1.º/2.º ativo. Ative no mínimo um.
           </p>
         )}
+        {modoEntradaLanc === 'manual' && (
         <div
           className="px-4 sm:px-5 py-4 sm:py-5 border-t border-viva-200/50 bg-gradient-to-b from-amber-50/25 to-amber-50/5"
           ref={boxBuscaRef}
@@ -1575,7 +3408,17 @@ const RelatoriosProcedimentos = () => {
                 >
                   Descartar
                 </button>
-                <button type="button" className="btn btn-primary btn-sm" onClick={salvarLinhaPendente}>
+                <button
+                  type="button"
+                  className="btn btn-primary btn-sm"
+                  disabled={local.concluido}
+                  title={
+                    local.concluido
+                      ? 'Mês fechado — reabra o mês para gravar na tabela'
+                      : undefined
+                  }
+                  onClick={salvarLinhaPendente}
+                >
                   {linhaPendente && local.procedimentos.some((p) => p.id === linhaPendente.id)
                     ? 'Salvar edição'
                     : 'Incluir na tabela de lançamentos'}
@@ -1585,15 +3428,33 @@ const RelatoriosProcedimentos = () => {
           </div>
         )}
         </div>
+        )}
       </div>
 
       <div
         className="rounded-2xl border border-viva-200/60 bg-white overflow-hidden shadow-[var(--card-shadow)]"
         id="secao-lancamentos-mes"
       >
-        <div className="px-4 py-3 border-b border-viva-200/50 bg-viva-50/30">
-          <h2 className="text-sm font-bold text-viva-900 font-display">Lançamentos do mês</h2>
+        <div className="px-4 py-3 border-b border-viva-200/50 bg-viva-50/30 flex flex-wrap items-center justify-between gap-2">
+          <div className="flex flex-wrap items-center gap-2 min-w-0">
+            <h2 className="text-sm font-bold text-viva-900 font-display">Lançamentos do mês</h2>
+            {local.concluido && (
+              <span
+                className="inline-flex items-center rounded-full border border-slate-600/50 bg-slate-800 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white font-display shrink-0"
+                title="Mês concluído: edição e exclusão de linhas estão bloqueadas até reabrir."
+              >
+                Mês fechado
+              </span>
+            )}
+          </div>
         </div>
+        {local.concluido && linhasTotais.length > 0 && (
+          <p className="px-3 sm:px-4 py-2.5 text-xs leading-snug text-slate-800 bg-slate-100 border-b border-slate-200/90 font-serif">
+            <span className="font-display font-semibold">Edição bloqueada.</span> Não é possível editar, excluir nem
+            gravar novas linhas neste mês enquanto estiver concluído. Use «Reabrir mês» na secção seguinte para voltar a
+            alterar os lançamentos.
+          </p>
+        )}
         {linhasTotais.length === 0 ? (
           <p className="p-6 text-sm text-viva-600 text-center font-serif">Nada lançado.</p>
         ) : (
@@ -1737,8 +3598,13 @@ const RelatoriosProcedimentos = () => {
                           <button
                             type="button"
                             onClick={() => editar(l.id)}
-                            className="text-viva-700 text-xs w-7 h-7 rounded hover:bg-viva-50 shrink-0 inline-flex items-center justify-center"
-                            title="Editar"
+                            disabled={local.concluido}
+                            className="text-viva-700 text-xs w-7 h-7 rounded hover:bg-viva-50 shrink-0 inline-flex items-center justify-center disabled:pointer-events-none disabled:opacity-40 disabled:hover:bg-transparent"
+                            title={
+                              local.concluido
+                                ? 'Mês fechado — reabra o mês para editar'
+                                : 'Editar'
+                            }
                             aria-label="Editar"
                           >
                             <IconPencil className="h-3 w-3 shrink-0" />
@@ -1746,8 +3612,13 @@ const RelatoriosProcedimentos = () => {
                           <button
                             type="button"
                             onClick={() => remover(l.id)}
-                            className="text-rose-600 text-xs w-7 h-7 rounded hover:bg-rose-50 shrink-0 inline-flex items-center justify-center"
-                            title="Excluir"
+                            disabled={local.concluido}
+                            className="text-rose-600 text-xs w-7 h-7 rounded hover:bg-rose-50 shrink-0 inline-flex items-center justify-center disabled:pointer-events-none disabled:opacity-40 disabled:hover:bg-transparent"
+                            title={
+                              local.concluido
+                                ? 'Mês fechado — reabra o mês para excluir'
+                                : 'Excluir'
+                            }
                             aria-label="Excluir"
                           >
                             ×
