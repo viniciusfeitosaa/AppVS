@@ -280,7 +280,7 @@ const Relatorios = () => {
   });
 
   const contratos = useMemo(() => contratosResp?.data ?? [], [contratosResp?.data]);
-  const subgruposList = subgruposResp?.data ?? [];
+  const subgruposList = useMemo(() => subgruposResp?.data ?? [], [subgruposResp?.data]);
   const equipesList = equipesResp?.data ?? [];
   const equipesDoSubgrupo = equipesPorSubgrupoResp?.data ?? [];
   const equipesFiltradas =
@@ -701,12 +701,12 @@ const Relatorios = () => {
     };
   }, [
     registrosDerived,
-    contratoId,
     usaEscalaEPonto,
     usaEscalaComValoresPlantao,
     valoresPlantaoPorGrade,
     apenasPonto,
     adicionaisPorDataGrade,
+    mostrarDetalheCalculo,
   ]);
 
   const totaisRepasseCobranca = useMemo(() => {

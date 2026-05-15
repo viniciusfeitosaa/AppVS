@@ -1073,7 +1073,7 @@ const lerDataIsoNaColuna = (
     return parseCelulaDataISO(row[c], mesReferencia);
   };
 
-  let iso = lerCol(colIdx);
+  const iso = lerCol(colIdx);
   if (iso) return iso;
 
   if (mesReferencia) {
@@ -2337,7 +2337,7 @@ const RelatoriosProcedimentos = () => {
       repasse2: r2a,
       repasseTotal: rTot,
     };
-  }, [linhasTotais, local, r2Pct, valorBruto]);
+  }, [linhasTotais, local, r2Pct]);
 
   const resumoMedicos = useMemo(() => {
     const mapa = new Map<
