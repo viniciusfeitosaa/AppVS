@@ -1353,6 +1353,29 @@ type AoaImportacaoPrep = {
   sheetRowOffset: number;
 };
 
+/**
+ * Conteúdo colado a partir do Excel / Calc: colunas separadas por tab (TSV), linhas por newline.
+ */
+const parseTsvClipboardParaAoa = (text: string): unknown[][] => {
+  const s = String(text).replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+  const lines = s.split('\n');
+  const rows: unknown[][] = [];
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    if ((line === '' || line === undefined) && rows.length === 0) continue;
+    const parts = line.split('\t');
+    rows.push(parts.map((c) => String(c).replace(/\u00a0/g, ' ').trim()));
+  }
+  return rows;
+};
+
+/** Sem folha Excel: sem merges; só limpa linhas vazias no início/fim. */
+const prepararAoaColagem = (raw: unknown[][]): AoaImportacaoPrep => {
+  let aoa = trimLeadingEmptyRows(raw);
+  aoa = trimAoaRemoveTrailingEmptyRows(aoa);
+  return { aoa, sheetRowOffset: 0 };
+};
+
 const prepararAoaImportacao = (sheet: XLSX.WorkSheet, mesReferencia?: string): AoaImportacaoPrep => {
   const ref = sheet['!ref'];
   const rangeStart = ref ? XLSX.utils.decode_range(ref).s.r : 0;
@@ -1676,6 +1699,42 @@ const parsePlanilhaLancamentos = (
   return { linhas, errors, headerRow, layoutHospital };
 };
 
+const LAYOUT_NOTA_IMPORT_HOSPITAL =
+  'Formato da planilha: prontuário, paciente, médicos, data, cirurgia e valor total.';
+
+const estadoUIMaposParseImportacao = (
+  linhas: LinhaProcedimento[],
+  errors: string[],
+  layoutHospital: boolean,
+  colMap: string,
+  mesChave: string
+): { preview: ImportPreviewLanc | null; msg: { tipo: 'ok' | 'aviso' | 'erro'; texto: string } } => {
+  const layoutNota = layoutHospital ? LAYOUT_NOTA_IMPORT_HOSPITAL : '';
+  if (linhas.length === 0) {
+    const baseErro =
+      errors.length > 0
+        ? errors.slice(0, 25).join('\n') + (errors.length > 25 ? '\n…' : '')
+        : `Nenhuma linha válida para o mês ${mesChave}. Confirme o mês no topo da página e se a coluna Data está preenchida (ex.: 02/03/2026).`;
+    return {
+      preview: null,
+      msg: { tipo: 'erro', texto: layoutNota ? `${layoutNota}\n\n${baseErro}` : baseErro },
+    };
+  }
+  const errosReais = errors.filter((e) => !e.startsWith('Layout hospital'));
+  return {
+    preview: { linhas, errors },
+    msg: errosReais.length
+      ? {
+          tipo: 'aviso',
+          texto: `${linhas.length} lançamento(s) reconhecido(s). Revise a pré-visualização — ${errosReais.length} aviso(s):\n${errosReais.slice(0, 12).join('\n')}${errosReais.length > 12 ? '\n…' : ''}`,
+        }
+      : {
+          tipo: 'ok',
+          texto: `${linhas.length} lançamento(s) pronto(s) para ${mesChave}. Confirme para gravar.${layoutNota ? `\n\n${layoutNota}` : ''}${colMap && !layoutHospital ? `\n\nColunas: ${colMap}` : ''}`,
+        },
+  };
+};
+
 const loadStore = (): Record<string, DadosMes> => {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
@@ -1818,6 +1877,7 @@ const RelatoriosProcedimentos = () => {
   const [importProcessing, setImportProcessing] = useState(false);
   const [importDragActive, setImportDragActive] = useState(false);
   const xlsxImportRef = useRef<HTMLInputElement>(null);
+  const importPasteRef = useRef<HTMLTextAreaElement>(null);
   useEffect(() => {
     try {
       localStorage.setItem(COLS_LANC_KEY, JSON.stringify(colsLanc));
@@ -1908,6 +1968,7 @@ const RelatoriosProcedimentos = () => {
     setImportProcessing(false);
     setImportDragActive(false);
     if (xlsxImportRef.current) xlsxImportRef.current.value = '';
+    if (importPasteRef.current) importPasteRef.current.value = '';
   }, [mesChave]);
 
   // Backend é a fonte de verdade (entre PCs). Se houver dados remotos para o mês, rehidrata o estado local.
@@ -2030,34 +2091,9 @@ const RelatoriosProcedimentos = () => {
             sheetRowOffset,
             mesChave
           );
-          const layoutNota = layoutHospital
-            ? 'Formato da planilha: prontuário, paciente, médicos, data, cirurgia e valor total.'
-            : '';
-          if (linhas.length === 0) {
-            setImportPreview(null);
-            const baseErro =
-              errors.length > 0
-                ? errors.slice(0, 25).join('\n') + (errors.length > 25 ? '\n…' : '')
-                : `Nenhuma linha válida para o mês ${mesChave}. Confirme o mês no topo da página e se a coluna Data está preenchida (ex.: 02/03/2026).`;
-            setImportMsg({
-              tipo: 'erro',
-              texto: layoutNota ? `${layoutNota}\n\n${baseErro}` : baseErro,
-            });
-            return;
-          }
-          setImportPreview({ linhas, errors });
-          const errosReais = errors.filter((e) => !e.startsWith('Layout hospital'));
-          setImportMsg(
-            errosReais.length
-              ? {
-                  tipo: 'aviso',
-                  texto: `${linhas.length} lançamento(s) reconhecido(s). Revise a pré-visualização — ${errosReais.length} aviso(s):\n${errosReais.slice(0, 12).join('\n')}${errosReais.length > 12 ? '\n…' : ''}`,
-                }
-              : {
-                  tipo: 'ok',
-                  texto: `${linhas.length} lançamento(s) pronto(s) para ${mesChave}. Confirme para gravar.${layoutNota ? `\n\n${layoutNota}` : ''}${colMap && !layoutHospital ? `\n\nColunas: ${colMap}` : ''}`,
-                }
-          );
+          const ui = estadoUIMaposParseImportacao(linhas, errors, layoutHospital, colMap, mesChave);
+          setImportPreview(ui.preview);
+          setImportMsg(ui.msg);
         } catch (e) {
           setImportPreview(null);
           setImportMsg({
@@ -2085,10 +2121,74 @@ const RelatoriosProcedimentos = () => {
     [mesChave]
   );
 
+  const processarTextoColadoLancamentos = useCallback(() => {
+    const L = localRef.current;
+    if (L.concluido) {
+      setImportPreview(null);
+      setImportMsg({ tipo: 'erro', texto: 'Mês fechado. Reabra o mês antes de importar.' });
+      return;
+    }
+    const text = importPasteRef.current?.value?.trim() ?? '';
+    if (!text) {
+      setImportMsg({
+        tipo: 'erro',
+        texto: 'Cole na caixa abaixo as células copiadas do Excel (Ctrl+V) e carregue em «Processar texto colado».',
+      });
+      return;
+    }
+    setImportMsg(null);
+    setImportPreview(null);
+    setImportProcessing(true);
+    window.requestAnimationFrame(() =>
+      window.requestAnimationFrame(() => {
+        try {
+          const raw = parseTsvClipboardParaAoa(text);
+          if (!raw.length) {
+            setImportPreview(null);
+            setImportMsg({
+              tipo: 'erro',
+              texto: 'Não foi possível ler linhas no texto colado. Copie diretamente do Excel (as células ficam separadas por tab).',
+            });
+            return;
+          }
+          const temVariasColunas = raw.some((r) => (r?.length ?? 0) > 1);
+          if (!temVariasColunas) {
+            setImportPreview(null);
+            setImportMsg({
+              tipo: 'erro',
+              texto:
+                'O texto colado tem uma só coluna. Selecione na planilha todas as colunas necessárias (prontuário até valor) e copie de novo.',
+            });
+            return;
+          }
+          const { aoa } = prepararAoaColagem(raw);
+          const headerRow = detectHeaderRowIndex(aoa);
+          const colMap = describeImportColumnMap(
+            aoa[headerRow] ?? [],
+            resolveLancImportColumns(aoa[headerRow] ?? [])
+          );
+          const { linhas, errors, layoutHospital } = parsePlanilhaLancamentos(aoa, undefined, 0, mesChave);
+          const ui = estadoUIMaposParseImportacao(linhas, errors, layoutHospital, colMap, mesChave);
+          setImportPreview(ui.preview);
+          setImportMsg(ui.msg);
+        } catch (e) {
+          setImportPreview(null);
+          setImportMsg({
+            tipo: 'erro',
+            texto: e instanceof Error ? e.message : 'Erro ao processar o texto colado.',
+          });
+        } finally {
+          setImportProcessing(false);
+        }
+      })
+    );
+  }, [mesChave]);
+
   const cancelarImportacaoPreview = useCallback(() => {
     setImportPreview(null);
     setImportMsg(null);
     setImportProcessing(false);
+    if (importPasteRef.current) importPasteRef.current.value = '';
   }, []);
 
   const confirmarImportacaoLancamentos = useCallback(() => {
@@ -2110,6 +2210,7 @@ const RelatoriosProcedimentos = () => {
       texto: `${n} lançamento(s) importado(s) no mês.${prev.errors.length ? `\n\nAvisos da importação:\n${prev.errors.slice(0, 15).join('\n')}` : ''}`,
     });
     if (xlsxImportRef.current) xlsxImportRef.current.value = '';
+    if (importPasteRef.current) importPasteRef.current.value = '';
     requestAnimationFrame(() => {
       document.getElementById('secao-lancamentos-mes')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     });
@@ -2641,12 +2742,14 @@ const RelatoriosProcedimentos = () => {
       <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
         <div>
           <h1 className="text-xl sm:text-2xl font-bold text-viva-900 font-display">Relatório de procedimentos</h1>
-          <p className="text-xs sm:text-sm text-viva-600 font-serif mt-1 max-w-xl">
-            Repasse total = {PCT.format(REPASSE_FRAC_LINHA * 100)}% da contribuição bruta por linha (1.º + 2.º); margem da
-            cooperativa = {MARGEM_COOP_PCT}% da mesma base. Sem deflator nem custo administrativo no cálculo.
-          </p>
         </div>
-        <button type="button" onClick={abrirParametros} className="btn btn-primary shrink-0 w-full sm:w-auto">
+        <button
+          type="button"
+          onClick={abrirParametros}
+          className="btn btn-primary shrink-0 w-full sm:w-auto hidden"
+          aria-hidden
+          tabIndex={-1}
+        >
           Parâmetros do cálculo
         </button>
       </div>
@@ -2736,27 +2839,44 @@ const RelatoriosProcedimentos = () => {
         </div>
       </div>
 
-      <div className="rounded-2xl border border-viva-200/60 bg-white overflow-hidden shadow-[var(--card-shadow)]">
-        <div className="p-4 sm:p-5 space-y-4">
-          <div className="flex flex-wrap items-start justify-between gap-2">
-          <div>
-            <h2 className="text-sm font-bold text-viva-900 font-display">Quem recebe o repasse</h2>
-            {errMedicos && (
-              <p className="text-xs text-amber-800 mt-1">Não foi possível carregar a lista de médicos. Tente de novo.</p>
-            )}
+      <div className="relative overflow-hidden rounded-2xl border border-viva-200/50 bg-white shadow-[var(--card-shadow)]">
+        <div
+          className="pointer-events-none h-[3px] shrink-0 bg-gradient-to-r from-viva-600/85 via-teal-500/70 to-emerald-500/55 opacity-95"
+          aria-hidden
+        />
+        <header className="relative border-b border-viva-100/80 bg-gradient-to-br from-white via-viva-50/25 to-teal-50/10 px-4 sm:px-6 py-4 sm:py-5">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div className="space-y-1.5 max-w-2xl min-w-[12rem]">
+              <p className="font-display text-[10px] font-bold uppercase tracking-[0.22em] text-teal-700/90">
+                Produção deste período
+              </p>
+              <h2 className="font-display text-base font-bold tracking-tight text-viva-900 sm:text-lg">Quem recebe o repasse</h2>
+              <p className="font-serif text-xs leading-relaxed text-viva-600 max-w-md">
+                Identifique médicos para o repasse e registe cirurgias por importação (.xlsx) ou lançamento manual.
+              </p>
+              {errMedicos && (
+                <p className="rounded-lg border border-amber-300/70 bg-amber-50 px-3 py-2 text-xs text-amber-900 mt-2">
+                  Não foi possível carregar a lista de médicos. Tente de novo.
+                </p>
+              )}
+            </div>
+            <button
+              type="button"
+              className="btn btn-primary btn-sm shrink-0 shadow-[0_4px_16px_-6px_rgba(20,90,72,0.45)]"
+              onClick={salvarRascunhoProfsMês}
+              disabled={local.concluido}
+              title={local.concluido ? 'Mês fechado' : undefined}
+            >
+              Salvar identificação
+            </button>
           </div>
-          <button
-            type="button"
-            className="btn btn-primary btn-sm shrink-0"
-            onClick={salvarRascunhoProfsMês}
-            disabled={local.concluido}
-            title={local.concluido ? 'Mês fechado' : undefined}
+        </header>
+        <div className="space-y-6 px-4 py-5 sm:px-6 sm:py-6">
+          <div
+            role="tablist"
+            aria-label="Forma de lançamento"
+            className="inline-flex w-full max-w-full flex-wrap gap-1 rounded-2xl border border-viva-200/50 bg-gradient-to-b from-slate-100/90 to-slate-50/60 p-1 shadow-inner"
           >
-            Salvar identificação
-          </button>
-          </div>
-
-          <div className="flex flex-wrap gap-2" role="tablist" aria-label="Forma de lançamento">
             <button
               type="button"
               role="tab"
@@ -2768,9 +2888,13 @@ const RelatoriosProcedimentos = () => {
                 setImportPreview(null);
                 setImportProcessing(false);
               }}
-              className={`btn btn-sm font-display shrink-0 ${
-                modoEntradaLanc === 'upload' ? 'btn-primary' : 'btn-secondary'
-              }`}
+              className={[
+                'min-h-[42px] flex-1 rounded-[12px] px-4 py-2.5 font-display text-xs font-semibold outline-none transition-all duration-200 sm:flex-none sm:min-w-[13rem]',
+                'focus-visible:ring-2 focus-visible:ring-viva-500 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-40',
+                modoEntradaLanc === 'upload'
+                  ? 'relative bg-white text-viva-950 shadow-[0_2px_10px_-4px_rgba(15,23,42,0.18)] ring-1 ring-viva-200/60'
+                  : 'text-viva-600 hover:bg-white/55 hover:text-viva-950',
+              ].join(' ')}
             >
               Importar Excel
             </button>
@@ -2785,58 +2909,132 @@ const RelatoriosProcedimentos = () => {
                 setImportPreview(null);
                 setImportProcessing(false);
               }}
-              className={`btn btn-sm font-display shrink-0 ${
-                modoEntradaLanc === 'manual' ? 'btn-primary' : 'btn-secondary'
-              }`}
+              className={[
+                'min-h-[42px] flex-1 rounded-[12px] px-4 py-2.5 font-display text-xs font-semibold outline-none transition-all duration-200 sm:flex-none sm:min-w-[13rem]',
+                'focus-visible:ring-2 focus-visible:ring-viva-500 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-40',
+                modoEntradaLanc === 'manual'
+                  ? 'relative bg-white text-viva-950 shadow-[0_2px_10px_-4px_rgba(15,23,42,0.18)] ring-1 ring-viva-200/60'
+                  : 'text-viva-600 hover:bg-white/55 hover:text-viva-950',
+              ].join(' ')}
             >
               Preencher manualmente
             </button>
           </div>
 
           {modoEntradaLanc === 'upload' && (
-            <div
-              className="rounded-xl border border-dashed border-viva-300/90 bg-gradient-to-b from-viva-50/50 to-white p-4 sm:p-5 space-y-3"
-              aria-busy={importProcessing}
-            >
-              <p className="text-xs font-bold text-viva-900 font-display">Planilha (.xlsx)</p>
-              <div className="flex flex-wrap gap-2">
-                <button type="button" className="btn btn-secondary btn-sm font-display" onClick={baixarModeloLancamentosXlsx}>
-                  Descarregar modelo
-                </button>
-                <button
-                  type="button"
-                  className="btn btn-secondary btn-sm font-display"
-                  disabled={local.concluido || importProcessing}
-                  onClick={() => xlsxImportRef.current?.click()}
-                >
-                  Escolher ficheiro…
-                </button>
-                <input
-                  ref={xlsxImportRef}
-                  type="file"
-                  accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
-                  className="sr-only"
-                  disabled={local.concluido || importProcessing}
-                  onChange={(e) => {
-                    const f = e.target.files?.[0];
-                    if (f) processarFicheiroLancamentosXlsx(f);
-                    e.target.value = '';
-                  }}
+            <div className="space-y-5" aria-busy={importProcessing}>
+              <div className="relative overflow-hidden rounded-2xl border border-viva-200/40 bg-gradient-to-br from-white via-slate-50/40 to-viva-50/20 shadow-[inset_0_1px_0_rgba(255,255,255,0.85),0_14px_40px_-24px_rgba(15,23,42,0.12)]">
+                <div
+                  className="pointer-events-none absolute inset-0 opacity-[0.5] bg-[radial-gradient(circle_at_center,rgb(148_163_184/0.085)_1.5px,transparent_1.5px)] [background-size:20px_20px]"
+                  aria-hidden
                 />
-              </div>
-              {importProcessing && (
+                <div className="relative space-y-4 p-4 sm:p-6">
+                  <div className="flex flex-col gap-4 sm:flex-row sm:items-stretch">
+                    <div className="flex shrink-0 flex-row items-center gap-3 rounded-xl border border-white/70 bg-white/75 px-4 py-3 shadow-sm ring-1 ring-viva-200/35 sm:flex-col sm:text-center">
+                      <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-gradient-to-br from-teal-50 to-viva-50 ring-1 ring-teal-200/50">
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          className="h-7 w-7 text-teal-800/90"
+                          aria-hidden
+                        >
+                          <path
+                            stroke="currentColor"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth="1.5"
+                            d="M7 3.5h10c.83 0 1.5.67 1.5 1.5v14a1 1 0 01-.62.927l-5 2a1 1 0 01-.759 0l-5-2A1 1 0 015 19V5c0-.83.67-1.5 1.5-1.5z"
+                          />
+                          <path stroke="currentColor" strokeLinecap="round" strokeWidth="1.5" d="M8 8h4M8 11h8M8 14h5" opacity="0.9" />
+                        </svg>
+                      </div>
+                      <div className="min-w-0 sm:px-0">
+                        <p className="font-display text-[11px] font-bold uppercase tracking-wider text-teal-800/95">Hospitalar</p>
+                        <p className="font-display text-sm font-bold tracking-tight text-viva-900">Planilha Excel</p>
+                        <p className="font-serif text-[10px] leading-tight text-viva-500">.xlsx · .xls · pront.+TUSS</p>
+                      </div>
+                    </div>
+                    <div className="min-w-0 flex-1 space-y-3">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <button
+                          type="button"
+                          className="btn btn-secondary btn-sm font-display ring-1 ring-viva-200/50"
+                          onClick={baixarModeloLancamentosXlsx}
+                        >
+                          Descarregar modelo
+                        </button>
+                        <button
+                          type="button"
+                          className="btn btn-secondary btn-sm font-display ring-1 ring-viva-200/50"
+                          disabled={local.concluido || importProcessing}
+                          onClick={() => xlsxImportRef.current?.click()}
+                        >
+                          Escolher ficheiro…
+                        </button>
+                        <input
+                          ref={xlsxImportRef}
+                          type="file"
+                          accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
+                          className="sr-only"
+                          disabled={local.concluido || importProcessing}
+                          onChange={(e) => {
+                            const f = e.target.files?.[0];
+                            if (f) processarFicheiroLancamentosXlsx(f);
+                            e.target.value = '';
+                          }}
+                        />
+                      </div>
+                      <div className="rounded-xl border border-slate-200/85 bg-gradient-to-b from-white/90 to-slate-50/40 px-3 py-3 ring-1 ring-inset ring-slate-100/90 sm:px-3.5">
+                        <label
+                          className="font-display text-[10px] font-bold uppercase tracking-[0.18em] text-teal-800/90"
+                          htmlFor="import-paste-tsv"
+                        >
+                          Ou colar do Excel
+                        </label>
+                        <p className="mt-1 font-serif text-[11px] leading-snug text-viva-600">
+                          Selecione as células na planilha, copie (Ctrl+C) e cole aqui. O conteúdo colado é texto com tab entre colunas — o mesmo dado que no .xlsx.
+                        </p>
+                        <textarea
+                          id="import-paste-tsv"
+                          ref={importPasteRef}
+                          rows={4}
+                          disabled={local.concluido || importProcessing}
+                          placeholder="Cole aqui (Ctrl+V) as linhas copiadas…"
+                          className="input mt-2 w-full min-h-[4.5rem] resize-y text-xs font-mono leading-relaxed"
+                          spellCheck={false}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+                              e.preventDefault();
+                              processarTextoColadoLancamentos();
+                            }
+                          }}
+                        />
+                        <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1">
+                          <button
+                            type="button"
+                            className="btn btn-secondary btn-sm font-display ring-1 ring-viva-200/45"
+                            disabled={local.concluido || importProcessing}
+                            onClick={processarTextoColadoLancamentos}
+                          >
+                            Processar texto colado
+                          </button>
+                          <span className="font-serif text-[10px] text-viva-500">Atalho: Ctrl+Enter</span>
+                        </div>
+                      </div>
+                      {importProcessing && (
                 <div
                   role="status"
                   aria-live="polite"
-                  className="flex items-start gap-3 rounded-lg border border-viva-400/70 bg-white/95 px-3 py-3 sm:px-4 shadow-[0_1px_0_rgba(0,0,0,0.04)]"
+                  className="flex items-start gap-3 rounded-xl border border-teal-200/80 bg-gradient-to-br from-white to-teal-50/30 px-4 py-3 shadow-sm ring-1 ring-teal-100/50 sm:px-4"
                 >
                   <span
-                    className="mt-0.5 inline-block h-8 w-8 shrink-0 rounded-full border-2 border-viva-600 border-t-transparent animate-spin motion-reduce:animate-none motion-reduce:border-solid motion-reduce:border-viva-300"
+                    className="mt-0.5 inline-block h-8 w-8 shrink-0 rounded-full border-2 border-teal-600 border-t-transparent animate-spin motion-reduce:animate-none motion-reduce:border-solid motion-reduce:border-teal-300"
                     aria-hidden
                   />
                   <div className="min-w-0">
                     <p className="text-sm font-display font-semibold text-viva-950">A ler e analisar a planilha…</p>
-                    <p className="text-[11px] text-viva-600 font-serif mt-1 leading-snug">
+                    <p className="font-serif text-[11px] text-viva-600 mt-1 leading-snug">
                       Ficheiros grandes levam vários segundos. Este passo faz a leitura do Excel na totalidade antes de mostrar o resultado.
                     </p>
                   </div>
@@ -2877,23 +3075,38 @@ const RelatoriosProcedimentos = () => {
                   if (!local.concluido && !importProcessing) xlsxImportRef.current?.click();
                 }}
                 className={[
-                  'rounded-lg border-2 border-dashed px-4 py-8 text-center transition relative',
+                  'group relative overflow-hidden rounded-2xl border-2 border-dashed px-4 py-9 text-center transition-all duration-200',
+                  'before:pointer-events-none before:absolute before:inset-x-8 before:top-3 before:border-t before:border-dashed before:border-teal-200/50 before:opacity-0 before:transition-opacity hover:before:opacity-100',
                   local.concluido || importProcessing
                     ? 'border-slate-200 bg-slate-50 text-slate-400 cursor-not-allowed'
                     : importDragActive
-                      ? 'border-viva-500 bg-viva-100/40 text-viva-900 cursor-pointer'
-                      : 'border-viva-200/90 bg-white/80 text-viva-700 hover:border-viva-400/80 cursor-pointer',
+                      ? 'border-teal-500/90 bg-teal-50/50 text-viva-950 shadow-[inset_0_0_0_1px_rgba(45,212,191,0.35)] cursor-pointer scale-[1.01]'
+                      : 'border-viva-200/90 bg-white/90 text-viva-800 hover:border-teal-400/70 hover:bg-gradient-to-br hover:from-white hover:to-teal-50/20 cursor-pointer',
                 ].join(' ')}
-              >
-                <p className="text-sm font-display font-semibold text-viva-900">
+                >
+                {!(local.concluido || importProcessing) ? (
+                <span
+                  className="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-xl bg-teal-100/70 text-teal-800 shadow-inner ring-1 ring-teal-200/60 transition-transform duration-200 group-hover:translate-y-0.5"
+                  aria-hidden
+                >
+                  <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                    <path d="M12 5v12M12 17l4-4M12 17l-4-4M5 15v2a2 2 0 002 2h10a2 2 0 002-2v-2" opacity="0.85" />
+                  </svg>
+                </span>
+                ) : (
+                  <span className="mx-auto mb-3 block h-10 w-10 rounded-xl bg-slate-200/80" aria-hidden />
+                )}
+                <p className="font-display text-sm font-semibold text-viva-900 tracking-tight">
                   {importProcessing ? 'Aguarde, a processar o ficheiro…' : 'Largue aqui o ficheiro Excel ou clique para selecionar'}
                 </p>
-                <p className="text-[11px] text-viva-500 font-serif mt-1">
+                <p className="font-serif text-[11px] text-viva-600 mt-2 max-w-[20rem] mx-auto leading-snug">
                   {importProcessing
                     ? 'Não feche esta página até aparecer mensagem ou pré-visualização.'
-                    : 'Cirurgia com dois nomes separados por « / » e valor total — identifica o par na base TUSS automaticamente'}
+                    : 'Cirurgia com dois nomes separados por « / » e valor total — cruza automaticamente com a base TUSS.'}
                 </p>
               </div>
+                    </div>
+                  </div>
 
               {importPreview && importPreview.linhas.length > 0 && (
                 <div className="rounded-lg border border-viva-200 bg-white overflow-hidden shadow-sm">
@@ -3014,6 +3227,8 @@ const RelatoriosProcedimentos = () => {
                   {importMsg.texto}
                 </div>
               )}
+                </div>
+              </div>
             </div>
           )}
 
