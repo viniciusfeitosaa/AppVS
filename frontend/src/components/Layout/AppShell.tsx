@@ -6,7 +6,6 @@ import { authService } from '../../services/auth.service';
 import { medicoService } from '../../services/medico.service';
 import { pontoService } from '../../services/ponto.service';
 import { ModuloSistema } from '../../constants/modulos';
-import { useInactivityLogout } from '../../hooks/useInactivityLogout';
 import NotificationBell from './NotificationBell';
 import GlobalToasts from './GlobalToasts';
 
@@ -117,12 +116,8 @@ const getMobileIcon = (label: string) => {
   }
 };
 
-/** Tempo sem atividade (em ms) antes do logout automático. 40 min. */
-const INACTIVITY_LOGOUT_MS = 40 * 60 * 1000;
-
 const AppShell = () => {
   const { user, logout } = useAuth();
-  useInactivityLogout(INACTIVITY_LOGOUT_MS);
   const isMaster = user?.role === 'MASTER';
   const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
   const [openDesktopGroup, setOpenDesktopGroup] = useState<string | null>(null);
