@@ -1343,9 +1343,58 @@ const describeImportColumnMap = (headerRow: unknown[], col: Record<string, numbe
   return labels.join('; ');
 };
 
+/** Linha da planilha que não casou com a base TUSS — pode ser concluída na aba manual. */
+type ImportLinhaAviso = {
+  sheetLine: number;
+  draft: LinhaProcedimento;
+  mensagens: string[];
+};
+
 type ImportPreviewLanc = {
   linhas: LinhaProcedimento[];
   errors: string[];
+  avisos: ImportLinhaAviso[];
+};
+
+/** Rascunho para preenchimento manual a partir de uma linha da importação com aviso. */
+const montarRascunhoLinhaImport = (p: {
+  dataIso: string;
+  paciente: string;
+  prontuario: string;
+  nomeProc: string;
+  instrumento: string;
+  codigo1: string;
+  codigo2: string;
+  v1s: string;
+  v2s: string;
+  honorTotalStr: string;
+  quemRepasse: RascunhoProfsT;
+}): LinhaProcedimento => {
+  const draft = linhaPendenteVazia();
+  draft.dataProcedimento = p.dataIso;
+  draft.nomePaciente = p.paciente;
+  draft.prontuario = p.prontuario;
+  draft.instrumento = p.instrumento;
+  draft.codigo1 = p.codigo1;
+  draft.codigo2 = p.codigo2;
+  const np = p.nomeProc.trim();
+  if (np) {
+    const parts = np.split(/\s*\/\s*/).map((s) => s.trim()).filter(Boolean);
+    if (parts.length >= 2) {
+      draft.nome1 = parts[0];
+      draft.nome2 = parts.slice(1).join(' / ');
+    } else {
+      draft.nome1 = np;
+    }
+  }
+  if (p.honorTotalStr.trim() && parseBrl(p.honorTotalStr) > 0) {
+    draft.valorPrimeiro = numBrl(parseBrl(p.honorTotalStr));
+  } else {
+    if (p.v1s.trim()) draft.valorPrimeiro = numBrl(parseBrl(p.v1s));
+    if (p.v2s.trim()) draft.valorSegundo = numBrl(parseBrl(p.v2s));
+  }
+  draft.quemRepasse = { ...p.quemRepasse };
+  return draft;
 };
 
 type AoaImportacaoPrep = {
@@ -1458,11 +1507,18 @@ const parsePlanilhaLancamentos = (
   sheet?: XLSX.WorkSheet,
   sheetRowOffset = 0,
   mesReferencia?: string
-): { linhas: LinhaProcedimento[]; errors: string[]; headerRow: number; layoutHospital: boolean } => {
+): {
+  linhas: LinhaProcedimento[];
+  errors: string[];
+  avisos: ImportLinhaAviso[];
+  headerRow: number;
+  layoutHospital: boolean;
+} => {
   const errors: string[] = [];
+  const avisos: ImportLinhaAviso[] = [];
   if (!aoa?.length) {
     errors.push('Planilha vazia.');
-    return { linhas: [], errors, headerRow: 0, layoutHospital: false };
+    return { linhas: [], errors, avisos, headerRow: 0, layoutHospital: false };
   }
   const resolved = resolverColunasImportacao(aoa, sheet, sheetRowOffset, mesReferencia);
   const { col, headerRow, dataStartRow, layoutHospital } = resolved;
@@ -1482,7 +1538,7 @@ const parsePlanilhaLancamentos = (
     );
   }
   if (col.data === undefined || (!temTriploCab && !temNomeProcCab && !temHonorCab)) {
-    return { linhas: [], errors, headerRow, layoutHospital };
+    return { linhas: [], errors, avisos, headerRow, layoutHospital };
   }
 
   const aoaData = trimAoaAfterDataBlock(
@@ -1555,18 +1611,21 @@ const parsePlanilhaLancamentos = (
     }
 
     let rowOk = true;
+    const errosLinha: string[] = [];
+    const pushErroLinha = (msg: string) => {
+      errosLinha.push(msg);
+      rowOk = false;
+    };
 
     const temTriploCompleto = !!(instrumento && codigo1 && codigo2);
     const temTriploParcial = !!(instrumento || codigo1 || codigo2) && !temTriploCompleto;
     if (temTriploParcial) {
-      errors.push(
-        `Linha ${linhaN}: preencha Ins., Cód. 1 e Cód. 2 em conjunto, ou use a coluna «Procedimento» / «Cirurgia» (nome do 1.º na base).`
+      pushErroLinha(
+        'preencha Ins., Cód. 1 e Cód. 2 em conjunto, ou use a coluna «Procedimento» / «Cirurgia» (nome do 1.º na base).'
       );
-      rowOk = false;
     }
     if (!temTriploCompleto && !nomeProc.trim()) {
-      errors.push(`Linha ${linhaN}: coluna «Cirurgia»/«Procedimento» em falta.`);
-      rowOk = false;
+      pushErroLinha('coluna «Cirurgia»/«Procedimento» em falta.');
     }
     if (!temTriploCompleto && !nomeProc.trim() && !temHonorParaId) {
       rowOk = false;
@@ -1576,8 +1635,7 @@ const parsePlanilhaLancamentos = (
     if (temTriploCompleto) {
       base = findProcedimentoBaseImport(instrumento, codigo1, codigo2);
       if (!base) {
-        errors.push(`Linha ${linhaN}: procedimento não encontrado na base (${instrumento} | ${codigo1} | ${codigo2}).`);
-        rowOk = false;
+        pushErroLinha(`procedimento não encontrado na base (${instrumento} | ${codigo1} | ${codigo2}).`);
       }
     } else if (nomeProc) {
       const honorDisamb = temHonorParaId ? honorT0Raw : undefined;
@@ -1589,27 +1647,24 @@ const parsePlanilhaLancamentos = (
         if (!('err' in sumHit)) {
           base = sumHit.ok;
         } else if (hit.err === 'ambiguous') {
-          errors.push(
-            `Linha ${linhaN}: várias hipóteses na base para «${nomeProc}» e o total ${honorTotalStr} não coincide com a soma TUSS de um único par. Use Ins.+Cód. 1+2 ou ajuste o texto/total.`
+          pushErroLinha(
+            `várias hipóteses na base para «${nomeProc}» e o total ${honorTotalStr} não coincide com a soma TUSS de um único par. Use Ins.+Cód. 1+2 ou ajuste o texto/total.`
           );
-          rowOk = false;
         } else {
-          errors.push(
-            `Linha ${linhaN}: não foi possível casar «${nomeProc}» com a base (TUSS usa abreviações, ex.: TRAT.) nem encontrar par com soma = ${honorTotalStr}. Verifique Cirurgia e honorários.`
+          pushErroLinha(
+            `não foi possível casar «${nomeProc}» com a base (TUSS usa abreviações, ex.: TRAT.) nem encontrar par com soma = ${honorTotalStr}. Verifique Cirurgia e honorários.`
           );
-          rowOk = false;
         }
       } else {
         if (hit.err === 'ambiguous') {
-          errors.push(
-            `Linha ${linhaN}: várias hipóteses na base para «${nomeProc}». Use Ins.+Cód. 1+2, o total de honorários (soma TUSS única) ou um texto mais próximo do TUSS (ex.: TRAT. em vez de TRATAMENTO).`
+          pushErroLinha(
+            `várias hipóteses na base para «${nomeProc}». Use Ins.+Cód. 1+2, o total de honorários (soma TUSS única) ou um texto mais próximo do TUSS (ex.: TRAT. em vez de TRATAMENTO).`
           );
         } else {
-          errors.push(
-            `Linha ${linhaN}: não foi possível casar «${nomeProc}» com a base. Experimente o total de honorários (soma 1.+2.) se for único na base, ou Ins.+Cód. 1+2.`
+          pushErroLinha(
+            `não foi possível casar «${nomeProc}» com a base. Experimente o total de honorários (soma 1.+2.) se for único na base, ou Ins.+Cód. 1+2.`
           );
         }
-        rowOk = false;
       }
     } else if (temHonorParaId && nomeProc.trim()) {
       const sumHit = findProcedimentoBasePorSomaValoresUnica(honorT0Raw);
@@ -1617,23 +1672,21 @@ const parsePlanilhaLancamentos = (
         base = sumHit.ok;
       } else {
         if (sumHit.err === 'ambiguous') {
-          errors.push(
-            `Linha ${linhaN}: vários pares na base têm soma TUSS (1.+2.) igual a ${honorTotalStr}. Acrescente «Cirurgia»/códigos para desambiguar.`
+          pushErroLinha(
+            `vários pares na base têm soma TUSS (1.+2.) igual a ${honorTotalStr}. Acrescente «Cirurgia»/códigos para desambiguar.`
           );
         } else {
-          errors.push(
-            `Linha ${linhaN}: nenhum par na base com soma TUSS (1.+2.) igual a ${honorTotalStr} (tolerância ±R$0,02).`
+          pushErroLinha(
+            `nenhum par na base com soma TUSS (1.+2.) igual a ${honorTotalStr} (tolerância ±R$0,02).`
           );
         }
-        rowOk = false;
       }
     }
 
     const incl1 = !!(m1n || m1c);
     const incl2 = !!(m2n || m2c);
     if (!incl1 && !incl2) {
-      errors.push(`Linha ${linhaN}: indique médico 1 e/ou 2 (nome ou CRM).`);
-      rowOk = false;
+      pushErroLinha('indique médico 1 e/ou 2 (nome ou CRM).');
     }
     const quemRepasse: RascunhoProfsT = {
       incluirProfissional1: incl1,
@@ -1644,12 +1697,34 @@ const parsePlanilhaLancamentos = (
       profissional2Crm: m2c,
     };
     if (!lancarRepassePermitido(quemRepasse)) {
-      errors.push(
-        `Linha ${linhaN}: para cada médico indicado preencha nome e/ou CRM (como no formulário manual).`
-      );
-      rowOk = false;
+      pushErroLinha('para cada médico indicado preencha nome e/ou CRM (como no formulário manual).');
     }
-    if (!rowOk || !base || !dataIso) continue;
+
+    if (!rowOk || !base || !dataIso) {
+      for (const msg of errosLinha) {
+        errors.push(`Linha ${linhaN}: ${msg}`);
+      }
+      if (!rowOk && dataIso && paciente.trim().length >= 3 && errosLinha.length > 0) {
+        avisos.push({
+          sheetLine: linhaN,
+          draft: montarRascunhoLinhaImport({
+            dataIso,
+            paciente,
+            prontuario,
+            nomeProc,
+            instrumento,
+            codigo1,
+            codigo2,
+            v1s,
+            v2s,
+            honorTotalStr,
+            quemRepasse,
+          }),
+          mensagens: errosLinha,
+        });
+      }
+      continue;
+    }
 
     // Texto Cirurgia/Procedimento identifica o registo na base (em geral o 1.º); o par 1.º+2.º completo vem de `fromBase`.
     const linha: LinhaProcedimento = {
@@ -1696,7 +1771,7 @@ const parsePlanilhaLancamentos = (
     }
   }
 
-  return { linhas, errors, headerRow, layoutHospital };
+  return { linhas, errors, avisos, headerRow, layoutHospital };
 };
 
 const LAYOUT_NOTA_IMPORT_HOSPITAL =
@@ -1705,6 +1780,7 @@ const LAYOUT_NOTA_IMPORT_HOSPITAL =
 const estadoUIMaposParseImportacao = (
   linhas: LinhaProcedimento[],
   errors: string[],
+  avisos: ImportLinhaAviso[],
   layoutHospital: boolean,
   colMap: string,
   mesChave: string
@@ -1721,12 +1797,15 @@ const estadoUIMaposParseImportacao = (
     };
   }
   const errosReais = errors.filter((e) => !e.startsWith('Layout hospital'));
+  const errosGlobais = errosReais.filter((e) => !/^Linha \d+:/.test(e));
   return {
-    preview: { linhas, errors },
+    preview: { linhas, errors, avisos },
     msg: errosReais.length
       ? {
           tipo: 'aviso',
-          texto: `${linhas.length} lançamento(s) reconhecido(s). Revise a pré-visualização — ${errosReais.length} aviso(s):\n${errosReais.slice(0, 12).join('\n')}${errosReais.length > 12 ? '\n…' : ''}`,
+          texto: avisos.length
+            ? `${linhas.length} lançamento(s) reconhecido(s). ${avisos.length} linha(s) da planilha precisam de preenchimento manual — use os botões abaixo.${errosGlobais.length ? `\n\n${errosGlobais.join('\n')}` : ''}`
+            : `${linhas.length} lançamento(s) reconhecido(s). Revise a pré-visualização — ${errosReais.length} aviso(s):\n${errosReais.slice(0, 12).join('\n')}${errosReais.length > 12 ? '\n…' : ''}`,
         }
       : {
           tipo: 'ok',
@@ -2085,13 +2164,13 @@ const RelatoriosProcedimentos = () => {
             aoa[headerRow] ?? [],
             resolveLancImportColumns(aoa[headerRow] ?? [])
           );
-          const { linhas, errors, layoutHospital } = parsePlanilhaLancamentos(
+          const { linhas, errors, avisos, layoutHospital } = parsePlanilhaLancamentos(
             aoa,
             picked.sheet,
             sheetRowOffset,
             mesChave
           );
-          const ui = estadoUIMaposParseImportacao(linhas, errors, layoutHospital, colMap, mesChave);
+          const ui = estadoUIMaposParseImportacao(linhas, errors, avisos, layoutHospital, colMap, mesChave);
           setImportPreview(ui.preview);
           setImportMsg(ui.msg);
         } catch (e) {
@@ -2167,8 +2246,8 @@ const RelatoriosProcedimentos = () => {
             aoa[headerRow] ?? [],
             resolveLancImportColumns(aoa[headerRow] ?? [])
           );
-          const { linhas, errors, layoutHospital } = parsePlanilhaLancamentos(aoa, undefined, 0, mesChave);
-          const ui = estadoUIMaposParseImportacao(linhas, errors, layoutHospital, colMap, mesChave);
+          const { linhas, errors, avisos, layoutHospital } = parsePlanilhaLancamentos(aoa, undefined, 0, mesChave);
+          const ui = estadoUIMaposParseImportacao(linhas, errors, avisos, layoutHospital, colMap, mesChave);
           setImportPreview(ui.preview);
           setImportMsg(ui.msg);
         } catch (e) {
@@ -2428,6 +2507,34 @@ const RelatoriosProcedimentos = () => {
   const salvarRascunhoProfsMês = useCallback(() => {
     persist({ ...localRef.current, ...rascunhoProfs });
   }, [rascunhoProfs, persist]);
+
+  const irPreencherManualDesdeImport = useCallback(
+    (aviso: ImportLinhaAviso) => {
+      const L = localRef.current;
+      if (L.concluido) {
+        window.alert('Este mês está concluído. Reabra o mês para lançar manualmente.');
+        return;
+      }
+      const draft = { ...aviso.draft };
+      if (aviso.draft.quemRepasse) {
+        setRascunhoProfs({ ...aviso.draft.quemRepasse });
+      }
+      setModoEntradaLanc('manual');
+      setLinhaPendente(draft);
+      const hint =
+        draft.instrumento.trim() ||
+        draft.codigo1.trim() ||
+        draft.nome1.trim().slice(0, 48) ||
+        draft.nome2.trim().slice(0, 48) ||
+        '';
+      setBusca(hint);
+      setAbrirSugestoes(hint.trim().length >= 2);
+      requestAnimationFrame(() => {
+        document.getElementById('entrada-manual-lanc')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      });
+    },
+    []
+  );
 
   const selecionarProcedimentoBase = (b: ProcedimentoBase) => {
     setLinhaPendente((atual) => {
@@ -3216,15 +3323,59 @@ const RelatoriosProcedimentos = () => {
                 <div
                   role="status"
                   className={[
-                    'rounded-lg border px-3 py-2.5 text-xs font-serif whitespace-pre-wrap',
+                    'rounded-lg border px-3 py-2.5 text-xs font-serif',
                     importMsg.tipo === 'erro'
-                      ? 'border-rose-200 bg-rose-50 text-rose-900'
+                      ? 'border-rose-200 bg-rose-50 text-rose-900 whitespace-pre-wrap'
                       : importMsg.tipo === 'aviso'
                         ? 'border-amber-200 bg-amber-50 text-amber-950'
-                        : 'border-emerald-200 bg-emerald-50/90 text-emerald-950',
+                        : 'border-emerald-200 bg-emerald-50/90 text-emerald-950 whitespace-pre-wrap',
                   ].join(' ')}
                 >
-                  {importMsg.texto}
+                  <p className={importPreview?.avisos?.length ? 'leading-relaxed' : 'whitespace-pre-wrap'}>
+                    {importMsg.texto}
+                  </p>
+                  {importMsg.tipo === 'aviso' && importPreview?.avisos && importPreview.avisos.length > 0 && (
+                    <ul className="mt-3 space-y-2.5 border-t border-amber-200/80 pt-3">
+                      {importPreview.avisos.map((aviso) => (
+                        <li
+                          key={aviso.sheetLine}
+                          className="rounded-lg border border-amber-300/60 bg-white/70 px-3 py-2.5 shadow-sm"
+                        >
+                          <div className="flex flex-wrap items-start justify-between gap-2">
+                            <div className="min-w-0 flex-1">
+                              <p className="font-display text-[11px] font-bold uppercase tracking-wide text-amber-900/90">
+                                Linha {aviso.sheetLine} da planilha
+                              </p>
+                              <p className="mt-0.5 font-serif text-[11px] text-viva-800 [overflow-wrap:anywhere]">
+                                {aviso.draft.nomePaciente || '—'}
+                                {aviso.draft.nome1 ? (
+                                  <>
+                                    {' '}
+                                    · <span className="text-viva-700">{aviso.draft.nome1}</span>
+                                  </>
+                                ) : null}
+                              </p>
+                            </div>
+                            <button
+                              type="button"
+                              className="btn btn-primary btn-sm shrink-0 font-display"
+                              disabled={local.concluido}
+                              onClick={() => irPreencherManualDesdeImport(aviso)}
+                            >
+                              Preencher manual
+                            </button>
+                          </div>
+                          <ul className="mt-2 list-disc pl-4 space-y-0.5 font-serif text-[11px] text-amber-950/90 leading-snug">
+                            {aviso.mensagens.map((m, i) => (
+                              <li key={i} className="[overflow-wrap:anywhere]">
+                                {m}
+                              </li>
+                            ))}
+                          </ul>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
                 </div>
               )}
                 </div>
@@ -3234,7 +3385,10 @@ const RelatoriosProcedimentos = () => {
 
           {modoEntradaLanc === 'manual' && (
           <>
-          <div className="rounded-xl border border-viva-200/70 bg-white/80 p-3 sm:p-3.5">
+          <div
+            id="entrada-manual-lanc"
+            className="rounded-xl border border-viva-200/70 bg-white/80 p-3 sm:p-3.5 scroll-mt-24"
+          >
             <p className="text-[10px] font-semibold uppercase text-viva-500 font-display mb-2">Dados do procedimento</p>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
               <div>
