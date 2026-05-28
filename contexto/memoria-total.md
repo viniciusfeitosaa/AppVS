@@ -31,11 +31,17 @@ git pull
 C:\Users\vinic\Documents\COFRE - MEMORIA
 ```
 
-Atalho na raiz do repo:
+Repo local (vinic): `C:\Users\vinic\Downloads\GymApp\AppVS`
+
+Atalho na raiz do repo (**comando separado** do `git pull`):
 
 ```powershell
+cd C:\Users\vinic\Downloads\GymApp\AppVS
+git pull
 .\rodar-cofre-memoria.ps1
 ```
+
+> Não use `git pull .\rodar-cofre-memoria.ps1` — são dois comandos diferentes.
 
 Na primeira vez em outro PC, informe o caminho do **vault** (pasta pai da `memoria total`).
 
