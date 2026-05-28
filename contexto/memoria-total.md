@@ -57,4 +57,12 @@ Só o conteúdo dentro de **`Viva-Saude/`** vai para o Git do AppVS.
 | Ver o que o agente fez | `git pull` no repo |
 | Enviar suas anotações | `git add contexto` → `commit` → `push` |
 
+## Changelog
+
+### 2026-05-28 — Junction confirmada (vinic)
+
+- `.\rodar-cofre-memoria.ps1` executado com sucesso
+- Repo: `C:\Users\vinic\Downloads\GymApp\AppVS`
+- Vault: `C:\Users\vinic\Documents\COFRE - MEMORIA\memoria total\Viva-Saude`
+
 Ver também: [[SETUP-OBSIDIAN]]

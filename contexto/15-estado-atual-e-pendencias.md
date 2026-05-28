@@ -36,6 +36,7 @@ O **Viva Saúde** é um sistema **maduro em produção/desenvolvimento avançado
 | Migrations Prisma | ✅ 39 pastas |
 | CI GitHub Actions | ✅ `ci.yml`, `deploy-vps.yml` |
 | Docs raiz README/CHECKLIST | ⚠️ Desatualizados |
+| Obsidian COFRE - MEMORIA (vinic) | ✅ Junction `memoria total\Viva-Saude` |
 
 ## Git local (agente/cloud)
 
