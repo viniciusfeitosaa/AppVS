@@ -74,8 +74,10 @@ app-medico/
 
 ## 📚 Documentação
 
-- [PLANO_PROJETO.md](./PLANO_PROJETO.md) - Plano completo do projeto
-- [GUIA_IMPLEMENTACAO.md](./GUIA_IMPLEMENTACAO.md) - Guia de implementação passo a passo
+- **[`contexto/`](./contexto/)** — Harness IA: o que foi feito em cada etapa (fonte atualizada para desenvolvimento)
+- [`AGENTS.md`](./AGENTS.md) — Instruções para agentes de IA
+- [PLANO_PROJETO.md](./PLANO_PROJETO.md) - Plano completo do projeto (histórico)
+- [GUIA_IMPLEMENTACAO.md](./GUIA_IMPLEMENTACAO.md) - Guia de implementação passo a passo (histórico)
 
 ## 🛠️ Desenvolvimento
 
@@ -102,11 +104,9 @@ docker-compose up -d
 
 ## 📝 Status do Projeto
 
-- [x] Planejamento
-- [ ] Setup inicial
-- [ ] Autenticação
-- [ ] Dashboard
-- [ ] Deploy
+O status detalhado e por módulo está em **[`contexto/15-estado-atual-e-pendencias.md`](./contexto/15-estado-atual-e-pendencias.md)**.
+
+Resumo: sistema em operação (auth, escalas, ponto, vagas, documentos, relatórios, mobile, deploy). Pendência principal: módulo **Atendimentos** (placeholder no frontend).
 
 ## 📄 Licença
 
