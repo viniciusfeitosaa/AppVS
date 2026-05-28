@@ -37,6 +37,14 @@ Se você criou a pasta **`memoria total`** dentro do Obsidian:
 
 ```powershell
 git pull
+.\rodar-cofre-memoria.ps1
+```
+
+Vault: `C:\Users\vinic\Documents\COFRE - MEMORIA`
+
+Ou o genérico (pede o caminho):
+
+```powershell
 .\rodar-memoria-total.ps1
 ```
 

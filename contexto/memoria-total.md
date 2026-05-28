@@ -25,9 +25,19 @@ git pull
 .\rodar-memoria-total.ps1
 ```
 
-Na primeira vez, informe o caminho do **vault** (pasta pai da `memoria total`), por exemplo:
+### Vault configurado (vinic)
 
-`C:\Users\SeuNome\Documents\Obsidian\MeuVault`
+```
+C:\Users\vinic\Documents\COFRE - MEMORIA
+```
+
+Atalho na raiz do repo:
+
+```powershell
+.\rodar-cofre-memoria.ps1
+```
+
+Na primeira vez em outro PC, informe o caminho do **vault** (pasta pai da `memoria total`).
 
 ## Notas pessoais na mesma pasta
 

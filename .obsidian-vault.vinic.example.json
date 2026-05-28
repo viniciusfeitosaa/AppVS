@@ -3,6 +3,6 @@
   "vaultPath": "C:\\Users\\vinic\\Documents\\COFRE - MEMORIA",
   "memoriaTotalFolder": "memoria total",
   "linkName": "Viva-Saude",
-  "contexto": "C:\\dev\\AppVS\\contexto",
-  "comment": "Copie para .obsidian-vault.json na raiz do repo. mode: repo-vault | symlink | memoria-total"
+  "contexto": "ALTERE_PARA_SEU_CAMINHO\\AppVS\\contexto",
+  "comment": "Copie para .obsidian-vault.json na raiz do repo apos git pull"
 }
