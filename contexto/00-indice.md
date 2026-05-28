@@ -7,6 +7,7 @@
 
 - [[Home]] — dashboard do vault
 - [[SETUP-OBSIDIAN]] — conectar no PC
+- [[memoria-total]] — pasta « memoria total » no vault Windows
 
 ## Por onde começar
 

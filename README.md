@@ -76,6 +76,7 @@ app-medico/
 
 - **[`contexto/`](./contexto/)** — Harness IA + **vault Obsidian** (anotações por etapa; ver `contexto/SETUP-OBSIDIAN.md`)
 - `scripts/setup-obsidian-vault.ps1` — abrir/configurar Obsidian no Windows
+- `rodar-memoria-total.ps1` — liga `memoria total\Viva-Saude` ao `contexto/` (Git)
 - [`AGENTS.md`](./AGENTS.md) — Instruções para agentes de IA
 - [PLANO_PROJETO.md](./PLANO_PROJETO.md) - Plano completo do projeto (histórico)
 - [GUIA_IMPLEMENTACAO.md](./GUIA_IMPLEMENTACAO.md) - Guia de implementação passo a passo (histórico)

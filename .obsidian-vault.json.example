@@ -1,6 +1,8 @@
 {
-  "mode": "repo-vault",
-  "vaultPath": "C:\\dev\\AppVS\\contexto",
-  "externalVaultPath": "C:\\Users\\SEU_USUARIO\\Documents\\Obsidian\\Viva-Saude",
-  "comment": "Copie para .obsidian-vault.json na raiz do repo (arquivo local, gitignored)"
+  "mode": "memoria-total",
+  "vaultPath": "C:\\Users\\SEU_USUARIO\\Documents\\Obsidian\\SEU-VAULT",
+  "memoriaTotalFolder": "memoria total",
+  "linkName": "Viva-Saude",
+  "contexto": "C:\\dev\\AppVS\\contexto",
+  "comment": "Copie para .obsidian-vault.json na raiz do repo. mode: repo-vault | symlink | memoria-total"
 }

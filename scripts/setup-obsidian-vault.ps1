@@ -3,23 +3,23 @@
 .SYNOPSIS
   Configura o Obsidian para usar o harness Viva Saúde (pasta contexto/).
 
-.EXAMPLE
-  .\scripts\setup-obsidian-vault.ps1
-  Abre ou instrui a abrir o vault = pasta contexto do repo.
+.PARAMETER Mode
+  repo-vault = abrir contexto/ como vault
+  symlink = AppVS-contexto na raiz do vault
+  memoria-total = memoria total\Viva-Saude -> repo\contexto (seu caso no Windows)
 
 .EXAMPLE
-  .\scripts\setup-obsidian-vault.ps1 -Mode symlink -VaultPath "$env:USERPROFILE\Documents\Obsidian\Viva-Saude"
-  Cria junction AppVS-contexto -> repo\contexto dentro do vault existente.
-
-.EXAMPLE
-  .\scripts\setup-obsidian-vault.ps1 -Open
-  Tenta abrir o Obsidian no vault configurado.
+  .\scripts\setup-obsidian-vault.ps1 -Mode memoria-total -VaultPath "C:\Users\voce\Documents\Obsidian\MeuVault" -Open -SaveConfig
 #>
 param(
-    [ValidateSet('repo-vault', 'symlink')]
+    [ValidateSet('repo-vault', 'symlink', 'memoria-total')]
     [string]$Mode = 'repo-vault',
 
     [string]$VaultPath = '',
+
+    [string]$MemoriaFolder = 'memoria total',
+
+    [string]$LinkName = 'Viva-Saude',
 
     [switch]$Open,
 
@@ -31,88 +31,151 @@ $ErrorActionPreference = 'Stop'
 $RepoRoot = Resolve-Path (Join-Path $PSScriptRoot '..')
 $ContextoPath = Join-Path $RepoRoot 'contexto'
 $ConfigPath = Join-Path $RepoRoot '.obsidian-vault.json'
-$LinkName = 'AppVS-contexto'
+$DefaultLinkName = 'AppVS-contexto'
 
 function Write-Info($msg) { Write-Host "[obsidian] $msg" -ForegroundColor Cyan }
 function Write-Ok($msg) { Write-Host "[obsidian] $msg" -ForegroundColor Green }
 function Write-Warn($msg) { Write-Host "[obsidian] $msg" -ForegroundColor Yellow }
 
+function New-DirectoryJunction {
+    param(
+        [Parameter(Mandatory)][string]$LinkPath,
+        [Parameter(Mandatory)][string]$TargetPath
+    )
+    if (-not (Test-Path $TargetPath)) {
+        throw "Destino inexistente: $TargetPath"
+    }
+    if (Test-Path $LinkPath) {
+        $item = Get-Item $LinkPath -Force
+        if ($item.Attributes -band [IO.FileAttributes]::ReparsePoint) {
+            $target = $item.Target
+            if ($target -and ($target -eq $TargetPath -or $target[0] -eq $TargetPath)) {
+                Write-Warn "Junction ja aponta para o repo: $LinkPath"
+                return
+            }
+            throw "Junction existe com outro destino: $LinkPath -> $target. Remova manualmente."
+        }
+        throw "Ja existe pasta/arquivo em $LinkPath (nao e junction). Renomeie ou remova."
+    }
+    $parent = Split-Path $LinkPath -Parent
+    if (-not (Test-Path $parent)) {
+        New-Item -ItemType Directory -Path $parent -Force | Out-Null
+    }
+    cmd /c "mklink /J `"$LinkPath`" `"$TargetPath`"" | Out-Null
+    if (-not (Test-Path $LinkPath)) {
+        throw "Falha ao criar junction. Execute PowerShell como Administrador ou ative Modo Desenvolvedor no Windows."
+    }
+    Write-Ok "Junction: $LinkPath -> $TargetPath"
+}
+
 if (-not (Test-Path $ContextoPath)) {
     throw "Pasta contexto nao encontrada: $ContextoPath"
 }
 
-# Carregar config local se existir
-if (-not $VaultPath -and (Test-Path $ConfigPath)) {
+# Config local
+if (Test-Path $ConfigPath) {
     try {
         $cfg = Get-Content $ConfigPath -Raw | ConvertFrom-Json
-        if ($cfg.vaultPath) { $VaultPath = $cfg.vaultPath }
+        if (-not $VaultPath -and $cfg.vaultPath) { $VaultPath = $cfg.vaultPath }
         if ($cfg.mode) { $Mode = $cfg.mode }
+        if ($cfg.memoriaTotalFolder) { $MemoriaFolder = $cfg.memoriaTotalFolder }
+        if ($cfg.linkName) { $LinkName = $cfg.linkName }
     } catch {
-        Write-Warn "Nao foi possivel ler $ConfigPath — ignorando."
+        Write-Warn "Nao foi possivel ler $ConfigPath"
     }
 }
 
-if ($Mode -eq 'symlink') {
-    if (-not $VaultPath) {
-        $VaultPath = Read-Host "Caminho do vault Obsidian existente (ex: $env:USERPROFILE\Documents\Obsidian\Viva-Saude)"
-    }
-    if (-not (Test-Path $VaultPath)) {
-        New-Item -ItemType Directory -Path $VaultPath -Force | Out-Null
-        Write-Info "Vault criado: $VaultPath"
-    }
-    $LinkPath = Join-Path $VaultPath $LinkName
+$OpenPath = $ContextoPath
+$OpenFile = 'Home.md'
 
-    if (Test-Path $LinkPath) {
-        $item = Get-Item $LinkPath -Force
-        if ($item.Attributes -band [IO.FileAttributes]::ReparsePoint) {
-            Write-Warn "Junction ja existe: $LinkPath"
-        } else {
-            throw "Ja existe pasta/arquivo em $LinkPath (nao e junction). Remova manualmente."
+switch ($Mode) {
+    'memoria-total' {
+        if (-not $VaultPath) {
+            Write-Info "Informe a pasta do VAULT Obsidian (onde existe 'memoria total')."
+            $VaultPath = Read-Host "Caminho do vault (ex: $env:USERPROFILE\Documents\Obsidian\MeuVault)"
         }
-    } else {
-        cmd /c "mklink /J `"$LinkPath`" `"$ContextoPath`"" | Out-Null
-        Write-Ok "Junction criada: $LinkPath -> $ContextoPath"
+        $VaultPath = $VaultPath.Trim().Trim('"')
+        if (-not (Test-Path $VaultPath)) {
+            throw "Vault nao encontrado: $VaultPath"
+        }
+
+        $MemoriaPath = Join-Path $VaultPath $MemoriaFolder
+        if (-not (Test-Path $MemoriaPath)) {
+            New-Item -ItemType Directory -Path $MemoriaPath -Force | Out-Null
+            Write-Ok "Pasta criada: $MemoriaPath"
+        } else {
+            Write-Ok "Usando pasta existente: $MemoriaPath"
+        }
+
+        $LinkPath = Join-Path $MemoriaPath $LinkName
+        New-DirectoryJunction -LinkPath $LinkPath -TargetPath $ContextoPath
+
+        Write-Host ""
+        Write-Ok "No Obsidian, abra o vault: $VaultPath"
+        Write-Ok "Navegue: $MemoriaFolder / $LinkName /"
+        Write-Ok "Comece por: [[Home]] em $MemoriaFolder\$LinkName\Home.md"
+
+        $OpenPath = $VaultPath
+        $OpenFile = "$MemoriaFolder/$LinkName/Home.md"
     }
 
-    Write-Ok "No Obsidian, abra o vault: $VaultPath"
-    Write-Ok "Edite as notas em: $LinkName\"
-    $OpenPath = $VaultPath
-} else {
-    Write-Ok "Modo recomendado: vault = pasta contexto do repositorio"
-    Write-Ok "Caminho: $ContextoPath"
-    Write-Info "Obsidian -> Open folder as vault -> selecione a pasta acima"
-    $OpenPath = $ContextoPath
+    'symlink' {
+        if (-not $VaultPath) {
+            $VaultPath = Read-Host "Caminho do vault Obsidian"
+        }
+        $VaultPath = $VaultPath.Trim().Trim('"')
+        if (-not (Test-Path $VaultPath)) {
+            New-Item -ItemType Directory -Path $VaultPath -Force | Out-Null
+        }
+        $LinkPath = Join-Path $VaultPath $DefaultLinkName
+        New-DirectoryJunction -LinkPath $LinkPath -TargetPath $ContextoPath
+        Write-Ok "Edite em: $DefaultLinkName\"
+        $OpenPath = $VaultPath
+        $OpenFile = "$DefaultLinkName/Home.md"
+    }
+
+    default {
+        Write-Ok "Vault recomendado = pasta contexto do repo"
+        Write-Ok $ContextoPath
+        Write-Info "Obsidian -> Open folder as vault -> selecione contexto\"
+        $OpenPath = $ContextoPath
+    }
 }
 
-if ($SaveConfig -or $VaultPath) {
-    $out = @{
-        mode      = $Mode
-        vaultPath = if ($Mode -eq 'symlink') { $VaultPath } else { $ContextoPath }
-        contexto  = $ContextoPath
-        updatedAt = (Get-Date).ToString('o')
-    }
-    $out | ConvertTo-Json | Set-Content -Path $ConfigPath -Encoding UTF8
-    Write-Ok "Config salva em $ConfigPath (local, nao vai pro Git)"
+if ($SaveConfig -or $Mode -ne 'repo-vault') {
+    @{
+        mode               = $Mode
+        vaultPath          = if ($Mode -eq 'repo-vault') { $ContextoPath } else { $VaultPath }
+        memoriaTotalFolder = $MemoriaFolder
+        linkName           = $LinkName
+        contexto           = $ContextoPath
+        memoriaTotalPath   = if ($Mode -eq 'memoria-total') { Join-Path $VaultPath $MemoriaFolder } else { $null }
+        updatedAt          = (Get-Date).ToString('o')
+    } | ConvertTo-Json | Set-Content -Path $ConfigPath -Encoding UTF8
+    Write-Ok "Config: $ConfigPath"
 }
 
 if ($Open) {
     $obsidianExe = @(
         "${env:LocalAppData}\Programs\Obsidian\Obsidian.exe",
-        "${env:ProgramFiles}\Obsidian\Obsidian.exe",
-        "$env:LOCALAPPDATA\obsidian\Obsidian.exe"
+        "${env:ProgramFiles}\Obsidian\Obsidian.exe"
     ) | Where-Object { Test-Path $_ } | Select-Object -First 1
 
-    $uri = 'obsidian://open?path=' + [uri]::EscapeDataString($OpenPath)
+    if ($Mode -eq 'repo-vault') {
+        $uri = 'obsidian://open?path=' + [uri]::EscapeDataString($OpenPath)
+    } else {
+        $fileEnc = [uri]::EscapeDataString($OpenFile)
+        $uri = "obsidian://open?path=$([uri]::EscapeDataString($OpenPath))&file=$fileEnc"
+    }
 
     if ($obsidianExe) {
-        Write-Info "Abrindo Obsidian: $OpenPath"
+        Write-Info "Abrindo Obsidian..."
         Start-Process -FilePath $obsidianExe -ArgumentList $uri
     } else {
-        Write-Warn "Obsidian.exe nao encontrado. Abra manualmente e selecione:"
-        Write-Host "  $OpenPath"
-        Write-Info "Ou cole no navegador: $uri"
+        Write-Warn "Instale o Obsidian ou abra manualmente: $OpenPath"
+        if ($OpenFile) { Write-Host "  Arquivo: $OpenFile" }
     }
 }
 
 Write-Host ""
-Write-Host "Documentacao: contexto\SETUP-OBSIDIAN.md" -ForegroundColor DarkGray
+Write-Host "Doc: contexto\SETUP-OBSIDIAN.md | memoria total: contexto\memoria-total.md" -ForegroundColor DarkGray

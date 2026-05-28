@@ -36,7 +36,8 @@
 
 ## Setup Obsidian
 
-Ver [[SETUP-OBSIDIAN]].
+- Vault só `contexto/` → [[SETUP-OBSIDIAN]]
+- Pasta **memoria total** no Windows → [[memoria-total]] · `rodar-memoria-total.ps1`
 
 ## Tags sugeridas
 

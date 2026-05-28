@@ -31,6 +31,38 @@ Na primeira vez, informe o caminho do Obsidian se o script não achar sozinho.
 
 ---
 
+## Estratégia « memoria total » (seu vault no Windows)
+
+Se você criou a pasta **`memoria total`** dentro do Obsidian:
+
+```powershell
+git pull
+.\rodar-memoria-total.ps1
+```
+
+O script cria (sem apagar o que você já tem em `memoria total`):
+
+```
+SeuVault/
+└── memoria total/
+    └── Viva-Saude/     ← junction → AppVS\contexto\  (Git)
+        ├── Home.md
+        ├── 01-produto-e-visao.md
+        └── journal/
+```
+
+- Anotações do **projeto** → dentro de `memoria total/Viva-Saude/`
+- Notas **pessoais** → outros arquivos ao lado de `Viva-Saude/` em `memoria total/`
+- Detalhes: [[memoria-total]]
+
+Parâmetros opcionais:
+
+```powershell
+.\scripts\setup-memoria-total.ps1 -VaultPath "C:\caminho\do\vault" -MemoriaFolder "memoria total" -Open -SaveConfig
+```
+
+---
+
 ## Estratégia alternativa (vault separado no Documents)
 
 Se você **já tem** um vault em `Documents\Obsidian\...` e quer manter tudo lá:

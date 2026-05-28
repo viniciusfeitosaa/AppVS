@@ -27,6 +27,11 @@ $ConfigPath = Join-Path $RepoRoot '.obsidian-vault.json'
 if (-not $ExternalVault -and (Test-Path $ConfigPath)) {
     $cfg = Get-Content $ConfigPath -Raw | ConvertFrom-Json
     if ($cfg.externalVaultPath) { $ExternalVault = $cfg.externalVaultPath }
+    elseif ($cfg.mode -eq 'memoria-total' -and $cfg.vaultPath) {
+        $folder = if ($cfg.memoriaTotalFolder) { $cfg.memoriaTotalFolder } else { 'memoria total' }
+        $link = if ($cfg.linkName) { $cfg.linkName } else { 'Viva-Saude' }
+        $ExternalVault = Join-Path (Join-Path $cfg.vaultPath $folder) $link
+    }
     elseif ($cfg.vaultPath -and $cfg.mode -eq 'symlink') {
         $ExternalVault = Join-Path $cfg.vaultPath 'AppVS-contexto'
     }
