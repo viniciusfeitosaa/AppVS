@@ -74,7 +74,8 @@ app-medico/
 
 ## 📚 Documentação
 
-- **[`contexto/`](./contexto/)** — Harness IA: o que foi feito em cada etapa (fonte atualizada para desenvolvimento)
+- **[`contexto/`](./contexto/)** — Harness IA + **vault Obsidian** (anotações por etapa; ver `contexto/SETUP-OBSIDIAN.md`)
+- `scripts/setup-obsidian-vault.ps1` — abrir/configurar Obsidian no Windows
 - [`AGENTS.md`](./AGENTS.md) — Instruções para agentes de IA
 - [PLANO_PROJETO.md](./PLANO_PROJETO.md) - Plano completo do projeto (histórico)
 - [GUIA_IMPLEMENTACAO.md](./GUIA_IMPLEMENTACAO.md) - Guia de implementação passo a passo (histórico)

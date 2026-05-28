@@ -3,6 +3,11 @@
 **Última revisão geral:** 2026-05-28  
 **Branch de referência:** `main`
 
+## Obsidian
+
+- [[Home]] — dashboard do vault
+- [[SETUP-OBSIDIAN]] — conectar no PC
+
 ## Por onde começar
 
 - Novo no projeto → `01` → `02` → `15`

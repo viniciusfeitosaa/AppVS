@@ -68,3 +68,9 @@ temp/
 
 # Uploads locais (check-in de ponto etc.)
 backend/uploads/
+
+# Obsidian — config local do PC (caminhos do vault no Windows)
+.obsidian-vault.json
+
+# Obsidian — layout de janelas (opcional por máquina; workspace.json versionado no vault)
+contexto/.obsidian/workspace-mobile.json

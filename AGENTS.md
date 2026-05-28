@@ -14,6 +14,11 @@ Antes de explorar o repositório inteiro ou refazer decisões já tomadas, **lei
 Atualize o documento da etapa afetada e, se necessário, `15-estado-atual-e-pendencias.md`.  
 Siga o guia em [`contexto/16-como-atualizar.md`](./contexto/16-como-atualizar.md).
 
+## Obsidian (humano no PC)
+
+O vault versionado é a pasta `contexto/`. O usuário pode anotar no Obsidian local; mudanças entram via Git.  
+Não é possível abrir o Obsidian do PC a partir do agente na nuvem — apenas atualizar os `.md` no repo.
+
 ## Não fazer sem necessidade
 
 - Reescanear todo o monorepo se o `contexto/` já responder à pergunta

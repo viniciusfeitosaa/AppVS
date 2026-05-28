@@ -40,6 +40,12 @@ Objetivo: evitar retrabalho — não redescobrir arquitetura, rotas, decisões e
 - `CHECKLIST_PROJETO.md` — checklist inicial; maioria dos itens já implementados
 - `PLANO_PROJETO.md` / `GUIA_IMPLEMENTACAO.md` — planejamento histórico
 
+## Obsidian
+
+Esta pasta é um **vault Obsidian** (`.obsidian/` incluído).  
+Abra `contexto/` no Obsidian ou rode `scripts/setup-obsidian-vault.ps1` no Windows.  
+Guia completo: [[SETUP-OBSIDIAN]] · nota inicial: [[Home]]
+
 ## Entrada para Cursor / outros agentes
 
 O arquivo raiz [`AGENTS.md`](../AGENTS.md) aponta para esta pasta.

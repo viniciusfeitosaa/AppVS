@@ -36,6 +36,12 @@ Use este ritual **ao final de cada tarefa** (humano ou IA) para não perder cont
 - Segredos (.env, tokens, senhas)
 - Dumps grandes de conversa com IA
 
+## Obsidian (seu PC)
+
+- Vault recomendado: pasta `contexto/` do repo (ver [[SETUP-OBSIDIAN]])
+- Após editar no Obsidian: `git commit` + `git push` — o agente na nuvem vê na próxima sessão
+- Entregas grandes: duplicar resumo em `journal/AAAA-MM-DD-titulo.md` (template [[_templates/entrega]])
+
 ## Para agentes Cursor
 
 1. Ler `AGENTS.md` na raiz
