@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import rateLimit from 'express-rate-limit';
 import {
+  deleteSelfAccountController,
   getPerfilController,
   updatePerfilController,
   listMeusDocumentosController,
@@ -25,6 +26,7 @@ import { authenticateToken, requireModuleAccess, requireRole } from '../middlewa
 import {
   validateCreateVaga,
   validateStatusCandidatoVaga,
+  validateDeleteSelfAccount,
   validateUpdatePerfil,
   validateUUIDParam,
 } from '../middleware/validation.middleware';
@@ -39,6 +41,14 @@ const vagasMutationLimiter = rateLimit({
   windowMs: 60 * 1000,
   max: 45,
   message: { success: false, error: 'Muitas ações em vagas. Aguarde um instante.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+const deleteAccountLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 5,
+  message: { success: false, error: 'Muitas tentativas de exclusão de conta. Tente mais tarde.' },
   standardHeaders: true,
   legacyHeaders: false,
 });
@@ -169,6 +179,15 @@ router.put(
   validateUpdatePerfil,
   requireModuleAccess(ModuloSistema.PERFIL),
   updatePerfilController
+);
+
+router.delete(
+  '/conta',
+  deleteAccountLimiter,
+  requireRole([UserRole.MEDICO]),
+  requireModuleAccess(ModuloSistema.PERFIL),
+  validateDeleteSelfAccount,
+  deleteSelfAccountController
 );
 
 export default router;

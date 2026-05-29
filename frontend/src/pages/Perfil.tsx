@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../context/AuthContext';
 import { medicoService } from '../services/medico.service';
@@ -16,7 +17,8 @@ import { ESPECIALIDADES_MEDICAS } from '../constants/profissoesEspecialidades';
 type TabPerfil = 'pessoais' | 'bancarios' | 'documentos';
 
 const Perfil = () => {
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const isMaster = user?.role === 'MASTER';
   const [activeTab, setActiveTab] = useState<TabPerfil>('pessoais');
@@ -28,6 +30,10 @@ const Perfil = () => {
   >({});
   const [savingAcessos, setSavingAcessos] = useState(false);
   const [acessosDraft, setAcessosDraft] = useState<AcessoModuloItem[]>([]);
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [deleteSenha, setDeleteSenha] = useState('');
+  const [deleteConfirmacao, setDeleteConfirmacao] = useState('');
+  const [deletingAccount, setDeletingAccount] = useState(false);
   const [form, setForm] = useState<{
     especialidades: string[];
     telefone: string;
@@ -93,6 +99,30 @@ const Perfil = () => {
         ? prev.especialidades.filter((x) => x !== nome)
         : [...prev.especialidades, nome],
     }));
+  };
+
+  const handleExcluirConta = async () => {
+    setDeletingAccount(true);
+    setError(null);
+    setSuccess(null);
+    try {
+      const res = await medicoService.deleteConta({
+        senha: deleteSenha,
+        confirmacao: deleteConfirmacao,
+      });
+      setDeleteModalOpen(false);
+      setDeleteSenha('');
+      setDeleteConfirmacao('');
+      logout();
+      navigate('/login', { state: { accountDeletedMessage: res.message } });
+    } catch (err: unknown) {
+      const msg =
+        (err as { response?: { data?: { error?: string } } })?.response?.data?.error ||
+        'Não foi possível excluir a conta.';
+      setError(msg);
+    } finally {
+      setDeletingAccount(false);
+    }
   };
 
   const handleSalvar = async () => {
@@ -459,6 +489,29 @@ const Perfil = () => {
         </div>
       )}
 
+      {!isMaster && (
+        <div className="card stagger-3 border-l-4 border-red-400 bg-red-50/40">
+          <h3 className="text-sm font-semibold uppercase tracking-wider text-red-800 mb-2 font-display">
+            Excluir conta
+          </h3>
+          <p className="text-sm text-viva-800 font-serif leading-relaxed mb-4">
+            Você pode excluir permanentemente sua conta e os dados associados (perfil, documentos,
+            registros de ponto e demais informações pessoais). Esta ação não pode ser desfeita.
+          </p>
+          <button
+            type="button"
+            className="btn text-sm border border-red-300 bg-white text-red-800 hover:bg-red-50"
+            onClick={() => {
+              setDeleteSenha('');
+              setDeleteConfirmacao('');
+              setDeleteModalOpen(true);
+            }}
+          >
+            Excluir minha conta
+          </button>
+        </div>
+      )}
+
       {isMaster && (
         <div className="card stagger-2 border-l-4 border-l-viva-500">
           <h3 className="text-sm font-semibold uppercase tracking-wider text-viva-600 mb-2 font-display">Administração de Acesso por Módulo</h3>
@@ -520,6 +573,65 @@ const Perfil = () => {
             <button className="btn btn-primary" disabled={savingAcessos} type="button" onClick={salvarAcessos}>
               {savingAcessos ? 'Salvando...' : 'Salvar permissões'}
             </button>
+          </div>
+        </div>
+      )}
+
+      {deleteModalOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-viva-950/60 backdrop-blur-sm"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="excluir-conta-titulo"
+        >
+          <div className="card max-w-md w-full shadow-2xl border border-red-200/80">
+            <h2 id="excluir-conta-titulo" className="text-base font-bold text-red-900 font-display mb-2">
+              Confirmar exclusão da conta
+            </h2>
+            <p className="text-xs text-viva-700 font-serif leading-relaxed mb-4">
+              Digite sua senha e <strong className="font-semibold">EXCLUIR</strong> para confirmar.
+            </p>
+            <label className="block text-xs font-semibold text-viva-800 mb-1">Senha</label>
+            <input
+              type="password"
+              className="w-full rounded-xl border border-viva-200 bg-white px-3 py-2 text-sm mb-3"
+              value={deleteSenha}
+              onChange={(e) => setDeleteSenha(e.target.value)}
+              autoComplete="current-password"
+            />
+            <label className="block text-xs font-semibold text-viva-800 mb-1">
+              Digite EXCLUIR para confirmar
+            </label>
+            <input
+              type="text"
+              className="w-full rounded-xl border border-viva-200 bg-white px-3 py-2 text-sm mb-4 uppercase"
+              value={deleteConfirmacao}
+              onChange={(e) => setDeleteConfirmacao(e.target.value)}
+              placeholder="EXCLUIR"
+              autoComplete="off"
+            />
+            <div className="flex flex-col sm:flex-row gap-2 justify-end">
+              <button
+                type="button"
+                className="btn text-sm border border-viva-300 bg-white text-viva-800"
+                disabled={deletingAccount}
+                onClick={() => setDeleteModalOpen(false)}
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                className="btn text-sm bg-red-700 text-white hover:bg-red-800 border border-red-800"
+                disabled={
+                  deletingAccount ||
+                  !deleteSenha.trim() ||
+                  deleteConfirmacao.trim().toUpperCase() !== 'EXCLUIR'
+                }
+                onClick={() => void handleExcluirConta()}
+              >
+                {deletingAccount ? 'Excluindo...' : 'Excluir permanentemente'}
+              </button>
+            </div>
           </div>
         </div>
       )}

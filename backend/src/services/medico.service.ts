@@ -1,7 +1,20 @@
+import fs from 'fs';
 import type { Prisma } from '@prisma/client';
 import { prisma } from '../config/database';
 import { DOCUMENTO_TIPO_BY_FIELD, DOCUMENTOS_PERFIL_FIELDS } from '../constants/documentos.const';
 import { fileExistsSafe, resolveStoredFileToAbsolute } from '../utils/upload-path.util';
+import { comparePassword } from '../utils/password.util';
+import { createAuditLog } from './auditoria.service';
+
+function safeUnlinkStoredPath(caminhoStored: string | null | undefined) {
+  if (!caminhoStored?.trim()) return;
+  try {
+    const full = resolveStoredFileToAbsolute(caminhoStored.trim());
+    if (fileExistsSafe(full)) fs.unlinkSync(full);
+  } catch {
+    // caminho inválido ou fora de uploads — ignorar
+  }
+}
 
 interface UpdatePerfilInput {
   especialidades?: string[];
@@ -169,3 +182,65 @@ export const updatePerfilService = async (
 
   return getPerfilService(medico.id, tenantId);
 };
+
+/** Exclusão permanente da conta do associado (Apple Guideline 5.1.1(v)). */
+export async function deleteSelfAccountService(
+  medicoId: string,
+  tenantId: string,
+  senha: string,
+  meta?: { ipAddress?: string | null; userAgent?: string | null }
+) {
+  const medico = await prisma.medico.findFirst({
+    where: { id: medicoId, tenantId },
+    select: {
+      id: true,
+      email: true,
+      nomeCompleto: true,
+      senhaHash: true,
+      documentos: { select: { caminhoArquivo: true } },
+      documentosEnviados: { select: { caminhoArquivo: true } },
+      registrosPonto: {
+        where: { fotoCheckinCaminho: { not: null } },
+        select: { fotoCheckinCaminho: true },
+      },
+    },
+  });
+
+  if (!medico) {
+    throw { statusCode: 404, message: 'Conta não encontrada' };
+  }
+
+  const senhaOk = await comparePassword(senha, medico.senhaHash);
+  if (!senhaOk) {
+    throw { statusCode: 401, message: 'Senha incorreta' };
+  }
+
+  await createAuditLog({
+    acao: 'EXCLUIR_CONTA_PROPRIA',
+    tenantId,
+    medicoId: medico.id,
+    ipAddress: meta?.ipAddress ?? undefined,
+    userAgent: meta?.userAgent ?? undefined,
+    detalhes: {
+      email: medico.email,
+      nomeCompleto: medico.nomeCompleto,
+    },
+  });
+
+  for (const doc of medico.documentos) {
+    safeUnlinkStoredPath(doc.caminhoArquivo);
+  }
+  for (const doc of medico.documentosEnviados) {
+    safeUnlinkStoredPath(doc.caminhoArquivo);
+  }
+  for (const ponto of medico.registrosPonto) {
+    safeUnlinkStoredPath(ponto.fotoCheckinCaminho);
+  }
+
+  await prisma.medico.delete({ where: { id: medico.id } });
+
+  return {
+    message:
+      'Sua conta foi excluída permanentemente. Você pode criar um novo cadastro no futuro, se desejar.',
+  };
+}

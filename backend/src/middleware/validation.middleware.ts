@@ -884,3 +884,13 @@ export const validateCreateVaga = [
     }),
   handleValidationErrors,
 ];
+
+/** Exclusão permanente da própria conta (associado). */
+export const validateDeleteSelfAccount = [
+  body('senha').notEmpty().withMessage('Senha é obrigatória para confirmar a exclusão'),
+  body('confirmacao')
+    .trim()
+    .equals('EXCLUIR')
+    .withMessage('Digite EXCLUIR (em maiúsculas) para confirmar'),
+  handleValidationErrors,
+];
