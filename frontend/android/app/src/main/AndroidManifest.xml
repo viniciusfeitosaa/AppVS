@@ -38,4 +38,11 @@
     <!-- Permissions -->
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Ponto eletrônico: foto no check-in (getUserMedia no WebView) -->
+    <uses-permission android:name="android.permission.CAMERA" />
+    <!-- Ponto eletrônico: validação de local no check-in/out (Geolocation API) -->
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
 </manifest>

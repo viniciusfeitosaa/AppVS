@@ -14,7 +14,7 @@ import {
 import { MODULO_LABEL, ModuloSistema } from '../constants/modulos';
 import { ESPECIALIDADES_MEDICAS } from '../constants/profissoesEspecialidades';
 
-type TabPerfil = 'pessoais' | 'bancarios' | 'documentos';
+type TabPerfil = 'pessoais' | 'bancarios' | 'documentos' | 'conta';
 
 const Perfil = () => {
   const { user, logout } = useAuth();
@@ -218,6 +218,12 @@ const Perfil = () => {
         </h1>
         <p className="text-viva-700 font-serif text-base">
           Informações do seu perfil de acesso na plataforma.
+          {!isMaster && (
+            <>
+              {' '}
+              Para excluir sua conta, abra a aba <strong className="font-semibold">Conta e privacidade</strong>.
+            </>
+          )}
         </p>
       </div>
 
@@ -232,8 +238,15 @@ const Perfil = () => {
         </div>
       )}
 
-      <div className="flex gap-1 p-1 rounded-xl bg-viva-100/50 border border-viva-200/60 w-fit">
-        {(['pessoais', 'bancarios', 'documentos'] as const).map((tab) => (
+      <div className="flex flex-wrap gap-1 p-1 rounded-xl bg-viva-100/50 border border-viva-200/60 w-fit max-w-full">
+        {(
+          [
+            'pessoais',
+            'bancarios',
+            'documentos',
+            ...(!isMaster ? (['conta'] as const) : []),
+          ] as TabPerfil[]
+        ).map((tab) => (
           <button
             key={tab}
             type="button"
@@ -247,6 +260,7 @@ const Perfil = () => {
             {tab === 'pessoais' && 'Dados Pessoais'}
             {tab === 'bancarios' && 'Dados Bancários'}
             {tab === 'documentos' && 'Documentos'}
+            {tab === 'conta' && 'Conta e privacidade'}
           </button>
         ))}
       </div>
@@ -489,18 +503,22 @@ const Perfil = () => {
         </div>
       )}
 
-      {!isMaster && (
+      {!isMaster && activeTab === 'conta' && (
         <div className="card stagger-3 border-l-4 border-red-400 bg-red-50/40">
           <h3 className="text-sm font-semibold uppercase tracking-wider text-red-800 mb-2 font-display">
-            Excluir conta
+            Excluir conta permanentemente
           </h3>
+          <p className="text-sm text-viva-800 font-serif leading-relaxed mb-2">
+            Conforme as diretrizes da App Store, você pode remover sua conta e os dados pessoais
+            associados (perfil, documentos enviados, registros de ponto, etc.).
+          </p>
           <p className="text-sm text-viva-800 font-serif leading-relaxed mb-4">
-            Você pode excluir permanentemente sua conta e os dados associados (perfil, documentos,
-            registros de ponto e demais informações pessoais). Esta ação não pode ser desfeita.
+            Esta ação é <strong className="font-semibold">irreversível</strong>. Para voltar a usar o
+            app, será necessário um novo cadastro.
           </p>
           <button
             type="button"
-            className="btn text-sm border border-red-300 bg-white text-red-800 hover:bg-red-50"
+            className="btn text-sm border border-red-300 bg-white text-red-800 hover:bg-red-50 w-full sm:w-auto"
             onClick={() => {
               setDeleteSenha('');
               setDeleteConfirmacao('');
