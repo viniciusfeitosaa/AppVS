@@ -2,7 +2,10 @@ import axios from 'axios';
 import { notify } from '../lib/notificationEmitter';
 import { sanitizeNotificationBody } from '../lib/notificationDisplay';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
+/** Dev: `/api` passa pelo proxy do Vite → backend :3001. Evita CORS e URL sem sufixo `/api`. */
+const API_URL =
+  import.meta.env.VITE_API_URL ||
+  (import.meta.env.DEV ? '/api' : 'http://localhost:3001/api');
 
 // Em produção a URL tem de vir de VITE_API_URL (build-time). Docker/VPS: .env na raiz; Netlify: env do site.
 if (import.meta.env.PROD && (API_URL.includes('localhost') || !import.meta.env.VITE_API_URL)) {
