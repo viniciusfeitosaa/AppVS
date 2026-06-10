@@ -69,7 +69,7 @@ const copy = (src, dest) => {
 for (const name of fs.readdirSync(landingDir)) {
   const src = path.join(landingDir, name);
   const dest = path.join(distDir, name);
-  if (name === 'README.md' || name === 'design.json') continue;
+  if (name === 'README.md') continue;
   copy(src, dest);
 }
 

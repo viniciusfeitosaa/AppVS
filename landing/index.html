@@ -3,163 +3,442 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="description" content="Instituição sem fins lucrativos atuante na prestação de serviços em saúde, educação e assistência social." />
-    <link rel="icon" type="image/png" href="/AppIcon.png?v=3" />
+    <meta name="description" content="A Viva Saúde conecta instituições de saúde a médicos qualificados com gestão inteligente de escalas, tecnologia e suporte integral em todo o Brasil." />
+    <link rel="icon" type="image/png" href="/icon-192.png?v=3" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png?v=3" />
     <link rel="manifest" href="/manifest.webmanifest?v=3" />
-    <meta name="theme-color" content="#166534" />
-    <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-    <meta name="apple-mobile-web-app-title" content="Viva Saude" />
-    <meta name="mobile-web-app-capable" content="yes" />
-    <title>Seja Viva Saúde | Saúde, Educação e Assistência Social</title>
-    <!-- Google Fonts - sofisticadas e modernas -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=Playfair+Display:wght@600;700;800&family=Poppins:wght@300;400;500;600;700&family=Source+Sans+3:wght@600;700&family=Bebas+Neue&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="css/style.css?v=2" />
+    <meta name="theme-color" content="#1A4011" />
+    <title>Viva Saúde | Gestão de Escalas Médicas e Inteligência em Saúde</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=Playfair+Display:wght@600;700;800&family=Poppins:wght@300;400;500;600;700&family=Source+Sans+3:wght@600;700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="css/style.css?v=3" />
   </head>
   <body>
     <header class="header">
       <div class="header-inner">
-        <a href="/" class="logo" aria-label="Seja Viva Saúde - Página inicial">
+        <a href="/" class="logo" aria-label="Viva Saúde - Página inicial">
           <img src="assets/logo.png" alt="Logomarca Viva Saúde" class="logo-img" />
         </a>
         <nav class="nav" id="mainNav" aria-label="Menu principal">
-          <a href="#sobre">Sobre</a>
-          <a href="#servicos">Serviços</a>
-          <a href="#faq">Perguntas frequentes</a>
-          <a href="#contato">Contato</a>
-          <a href="/app/login" class="btn btn-access">Área do Associado</a>
+          <a href="/para-instituicoes/">Para Instituições</a>
+          <a href="/para-medicos/">Para Médicos</a>
+          <a href="/como-funciona/">Como Funciona</a>
+          <a href="/app-viva-saude/">App Viva Saúde</a>
+          <a href="/quem-somos/">Quem Somos</a>
+          <a href="/blog/">Blog</a>
+          <a href="/app/login" class="nav-link-subtle">Área do Associado</a>
+          <a href="#cta-final" class="btn btn-cta-nav">Falar com Especialista</a>
         </nav>
         <button type="button" class="nav-toggle" id="navToggle" aria-label="Abrir menu" aria-expanded="false">
-          <span></span>
-          <span></span>
-          <span></span>
+          <span></span><span></span><span></span>
         </button>
       </div>
     </header>
 
     <main>
-      <section class="hero">
+      <!-- 1. Hero -->
+      <section class="hero hero-v2">
         <div class="hero-overlay"></div>
         <div class="hero-inner" data-animate="fade-up">
-          <h1 class="hero-title">Seja Viva Saúde</h1>
-          <a href="#servicos" class="btn btn-primary">Conheça nossos serviços</a>
-        </div>
-      </section>
-
-      <section id="sobre" class="section about">
-        <div class="container">
-          <h2 class="section-title" data-animate="fade-up">Nossa missão</h2>
-          <p class="about-text" data-animate="fade-up" data-delay="100">
-            A Viva Saúde tem como missão a excelência nos serviços prestados, tanto em parceria com a administração pública, quanto no âmbito privado, buscando sempre alcançar uma atuação democrática, justa e humanizada.
+          <p class="hero-eyebrow">VIVA SAÚDE</p>
+          <h1 class="hero-title hero-title-v2">A inteligência que conecta e otimiza a saúde no Brasil.</h1>
+          <p class="hero-subheadline">
+            Chega de escala de última hora. A Viva Saúde garante que o profissional certo esteja no lugar certo e na hora certa para que você possa focar no que realmente importa: o cuidado ao paciente.
           </p>
-        </div>
-      </section>
-
-      <section id="servicos" class="section services">
-        <div class="container">
-          <h2 class="section-title" data-animate="fade-up">Serviços</h2>
-          <div class="services-grid" data-services data-animate="stagger">
-            <article class="service-card">
-              <h3>Gestão de Mão de Obra</h3>
-              <p>Gestão completa de recursos humanos, incluindo médicos, prestadores de serviços e celetistas das diversas áreas relacionadas à saúde, educação e assistência social.</p>
-            </article>
-            <article class="service-card">
-              <h3>Gestão completa de Hospitais</h3>
-              <p>Gestão completa de hospitais de pequeno, médio e grande porte, especializados ou gerais.</p>
-            </article>
-            <article class="service-card">
-              <h3>Urgência e Emergência</h3>
-              <p>Gestão completa do pronto atendimento com eficiência e humanização.</p>
-            </article>
-            <article class="service-card">
-              <h3>Unidades Básicas e Secundárias</h3>
-              <p>Gestão integrada de UPA's, PSF's, Multicentros e Maternidades.</p>
-            </article>
-            <article class="service-card">
-              <h3>Centros de Atenção Psicossocial (CAPs)</h3>
-              <p>Atendimento intensivo e diário para portadores de transtornos mentais.</p>
-            </article>
+          <div class="stats-bar" data-animate="fade-up" data-delay="100">
+            <div class="stat-item"><strong data-stat="institutions">50+</strong><span>Instituições Atendidas</span></div>
+            <div class="stat-item"><strong data-stat="professionals">2.000+</strong><span>Médicos e Especialistas disponíveis</span></div>
+            <div class="stat-item"><strong data-stat="shifts">10.000+</strong><span>Plantões Gerenciados por Mês</span></div>
+            <div class="stat-item"><strong data-stat="states">15+</strong><span>Estados com Atendimento Ativo</span></div>
+          </div>
+          <div class="hero-ctas" data-animate="fade-up" data-delay="200">
+            <a href="#cta-final" class="btn btn-primary">Agendar Demonstração Gratuita</a>
+            <a href="/para-medicos/" class="btn btn-outline">Sou Médico — Quero Oportunidades</a>
           </div>
         </div>
       </section>
 
-      <section id="faq" class="section faq">
+      <!-- 2. Barra de Autoridade -->
+      <section id="autoridade" class="authority-bar section-compact">
+        <div class="container authority-grid" data-animate="stagger">
+          <article class="authority-item">
+            <span class="authority-icon" aria-hidden="true">🇧🇷</span>
+            <p><strong>Presença nacional</strong> — atendemos hospitais, clínicas e instituições públicas em todo o Brasil.</p>
+          </article>
+          <article class="authority-item">
+            <span class="authority-icon" aria-hidden="true">✓</span>
+            <p><strong>Transparência e ética</strong> — clareza em todas as relações, do contrato ao atendimento.</p>
+          </article>
+          <article class="authority-item">
+            <span class="authority-icon" aria-hidden="true">📱</span>
+            <p><strong>App próprio</strong> — ecossistema digital completo para gestores e profissionais.</p>
+          </article>
+          <article class="authority-item">
+            <span class="authority-icon" aria-hidden="true">🤝</span>
+            <p><strong>Suporte integral</strong> — administrativo, jurídico e contábil para cada parceria.</p>
+          </article>
+        </div>
+      </section>
+
+      <!-- 3. Seção de Dor -->
+      <section id="dor" class="section pain-section">
         <div class="container">
-          <h2 class="section-title">Perguntas frequentes</h2>
-          <p class="faq-intro">Confira as dúvidas mais comuns sobre a Viva Saúde</p>
+          <h2 class="section-title" data-animate="fade-up">Você reconhece esse cenário?</h2>
+          <p class="section-lead" data-animate="fade-up">
+            Gerir escalas médicas não deveria ser o maior problema do seu dia. Mas, para muitos gestores, ainda é.
+          </p>
+          <div class="pain-grid" data-animate="stagger">
+            <article class="pain-card">
+              <span class="pain-icon" aria-hidden="true">⚡</span>
+              <h3>Plantão descoberto de última hora</h3>
+              <p>Você recebe uma ligação às 22h avisando que o médico não vem. O estresse é imediato, o risco ao atendimento também.</p>
+            </article>
+            <article class="pain-card">
+              <span class="pain-icon" aria-hidden="true">📋</span>
+              <h3>Sobrecarga administrativa</h3>
+              <p>Horas da sua semana consumidas em tabelas, ligações e remediações de escala. Tempo que deveria ir para a gestão estratégica.</p>
+            </article>
+            <article class="pain-card">
+              <span class="pain-icon" aria-hidden="true">🔄</span>
+              <h3>Rotatividade alta</h3>
+              <p>Profissionais sem vínculo real com a instituição. Atendimento inconsistente, desmotivação e turnover que não para.</p>
+            </article>
+            <article class="pain-card">
+              <span class="pain-icon" aria-hidden="true">📊</span>
+              <h3>Falta de dados confiáveis</h3>
+              <p>Decisões tomadas no escuro, sem indicadores claros de desempenho da equipe ou da cobertura assistencial.</p>
+            </article>
+          </div>
+          <div class="section-cta" data-animate="fade-up">
+            <a href="#cta-final" class="btn btn-primary">Quero resolver isso →</a>
+          </div>
+        </div>
+      </section>
+
+      <!-- 4. Nossos Serviços -->
+      <section id="servicos" class="section services services-v2">
+        <div class="container">
+          <h2 class="section-title" data-animate="fade-up">Nossos Serviços</h2>
+          <p class="section-lead" data-animate="fade-up">
+            Mais do que preencher plantões. A Viva Saúde organiza, estrutura e sustenta a operação médica da sua instituição.
+          </p>
+          <div class="pillars-grid" data-animate="stagger">
+            <article class="pillar-card">
+              <h3>1. Gestão de Escalas Médicas</h3>
+              <p>Gerenciamos integralmente as escalas de hospitais, clínicas e unidades de saúde. Planejamento antecipado, comunicação clara e cobertura garantida.</p>
+              <p class="pillar-benefit"><strong>Benefício direto:</strong> Previsibilidade e continuidade operacional, todo dia.</p>
+            </article>
+            <article class="pillar-card">
+              <h3>2. Captação e Gestão de Profissionais</h3>
+              <p>Conectamos médicos generalistas e especialistas a oportunidades em todo o Brasil. Banco amplo, atualizado e filtrado por especialidade e perfil cultural.</p>
+              <p class="pillar-benefit"><strong>Benefício direto:</strong> O profissional certo, no momento certo, sem comprometer a qualidade.</p>
+            </article>
+            <article class="pillar-card">
+              <h3>3. Estruturação de Equipes Assistenciais</h3>
+              <p>Ajudamos a montar equipes coesas, alinhadas à cultura da instituição e prontas para os desafios da saúde de alta complexidade.</p>
+              <p class="pillar-benefit"><strong>Benefício direto:</strong> Menos rotatividade, mais engajamento e atendimento de excelência.</p>
+            </article>
+            <article class="pillar-card">
+              <h3>4. Suporte à Gestão em Saúde</h3>
+              <p>Transformamos dados em inteligência. Indicadores de desempenho, análise de cobertura e suporte tático-operacional para gestão estratégica.</p>
+              <p class="pillar-benefit"><strong>Benefício direto:</strong> Decisões embasadas, custos otimizados, gestão profissional.</p>
+            </article>
+          </div>
+          <div class="section-cta" data-animate="fade-up">
+            <a href="/como-funciona/" class="btn btn-primary">Ver como funciona na prática</a>
+          </div>
+        </div>
+      </section>
+
+      <!-- 5. Como Funciona -->
+      <section id="como-funciona" class="section steps-section">
+        <div class="container">
+          <h2 class="section-title section-title-light" data-animate="fade-up">Como Funciona</h2>
+          <p class="section-lead section-lead-light" data-animate="fade-up">Do primeiro contato até a escala funcionando, cuidamos de tudo. Simples assim.</p>
+          <ol class="steps-timeline" data-animate="stagger">
+            <li class="step-item">
+              <span class="step-num">1</span>
+              <div>
+                <h3>Diagnóstico</h3>
+                <p>Reunião com o gestor para entender as necessidades reais da instituição, especialidades, volume de plantões, cultura organizacional e desafios atuais.</p>
+              </div>
+            </li>
+            <li class="step-item">
+              <span class="step-num">2</span>
+              <div>
+                <h3>Planejamento estratégico</h3>
+                <p>Montagem da escala com antecedência. Análise de disponibilidade, especialidades e legislação. Sem achismos, sem improvisos.</p>
+              </div>
+            </li>
+            <li class="step-item">
+              <span class="step-num">3</span>
+              <div>
+                <h3>Seleção dos profissionais</h3>
+                <p>Buscamos no nosso banco o profissional certo, alinhado à especialidade, ao perfil da equipe e à cultura do seu serviço.</p>
+              </div>
+            </li>
+            <li class="step-item">
+              <span class="step-num">4</span>
+              <div>
+                <h3>Gestão contínua</h3>
+                <p>Monitoramento diário, substituições ágeis, comunicação fluida com as equipes e ajustes em tempo real para garantir a cobertura.</p>
+              </div>
+            </li>
+            <li class="step-item">
+              <span class="step-num">5</span>
+              <div>
+                <h3>Relatórios e inteligência</h3>
+                <p>Indicadores de desempenho, dados de cobertura e insights para tomadas de decisão cada vez mais estratégicas.</p>
+              </div>
+            </li>
+          </ol>
+          <blockquote class="steps-quote" data-animate="fade-up">
+            "A gestão da escala deixa de ser improviso e passa a ser processo. Isso muda tudo na rotina do gestor e na qualidade do atendimento."
+          </blockquote>
+        </div>
+      </section>
+
+      <!-- 6. Diferenciais -->
+      <section id="diferenciais" class="section differentials-section">
+        <div class="container">
+          <h2 class="section-title" data-animate="fade-up">Por que a Viva Saúde?</h2>
+          <p class="section-lead" data-animate="fade-up">
+            Existem outras opções no mercado. Mas poucos parceiros tratam a gestão de escalas como a Viva Saúde trata: com processo, tecnologia e comprometimento real com o seu resultado.
+          </p>
+          <ul class="differentials-list" data-animate="stagger">
+            <li>
+              <strong>A escala como processo, não como improviso</strong>
+              <p>Transformamos a gestão de escalas num fluxo estruturado, com planejamento antecipado e comunicação clara.</p>
+            </li>
+            <li>
+              <strong>Banco amplo de profissionais qualificados</strong>
+              <p>Acesso imediato a médicos generalistas e especialistas, com dados atualizados e reposição ágil.</p>
+            </li>
+            <li>
+              <strong>Estrutura leve e flexível para a sua instituição</strong>
+              <p>Terceirização inteligente que reduz despesas operacionais e libera sua equipe interna.</p>
+            </li>
+            <li>
+              <strong>Proximidade real com os profissionais de saúde</strong>
+              <p>Relações de confiança com os médicos do nosso banco. Profissionais motivados entregam mais qualidade.</p>
+            </li>
+            <li>
+              <strong>Atuação tático-operacional, além da execução</strong>
+              <p>Inteligência para aprimorar a gestão, analisar indicadores e apoiar decisões estratégicas.</p>
+            </li>
+            <li>
+              <strong>App Viva Saúde — o ecossistema digital da sua equipe</strong>
+              <p>Escalas, ponto, documentos e valores na palma da mão. Transparência e agilidade.</p>
+            </li>
+          </ul>
+        </div>
+      </section>
+
+      <!-- 7. Prova Social -->
+      <section id="depoimentos" class="section testimonials-section">
+        <div class="container">
+          <h2 class="section-title" data-animate="fade-up">O que dizem nossos parceiros</h2>
+          <div class="testimonials-grid" data-animate="stagger">
+            <blockquote class="testimonial-card">
+              <p>"Antes de conhecer a Viva Saúde, passávamos pelo menos dois dias por semana resolvendo gaps de escala. Hoje isso simplesmente não acontece mais. A operação ficou mais previsível, a equipe ficou mais estável e eu consigo focar no que realmente importa."</p>
+              <footer><cite>Nome, Cargo — Instituição, Cidade/Estado (MODELO)</cite></footer>
+            </blockquote>
+            <blockquote class="testimonial-card">
+              <p>"O que me surpreendeu foi o cuidado deles com os médicos. Os profissionais que eles enviam chegam bem orientados, motivados e alinhados à nossa cultura. Isso se reflete diretamente na satisfação dos nossos pacientes."</p>
+              <footer><cite>Nome, Cargo — Instituição, Cidade/Estado (MODELO)</cite></footer>
+            </blockquote>
+            <blockquote class="testimonial-card">
+              <p>"Já trabalhei com outras empresas de escalas, mas a Viva Saúde é diferente. Eles me tratam como parceiro, não como número. Tenho suporte administrativo, acesso ao app e clareza sobre tudo que envolve meu trabalho."</p>
+              <footer><cite>Nome, Especialidade — Cidade/Estado (MODELO)</cite></footer>
+            </blockquote>
+          </div>
+          <div class="partners-area" data-animate="fade-up">
+            <p class="partners-label">Instituições que confiam na Viva Saúde</p>
+            <div class="partners-logos">
+              <span class="partner-placeholder">Logo parceiro</span>
+              <span class="partner-placeholder">Logo parceiro</span>
+              <span class="partner-placeholder">Logo parceiro</span>
+              <span class="partner-placeholder">Logo parceiro</span>
+            </div>
+            <div class="coverage-map" aria-hidden="true">
+              <p>Presença nacional — atuação em múltiplos estados do Brasil</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 8. App -->
+      <section id="app" class="section app-section">
+        <div class="container app-grid">
+          <div class="app-content" data-animate="fade-up">
+            <h2 class="section-title section-title-light">A gestão na palma da mão</h2>
+            <p class="section-lead section-lead-light">Para o gestor e para o profissional. O App Viva Saúde centraliza tudo num só lugar — simples, intuitivo e disponível 24 horas.</p>
+            <ul class="app-features">
+              <li>Acompanhamento de escalas em tempo real</li>
+              <li>Registro de ponto digital pelo celular</li>
+              <li>Visualização de valores com transparência total</li>
+              <li>Notificações inteligentes sobre escalas e substituições</li>
+              <li>Assinatura digital de documentos</li>
+            </ul>
+            <div class="app-store-btns">
+              <a href="#" class="btn btn-store" aria-label="Baixar na App Store">Baixar na App Store</a>
+              <a href="#" class="btn btn-store btn-store-outline" aria-label="Baixar no Google Play">Baixar no Google Play</a>
+              <a href="/app-viva-saude/" class="btn btn-outline btn-outline-light">Saiba mais sobre o App</a>
+            </div>
+          </div>
+          <div class="app-mockup" data-animate="fade-up" aria-hidden="true">
+            <div class="phone-frame">
+              <div class="phone-screen">App Viva Saúde</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 9. FAQ -->
+      <section id="faq" class="section faq faq-v2">
+        <div class="container">
+          <h2 class="section-title" data-animate="fade-up">Perguntas Frequentes</h2>
+          <h3 class="faq-group-title">Para gestores de instituições</h3>
           <div class="faq-list">
             <details class="faq-item">
-              <summary class="faq-question">O que é a Viva Saúde?</summary>
-              <div class="faq-answer">
-                <p>A Viva Saúde é uma instituição de direito privado, sem fins lucrativos, de caráter social e inclusivo, reconhecida como de utilidade pública nacional, estadual e municipal. Atuamos na prestação de serviços em saúde, educação e assistência social.</p>
-              </div>
+              <summary class="faq-question">Como funciona o processo de contratação?</summary>
+              <div class="faq-answer"><p>Começamos com uma reunião de diagnóstico para entender as necessidades da sua instituição. A partir daí, estruturamos a escala, selecionamos os profissionais e assumimos a gestão completa. O processo é ágil e sem burocracia desnecessária.</p></div>
             </details>
             <details class="faq-item">
-              <summary class="faq-question">Quais serviços a Viva Saúde oferece?</summary>
-              <div class="faq-answer">
-                <p>Oferecemos gestão de mão de obra em saúde, gestão completa de hospitais, urgência e emergência, unidades básicas e secundárias (UPA's, PSF's, Multicentros, Maternidades) e Centros de Atenção Psicossocial (CAPs), sempre com foco em eficiência e humanização.</p>
-              </div>
+              <summary class="faq-question">Quanto tempo leva para a escala entrar em funcionamento?</summary>
+              <div class="faq-answer"><p>Depende da complexidade e do volume da escala, mas em geral conseguimos estruturar e operacionalizar em poucos dias. Em casos de urgência, atuamos com ainda mais rapidez.</p></div>
             </details>
             <details class="faq-item">
-              <summary class="faq-question">Como posso entrar em contato?</summary>
-              <div class="faq-answer">
-                <p>Você pode nos contatar por e-mail (contato@sejavivasaude.com.br), telefone (+55 11 4040-2345) ou pelo WhatsApp. Nosso endereço é Rua Serra de Botucatu, 1195, Sala 103 — Vila Gomes Cardim, São Paulo — SP.</p>
-              </div>
+              <summary class="faq-question">Atendem instituições do setor público?</summary>
+              <div class="faq-answer"><p>Sim. Temos respaldo de utilidade nas esferas nacional, estadual e municipal. Atuamos com total transparência e adequação às exigências do setor público.</p></div>
             </details>
             <details class="faq-item">
-              <summary class="faq-question">Como acessar a área do associado?</summary>
-              <div class="faq-answer">
-                <p>Profissionais vinculados à Viva Saúde podem acessar a área restrita com CPF e CRM. Utilize o botão "Área do Associado" no menu para ser direcionado ao portal de acesso.</p>
-              </div>
+              <summary class="faq-question">Como funciona a substituição de um profissional em caso de ausência?</summary>
+              <div class="faq-answer"><p>Monitoramos a escala diariamente. Em caso de ausência, acionamos imediatamente nossa rede de profissionais para garantir a cobertura sem interrupção no atendimento.</p></div>
             </details>
             <details class="faq-item">
-              <summary class="faq-question">A Viva Saúde atende apenas em São Paulo?</summary>
-              <div class="faq-answer">
-                <p>Atuamos em parceria com a administração pública e no âmbito privado em diversas regiões. Entre em contato para saber sobre atuação na sua localidade.</p>
-              </div>
+              <summary class="faq-question">A Viva Saúde cuida também da parte administrativa e financeira?</summary>
+              <div class="faq-answer"><p>Sim. Gerenciamos a remuneração dos profissionais, a gestão de documentos, o suporte contábil e jurídico. Você foca na gestão assistencial; a gente cuida do resto.</p></div>
+            </details>
+          </div>
+          <h3 class="faq-group-title">Para médicos e profissionais de saúde</h3>
+          <div class="faq-list">
+            <details class="faq-item">
+              <summary class="faq-question">Como me cadastro no banco de talentos?</summary>
+              <div class="faq-answer"><p>Basta acessar a página <a href="/para-medicos/">Para Médicos</a> e preencher o formulário de cadastro. Nossa equipe entra em contato para apresentar as oportunidades alinhadas ao seu perfil.</p></div>
+            </details>
+            <details class="faq-item">
+              <summary class="faq-question">Que tipo de suporte recebo como profissional parceiro?</summary>
+              <div class="faq-answer"><p>Você tem acesso ao App Viva Saúde, suporte administrativo completo, orientação jurídica e contábil, e uma equipe que se preocupa genuinamente com o seu desenvolvimento profissional.</p></div>
+            </details>
+            <details class="faq-item">
+              <summary class="faq-question">Atende médicos de todas as especialidades?</summary>
+              <div class="faq-answer"><p>Sim. Trabalhamos com clínicos gerais, especialistas e profissionais de diversas áreas da saúde, conectando cada perfil às oportunidades mais adequadas em todo o Brasil.</p></div>
             </details>
           </div>
         </div>
       </section>
 
-      <section id="contato" class="section contact">
-        <div class="container">
-          <h2 class="section-title">Contato</h2>
-          <div class="contact-block">
-            <p><strong>E-mail:</strong> <a href="mailto:contato@sejavivasaude.com.br">contato@sejavivasaude.com.br</a></p>
-            <p><strong>Telefone:</strong> <a href="tel:+551140402345">+55 11 4040-2345</a></p>
-            <p><strong>WhatsApp:</strong> <a href="https://wa.me/551140402345" target="_blank" rel="noopener noreferrer">Fale conosco</a></p>
-            <p><strong>Endereço:</strong> Rua Serra de Botucatu, 1195, Sala 103 - Vila Gomes Cardim, São Paulo - SP, Brasil</p>
+      <!-- 10. CTA Final -->
+      <section id="cta-final" class="section cta-final">
+        <div class="container cta-final-inner">
+          <div class="cta-final-copy" data-animate="fade-up">
+            <h2>Pronto para transformar a gestão de escalas da sua instituição?</h2>
+            <p>Fale com um especialista Viva Saúde hoje. Sem compromisso, com toda a atenção que a sua instituição merece.</p>
           </div>
+          <form id="leadForm" class="lead-form" data-animate="fade-up" novalidate>
+            <div class="form-row">
+              <label for="leadName">Nome completo</label>
+              <input type="text" id="leadName" name="name" required autocomplete="name" />
+            </div>
+            <div class="form-row">
+              <label for="leadRole">Cargo / Função</label>
+              <input type="text" id="leadRole" name="role" required />
+            </div>
+            <div class="form-row">
+              <label for="leadInstitution">Nome da Instituição</label>
+              <input type="text" id="leadInstitution" name="institution" required />
+            </div>
+            <div class="form-row">
+              <label for="leadCity">Cidade / Estado</label>
+              <input type="text" id="leadCity" name="city" required />
+            </div>
+            <div class="form-row">
+              <label for="leadWhatsapp">WhatsApp</label>
+              <input type="tel" id="leadWhatsapp" name="whatsapp" required placeholder="(11) 99999-9999" inputmode="tel" />
+            </div>
+            <div class="form-actions">
+              <button type="submit" class="btn btn-gold">Agendar Demonstração Gratuita</button>
+              <a href="https://wa.me/551140402345" class="btn btn-ghost" id="whatsappDirect" target="_blank" rel="noopener noreferrer">Prefiro falar pelo WhatsApp</a>
+            </div>
+            <p id="formFeedback" class="form-feedback" role="status" hidden></p>
+          </form>
         </div>
       </section>
     </main>
 
-    <footer class="footer">
-      <div class="footer-inner container">
-        <div class="footer-brand">
+    <footer class="footer footer-v2">
+      <div class="container footer-columns">
+        <div class="footer-col">
           <img src="assets/logo-rodape.png" alt="Viva Saúde" class="footer-logo" />
+          <p class="footer-tagline">Gestão inteligente de escalas médicas em todo o Brasil.</p>
         </div>
-        <div class="footer-links">
-          <a href="/politica-privacidade">Política de Privacidade</a>
-          <a href="#politica-cookies">Política de Cookies</a>
+        <div class="footer-col">
+          <h4>Institucional</h4>
+          <ul>
+            <li><a href="/quem-somos/">Quem Somos</a></li>
+            <li><a href="/quem-somos/#missao">Nossa Missão</a></li>
+            <li><a href="/quem-somos/#valores">Valores</a></li>
+          </ul>
         </div>
-        <div class="footer-social">
-          <a href="https://www.instagram.com/sejavivasaude" target="_blank" rel="noopener noreferrer" aria-label="Instagram @sejavivasaude" class="instagram-link">
-            <svg width="20" height="20" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-              <path d="M12.315 2c2.43 0 2.784.013 3.808.06 1.064.049 1.791.218 2.427.465a4.902 4.902 0 011.772 1.153 4.902 4.902 0 011.153 1.772c.247.636.416 1.363.465 2.427.048 1.067.06 1.407.06 4.123v.08c0 2.643-.012 2.987-.06 4.043-.049 1.064-.218 1.791-.465 2.427a4.902 4.902 0 01-1.153 1.772 4.902 4.902 0 01-1.772 1.153c-.636.247-1.363.416-2.427.465-1.067.048-1.407.06-4.123.06h-.08c-2.643 0-2.987-.012-4.043-.06-1.064-.049-1.791-.218-2.427-.465a4.902 4.902 0 01-1.772-1.153 4.902 4.902 0 01-1.153-1.772c-.247-.636-.416-1.363-.465-2.427-.047-1.024-.06-1.379-.06-3.808v-.63c0-2.43.013-2.784.06-3.808.049-1.064.218-1.791.465-2.427a4.902 4.902 0 011.153-1.772A4.902 4.902 0 015.45 2.525c.636-.247 1.363-.416 2.427-.465C8.901 2.013 9.256 2 11.685 2h.63zm-.081 1.802h-.468c-2.456 0-2.784.011-3.807.058-.975.045-1.504.207-1.857.344-.467.182-.8.398-1.15.748-.35.35-.566.683-.748 1.15-.137.353-.3.882-.344 1.857-.047 1.023-.058 1.351-.058 3.807v.468c0 2.456.011 2.784.058 3.807.045.975.207 1.504.344 1.857.182.466.399.8.748 1.15.35.35.683.566 1.15.748.353.137.882.3 1.857.344 1.054.048 1.37.058 4.041.058h.08c2.597 0 2.917-.01 3.96-.058.976-.045 1.505-.207 1.858-.344.466-.182.8-.398 1.15-.748.35-.35.566-.683.748-1.15.137-.353.3-.882.344-1.857.048-1.055.058-1.37.058-4.041v-.08c0-2.597-.01-2.917-.058-3.96-.045-.976-.207-1.505-.344-1.858a3.097 3.097 0 00-.748-1.15 3.098 3.098 0 00-1.15-.748c-.353-.137-.882-.3-1.857-.344-1.023-.047-1.351-.058-3.807-.058zM12 6.865a5.135 5.135 0 110 10.27 5.135 5.135 0 010-10.27zm0 1.802a3.333 3.333 0 100 6.666 3.333 3.333 0 000-6.666zm5.338-3.205a1.2 1.2 0 110 2.4 1.2 1.2 0 010-2.4z"/>
-            </svg>
-            @sejavivasaude
-          </a>
+        <div class="footer-col">
+          <h4>Serviços</h4>
+          <ul>
+            <li><a href="/para-instituicoes/">Para Instituições</a></li>
+            <li><a href="/para-medicos/">Para Médicos</a></li>
+            <li><a href="/app-viva-saude/">App Viva Saúde</a></li>
+            <li><a href="/como-funciona/">Como Funciona</a></li>
+          </ul>
+        </div>
+        <div class="footer-col">
+          <h4>Conteúdo</h4>
+          <ul>
+            <li><a href="/blog/">Blog</a></li>
+            <li><a href="#faq">FAQ</a></li>
+            <li><a href="/politica-privacidade/">Política de Privacidade</a></li>
+          </ul>
+        </div>
+        <div class="footer-col">
+          <h4>Contato</h4>
+          <ul class="footer-contact">
+            <li><a href="mailto:contato@sejavivasaude.com.br">contato@sejavivasaude.com.br</a></li>
+            <li><a href="tel:+551140402345">+55 11 4040-2345</a></li>
+            <li><a href="https://www.sejavivasaude.com.br" target="_blank" rel="noopener noreferrer">www.sejavivasaude.com.br</a></li>
+            <li><a href="https://www.instagram.com/sejavivasaude" target="_blank" rel="noopener noreferrer">@sejavivasaude</a></li>
+          </ul>
         </div>
       </div>
-      <p class="footer-copy">&copy; Seja Viva Saúde. Todos os direitos reservados.</p>
+      <p class="footer-copy">© 2025 Viva Saúde. Todos os direitos reservados. | <a href="/politica-privacidade/">Política de Privacidade</a></p>
     </footer>
+
+    <a href="https://wa.me/551140402345" class="whatsapp-float" id="whatsappFloat" target="_blank" rel="noopener noreferrer" aria-label="Falar pelo WhatsApp">
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.435 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+    </a>
+
+    <div id="exitPopup" class="exit-popup" hidden role="dialog" aria-labelledby="exitPopupTitle" aria-modal="true">
+      <div class="exit-popup-backdrop"></div>
+      <div class="exit-popup-card">
+        <button type="button" class="exit-popup-close" id="exitPopupClose" aria-label="Fechar">×</button>
+        <h3 id="exitPopupTitle">Quer o Guia Gratuito?</h3>
+        <p>Receba dicas práticas para gestão de escalas médicas sem improviso.</p>
+        <a href="#cta-final" class="btn btn-primary" id="exitPopupCta">Quero o Guia Gratuito</a>
+      </div>
+    </div>
 
     <script src="js/design-loader.js"></script>
     <script src="js/animations.js"></script>
+    <script src="js/landing-ui.js"></script>
+    <script src="js/contact-form.js"></script>
   </body>
 </html>
