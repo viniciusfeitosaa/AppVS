@@ -49,14 +49,13 @@
     })
     .catch(function () {});
 
-  // FAQ accordion: apenas um item aberto por vez (briefing)
-  document.querySelectorAll('.faq-list').forEach(function (list) {
-    list.querySelectorAll('details.faq-item').forEach(function (item) {
-      item.addEventListener('toggle', function () {
-        if (!item.open) return;
-        list.querySelectorAll('details.faq-item[open]').forEach(function (other) {
-          if (other !== item) other.open = false;
-        });
+  // FAQ accordion: apenas um item aberto por vez na página (briefing)
+  var faqItems = document.querySelectorAll('details.faq-item');
+  faqItems.forEach(function (item) {
+    item.addEventListener('toggle', function () {
+      if (!item.open) return;
+      faqItems.forEach(function (other) {
+        if (other !== item && other.open) other.open = false;
       });
     });
   });
