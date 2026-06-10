@@ -7,11 +7,21 @@
   <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Poppins:wght@400;500;600&display=swap" rel="stylesheet" />
 </head>
 <body>
-  <header class="header"><div class="header-inner">
-    <a href="/" class="logo"><img src="../../assets/logo.png" alt="Viva Saúde" class="logo-img" /></a>
-    <nav class="nav" id="mainNav"><a href="/blog/">← Blog</a><a href="/#cta-final" class="btn btn-cta-nav">Falar com Especialista</a></nav>
-    <button type="button" class="nav-toggle" id="navToggle" aria-label="Menu"><span></span><span></span><span></span></button>
-  </div></header>
+  <header class="header">
+    <div class="header-inner">
+      <a href="/" class="logo"><img src="../../assets/logo.png" alt="Viva Saúde" class="logo-img" /></a>
+      <nav class="nav" id="mainNav" aria-label="Menu principal">
+        <ul class="nav-links">
+          <li><a href="/blog/">← Blog</a></li>
+        </ul>
+        <div class="header-actions">
+          <a href="/app/login" class="nav-link-login">Área do Associado</a>
+          <a href="/#cta-final" class="btn btn-cta-nav">Falar com Especialista</a>
+        </div>
+      </nav>
+      <button type="button" class="nav-toggle" id="navToggle" aria-label="Abrir menu" aria-expanded="false"><span></span><span></span><span></span></button>
+    </div>
+  </header>
   <main class="page-content"><div class="container" style="max-width:720px">
     <p style="color:var(--color-text-muted);margin-bottom:0.5rem">Gestão de Escalas</p>
     <h1 style="font-family:var(--font-heading);color:var(--color-primary);margin-bottom:1.5rem">Como montar uma escala médica sem improviso: guia passo a passo</h1>

@@ -4,19 +4,29 @@
   var navToggle = document.getElementById('navToggle');
   var mainNav = document.getElementById('mainNav');
 
+  function setNavOpen(open) {
+    if (!mainNav || !navToggle) return;
+    mainNav.classList.toggle('is-open', open);
+    navToggle.classList.toggle('is-active', open);
+    navToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+    document.body.classList.toggle('nav-open', open);
+  }
+
   if (navToggle && mainNav) {
     navToggle.addEventListener('click', function () {
-      var open = mainNav.classList.toggle('is-open');
-      navToggle.classList.toggle('is-active', open);
-      navToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+      setNavOpen(!mainNav.classList.contains('is-open'));
     });
 
     mainNav.querySelectorAll('a').forEach(function (link) {
       link.addEventListener('click', function () {
-        mainNav.classList.remove('is-open');
-        navToggle.classList.remove('is-active');
-        navToggle.setAttribute('aria-expanded', 'false');
+        setNavOpen(false);
       });
+    });
+
+    document.body.addEventListener('click', function (e) {
+      if (!mainNav.classList.contains('is-open')) return;
+      if (mainNav.contains(e.target) || navToggle.contains(e.target)) return;
+      setNavOpen(false);
     });
   }
 

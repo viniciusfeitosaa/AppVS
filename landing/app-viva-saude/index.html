@@ -7,16 +7,26 @@
   <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Poppins:wght@400;500;600&display=swap" rel="stylesheet" />
 </head>
 <body>
-  <header class="header"><div class="header-inner">
-    <a href="/" class="logo"><img src="../assets/logo.png" alt="Viva Saúde" class="logo-img" /></a>
-    <nav class="nav" id="mainNav">
-      <a href="/para-instituicoes/">Para Instituições</a><a href="/para-medicos/">Para Médicos</a>
-      <a href="/como-funciona/">Como Funciona</a><a href="/app-viva-saude/">App Viva Saúde</a>
-      <a href="/quem-somos/">Quem Somos</a><a href="/blog/">Blog</a>
-      <a href="/app/login" class="btn btn-cta-nav">Acessar o App</a>
-    </nav>
-    <button type="button" class="nav-toggle" id="navToggle" aria-label="Menu"><span></span><span></span><span></span></button>
-  </div></header>
+  <header class="header">
+    <div class="header-inner">
+      <a href="/" class="logo"><img src="../assets/logo.png" alt="Viva Saúde" class="logo-img" /></a>
+      <nav class="nav" id="mainNav" aria-label="Menu principal">
+        <ul class="nav-links">
+          <li><a href="/para-instituicoes/">Para Instituições</a></li>
+          <li><a href="/para-medicos/">Para Médicos</a></li>
+          <li><a href="/como-funciona/">Como Funciona</a></li>
+          <li><a href="/app-viva-saude/">App Viva Saúde</a></li>
+          <li><a href="/quem-somos/">Quem Somos</a></li>
+          <li><a href="/blog/">Blog</a></li>
+        </ul>
+        <div class="header-actions">
+          <a href="/app/login" class="nav-link-login">Área do Associado</a>
+          <a href="/app/login" class="btn btn-cta-nav">Acessar o App</a>
+        </div>
+      </nav>
+      <button type="button" class="nav-toggle" id="navToggle" aria-label="Abrir menu" aria-expanded="false"><span></span><span></span><span></span></button>
+    </div>
+  </header>
 
   <section class="page-hero">
     <div class="container">
