@@ -29,6 +29,21 @@
     el.className = 'form-feedback is-' + type;
   }
 
+  function setFieldError(input, hasError) {
+    if (!input) return;
+    input.classList.toggle('is-invalid', hasError);
+    input.closest('.form-row')?.classList.toggle('has-error', hasError);
+  }
+
+  // Validação em tempo real: limpa o erro assim que o campo é corrigido
+  ['leadName', 'leadRole', 'leadInstitution', 'leadCity', 'leadWhatsapp'].forEach(function (id) {
+    var input = document.getElementById(id);
+    if (!input) return;
+    input.addEventListener('input', function () {
+      if (input.value.trim()) setFieldError(input, false);
+    });
+  });
+
   function saveLeadLocal(data) {
     try {
       var leads = JSON.parse(localStorage.getItem('viva_leads') || '[]');
@@ -40,50 +55,72 @@
 
   form.addEventListener('submit', function (e) {
     e.preventDefault();
-    var name = (document.getElementById('leadName')?.value || '').trim();
-    var role = (document.getElementById('leadRole')?.value || '').trim();
-    var institution = (document.getElementById('leadInstitution')?.value || '').trim();
-    var city = (document.getElementById('leadCity')?.value || '').trim();
-    var whatsapp = (document.getElementById('leadWhatsapp')?.value || '').trim();
+    var fields = {
+      name: document.getElementById('leadName'),
+      role: document.getElementById('leadRole'),
+      institution: document.getElementById('leadInstitution'),
+      city: document.getElementById('leadCity'),
+      whatsapp: document.getElementById('leadWhatsapp')
+    };
+    var consent = document.getElementById('leadConsent');
 
-    if (!name || !role || !institution || !city || !whatsapp) {
-      showFeedback('Preencha todos os campos obrigatórios.', 'error');
+    var hasError = false;
+    Object.keys(fields).forEach(function (key) {
+      var input = fields[key];
+      var empty = !(input && input.value.trim());
+      setFieldError(input, empty);
+      if (empty) hasError = true;
+    });
+
+    var digits = (fields.whatsapp?.value || '').replace(/\D/g, '');
+    if (!hasError && digits.length < 10) {
+      setFieldError(fields.whatsapp, true);
+      hasError = true;
+    }
+
+    if (hasError) {
+      showFeedback('Revise os campos destacados.', 'error');
       return;
     }
 
-    var digits = whatsapp.replace(/\D/g, '');
-    if (digits.length < 10) {
-      showFeedback('Informe um WhatsApp válido.', 'error');
+    if (consent && !consent.checked) {
+      showFeedback('É necessário aceitar a Política de Privacidade para enviar.', 'error');
       return;
     }
 
-    var payload = { name: name, role: role, institution: institution, city: city, whatsapp: whatsapp };
+    var payload = {
+      name: fields.name.value.trim(),
+      role: fields.role.value.trim(),
+      institution: fields.institution.value.trim(),
+      city: fields.city.value.trim(),
+      whatsapp: fields.whatsapp.value.trim()
+    };
     saveLeadLocal(payload);
 
     fetch('/api/leads', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        name: name,
-        role: role,
-        institution: institution,
-        city: city,
-        whatsapp: whatsapp,
-        source: 'landing-home'
-      })
+      body: JSON.stringify(Object.assign({ source: 'landing-home' }, payload))
     }).catch(function () {});
 
     var text = [
-      'Olá! Gostaria de agendar uma demonstração gratuita.',
+      'Olá! Gostaria de falar com um especialista Viva Saúde.',
       '',
-      'Nome: ' + name,
-      'Cargo: ' + role,
-      'Instituição: ' + institution,
-      'Cidade/Estado: ' + city,
-      'WhatsApp: ' + whatsapp
+      'Nome: ' + payload.name,
+      'Cargo: ' + payload.role,
+      'Instituição: ' + payload.institution,
+      'Cidade/Estado: ' + payload.city,
+      'WhatsApp: ' + payload.whatsapp
     ].join('\n');
 
-    showFeedback('Redirecionando para o WhatsApp… Nossa equipe entrará em contato em breve.', 'success');
+    // Confirmação com check animado (briefing)
+    var success = document.getElementById('formSuccess');
+    if (success) {
+      success.hidden = false;
+    } else {
+      showFeedback('Recebemos seu contato! Nossa equipe falará com você em breve.', 'success');
+    }
+
     window.open('https://wa.me/' + WA_NUMBER + '?text=' + encodeURIComponent(text), '_blank', 'noopener');
   });
 })();

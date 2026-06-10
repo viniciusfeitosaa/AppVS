@@ -49,6 +49,38 @@
     })
     .catch(function () {});
 
+  // FAQ accordion: apenas um item aberto por vez (briefing)
+  document.querySelectorAll('.faq-list').forEach(function (list) {
+    list.querySelectorAll('details.faq-item').forEach(function (item) {
+      item.addEventListener('toggle', function () {
+        if (!item.open) return;
+        list.querySelectorAll('details.faq-item[open]').forEach(function (other) {
+          if (other !== item) other.open = false;
+        });
+      });
+    });
+  });
+
+  // Banner de cookies (LGPD)
+  var cookieBanner = document.getElementById('cookieBanner');
+  if (cookieBanner) {
+    var CONSENT_KEY = 'viva_cookie_consent';
+    var stored = null;
+    try { stored = localStorage.getItem(CONSENT_KEY); } catch (e) {}
+    if (!stored) cookieBanner.hidden = false;
+
+    function setConsent(value) {
+      try { localStorage.setItem(CONSENT_KEY, value); } catch (e) {}
+      cookieBanner.hidden = true;
+    }
+    document.getElementById('cookieAccept')?.addEventListener('click', function () {
+      setConsent('all');
+    });
+    document.getElementById('cookieEssential')?.addEventListener('click', function () {
+      setConsent('essential');
+    });
+  }
+
   var exitPopup = document.getElementById('exitPopup');
   var exitClose = document.getElementById('exitPopupClose');
   var exitShown = false;
