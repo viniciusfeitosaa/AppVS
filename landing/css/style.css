@@ -1008,9 +1008,16 @@ body {
 .app-features { list-style: none; padding: 0; margin: 1.5rem 0; }
 .app-features li { padding: 0.5rem 0 0.5rem 1.5rem; position: relative; }
 .app-features li::before { content: '•'; position: absolute; left: 0; color: var(--color-gold); }
-.app-store-btns { display: flex; flex-wrap: wrap; gap: 0.75rem; }
-.btn-store { background: #fff; color: var(--color-primary); font-size: 0.85rem; padding: 0.75rem 1.25rem; }
-.btn-store-outline { background: transparent; border: 2px solid rgba(255,255,255,0.5); color: #fff; }
+.app-store-btns { display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem; }
+.store-badge-link {
+  display: inline-block;
+  line-height: 0;
+  border-radius: 6px;
+  transition: transform 0.2s ease, opacity 0.2s ease;
+}
+.store-badge-link:hover { transform: translateY(-2px); opacity: 0.9; }
+.store-badge-link:focus-visible { outline: 2px solid var(--color-gold); outline-offset: 3px; }
+.store-badge-link img { display: block; height: 40px; width: auto; }
 .phone-frame { width: 220px; height: 440px; margin: 0 auto; background: #111; border-radius: 32px; padding: 12px; box-shadow: 0 20px 60px rgba(0,0,0,0.4); }
 .phone-screen { background: linear-gradient(180deg, var(--color-secondary), var(--color-accent)); height: 100%; border-radius: 24px; display: flex; align-items: center; justify-content: center; color: #fff; font-weight: 600; text-align: center; padding: 1rem; }
 .faq-v2 .faq-group-title { font-size: 1rem; color: var(--color-secondary); margin: 2rem 0 1rem; text-transform: uppercase; letter-spacing: 0.05em; }
