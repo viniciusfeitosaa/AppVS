@@ -88,6 +88,7 @@ export function landingDevPlugin(): Plugin {
   return {
     name: 'vite-landing-dev',
     apply: 'serve',
+    enforce: 'pre',
     configResolved(config) {
       const base = config.base.endsWith('/') ? config.base : `${config.base}/`;
       if (base !== '/app/') {
