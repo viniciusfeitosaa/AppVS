@@ -1,12 +1,13 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
+import { landingDevPlugin } from './vite-plugin-landing-dev';
 
 // Raiz `/` para Docker e domínio dedicado. Para deploy em /app/ (ex.: Netlify + landing), define VITE_APP_BASE=/app/
 // https://vitejs.dev/config/
 export default defineConfig({
   base: process.env.VITE_APP_BASE ?? '/',
-  plugins: [react()],
+  plugins: [react(), landingDevPlugin()],
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
