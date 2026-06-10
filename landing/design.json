@@ -14,6 +14,10 @@
       "instagram": "https://www.instagram.com/sejavivasaude",
       "instagramHandle": "@sejavivasaude"
     },
+    "apps": {
+      "ios": "https://apps.apple.com/br/app/viva-saude/id6772163116",
+      "android": "https://play.google.com/store/apps/details?id=com.vivasaude.appvs"
+    },
     "stats": {
       "institutions": "50+",
       "institutionsLabel": "Instituições Atendidas",
