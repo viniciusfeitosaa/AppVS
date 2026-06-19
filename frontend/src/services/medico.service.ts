@@ -96,6 +96,16 @@ export const medicoService = {
     return response.data;
   },
 
+  deleteConta: async (payload: {
+    senha: string;
+    confirmacao: string;
+  }): Promise<{ success: boolean; message: string }> => {
+    const response = await api.delete<{ success: boolean; message: string }>('/medico/conta', {
+      data: payload,
+    });
+    return response.data;
+  },
+
   listDocumentosEnviados: async (): Promise<{ success: boolean; data: DocumentoEnviadoItem[] }> => {
     const response = await api.get<{ success: boolean; data: DocumentoEnviadoItem[] }>('/medico/documentos-enviados');
     return response.data;

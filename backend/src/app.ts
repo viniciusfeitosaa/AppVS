@@ -9,6 +9,7 @@ import authRoutes from './routes/auth.routes';
 import medicoRoutes from './routes/medico.routes';
 import adminRoutes from './routes/admin.routes';
 import pontoRoutes from './routes/ponto.routes';
+import leadsRoutes from './routes/leads.routes';
 
 // Criar aplicação Express
 const app: Express = express();
@@ -101,6 +102,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/medico', medicoRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/ponto', pontoRoutes);
+app.use('/api/leads', leadsRoutes);
 
 // Rota raiz
 app.get('/', (_req: Request, res: Response) => {

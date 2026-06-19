@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../context/AuthContext';
 import { medicoService } from '../services/medico.service';
@@ -13,10 +14,11 @@ import {
 import { MODULO_LABEL, ModuloSistema } from '../constants/modulos';
 import { ESPECIALIDADES_MEDICAS } from '../constants/profissoesEspecialidades';
 
-type TabPerfil = 'pessoais' | 'bancarios' | 'documentos';
+type TabPerfil = 'pessoais' | 'bancarios' | 'documentos' | 'conta';
 
 const Perfil = () => {
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const isMaster = user?.role === 'MASTER';
   const [activeTab, setActiveTab] = useState<TabPerfil>('pessoais');
@@ -28,6 +30,17 @@ const Perfil = () => {
   >({});
   const [savingAcessos, setSavingAcessos] = useState(false);
   const [acessosDraft, setAcessosDraft] = useState<AcessoModuloItem[]>([]);
+  /** idle = fechado; confirm = aviso inicial; credentials = senha + EXCLUIR */
+  const [deleteFlowStep, setDeleteFlowStep] = useState<'idle' | 'confirm' | 'credentials'>('idle');
+  const [deleteSenha, setDeleteSenha] = useState('');
+  const [deleteConfirmacao, setDeleteConfirmacao] = useState('');
+  const [deletingAccount, setDeletingAccount] = useState(false);
+
+  const closeDeleteFlow = () => {
+    setDeleteFlowStep('idle');
+    setDeleteSenha('');
+    setDeleteConfirmacao('');
+  };
   const [form, setForm] = useState<{
     especialidades: string[];
     telefone: string;
@@ -93,6 +106,28 @@ const Perfil = () => {
         ? prev.especialidades.filter((x) => x !== nome)
         : [...prev.especialidades, nome],
     }));
+  };
+
+  const handleExcluirConta = async () => {
+    setDeletingAccount(true);
+    setError(null);
+    setSuccess(null);
+    try {
+      const res = await medicoService.deleteConta({
+        senha: deleteSenha,
+        confirmacao: deleteConfirmacao,
+      });
+      closeDeleteFlow();
+      logout();
+      navigate('/login', { state: { accountDeletedMessage: res.message } });
+    } catch (err: unknown) {
+      const msg =
+        (err as { response?: { data?: { error?: string } } })?.response?.data?.error ||
+        'Não foi possível excluir a conta.';
+      setError(msg);
+    } finally {
+      setDeletingAccount(false);
+    }
   };
 
   const handleSalvar = async () => {
@@ -188,6 +223,12 @@ const Perfil = () => {
         </h1>
         <p className="text-viva-700 font-serif text-base">
           Informações do seu perfil de acesso na plataforma.
+          {!isMaster && (
+            <>
+              {' '}
+              Para excluir sua conta, abra a aba <strong className="font-semibold">Conta e privacidade</strong>.
+            </>
+          )}
         </p>
       </div>
 
@@ -202,8 +243,15 @@ const Perfil = () => {
         </div>
       )}
 
-      <div className="flex gap-1 p-1 rounded-xl bg-viva-100/50 border border-viva-200/60 w-fit">
-        {(['pessoais', 'bancarios', 'documentos'] as const).map((tab) => (
+      <div className="flex flex-wrap gap-1 p-1 rounded-xl bg-viva-100/50 border border-viva-200/60 w-fit max-w-full">
+        {(
+          [
+            'pessoais',
+            'bancarios',
+            'documentos',
+            ...(!isMaster ? (['conta'] as const) : []),
+          ] as TabPerfil[]
+        ).map((tab) => (
           <button
             key={tab}
             type="button"
@@ -217,6 +265,7 @@ const Perfil = () => {
             {tab === 'pessoais' && 'Dados Pessoais'}
             {tab === 'bancarios' && 'Dados Bancários'}
             {tab === 'documentos' && 'Documentos'}
+            {tab === 'conta' && 'Conta e privacidade'}
           </button>
         ))}
       </div>
@@ -459,6 +508,29 @@ const Perfil = () => {
         </div>
       )}
 
+      {!isMaster && activeTab === 'conta' && (
+        <div className="card stagger-3 border-l-4 border-red-400 bg-red-50/40">
+          <h3 className="text-sm font-semibold uppercase tracking-wider text-red-800 mb-2 font-display">
+            Excluir conta permanentemente
+          </h3>
+          <p className="text-sm text-viva-800 font-serif leading-relaxed mb-2">
+            Conforme as diretrizes da App Store, você pode remover sua conta e os dados pessoais
+            associados (perfil, documentos enviados, registros de ponto, etc.).
+          </p>
+          <p className="text-sm text-viva-800 font-serif leading-relaxed mb-4">
+            Esta ação é <strong className="font-semibold">irreversível</strong>. Para voltar a usar o
+            app, será necessário um novo cadastro.
+          </p>
+          <button
+            type="button"
+            className="btn text-sm border border-red-300 bg-white text-red-800 hover:bg-red-50 w-full sm:w-auto"
+            onClick={() => setDeleteFlowStep('confirm')}
+          >
+            Excluir minha conta
+          </button>
+        </div>
+      )}
+
       {isMaster && (
         <div className="card stagger-2 border-l-4 border-l-viva-500">
           <h3 className="text-sm font-semibold uppercase tracking-wider text-viva-600 mb-2 font-display">Administração de Acesso por Módulo</h3>
@@ -520,6 +592,102 @@ const Perfil = () => {
             <button className="btn btn-primary" disabled={savingAcessos} type="button" onClick={salvarAcessos}>
               {savingAcessos ? 'Salvando...' : 'Salvar permissões'}
             </button>
+          </div>
+        </div>
+      )}
+
+      {deleteFlowStep !== 'idle' && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-viva-950/60 backdrop-blur-sm"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="excluir-conta-titulo"
+        >
+          <div className="card max-w-md w-full shadow-2xl border border-red-200/80">
+            {deleteFlowStep === 'confirm' ? (
+              <>
+                <h2 id="excluir-conta-titulo" className="text-base font-bold text-red-900 font-display mb-2">
+                  Excluir sua conta?
+                </h2>
+                <p className="text-sm text-viva-800 font-serif leading-relaxed mb-4">
+                  Você está prestes a excluir permanentemente sua conta e todos os dados associados.
+                  Esta ação não pode ser desfeita.
+                </p>
+                <p className="text-xs text-viva-600 font-serif mb-6">
+                  Se foi um clique acidental, toque em <strong className="font-semibold">Cancelar</strong>.
+                </p>
+                <div className="flex flex-col sm:flex-row gap-2 justify-end">
+                  <button
+                    type="button"
+                    className="btn text-sm border border-viva-300 bg-white text-viva-800"
+                    onClick={closeDeleteFlow}
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="button"
+                    className="btn text-sm bg-red-700 text-white hover:bg-red-800 border border-red-800"
+                    onClick={() => {
+                      setDeleteSenha('');
+                      setDeleteConfirmacao('');
+                      setDeleteFlowStep('credentials');
+                    }}
+                  >
+                    Confirmar exclusão
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <h2 id="excluir-conta-titulo" className="text-base font-bold text-red-900 font-display mb-2">
+                  Confirmar exclusão da conta
+                </h2>
+                <p className="text-xs text-viva-700 font-serif leading-relaxed mb-4">
+                  Para concluir, digite sua senha e <strong className="font-semibold">EXCLUIR</strong>.
+                </p>
+                <label className="block text-xs font-semibold text-viva-800 mb-1">Senha</label>
+                <input
+                  type="password"
+                  className="w-full rounded-xl border border-viva-200 bg-white px-3 py-2 text-sm mb-3"
+                  value={deleteSenha}
+                  onChange={(e) => setDeleteSenha(e.target.value)}
+                  autoComplete="current-password"
+                />
+                <label className="block text-xs font-semibold text-viva-800 mb-1">
+                  Digite EXCLUIR para confirmar
+                </label>
+                <input
+                  type="text"
+                  className="w-full rounded-xl border border-viva-200 bg-white px-3 py-2 text-sm mb-4 uppercase"
+                  value={deleteConfirmacao}
+                  onChange={(e) => setDeleteConfirmacao(e.target.value)}
+                  placeholder="EXCLUIR"
+                  autoComplete="off"
+                />
+                <div className="flex flex-col sm:flex-row gap-2 justify-end">
+                  <button
+                    type="button"
+                    className="btn text-sm border border-viva-300 bg-white text-viva-800"
+                    disabled={deletingAccount}
+                    onClick={closeDeleteFlow}
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="button"
+                    className="btn text-sm bg-red-700 text-white hover:bg-red-800 border border-red-800"
+                    disabled={
+                      deletingAccount ||
+                      !deleteSenha.trim() ||
+                      deleteConfirmacao.trim().toUpperCase() !== 'EXCLUIR'
+                    }
+                    onClick={() => void handleExcluirConta()}
+                  >
+                    {deletingAccount ? 'Excluindo...' : 'Excluir permanentemente'}
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}

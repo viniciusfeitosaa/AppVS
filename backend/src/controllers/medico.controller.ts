@@ -1,5 +1,10 @@
 import { Request, Response } from 'express';
-import { getPerfilService, getMedicoDocumentoPerfilForDownload, updatePerfilService } from '../services/medico.service';
+import {
+  deleteSelfAccountService,
+  getPerfilService,
+  getMedicoDocumentoPerfilForDownload,
+  updatePerfilService,
+} from '../services/medico.service';
 import {
   listMeusDocumentos,
   getDocumentoForDownload,
@@ -44,6 +49,30 @@ export const getPerfilController = async (req: Request, res: Response) => {
     return res.status(error.statusCode || 500).json({
       success: false,
       error: error.message || 'Erro ao buscar perfil',
+    });
+  }
+};
+
+export const deleteSelfAccountController = async (req: Request, res: Response) => {
+  try {
+    const medicoId = req.user?.id;
+    const tenantId = req.user?.tenantId;
+
+    if (!medicoId || !tenantId) {
+      return res.status(401).json({ success: false, error: 'Não autenticado' });
+    }
+
+    const { senha } = req.body as { senha: string };
+    const result = await deleteSelfAccountService(medicoId, tenantId, senha, {
+      ipAddress: req.ip,
+      userAgent: req.get('user-agent'),
+    });
+
+    return res.status(200).json({ success: true, ...result });
+  } catch (error: any) {
+    return res.status(error.statusCode || 500).json({
+      success: false,
+      error: error.message || 'Erro ao excluir conta',
     });
   }
 };
