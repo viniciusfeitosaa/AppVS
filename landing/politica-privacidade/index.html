@@ -7,15 +7,23 @@
       name="description"
       content="Política de Privacidade da Viva Saúde em conformidade com a LGPD (Lei 13.709/2018). Tratamento de dados no site e na plataforma de gestão médica e administrativa."
     />
-    <link rel="icon" type="image/png" href="/AppIcon.png?v=3" />
-    <title>Política de Privacidade | Seja Viva Saúde</title>
+    <link rel="icon" type="image/png" href="/icon-192.png?v=3" />
+    <title>Política de Privacidade | Viva Saúde</title>
+    <link rel="canonical" href="https://www.sejavivasaude.com.br/politica-privacidade/" />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Política de Privacidade | Viva Saúde" />
+    <meta property="og:description" content="Política de Privacidade da Viva Saúde em conformidade com a LGPD." />
+    <meta property="og:url" content="https://www.sejavivasaude.com.br/politica-privacidade/" />
+    <meta property="og:image" content="https://www.sejavivasaude.com.br/assets/og-image.jpg" />
+    <meta property="og:locale" content="pt_BR" />
+    <meta name="twitter:card" content="summary_large_image" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
       href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=Playfair+Display:wght@600;700;800&family=Poppins:wght@300;400;500;600;700&family=Source+Sans+3:wght@600;700&family=Bebas+Neue&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="../css/style.css?v=2" />
+    <link rel="stylesheet" href="../css/style.css?v=22" />
     <style>
       .legal-doc {
         max-width: 42rem;
@@ -74,10 +82,14 @@
         <a href="/" class="logo" aria-label="Seja Viva Saúde - Página inicial">
           <img src="../assets/logo.png" alt="Logomarca Viva Saúde" class="logo-img" />
         </a>
-        <nav class="nav" aria-label="Menu principal">
-          <a href="/">Início</a>
-          <a href="/#contato">Contato</a>
-          <a href="/app/login" class="btn btn-access">Área do Associado</a>
+        <nav class="nav" id="mainNav" aria-label="Menu principal">
+          <ul class="nav-links">
+            <li><a href="/">Início</a></li>
+            <li><a href="/#contato">Contato</a></li>
+          </ul>
+          <div class="header-actions">
+            <a href="/app/login" class="btn btn-access">Área do Associado</a>
+          </div>
         </nav>
         <button type="button" class="nav-toggle" id="navToggle" aria-label="Abrir menu" aria-expanded="false">
           <span></span><span></span><span></span>
@@ -96,7 +108,7 @@
       <p>
         Esta Política de Privacidade aplica-se ao site institucional e ao ambiente digital de apoio à gestão de rotina
         de profissionais de saúde vinculados ou contratados pela <strong>Viva Saúde</strong> (ou pela instituição
-        parceira que disponibilize o acesso), doravante denominada <strong>Controladora</strong>, em conformidade com
+        contratante que disponibilize o acesso), doravante denominada <strong>Controladora</strong>, em conformidade com
         a Lei n.º 13.709/2018 (Lei Geral de Proteção de Dados Pessoais — LGPD).
       </p>
       <p>
@@ -249,19 +261,52 @@
       <a class="legal-back" href="/">← Voltar à página inicial</a>
     </main>
 
-    <footer class="footer">
-      <div class="footer-inner container">
-        <div class="footer-brand">
+    <footer class="footer footer-v2">
+      <div class="container footer-columns">
+        <div class="footer-col">
           <img src="../assets/logo-rodape.png" alt="Viva Saúde" class="footer-logo" />
+          <p class="footer-tagline">Gestão integral de escalas médicas em todo o Brasil.</p>
         </div>
-        <div class="footer-links">
-          <a href="/politica-privacidade">Política de Privacidade</a>
-          <a href="/#politica-cookies">Política de Cookies</a>
+        <div class="footer-col">
+          <h4>Institucional</h4>
+          <ul>
+            <li><a href="/quem-somos/">Quem Somos</a></li>
+            <li><a href="/quem-somos/#missao">Nossa Missão</a></li>
+            <li><a href="/quem-somos/#valores">Valores</a></li>
+          </ul>
+        </div>
+        <div class="footer-col">
+          <h4>Serviços</h4>
+          <ul>
+            <li><a href="/para-instituicoes/">Para Instituições</a></li>
+            <li><a href="/para-medicos/">Para Médicos</a></li>
+            <li><a href="/app-viva-saude/">App Viva Saúde</a></li>
+            <li><a href="/como-funciona/">Como Funciona</a></li>
+          </ul>
+        </div>
+        <div class="footer-col">
+          <h4>Informações</h4>
+          <ul>
+            <li><a href="/#faq">FAQ</a></li>
+            <li><a href="/politica-privacidade/">Política de Privacidade</a></li>
+            <li><a href="/politica-cookies/">Política de Cookies</a></li>
+            <li><a href="/termos-de-uso/">Termos de Uso</a></li>
+          </ul>
+        </div>
+        <div class="footer-col">
+          <h4>Contato</h4>
+          <ul class="footer-contact">
+            <li><a href="mailto:contato@sejavivasaude.com.br">contato@sejavivasaude.com.br</a></li>
+            <li><a href="tel:+551140402345">+55 11 4040-2345</a></li>
+            <li><a href="https://www.sejavivasaude.com.br" target="_blank" rel="noopener noreferrer">www.sejavivasaude.com.br</a></li>
+            <li><a href="https://www.instagram.com/sejavivasaude" target="_blank" rel="noopener noreferrer">@sejavivasaude</a></li>
+          </ul>
         </div>
       </div>
-      <p class="footer-copy">&copy; Seja Viva Saúde. Todos os direitos reservados.</p>
+      <p class="footer-copy">© 2025 Viva Saúde. Todos os direitos reservados. | <a href="/politica-privacidade/">Política de Privacidade</a> · <a href="/politica-cookies/">Cookies</a> · <a href="/termos-de-uso/">Termos de Uso</a></p>
     </footer>
 
+    <script src="../js/landing-ui.js?v=2"></script>
     <script src="../js/design-loader.js"></script>
     <script src="../js/animations.js"></script>
   </body>
