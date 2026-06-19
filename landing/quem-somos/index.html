@@ -22,7 +22,7 @@
   <meta name="twitter:image" content="https://www.sejavivasaude.com.br/assets/og-image.jpg" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link rel="stylesheet" href="../css/style.css?v=30" />
+  <link rel="stylesheet" href="../css/style.css?v=38" />
   <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Poppins:wght@400;500;600&display=swap" rel="stylesheet" />
 </head>
 <body>
@@ -45,7 +45,10 @@
     </div>
   </header>
 
-  <section class="page-hero">
+  <section class="page-hero page-hero--visual">
+    <div class="page-hero__bg" aria-hidden="true">
+      <img src="../assets/photos/hero-equipe-medica.jpg" alt="" width="1920" height="1080" />
+    </div>
     <div class="container">
       <h1>Acreditamos que uma escala bem feita salva vidas.</h1>
       <p>A Viva Saúde nasceu da convicção de que a gestão de escalas médicas não pode ser tratada como improviso.</p>
@@ -54,8 +57,15 @@
 
   <main class="page-content"><div class="container">
     <section class="content-block" id="sobre">
-      <p>Atuamos com hospitais, clínicas e instituições públicas gerenciando médicos e escalas: assumimos a operação, conduzimos a rotina profissional e entregamos suporte administrativo em todo o Brasil.</p>
-      <p>Mais do que montar plantões, cuidamos do profissional e do funcionamento contínuo da operação assistencial, para que gestores foquem na qualidade do cuidado ao paciente.</p>
+      <div class="page-split">
+        <div class="page-split__copy">
+          <p>Atuamos com hospitais, clínicas e instituições públicas gerenciando médicos e escalas: assumimos a operação, conduzimos a rotina profissional e entregamos suporte administrativo em todo o Brasil.</p>
+          <p>Mais do que montar plantões, cuidamos do profissional e do funcionamento contínuo da operação assistencial, para que gestores foquem na qualidade do cuidado ao paciente.</p>
+        </div>
+        <figure class="page-split__media section-photo">
+          <img src="../assets/photos/plantao-medico.jpg" alt="Equipe médica em plantão hospitalar" width="1280" height="900" loading="lazy" />
+        </figure>
+      </div>
     </section>
     <section class="content-block" id="missao">
       <h2>Missão, Visão e Valores</h2>
