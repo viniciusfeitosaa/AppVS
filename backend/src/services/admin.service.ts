@@ -7,6 +7,7 @@ import {
   resolveRegistroConselhoParaCadastro,
 } from '../utils/profissao-registro.util';
 import { fileExistsSafe, resolveStoredFileToAbsolute } from '../utils/upload-path.util';
+import { getFrontendAppBaseUrl } from '../utils/email-branding.util';
 import { createAuditLog } from './auditoria.service';
 import {
   ensureTiposLegadoMigrados,
@@ -272,7 +273,8 @@ export async function createMedicoService(input: CreateMedicoInput) {
     }
   }
 
-  const senhaHash = await hashPassword(input.senha || 'viva@2026');
+  const senhaPlain = input.senha?.trim() || crypto.randomBytes(24).toString('base64url');
+  const senhaHash = await hashPassword(senhaPlain);
 
   const medico = await prisma.medico.create({
     data: {
@@ -437,7 +439,7 @@ export async function inviteMedicoService(
     );
   });
 
-  const inviteUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/ativar-conta/${rawToken}`;
+  const inviteUrl = `${getFrontendAppBaseUrl()}/ativar-conta/${rawToken}`;
 
   const docuseal = await createDocusealSubmissionsForMedicoInvite({
     nomeCompleto: medico.nomeCompleto,

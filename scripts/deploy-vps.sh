@@ -31,7 +31,7 @@ if [ ! -f .env ]; then
 fi
 
 echo "[deploy] Docker compose build + up..."
-docker compose up -d --build
+docker compose -f docker-compose.yml -f docker-compose.postgres.yml -f docker-compose.vps.yml up -d --build
 
 echo "[deploy] Estado dos serviços:"
 docker compose ps

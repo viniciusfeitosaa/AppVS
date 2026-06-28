@@ -14,15 +14,13 @@ import tls from 'tls';
 import nodemailer from 'nodemailer';
 import { Resend } from 'resend';
 import twilio from 'twilio';
-import { escapeHtmlAttr, getEmailLogoUrl, getOrgDisplayName, getEmailTagline } from '../utils/email-branding.util';
-
-/** Base do app para links de redefinição (prefira FRONTEND_APP_URL em produção). */
-function getResetPasswordAppBaseUrl(): string {
-  const appUrl = process.env.FRONTEND_APP_URL?.trim();
-  if (appUrl) return appUrl.replace(/\/$/, '');
-  const fallback = (process.env.FRONTEND_URL || 'http://localhost:3000').trim().replace(/\/$/, '');
-  return fallback;
-}
+import {
+  escapeHtmlAttr,
+  getEmailLogoUrl,
+  getOrgDisplayName,
+  getEmailTagline,
+  getFrontendAppBaseUrl,
+} from '../utils/email-branding.util';
 
 function resetEmailSubject(): string {
   return `Redefinir sua senha — ${getOrgDisplayName()}`;
@@ -93,7 +91,7 @@ function buildResetPasswordEmailHtml(resetLink: string): string {
 }
 
 export function previewResetPasswordEmailHtmlService(token?: string): string {
-  const frontendUrl = getResetPasswordAppBaseUrl();
+  const frontendUrl = getFrontendAppBaseUrl();
   const safeToken = (token && token.trim()) || 'preview-token-123';
   const resetLink = `${frontendUrl}/redefinir-senha?token=${safeToken}`;
   return buildResetPasswordEmailHtml(resetLink);
@@ -874,7 +872,7 @@ export async function esqueciSenhaService(email: string): Promise<{
     });
   });
 
-  const frontendUrl = getResetPasswordAppBaseUrl();
+  const frontendUrl = getFrontendAppBaseUrl();
   const resetLink = `${frontendUrl}/redefinir-senha?token=${token}`;
 
   const whatsAppPhone = medico?.telefone ? normalizePhoneForWhatsApp(medico.telefone) : null;

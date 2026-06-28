@@ -1,7 +1,7 @@
 import tls from 'tls';
 import nodemailer from 'nodemailer';
 import { Resend } from 'resend';
-import { escapeHtmlAttr, getEmailLogoUrl, getOrgDisplayName, getEmailTagline } from '../utils/email-branding.util';
+import { escapeHtmlAttr, getEmailLogoUrl, getOrgDisplayName, getEmailTagline, getFrontendAppBaseUrl } from '../utils/email-branding.util';
 
 function escapeHtmlText(s: string): string {
   return s
@@ -16,9 +16,7 @@ function org(): string {
 }
 
 function getAppBaseUrl(): string {
-  const appUrl = process.env.FRONTEND_APP_URL?.trim();
-  if (appUrl) return appUrl.replace(/\/$/, '');
-  return (process.env.FRONTEND_URL || 'http://localhost:3000').trim().replace(/\/$/, '');
+  return getFrontendAppBaseUrl();
 }
 
 function hasResendConfig(): boolean {

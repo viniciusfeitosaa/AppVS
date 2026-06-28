@@ -212,7 +212,7 @@ export const previewResetEmailController = async (req: Request, res: Response) =
     // No preview web, permitir estilos inline (padrão de e-mail HTML) e logo externa sem quebrar CSP global.
     res.setHeader(
       'Content-Security-Policy',
-      "default-src 'self'; img-src 'self' data: https://sejavivasaude.com.br; style-src 'self' 'unsafe-inline';"
+      "default-src 'self'; img-src 'self' data: https://app.coopvitta.cloud; style-src 'self' 'unsafe-inline';"
     );
     return res.status(200).type('html').send(html);
   } catch (error: any) {

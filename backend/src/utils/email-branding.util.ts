@@ -17,6 +17,15 @@ export function getEmailTagline(): string {
   ).trim();
 }
 
+/** Base URL do SPA React (rotas como /login, /redefinir-senha, /ativar-conta). */
+export function getFrontendAppBaseUrl(): string {
+  const appUrl = process.env.FRONTEND_APP_URL?.trim();
+  if (appUrl) return appUrl.replace(/\/$/, '');
+  const base = (process.env.FRONTEND_URL || 'http://localhost:5173').trim().replace(/\/$/, '');
+  if (base.endsWith('/app')) return base;
+  return `${base}/app`;
+}
+
 /** Logo: EMAIL_LOGO_URL ou frontend + /assets/logo-coopvitta.png */
 export function getEmailLogoUrl(): string {
   const raw = (process.env.FRONTEND_URL || process.env.FRONTEND_APP_URL || 'https://app.coopvitta.cloud').trim();

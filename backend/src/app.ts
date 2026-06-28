@@ -27,7 +27,8 @@ const originsFromEnv = [
   ...(env.FRONTEND_URL ? [env.FRONTEND_URL.trim()] : []),
 ];
 const allowedOriginsSet = new Set([
-  'https://sejavivasaude.com.br',
+  'https://app.coopvitta.cloud',
+  'https://coopvitta.cloud',
   'http://localhost:3000',
   'http://localhost:5173',
   ...originsFromEnv,
