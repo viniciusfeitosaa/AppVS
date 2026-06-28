@@ -76,11 +76,11 @@ const VagaCardDisponivel = ({ v, formatCentavosBRL, formatDataHora, onGerenciarC
   };
 
   return (
-    <li className="rounded-2xl border border-viva-100 bg-gradient-to-br from-white to-viva-50/30 p-4 shadow-sm">
+    <li className="rounded-2xl border border-coop-100 bg-gradient-to-br from-white to-coop-50/30 p-4 shadow-sm">
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div>
-          <p className="text-lg font-bold text-viva-950 font-display">{v.tipoAtendimento}</p>
-          <p className="text-sm text-viva-700 font-serif">
+          <p className="text-lg font-bold text-coop-950 font-display">{v.tipoAtendimento}</p>
+          <p className="text-sm text-coop-700 font-serif">
             {v.setor} · {v.quantidadeVagas} vaga(s)
           </p>
         </div>
@@ -90,14 +90,14 @@ const VagaCardDisponivel = ({ v, formatCentavosBRL, formatDataHora, onGerenciarC
               Sua publicação
             </span>
           )}
-          <span className="rounded-full bg-viva-100 px-3 py-1 text-xs font-semibold text-viva-800">
+          <span className="rounded-full bg-coop-100 px-3 py-1 text-xs font-semibold text-coop-800">
             Até {formatDataHora(v.expiresAt)}
           </span>
         </div>
       </div>
-      <dl className="mt-3 grid gap-1 text-sm text-viva-800 font-serif">
+      <dl className="mt-3 grid gap-1 text-sm text-coop-800 font-serif">
         <div>
-          <span className="text-viva-600">Valor: </span>
+          <span className="text-coop-600">Valor: </span>
           {v.valorACombinar ? (
             'A combinar'
           ) : (
@@ -107,28 +107,28 @@ const VagaCardDisponivel = ({ v, formatCentavosBRL, formatDataHora, onGerenciarC
           )}
         </div>
         <div>
-          <span className="text-viva-600">Pagamento: </span>
+          <span className="text-coop-600">Pagamento: </span>
           {PAGAMENTO_LABEL[v.pagamento] ?? v.pagamento}
         </div>
         <div>
-          <span className="text-viva-600">Dias: </span>
+          <span className="text-coop-600">Dias: </span>
           {v.diasVaga.join(', ')}
         </div>
         <div>
-          <span className="text-viva-600">Publicado por: </span>
+          <span className="text-coop-600">Publicado por: </span>
           {v.publicador.nomeCompleto}
           {v.publicador.crm ? ` · CRM ${v.publicador.crm}` : ''}
         </div>
       </dl>
-      <p className="mt-3 text-sm text-viva-900 font-serif whitespace-pre-wrap border-t border-viva-100 pt-3">{v.descricao}</p>
+      <p className="mt-3 text-sm text-coop-900 font-serif whitespace-pre-wrap border-t border-coop-100 pt-3">{v.descricao}</p>
 
-      <div className="mt-4 flex flex-wrap gap-2 border-t border-viva-100 pt-3">
+      <div className="mt-4 flex flex-wrap gap-2 border-t border-coop-100 pt-3">
         {sou ? (
           <>
             <button
               type="button"
               onClick={onGerenciarCandidatos}
-              className="rounded-xl bg-viva-900 px-4 py-2 text-xs font-semibold text-white hover:bg-viva-800"
+              className="rounded-xl bg-coop-900 px-4 py-2 text-xs font-semibold text-white hover:bg-coop-800"
             >
               Candidatos ({total})
             </button>
@@ -148,13 +148,13 @@ const VagaCardDisponivel = ({ v, formatCentavosBRL, formatDataHora, onGerenciarC
                 type="button"
                 onClick={() => postMut.mutate()}
                 disabled={postMut.isPending}
-                className="rounded-xl bg-viva-900 px-4 py-2 text-xs font-semibold text-white hover:bg-viva-800 disabled:opacity-50"
+                className="rounded-xl bg-coop-900 px-4 py-2 text-xs font-semibold text-white hover:bg-coop-800 disabled:opacity-50"
               >
                 {postMut.isPending ? 'Enviando…' : 'Demonstrar interesse'}
               </button>
             )}
             {interesse && (
-              <span className="rounded-full bg-viva-100 px-3 py-1.5 text-xs font-semibold text-viva-900">
+              <span className="rounded-full bg-coop-100 px-3 py-1.5 text-xs font-semibold text-coop-900">
                 Seu interesse: {STATUS_INTERESSE_LABEL[interesse.status] ?? interesse.status}
               </span>
             )}
@@ -163,7 +163,7 @@ const VagaCardDisponivel = ({ v, formatCentavosBRL, formatDataHora, onGerenciarC
                 type="button"
                 onClick={() => delIntMut.mutate()}
                 disabled={delIntMut.isPending}
-                className="rounded-xl border border-viva-200 px-4 py-2 text-xs font-semibold text-viva-800 hover:bg-viva-50"
+                className="rounded-xl border border-coop-200 px-4 py-2 text-xs font-semibold text-coop-800 hover:bg-coop-50"
               >
                 Retirar interesse
               </button>

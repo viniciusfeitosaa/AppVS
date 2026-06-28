@@ -47,25 +47,25 @@ const CandidatosVagaModal = ({ open, onClose, vagaId, titulo }: Props) => {
   return (
     <>
       <button type="button" className="fixed inset-0 z-40 bg-black/40" aria-label="Fechar" onClick={onClose} />
-      <div className="fixed left-1/2 top-1/2 z-50 w-[min(100%-1.5rem,640px)] max-h-[85vh] -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-2xl border border-viva-200 bg-white shadow-2xl flex flex-col">
-        <div className="flex-none border-b border-viva-100 px-4 py-3 flex items-start justify-between gap-2">
+      <div className="fixed left-1/2 top-1/2 z-50 w-[min(100%-1.5rem,640px)] max-h-[85vh] -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-2xl border border-coop-200 bg-white shadow-2xl flex flex-col">
+        <div className="flex-none border-b border-coop-100 px-4 py-3 flex items-start justify-between gap-2">
           <div>
-            <h3 className="text-base font-bold text-viva-950 font-display">Candidatos</h3>
-            <p className="text-xs text-viva-600 font-serif mt-0.5">{titulo}</p>
+            <h3 className="text-base font-bold text-coop-950 font-display">Candidatos</h3>
+            <p className="text-xs text-coop-600 font-serif mt-0.5">{titulo}</p>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="rounded-lg px-2 py-1 text-sm text-viva-700 hover:bg-viva-100"
+            className="rounded-lg px-2 py-1 text-sm text-coop-700 hover:bg-coop-100"
           >
             Fechar
           </button>
         </div>
         <div className="flex-1 overflow-y-auto p-4">
-          {isLoading && <p className="text-sm text-viva-700 font-serif">Carregando…</p>}
+          {isLoading && <p className="text-sm text-coop-700 font-serif">Carregando…</p>}
           {error && <p className="text-sm text-red-700">Não foi possível carregar candidatos.</p>}
           {!isLoading && items.length === 0 && (
-            <p className="text-sm text-viva-700 font-serif">Nenhum interesse registrado ainda.</p>
+            <p className="text-sm text-coop-700 font-serif">Nenhum interesse registrado ainda.</p>
           )}
           <ul className="space-y-3">
             {items.map((row) => {
@@ -73,24 +73,24 @@ const CandidatosVagaModal = ({ open, onClose, vagaId, titulo }: Props) => {
               return (
                 <li
                   key={row.interesseId}
-                  className="rounded-xl border border-viva-100 bg-viva-50/40 p-3 text-sm"
+                  className="rounded-xl border border-coop-100 bg-coop-50/40 p-3 text-sm"
                 >
                   <div className="flex flex-wrap items-start justify-between gap-2">
                     <div>
-                      <p className="font-semibold text-viva-950 font-display">{row.candidato.nomeCompleto}</p>
-                      <p className="text-viva-700 font-serif text-xs mt-0.5">
+                      <p className="font-semibold text-coop-950 font-display">{row.candidato.nomeCompleto}</p>
+                      <p className="text-coop-700 font-serif text-xs mt-0.5">
                         {row.candidato.profissao}
                         {row.candidato.crm ? ` · CRM ${row.candidato.crm}` : ''}
                       </p>
                       {row.candidato.especialidades?.length > 0 && (
-                        <p className="text-xs text-viva-600 mt-1">{row.candidato.especialidades.join(', ')}</p>
+                        <p className="text-xs text-coop-600 mt-1">{row.candidato.especialidades.join(', ')}</p>
                       )}
                       {row.candidato.email && (
-                        <p className="text-xs text-viva-700 mt-1">{row.candidato.email}</p>
+                        <p className="text-xs text-coop-700 mt-1">{row.candidato.email}</p>
                       )}
-                      {row.candidato.telefone && <p className="text-xs text-viva-700">{row.candidato.telefone}</p>}
+                      {row.candidato.telefone && <p className="text-xs text-coop-700">{row.candidato.telefone}</p>}
                     </div>
-                    <span className="rounded-full bg-white px-2 py-0.5 text-[11px] font-semibold text-viva-800 ring-1 ring-viva-200">
+                    <span className="rounded-full bg-white px-2 py-0.5 text-[11px] font-semibold text-coop-800 ring-1 ring-coop-200">
                       {STATUS_INTERESSE_LABEL[row.status] ?? row.status}
                     </span>
                   </div>
@@ -111,7 +111,7 @@ const CandidatosVagaModal = ({ open, onClose, vagaId, titulo }: Props) => {
                           type="button"
                           disabled={patchMut.isPending}
                           onClick={() => patchMut.mutate({ candidatoId: row.candidato.id, status: 'ACEITO' })}
-                          className="rounded-lg bg-viva-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-viva-800 disabled:opacity-50"
+                          className="rounded-lg bg-coop-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-coop-800 disabled:opacity-50"
                         >
                           Aceitar
                         </button>
@@ -119,14 +119,14 @@ const CandidatosVagaModal = ({ open, onClose, vagaId, titulo }: Props) => {
                           type="button"
                           disabled={patchMut.isPending}
                           onClick={() => patchMut.mutate({ candidatoId: row.candidato.id, status: 'RECUSADO' })}
-                          className="rounded-lg border border-viva-300 px-3 py-1.5 text-xs font-semibold text-viva-900 hover:bg-viva-100 disabled:opacity-50"
+                          className="rounded-lg border border-coop-300 px-3 py-1.5 text-xs font-semibold text-coop-900 hover:bg-coop-100 disabled:opacity-50"
                         >
                           Recusar
                         </button>
                       </>
                     )}
                   </div>
-                  <p className="text-[10px] text-viva-500 mt-2">
+                  <p className="text-[10px] text-coop-500 mt-2">
                     Interesse em {new Date(row.criadoEm).toLocaleString('pt-BR')}
                   </p>
                 </li>

@@ -57,8 +57,8 @@ const MeusDocumentos = () => {
   if (isMaster) {
     return (
       <div className="card border-l-4 border-red-400">
-        <h2 className="text-base font-bold text-viva-900 mb-2 font-display">Acesso restrito</h2>
-        <p className="text-sm text-viva-700 font-serif">Documentos enviados para você estão na área do profissional. Use o perfil Master apenas para envio em Envio de Documentos.</p>
+        <h2 className="text-base font-bold text-coop-900 mb-2 font-display">Acesso restrito</h2>
+        <p className="text-sm text-coop-700 font-serif">Documentos enviados para você estão na área do profissional. Use o perfil Master apenas para envio em Envio de Documentos.</p>
       </div>
     );
   }
@@ -67,21 +67,21 @@ const MeusDocumentos = () => {
     <div className="space-y-6">
       {/* Hero */}
       <div className="card dashboard-hero col-span-full stagger-1 py-8 md:py-10">
-        <p className="text-xs font-semibold uppercase tracking-widest text-viva-600 mb-2 font-display">
+        <p className="text-xs font-semibold uppercase tracking-widest text-coop-600 mb-2 font-display">
           Área do profissional
         </p>
-        <h1 className="text-xl md:text-2xl font-bold text-viva-900 font-display leading-tight mb-2">
+        <h1 className="text-xl md:text-2xl font-bold text-coop-900 font-display leading-tight mb-2">
           Meus Documentos
         </h1>
-        <p className="text-viva-700 font-serif text-base">
-          Abra o ficheiro com <strong className="font-semibold text-viva-800">Visualizar</strong> e, depois de ler,
-          use <strong className="font-semibold text-viva-800">Registar ciência</strong> para que a equipa saiba que
+        <p className="text-coop-700 font-serif text-base">
+          Abra o ficheiro com <strong className="font-semibold text-coop-800">Visualizar</strong> e, depois de ler,
+          use <strong className="font-semibold text-coop-800">Registar ciência</strong> para que a equipa saiba que
           tomou conhecimento (assinatura eletrónica simplificada).
         </p>
       </div>
 
       {/* Lista de documentos */}
-      <div className="card stagger-2 border-l-4 border-l-viva-500 bg-gradient-to-br from-white to-viva-50/30">
+      <div className="card stagger-2 border-l-4 border-l-coop-500 bg-gradient-to-br from-white to-coop-50/30">
         {cienciaErro && (
           <p className="text-sm text-red-600 mb-3 px-1" role="alert">
             {cienciaErro}
@@ -89,39 +89,39 @@ const MeusDocumentos = () => {
         )}
         {isLoading ? (
           <div className="flex items-center gap-3 py-8">
-            <div className="animate-spin rounded-full h-8 w-8 border-2 border-viva-200 border-t-viva-600" />
-            <p className="text-sm text-viva-700 font-medium">Carregando...</p>
+            <div className="animate-spin rounded-full h-8 w-8 border-2 border-coop-200 border-t-coop-600" />
+            <p className="text-sm text-coop-700 font-medium">Carregando...</p>
           </div>
         ) : documentos.length === 0 ? (
           <div className="py-12 text-center">
-            <span className="inline-flex w-14 h-14 rounded-2xl bg-viva-100/80 items-center justify-center text-viva-500 mb-4">
+            <span className="inline-flex w-14 h-14 rounded-2xl bg-coop-100/80 items-center justify-center text-coop-500 mb-4">
               <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
               </svg>
             </span>
-            <p className="text-sm text-viva-600 font-serif">Nenhum documento enviado para você ainda.</p>
+            <p className="text-sm text-coop-600 font-serif">Nenhum documento enviado para você ainda.</p>
           </div>
         ) : (
           <ul className="space-y-2">
             {documentos.map((doc) => (
               <li
                 key={doc.id}
-                className="flex flex-col sm:flex-row sm:items-center gap-2 p-4 rounded-xl bg-viva-50/50 border border-viva-200/40"
+                className="flex flex-col sm:flex-row sm:items-center gap-2 p-4 rounded-xl bg-coop-50/50 border border-coop-200/40"
               >
                 <div className="flex items-center gap-3 min-w-0 flex-1">
-                  <span className="flex-shrink-0 w-10 h-10 rounded-xl bg-viva-200/50 flex items-center justify-center text-viva-700">
+                  <span className="flex-shrink-0 w-10 h-10 rounded-xl bg-coop-200/50 flex items-center justify-center text-coop-700">
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                     </svg>
                   </span>
                   <div className="min-w-0 flex-1">
-                    <p className="font-semibold text-viva-900 truncate font-display text-sm">
+                    <p className="font-semibold text-coop-900 truncate font-display text-sm">
                       {doc.titulo ? fixMojibake(doc.titulo) : fixMojibake(doc.nomeArquivo)}
                     </p>
                     {doc.titulo && (
-                      <p className="text-[10px] text-viva-600 truncate mt-0.5">{fixMojibake(doc.nomeArquivo)}</p>
+                      <p className="text-[10px] text-coop-600 truncate mt-0.5">{fixMojibake(doc.nomeArquivo)}</p>
                     )}
-                    <p className="text-[10px] text-viva-600 mt-1">
+                    <p className="text-[10px] text-coop-600 mt-1">
                       {formatBytes(doc.tamanhoBytes)} · {formatDate(doc.createdAt)}
                       {doc.aceitoEm && (
                         <span className="text-green-800 font-medium"> · Ciência: {formatDate(doc.aceitoEm)}</span>

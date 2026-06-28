@@ -12,7 +12,7 @@ import { NotificationProvider } from './context/NotificationContext';
 import ProtectedRoute from './components/Layout/ProtectedRoute';
 import AppShell from './components/Layout/AppShell';
 import Login from './pages/Login';
-import Cadastro from './pages/Cadastro';
+import CadastroCoop from './pages/CadastroCoop';
 import Dashboard from './pages/Dashboard';
 import AcceptInvite from './pages/AcceptInvite';
 import Medicos from './pages/Medicos';
@@ -39,10 +39,10 @@ import Avaliacao from './pages/Avaliacao';
 import ModuloEscalaMaster from './pages/ModuloEscalaMaster';
 
 const PageLoadingScreen = () => (
-  <div className="min-h-screen flex items-center justify-center bg-viva-50">
+  <div className="min-h-screen flex items-center justify-center bg-coop-50">
     <div className="text-center">
-      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-viva-600 mx-auto" />
-      <p className="mt-4 text-viva-800">Carregando...</p>
+      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-coop-600 mx-auto" />
+      <p className="mt-4 text-coop-800">Carregando...</p>
     </div>
   </div>
 );
@@ -80,7 +80,7 @@ function AppRoutes() {
         path="/cadastro"
         element={
           <LoginGuard>
-            <Cadastro />
+            <CadastroCoop />
           </LoginGuard>
         }
       />

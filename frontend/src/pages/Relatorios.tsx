@@ -734,7 +734,7 @@ const Relatorios = () => {
   if (!isMaster) {
     return (
       <div className="card border-l-4 border-red-400">
-        <h2 className="text-xl font-bold text-viva-900 mb-2">Acesso restrito</h2>
+        <h2 className="text-xl font-bold text-coop-900 mb-2">Acesso restrito</h2>
         <p className="text-gray-600">Esta área de relatórios é exclusiva para o perfil Master.</p>
       </div>
     );
@@ -742,16 +742,16 @@ const Relatorios = () => {
 
   return (
     <div className="space-y-6">
-      <div className="card border-l-4 border-viva-500">
-        <h2 className="text-2xl font-bold text-viva-900 mb-1">Relatório financeiro</h2>
+      <div className="card border-l-4 border-coop-500">
+        <h2 className="text-2xl font-bold text-coop-900 mb-1">Relatório financeiro</h2>
         <p className="text-gray-600">Consolidação por médico e escala, com filtros de período.</p>
       </div>
 
       <div className="card">
-        <h3 className="text-lg font-bold text-viva-900 mb-4">Filtros</h3>
+        <h3 className="text-lg font-bold text-coop-900 mb-4">Filtros</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-4">
           <div>
-            <label htmlFor="dataInicio" className="block text-sm font-semibold text-viva-800 mb-1">
+            <label htmlFor="dataInicio" className="block text-sm font-semibold text-coop-800 mb-1">
               Data início
             </label>
             <input
@@ -764,7 +764,7 @@ const Relatorios = () => {
           </div>
 
           <div>
-            <label htmlFor="dataFim" className="block text-sm font-semibold text-viva-800 mb-1">
+            <label htmlFor="dataFim" className="block text-sm font-semibold text-coop-800 mb-1">
               Data fim
             </label>
             <input
@@ -777,7 +777,7 @@ const Relatorios = () => {
           </div>
 
           <div>
-            <label htmlFor="contratoId" className="block text-sm font-semibold text-viva-800 mb-1">
+            <label htmlFor="contratoId" className="block text-sm font-semibold text-coop-800 mb-1">
               Contrato
             </label>
             <select
@@ -800,7 +800,7 @@ const Relatorios = () => {
           </div>
 
           <div>
-            <label htmlFor="subgrupoId" className="block text-sm font-semibold text-viva-800 mb-1">
+            <label htmlFor="subgrupoId" className="block text-sm font-semibold text-coop-800 mb-1">
               Subgrupo
             </label>
             <select
@@ -829,7 +829,7 @@ const Relatorios = () => {
           </div>
 
           <div>
-            <label htmlFor="equipeId" className="block text-sm font-semibold text-viva-800 mb-1">
+            <label htmlFor="equipeId" className="block text-sm font-semibold text-coop-800 mb-1">
               Equipe
             </label>
             <select
@@ -858,28 +858,28 @@ const Relatorios = () => {
         className={`grid grid-cols-1 gap-4 ${mostrarRepasseECobranca ? 'md:grid-cols-2 xl:grid-cols-5' : 'md:grid-cols-3'}`}
       >
         <div className="card">
-          <p className="text-xs uppercase tracking-wide text-viva-600">Total de horas</p>
-          <p className="text-2xl font-bold text-viva-900 mt-1">{formatDuration(totalMinutos)}</p>
+          <p className="text-xs uppercase tracking-wide text-coop-600">Total de horas</p>
+          <p className="text-2xl font-bold text-coop-900 mt-1">{formatDuration(totalMinutos)}</p>
         </div>
         <div className="card">
-          <p className="text-xs uppercase tracking-wide text-viva-600">Total de registros</p>
-          <p className="text-2xl font-bold text-viva-900 mt-1">{totalRegistros}</p>
+          <p className="text-xs uppercase tracking-wide text-coop-600">Total de registros</p>
+          <p className="text-2xl font-bold text-coop-900 mt-1">{totalRegistros}</p>
         </div>
         <div className="card">
-          <p className="text-xs uppercase tracking-wide text-viva-600">Agrupamentos</p>
-          <p className="text-2xl font-bold text-viva-900 mt-1">{agrupado.length}</p>
+          <p className="text-xs uppercase tracking-wide text-coop-600">Agrupamentos</p>
+          <p className="text-2xl font-bold text-coop-900 mt-1">{agrupado.length}</p>
         </div>
         {mostrarRepasseECobranca && (
           <>
-            <div className="card border-l-4 border-viva-500">
-              <p className="text-xs uppercase tracking-wide text-viva-600">Total repasse</p>
-              <p className="text-2xl font-bold text-viva-900 mt-1">
+            <div className="card border-l-4 border-coop-500">
+              <p className="text-xs uppercase tracking-wide text-coop-600">Total repasse</p>
+              <p className="text-2xl font-bold text-coop-900 mt-1">
                 {totaisRepasseCobranca.repasse != null ? formatValor(totaisRepasseCobranca.repasse) : '—'}
               </p>
             </div>
-            <div className="card border-l-4 border-viva-600">
-              <p className="text-xs uppercase tracking-wide text-viva-600">Total cobrança</p>
-              <p className="text-2xl font-bold text-viva-900 mt-1">
+            <div className="card border-l-4 border-coop-600">
+              <p className="text-xs uppercase tracking-wide text-coop-600">Total cobrança</p>
+              <p className="text-2xl font-bold text-coop-900 mt-1">
                 {totaisRepasseCobranca.cobranca != null ? formatValor(totaisRepasseCobranca.cobranca) : '—'}
               </p>
             </div>
@@ -890,16 +890,16 @@ const Relatorios = () => {
       <div className="card">
         <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
           <div>
-            <h3 className="text-lg font-bold text-viva-900">Horas por médico e escala</h3>
+            <h3 className="text-lg font-bold text-coop-900">Horas por médico e escala</h3>
             <p className="text-xs text-gray-600 mt-1 max-w-3xl leading-relaxed">
               Registros já fechados usam o <strong>valor congelado no checkout</strong> (repasse). Sem congelado, o
               cálculo usa <strong>valor/h × horas</strong> (alocação médico–escala ou valores de plantão por dia).
             </p>
             {usaEscalaEPonto && (
-              <label className="mt-3 flex cursor-pointer items-center gap-2 text-sm text-viva-800">
+              <label className="mt-3 flex cursor-pointer items-center gap-2 text-sm text-coop-800">
                 <input
                   type="checkbox"
-                  className="rounded border-viva-300"
+                  className="rounded border-coop-300"
                   checked={mostrarDetalheCalculo}
                   onChange={(e) => setMostrarDetalheCalculo(e.target.checked)}
                 />
@@ -934,7 +934,7 @@ const Relatorios = () => {
           <div className="overflow-x-auto">
             <table className="min-w-full text-sm">
               <thead>
-                <tr className="text-left text-viva-700 border-b">
+                <tr className="text-left text-coop-700 border-b">
                   <th className="py-2 pr-4">Médico</th>
                   <th className="py-2 pr-4">Escala</th>
                   <th className="py-2 pr-4">Registros</th>
@@ -955,10 +955,10 @@ const Relatorios = () => {
                   return (
                     <Fragment key={item.key}>
                       <tr className="border-b last:border-b-0">
-                        <td className="py-2 pr-4 font-medium text-viva-900">{item.medicoNome}</td>
+                        <td className="py-2 pr-4 font-medium text-coop-900">{item.medicoNome}</td>
                         <td className="py-2 pr-4 text-gray-700">{item.escalaNome}</td>
                         <td className="py-2 pr-4 text-gray-700">{item.totalRegistros}</td>
-                        <td className="py-2 pr-4 font-semibold text-viva-900">{formatDuration(item.totalMinutos)}</td>
+                        <td className="py-2 pr-4 font-semibold text-coop-900">{formatDuration(item.totalMinutos)}</td>
                         {mostrarRepasseECobranca ? (
                           <>
                             <td className="py-2 pr-4 text-gray-700">
@@ -978,9 +978,9 @@ const Relatorios = () => {
                         mostrarDetalheCalculo &&
                         item.calculoPorRegistro &&
                         item.calculoPorRegistro.length > 0 && (
-                          <tr key={`${item.key}-det`} className="border-b bg-viva-50/80 last:border-b-0">
+                          <tr key={`${item.key}-det`} className="border-b bg-coop-50/80 last:border-b-0">
                             <td colSpan={colSpan} className="py-2 px-2 text-xs text-gray-700">
-                              <p className="mb-1 font-semibold text-viva-800">Como o valor desta linha foi composto</p>
+                              <p className="mb-1 font-semibold text-coop-800">Como o valor desta linha foi composto</p>
                               <ul className="list-inside list-disc space-y-1 pl-1">
                                 {item.calculoPorRegistro.map((d, i) => (
                                   <li key={`${d.registroId}-${i}`}>

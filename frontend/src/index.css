@@ -3,13 +3,13 @@
 @tailwind utilities;
 
 :root {
-  --app-bg: linear-gradient(165deg, rgba(255,255,255,0.98) 0%, rgba(255,255,255,0.95) 50%, rgba(250,252,254,0.97) 100%);
+  --app-bg: linear-gradient(165deg, rgba(239,248,247,0.98) 0%, rgba(227,244,242,0.95) 50%, rgba(255,255,255,0.97) 100%);
   --app-surface: rgba(255, 255, 255, 0.85);
-  --app-border: rgba(22, 101, 52, 0.12);
-  --app-accent: #166534;
-  --app-accent-hover: #14532d;
-  --card-shadow: 0 1px 3px rgba(8, 50, 20, 0.06);
-  --card-shadow-hover: 0 12px 28px rgba(8, 50, 20, 0.1);
+  --app-border: rgba(13, 148, 136, 0.14);
+  --app-accent: #0d9488;
+  --app-accent-hover: #115e59;
+  --card-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
+  --card-shadow-hover: 0 12px 28px rgba(15, 23, 42, 0.1);
 }
 
 @layer base {
@@ -60,16 +60,16 @@
   }
 
   .btn-secondary {
-    @apply bg-white/80 text-viva-900 border border-viva-200 hover:bg-viva-50 hover:border-viva-300;
+    @apply bg-white/80 text-coop-900 border border-coop-200 hover:bg-coop-50 hover:border-coop-300;
   }
 
   .input {
-    @apply w-full px-4 py-2.5 border border-viva-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-viva-500/40 focus:border-viva-400 bg-white/90;
+    @apply w-full px-4 py-2.5 border border-coop-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-coop-500/40 focus:border-coop-400 bg-white/90;
   }
 
   /** Controle nativo type="time" precisa de largura mínima (~8.5rem) e padding horizontal menor. */
   .input-time {
-    @apply w-full min-w-[8.75rem] max-w-[10rem] shrink-0 px-2.5 py-2 border border-viva-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-viva-500/40 focus:border-viva-400 bg-white/90 text-sm tabular-nums;
+    @apply w-full min-w-[8.75rem] max-w-[10rem] shrink-0 px-2.5 py-2 border border-coop-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-coop-500/40 focus:border-coop-400 bg-white/90 text-sm tabular-nums;
   }
 
   .card {
@@ -82,8 +82,8 @@
   }
 
   .dashboard-hero {
-    background: linear-gradient(135deg, rgba(22, 101, 52, 0.06) 0%, rgba(22, 101, 52, 0.02) 100%);
-    @apply border border-viva-200/60;
+    background: linear-gradient(135deg, rgba(13, 148, 136, 0.06) 0%, rgba(13, 148, 136, 0.02) 100%);
+    @apply border border-coop-200/60;
   }
 
   .stagger-1 { animation: fadeInUp 0.5s ease-out 0.05s forwards; opacity: 0; }
@@ -104,10 +104,10 @@
     @apply px-3 py-2 rounded-xl text-sm font-semibold transition-all duration-200;
   }
   .nav-pill-active {
-    @apply bg-viva-900 text-white shadow-sm;
+    @apply bg-coop-900 text-white shadow-sm;
   }
   .nav-pill-inactive {
-    @apply text-viva-800 hover:bg-viva-100/80;
+    @apply text-coop-800 hover:bg-coop-100/80;
   }
 
   /* Cadastro público — superfície tipo app premium (claro, vidro, tipografia contida) */

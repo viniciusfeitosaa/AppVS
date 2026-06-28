@@ -31,7 +31,7 @@ const LiveClock = ({ tickMs = 1000 }: { tickMs?: number }) => {
     return () => clearInterval(t);
   }, [tickMs]);
   return (
-    <span className="text-3xl md:text-4xl font-mono font-bold text-viva-900 tabular-nums tracking-tight" aria-live="polite">
+    <span className="text-3xl md:text-4xl font-mono font-bold text-coop-900 tabular-nums tracking-tight" aria-live="polite">
       {formatClock(now)}
     </span>
   );
@@ -338,8 +338,8 @@ const PontoEletronico = () => {
   if (!isMedico) {
     return (
       <div className="card border-l-4 border-red-400">
-        <h2 className="text-base font-bold text-viva-900 mb-2 font-display">Acesso restrito</h2>
-        <p className="text-sm text-viva-700 font-serif">Somente profissionais (perfil médico) podem registrar ponto eletrônico.</p>
+        <h2 className="text-base font-bold text-coop-900 mb-2 font-display">Acesso restrito</h2>
+        <p className="text-sm text-coop-700 font-serif">Somente profissionais (perfil médico) podem registrar ponto eletrônico.</p>
       </div>
     );
   }
@@ -348,8 +348,8 @@ const PontoEletronico = () => {
   if (modulosResp && mapModulos && mapModulos.PONTO_ELETRONICO === false) {
     return (
       <div className="card border-l-4 border-amber-500">
-        <h2 className="text-base font-bold text-viva-900 mb-2 font-display">Acesso ao módulo</h2>
-        <p className="text-sm text-viva-700 font-serif">
+        <h2 className="text-base font-bold text-coop-900 mb-2 font-display">Acesso ao módulo</h2>
+        <p className="text-sm text-coop-700 font-serif">
           O Ponto Eletrônico não está habilitado para o seu perfil neste tenant. Peça ao administrador para ativar o
           módulo ou verifique suas permissões.
         </p>
@@ -724,37 +724,37 @@ const PontoEletronico = () => {
     <div className="space-y-6">
       {/* Hero */}
       <div className="card dashboard-hero col-span-full stagger-1 py-8 md:py-10">
-        <p className="text-xs font-semibold uppercase tracking-widest text-viva-600 mb-2 font-display">
+        <p className="text-xs font-semibold uppercase tracking-widest text-coop-600 mb-2 font-display">
           Controle de jornada
         </p>
-        <h1 className="text-xl md:text-2xl font-bold text-viva-900 font-display leading-tight mb-2">
+        <h1 className="text-xl md:text-2xl font-bold text-coop-900 font-display leading-tight mb-2">
           Ponto Eletrônico
         </h1>
-        <p className="text-viva-700 font-serif text-base">
+        <p className="text-coop-700 font-serif text-base">
           Registre seu check-in e checkout atual.
         </p>
       </div>
 
       {/* Relógio + Ação */}
       <div className="card stagger-2">
-        <div className="flex items-center justify-center mb-6 py-6 rounded-2xl bg-gradient-to-br from-viva-50/80 to-viva-100/40 border border-viva-200/50">
+        <div className="flex items-center justify-center mb-6 py-6 rounded-2xl bg-gradient-to-br from-coop-50/80 to-coop-100/40 border border-coop-200/50">
           <LiveClock />
         </div>
 
-        <h3 className="text-xs font-semibold uppercase tracking-wider text-viva-600 mb-4 font-display">
+        <h3 className="text-xs font-semibold uppercase tracking-wider text-coop-600 mb-4 font-display">
           Registrar ponto
         </h3>
         {listaEscalas.length > 1 && (
           <div className="w-full max-w-sm mx-auto mb-4 text-center space-y-1">
-            <label className="block text-xs font-semibold text-viva-800 mb-1 font-display">
+            <label className="block text-xs font-semibold text-coop-800 mb-1 font-display">
               Onde está registrando o ponto
             </label>
             {escalaAutoStatus === 'loading' && !escalaIdEfetivo && (
-              <p className="text-sm text-viva-600 font-serif">A localizar a unidade mais próxima (opcional)…</p>
+              <p className="text-sm text-coop-600 font-serif">A localizar a unidade mais próxima (opcional)…</p>
             )}
             {escalaIdEfetivo &&
               (escalaAutoStatus !== 'loading' || escalaIdEfetivo !== selectedEscalaId) && (
-                <p className="input w-full text-sm py-2.5 bg-viva-50/80 text-viva-900 font-medium text-center">
+                <p className="input w-full text-sm py-2.5 bg-coop-50/80 text-coop-900 font-medium text-center">
                   {listaEscalas.find((e) => e.id === escalaIdEfetivo)?.nome ?? '—'}
                 </p>
               )}
@@ -762,27 +762,27 @@ const PontoEletronico = () => {
         )}
         <div className="flex flex-col items-center gap-3 text-center mb-6">
           {escalaIdEfetivo === PONTO_SEM_ESCALA_ESCALA_ID ? (
-            <p className="text-xs text-viva-600 font-serif">
-              <span className="font-medium text-viva-800">Ponto sem escala de plantão</span>
+            <p className="text-xs text-coop-600 font-serif">
+              <span className="font-medium text-coop-800">Ponto sem escala de plantão</span>
             </p>
           ) : plantaoHojeExibir ? (
-            <p className="text-xs text-viva-600 font-serif">
-              <span className="font-medium text-viva-800">
+            <p className="text-xs text-coop-600 font-serif">
+              <span className="font-medium text-coop-800">
                 {formatDiaPlantaoCurto(plantaoHojeExibir.data)} ·{' '}
                 {plantaoHojeExibir.faixaHorario?.trim() || '—'}
               </span>
             </p>
           ) : mostrarAvisoCalendarioSemPlantaoHoje ? (
-            <p className="text-xs text-viva-600 font-serif">
+            <p className="text-xs text-coop-600 font-serif">
               Você não tem plantão nesta escala hoje (conforme seu calendário de escalas).
             </p>
           ) : null}
           {plantaoHojeExibir ? (
-            <p className="text-xs text-viva-600">
+            <p className="text-xs text-coop-600">
               Entrada: {formatHoraCurta(plantaoHojeExibir.horaInicio)} · Saída: {formatHoraCurta(plantaoHojeExibir.horaFim)}
             </p>
           ) : (configHorario.horarioEntrada || configHorario.horarioSaida) && (
-            <p className="text-xs text-viva-600">
+            <p className="text-xs text-coop-600">
               Entrada: {configHorario.horarioEntrada ?? '—'} · Saída: {configHorario.horarioSaida ?? '—'}
             </p>
           )}
@@ -811,7 +811,7 @@ const PontoEletronico = () => {
                 Bater ponto (entrada)
               </button>
             ) : (
-              <p className="text-xs text-viva-600 font-serif">
+              <p className="text-xs text-coop-600 font-serif">
                 {loadingPainel || canCheckInPending
                   ? 'Carregando dados do ponto…'
                   : canCheckInErro
@@ -835,17 +835,17 @@ const PontoEletronico = () => {
 
       {/* Status de hoje */}
       <div className="card stagger-3">
-        <h3 className="text-xs font-semibold uppercase tracking-wider text-viva-600 mb-4 font-display">
+        <h3 className="text-xs font-semibold uppercase tracking-wider text-coop-600 mb-4 font-display">
           Status de hoje
         </h3>
         {loadingPainel ? (
-          <p className="text-xs text-viva-600 font-serif">Carregando status...</p>
+          <p className="text-xs text-coop-600 font-serif">Carregando status...</p>
         ) : (
           <>
             <div className="space-y-3 mb-4">
-              <div className="flex items-center justify-between p-4 rounded-xl bg-viva-50/60 border border-viva-200/50">
-                <p className="text-xs font-medium text-viva-700">Ponto atual</p>
-                <span className="text-xs font-bold text-viva-900">
+              <div className="flex items-center justify-between p-4 rounded-xl bg-coop-50/60 border border-coop-200/50">
+                <p className="text-xs font-medium text-coop-700">Ponto atual</p>
+                <span className="text-xs font-bold text-coop-900">
                   {registroAberto?.checkInAt
                     ? `Em aberto desde ${new Date(registroAberto.checkInAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}`
                     : registroAberto
@@ -853,9 +853,9 @@ const PontoEletronico = () => {
                       : 'Fechado'}
                 </span>
               </div>
-              <div className="flex items-center justify-between p-4 rounded-xl bg-viva-50/60 border border-viva-200/50">
-                <p className="text-xs font-medium text-viva-700">Último ponto batido</p>
-                <span className="text-xs font-bold text-viva-900">
+              <div className="flex items-center justify-between p-4 rounded-xl bg-coop-50/60 border border-coop-200/50">
+                <p className="text-xs font-medium text-coop-700">Último ponto batido</p>
+                <span className="text-xs font-bold text-coop-900">
                   {ultimoRegistroPonto?.checkInAt
                     ? (() => {
                         const d = new Date(ultimoRegistroPonto.checkInAt);
@@ -868,18 +868,18 @@ const PontoEletronico = () => {
                     : '—'}
                 </span>
               </div>
-              <div className="flex items-center justify-between p-4 rounded-xl bg-viva-50/60 border border-viva-200/50">
-                <p className="text-xs font-medium text-viva-700">Total de horas hoje</p>
-                <span className="text-xs font-bold text-viva-900">{formatDuration(totalMinutosHoje)}</span>
+              <div className="flex items-center justify-between p-4 rounded-xl bg-coop-50/60 border border-coop-200/50">
+                <p className="text-xs font-medium text-coop-700">Total de horas hoje</p>
+                <span className="text-xs font-bold text-coop-900">{formatDuration(totalMinutosHoje)}</span>
               </div>
-              <div className="flex items-center justify-between p-4 rounded-xl bg-viva-50/60 border border-viva-200/50">
-                <p className="text-xs font-medium text-viva-700">Total da semana</p>
-                <span className="text-xs font-bold text-viva-900">{formatDuration(totalMinutosSemana)}</span>
+              <div className="flex items-center justify-between p-4 rounded-xl bg-coop-50/60 border border-coop-200/50">
+                <p className="text-xs font-medium text-coop-700">Total da semana</p>
+                <span className="text-xs font-bold text-coop-900">{formatDuration(totalMinutosSemana)}</span>
               </div>
             </div>
 
             {registrosHoje.length === 0 ? (
-              <p className="text-xs text-viva-600 font-serif">Sem registros hoje.</p>
+              <p className="text-xs text-coop-600 font-serif">Sem registros hoje.</p>
             ) : (
               <div className="space-y-2">
                 {registrosHoje.map((r: any) => {
@@ -892,10 +892,10 @@ const PontoEletronico = () => {
                   return (
                     <div
                       key={r.id}
-                      className="rounded-xl bg-viva-50/50 border border-viva-200/50 px-4 py-3 hover:bg-viva-50/70 transition"
+                      className="rounded-xl bg-coop-50/50 border border-coop-200/50 px-4 py-3 hover:bg-coop-50/70 transition"
                     >
-                      <p className="font-semibold text-viva-900 font-display text-xs">{nomeEscala}</p>
-                      <p className="text-[10px] text-viva-600 mt-1">
+                      <p className="font-semibold text-coop-900 font-display text-xs">{nomeEscala}</p>
+                      <p className="text-[10px] text-coop-600 mt-1">
                         Início: {new Date(r.checkInAt).toLocaleTimeString()} · Fim:{' '}
                         {r.checkOutAt ? new Date(r.checkOutAt).toLocaleTimeString() : 'Em aberto'} · Duração:{' '}
                         {r.duracaoMinutos ? formatDuration(r.duracaoMinutos) : '-'}
@@ -911,20 +911,20 @@ const PontoEletronico = () => {
 
       {checkinModalOpen && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-viva-950/60 backdrop-blur-sm"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-coop-950/60 backdrop-blur-sm"
           role="dialog"
           aria-modal="true"
           aria-labelledby="checkin-foto-titulo"
         >
-          <div className="card max-w-md w-full shadow-2xl border border-viva-200/80 max-h-[90vh] overflow-y-auto">
-            <h2 id="checkin-foto-titulo" className="text-base font-bold text-viva-900 font-display mb-1">
+          <div className="card max-w-md w-full shadow-2xl border border-coop-200/80 max-h-[90vh] overflow-y-auto">
+            <h2 id="checkin-foto-titulo" className="text-base font-bold text-coop-900 font-display mb-1">
               Foto do rosto — check-in
             </h2>
 
             <div className="space-y-3">
               {!cameraErro ? (
                 <>
-                  <div className="rounded-xl overflow-hidden bg-viva-900 w-full max-w-[min(100%,320px)] mx-auto aspect-[3/4] flex items-center justify-center relative">
+                  <div className="rounded-xl overflow-hidden bg-coop-900 w-full max-w-[min(100%,320px)] mx-auto aspect-[3/4] flex items-center justify-center relative">
                     <video
                       ref={videoRef}
                       className="w-full h-full object-cover [transform:scaleX(-1)]"
@@ -939,13 +939,13 @@ const PontoEletronico = () => {
                       }}
                     />
                     {!videoPronto && (
-                      <span className="absolute inset-0 flex items-center justify-center bg-viva-950/40 text-xs text-white font-serif px-4 text-center">
+                      <span className="absolute inset-0 flex items-center justify-center bg-coop-950/40 text-xs text-white font-serif px-4 text-center">
                         Iniciando câmera…
                       </span>
                     )}
                   </div>
                   {videoPronto && (
-                    <p className="text-[11px] text-viva-600 font-serif text-center">
+                    <p className="text-[11px] text-coop-600 font-serif text-center">
                       Quando estiver pronto, confirme — a captura ocorre no momento do clique.
                     </p>
                   )}
@@ -955,7 +955,7 @@ const PontoEletronico = () => {
                 </>
               ) : (
                 <div className="rounded-xl border border-amber-200 bg-amber-50/90 p-4 space-y-3">
-                  <p className="text-xs text-viva-800 font-serif leading-relaxed">
+                  <p className="text-xs text-coop-800 font-serif leading-relaxed">
                     {cameraErroTipo === 'NotAllowedError' || cameraErroTipo === 'PermissionDeniedError'
                       ? 'A permissão da câmera foi negada. Em alguns navegadores o prompt não aparece novamente; habilite em Configurações do site e tente novamente.'
                       : 'Não foi possível abrir a câmera (permissão negada ou bloqueio do navegador). Ajuste a permissão no site ou use o formulário abaixo para registrar sem foto.'}
@@ -968,20 +968,20 @@ const PontoEletronico = () => {
             </div>
 
             {showSemFotoSection && (
-              <div className="mt-5 pt-4 border-t border-viva-100 border-dashed">
-                <p className="text-xs font-semibold text-viva-800 font-display mb-2">Sem câmera agora</p>
-                <p className="text-[11px] text-viva-600 font-serif mb-2">
+              <div className="mt-5 pt-4 border-t border-coop-100 border-dashed">
+                <p className="text-xs font-semibold text-coop-800 font-display mb-2">Sem câmera agora</p>
+                <p className="text-[11px] text-coop-600 font-serif mb-2">
                   Se não for possível usar a câmera (permissão persistente, dispositivo corporativo, etc.), descreva o motivo em pelo menos 15 caracteres.
                 </p>
                 <textarea
-                  className="w-full rounded-xl border border-viva-200 bg-white px-3 py-2 text-xs text-viva-900 font-serif min-h-[72px] resize-y"
+                  className="w-full rounded-xl border border-coop-200 bg-white px-3 py-2 text-xs text-coop-900 font-serif min-h-[72px] resize-y"
                   placeholder="Ex.: permissão de câmera negada no Chrome e o site não mostra o prompt de novo"
                   value={motivoSemFoto}
                   onChange={(e) => setMotivoSemFoto(e.target.value)}
                   maxLength={500}
                   rows={3}
                 />
-                <p className="text-[10px] text-viva-500 mt-1">{motivoSemFoto.trim().length}/500 · mínimo 15 caracteres</p>
+                <p className="text-[10px] text-coop-500 mt-1">{motivoSemFoto.trim().length}/500 · mínimo 15 caracteres</p>
               </div>
             )}
 
@@ -989,13 +989,13 @@ const PontoEletronico = () => {
               <p className="mt-3 p-3 rounded-xl bg-red-50 border border-red-200 text-xs text-red-700">{error}</p>
             )}
 
-            <div className="flex flex-col sm:flex-row flex-wrap gap-2 justify-end mt-6 pt-4 border-t border-viva-100">
-              <button type="button" className="btn text-sm border border-viva-300 bg-white text-viva-800" onClick={closeCheckinModal}>
+            <div className="flex flex-col sm:flex-row flex-wrap gap-2 justify-end mt-6 pt-4 border-t border-coop-100">
+              <button type="button" className="btn text-sm border border-coop-300 bg-white text-coop-800" onClick={closeCheckinModal}>
                 Cancelar
               </button>
               <button
                 type="button"
-                className="btn text-sm border border-viva-300 bg-white text-viva-800"
+                className="btn text-sm border border-coop-300 bg-white text-coop-800"
                 onClick={() => {
                   if (!showSemFotoSection) {
                     setShowSemFotoSection(true);

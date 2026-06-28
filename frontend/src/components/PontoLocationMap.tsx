@@ -73,7 +73,7 @@ export function PontoLocationMap({
 
   return (
     <div
-      className={`rounded-xl border border-viva-200 overflow-hidden bg-viva-50/40 ${className}`}
+      className={`rounded-xl border border-coop-200 overflow-hidden bg-coop-50/40 ${className}`}
       style={{ minHeight: 280 }}
     >
       <MapContainer
@@ -117,7 +117,7 @@ export function PontoLocationMap({
           </>
         ) : null}
       </MapContainer>
-      <p className="text-xs text-viva-600 px-3 py-2 border-t border-viva-200 bg-white/90">
+      <p className="text-xs text-coop-600 px-3 py-2 border-t border-coop-200 bg-white/90">
         Mapa OpenStreetMap — pesquise um endereço acima para posicionar o mapa, ou clique no mapa / arraste o marcador.
         {circleRadius != null ? ` Círculo: raio de ${circleRadius} m.` : null}
       </p>

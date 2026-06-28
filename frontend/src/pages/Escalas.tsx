@@ -1323,8 +1323,8 @@ const Escalas = () => {
   if (!isMaster) {
     return (
       <div className="card border-l-4 border-red-400 stagger-1">
-        <h2 className="text-lg font-bold text-viva-900 mb-2 font-display">Acesso restrito</h2>
-        <p className="text-sm text-viva-700 font-serif">Somente o perfil Master pode gerenciar escalas.</p>
+        <h2 className="text-lg font-bold text-coop-900 mb-2 font-display">Acesso restrito</h2>
+        <p className="text-sm text-coop-700 font-serif">Somente o perfil Master pode gerenciar escalas.</p>
       </div>
     );
   }
@@ -1635,10 +1635,10 @@ const Escalas = () => {
     return (
       <>
         <div className="flex flex-col h-full">
-        <div className="flex-1 bg-white rounded-lg border border-viva-200/80 flex flex-col overflow-hidden">
-          <div className="pb-4 border-b border-viva-200 px-4 sm:px-5 flex-shrink-0">
+        <div className="flex-1 bg-white rounded-lg border border-coop-200/80 flex flex-col overflow-hidden">
+          <div className="pb-4 border-b border-coop-200 px-4 sm:px-5 flex-shrink-0">
             <div className="flex flex-wrap items-center justify-between gap-3 my-3">
-              <p className="font-semibold text-viva-900 text-lg">Lista de grupos</p>
+              <p className="font-semibold text-coop-900 text-lg">Lista de grupos</p>
               <button
                 type="button"
                 className="btn btn-primary inline-flex items-center gap-2"
@@ -1649,7 +1649,7 @@ const Escalas = () => {
               </button>
             </div>
             <div className="min-w-0 max-w-xl">
-              <label htmlFor="filtro-grupo-contrato" className="block text-xs font-medium text-viva-600 mb-1">
+              <label htmlFor="filtro-grupo-contrato" className="block text-xs font-medium text-coop-600 mb-1">
                 Contrato
               </label>
               <select
@@ -1659,7 +1659,7 @@ const Escalas = () => {
                   setFiltroListaContratoId(e.target.value);
                   setSearchGrupos('');
                 }}
-                className="w-full py-2 px-3 text-sm border border-viva-200 rounded-lg outline-none bg-viva-50/50 focus:ring-2 focus:ring-viva-500/30 focus:border-viva-500"
+                className="w-full py-2 px-3 text-sm border border-coop-200 rounded-lg outline-none bg-coop-50/50 focus:ring-2 focus:ring-coop-500/30 focus:border-coop-500"
               >
                 <option value="">Selecione um contrato</option>
                 {contratosParaFiltroLista.map((c) => (
@@ -1675,7 +1675,7 @@ const Escalas = () => {
                   <div className="flex justify-end">
                     <button
                       type="button"
-                      className="text-sm font-medium text-viva-600 hover:text-viva-800 underline"
+                      className="text-sm font-medium text-coop-600 hover:text-coop-800 underline"
                       onClick={() => setSearchGrupos('')}
                     >
                       Limpar busca
@@ -1689,11 +1689,11 @@ const Escalas = () => {
                     placeholder="Procurar grupo"
                     value={searchGrupos}
                     onChange={(e) => setSearchGrupos(e.target.value)}
-                    className="w-full pl-10 pr-4 py-2.5 text-base border border-viva-200 rounded-lg outline-none bg-viva-50/50 focus:ring-2 focus:ring-viva-500/30 focus:border-viva-500"
+                    className="w-full pl-10 pr-4 py-2.5 text-base border border-coop-200 rounded-lg outline-none bg-coop-50/50 focus:ring-2 focus:ring-coop-500/30 focus:border-coop-500"
                   />
                   <Link
                     to="/subgrupos-equipes"
-                    className="flex-shrink-0 flex items-center justify-center w-12 h-12 rounded-lg bg-viva-100 hover:bg-viva-200 text-viva-800 transition"
+                    className="flex-shrink-0 flex items-center justify-center w-12 h-12 rounded-lg bg-coop-100 hover:bg-coop-200 text-coop-800 transition"
                     title="Criar subgrupo ou equipe"
                   >
                     <svg className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" /></svg>
@@ -1704,11 +1704,11 @@ const Escalas = () => {
           </div>
           <div className="flex-1 overflow-y-auto min-h-0">
             {!filtroListaContratoId ? (
-              <div className="p-6 text-center text-viva-700">
+              <div className="p-6 text-center text-coop-700">
                 Selecione um contrato acima para ver subgrupos e equipes vinculados a ele.
               </div>
             ) : subgruposFiltrados.length === 0 ? (
-              <div className="p-6 text-center text-viva-700">
+              <div className="p-6 text-center text-coop-700">
                 {searchGrupos.trim()
                   ? 'Nenhum subgrupo corresponde à busca. Ajuste o texto em "Procurar grupo".'
                   : 'Nenhum subgrupo com escalas neste contrato. Vincule subgrupos em Contratos ativos e ative “Usar escalas” no subgrupo em Subgrupos e Equipes.'}
@@ -1716,7 +1716,7 @@ const Escalas = () => {
             ) : (
               <>
         <div>
-                  <h2 className="sticky top-0 px-4 py-3 bg-white border-b border-viva-100 text-lg font-bold text-viva-800 shadow-sm z-10">Subgrupos</h2>
+                  <h2 className="sticky top-0 px-4 py-3 bg-white border-b border-coop-100 text-lg font-bold text-coop-800 shadow-sm z-10">Subgrupos</h2>
                   <div className="flex flex-col gap-0 p-4">
                     {subgruposFiltrados.map((s) => {
                       const countEquipes = s._count?.equipes ?? 0;
@@ -1735,12 +1735,12 @@ const Escalas = () => {
                           key={s.id}
                           type="button"
                           onClick={() => setSelectedSubgrupoId(isSelected ? '' : s.id)}
-                          className={`flex items-stretch gap-2 p-3 rounded-lg w-full transition text-left border-b border-viva-100 last:border-b-0 ${isSelected ? 'bg-viva-100 ring-2 ring-viva-500/30' : 'hover:bg-viva-50/80'}`}
+                          className={`flex items-stretch gap-2 p-3 rounded-lg w-full transition text-left border-b border-coop-100 last:border-b-0 ${isSelected ? 'bg-coop-100 ring-2 ring-coop-500/30' : 'hover:bg-coop-50/80'}`}
                         >
-                          <div className="w-1.5 rounded-md bg-viva-500 flex-shrink-0 self-stretch" />
+                          <div className="w-1.5 rounded-md bg-coop-500 flex-shrink-0 self-stretch" />
                           <div className="flex-1 min-w-0">
-                            <p className="font-bold text-viva-900 truncate">{s.nome}</p>
-                            <p className="text-sm text-viva-600">
+                            <p className="font-bold text-coop-900 truncate">{s.nome}</p>
+                            <p className="text-sm text-coop-600">
                               {countEquipes} equipe(s) · {s._count?.escalaSubgrupos ?? 0} escala(s)
                               {contratosLabel ? ` · ${contratosLabel}` : ''}
                             </p>
@@ -1753,17 +1753,17 @@ const Escalas = () => {
 
                 {selectedSubgrupoId && selectedSubgrupo && (
                   <div>
-                    <h2 className="sticky top-0 px-4 py-3 bg-white border-b border-viva-100 text-lg font-bold text-viva-800 shadow-sm z-10">
+                    <h2 className="sticky top-0 px-4 py-3 bg-white border-b border-coop-100 text-lg font-bold text-coop-800 shadow-sm z-10">
                       Escala de {selectedSubgrupo.nome}
                     </h2>
                     <div className="flex flex-col gap-0 p-4">
                       {equipesDoSubgrupoSelecionado.length === 0 ? (
                         <div className="py-6 text-center">
-                          <p className="text-viva-700 mb-3">Este subgrupo não possui equipe associada ainda.</p>
+                          <p className="text-coop-700 mb-3">Este subgrupo não possui equipe associada ainda.</p>
                           <Link
                             to="/subgrupos-equipes"
                             state={{ subgrupoId: selectedSubgrupoId }}
-                            className="text-sm font-semibold text-viva-600 hover:text-viva-800 underline"
+                            className="text-sm font-semibold text-coop-600 hover:text-coop-800 underline"
                           >
                             Ir para Subgrupos e Equipes para adicionar
         </Link>
@@ -1774,12 +1774,12 @@ const Escalas = () => {
                             key={e.id}
                             type="button"
                             onClick={() => { setSelectedEquipeId(e.id); setEquipePanelTab('calendario'); }}
-                            className="flex items-stretch gap-2 p-3 rounded-lg w-full hover:bg-viva-50/80 transition text-left border-b border-viva-100 last:border-b-0"
+                            className="flex items-stretch gap-2 p-3 rounded-lg w-full hover:bg-coop-50/80 transition text-left border-b border-coop-100 last:border-b-0"
                           >
-                            <div className="w-1.5 rounded-md bg-viva-500 flex-shrink-0 self-stretch" />
+                            <div className="w-1.5 rounded-md bg-coop-500 flex-shrink-0 self-stretch" />
                             <div className="flex-1 min-w-0">
-                              <p className="font-bold text-viva-900 truncate">{e.nome}</p>
-                              <p className="text-sm text-viva-600">{e.subgrupo?.nome ?? 'Sem subgrupo'}</p>
+                              <p className="font-bold text-coop-900 truncate">{e.nome}</p>
+                              <p className="text-sm text-coop-600">{e.subgrupo?.nome ?? 'Sem subgrupo'}</p>
                             </div>
                           </button>
                         ))
@@ -1801,29 +1801,29 @@ const Escalas = () => {
             aria-hidden="true"
           />
           <div className="fixed top-0 right-0 bottom-0 w-full max-w-md bg-white shadow-2xl z-50 flex flex-col">
-            <div className="bg-viva-600 flex-shrink-0">
+            <div className="bg-coop-600 flex-shrink-0">
               <div className="flex items-center gap-3 p-3">
                 <button
                   type="button"
                   onClick={() => setSelectedEquipeId('')}
-                  className="p-2 rounded-lg text-white hover:bg-viva-500 transition"
+                  className="p-2 rounded-lg text-white hover:bg-coop-500 transition"
                   aria-label="Fechar"
                 >
                   <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14" /><path d="M5 12l6 6" /><path d="M5 12l6 -6" /></svg>
                 </button>
                 <div className="flex-1 min-w-0">
                   <h2 className="text-white font-semibold truncate">{selectedEquipe.nome}</h2>
-                  <p className="text-viva-100 text-sm truncate">{selectedEquipe.subgrupo?.nome ?? 'Sem subgrupo'}</p>
+                  <p className="text-coop-100 text-sm truncate">{selectedEquipe.subgrupo?.nome ?? 'Sem subgrupo'}</p>
                 </div>
               </div>
             </div>
-            <div className="flex items-center overflow-x-auto border-b border-viva-200 flex-shrink-0">
+            <div className="flex items-center overflow-x-auto border-b border-coop-200 flex-shrink-0">
               {equipePanelTabs.map((tab) => (
                 <button
                   key={tab.id}
                   type="button"
                   onClick={() => setEquipePanelTab(tab.id)}
-                  className={`flex flex-col items-center flex-1 min-w-[4.5rem] py-3 text-xs transition ${equipePanelTab === tab.id ? 'bg-viva-50 text-viva-700 border-b-2 border-viva-500 font-semibold' : 'text-gray-500 hover:bg-viva-50/50 hover:text-viva-600'}`}
+                  className={`flex flex-col items-center flex-1 min-w-[4.5rem] py-3 text-xs transition ${equipePanelTab === tab.id ? 'bg-coop-50 text-coop-700 border-b-2 border-coop-500 font-semibold' : 'text-gray-500 hover:bg-coop-50/50 hover:text-coop-600'}`}
                 >
                   {tab.id === 'calendario' && <svg className="w-6 h-6 mb-1" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" /><path d="M16 2v4M8 2v4M3 10h18" /></svg>}
                   {tab.id === 'editar' && <svg className="w-6 h-6 mb-1" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>}
@@ -1841,7 +1841,7 @@ const Escalas = () => {
                 const carregandoEscalas = !!selectedEquipeId && equipeEscalasResp === undefined;
                 if (carregandoEscalas) {
                   return (
-                    <div className="flex flex-col items-center justify-center py-12 text-viva-700">
+                    <div className="flex flex-col items-center justify-center py-12 text-coop-700">
                       <p className="text-sm">Carregando...</p>
                     </div>
                   );
@@ -1852,7 +1852,7 @@ const Escalas = () => {
                       <div className="rounded-full bg-amber-100 p-4 mb-4">
                         <svg className="w-10 h-10 text-amber-600" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
                       </div>
-                      <h3 className="text-lg font-semibold text-viva-900 mb-2">Nenhuma escala vinculada</h3>
+                      <h3 className="text-lg font-semibold text-coop-900 mb-2">Nenhuma escala vinculada</h3>
                       <p className="text-sm text-gray-600 mb-4">O subgrupo desta equipe ainda não possui escala. Crie uma escala e vincule o subgrupo e a equipe para visualizar o calendário.</p>
                       <Link
                         to="/subgrupos-equipes"
@@ -1887,30 +1887,30 @@ const Escalas = () => {
                 while (cells.length < 42) cells.push(null);
                 return (
                   <div className="w-full max-w-sm mx-auto">
-                    <div className="flex flex-col w-full bg-white rounded-lg border border-viva-100 overflow-hidden">
-                      <header className="flex items-center justify-between p-4 border-b border-viva-100">
+                    <div className="flex flex-col w-full bg-white rounded-lg border border-coop-100 overflow-hidden">
+                      <header className="flex items-center justify-between p-4 border-b border-coop-100">
                         <button
                           type="button"
                           onClick={() => setCalendarViewDate((d) => new Date(d.getFullYear(), d.getMonth() - 1))}
-                          className="p-2 rounded-lg text-viva-800 hover:bg-viva-100 transition"
+                          className="p-2 rounded-lg text-coop-800 hover:bg-coop-100 transition"
                           aria-label="Mês anterior"
                         >
                           <svg stroke="currentColor" fill="currentColor" strokeWidth="0" viewBox="0 0 24 24" className="w-6 h-6"><path fill="none" d="M0 0h24v24H0V0z" /><path d="M15.41 16.59 10.83 12l4.58-4.59L14 6l-6 6 6 6 1.41-1.41z" /></svg>
                         </button>
                         <div className="flex flex-row gap-2">
-                          <span className="text-lg font-semibold text-viva-900">{monthNames[month]}</span>
+                          <span className="text-lg font-semibold text-coop-900">{monthNames[month]}</span>
                           <span className="text-lg font-semibold text-gray-400">{year}</span>
                         </div>
                         <button
                           type="button"
                           onClick={() => setCalendarViewDate((d) => new Date(d.getFullYear(), d.getMonth() + 1))}
-                          className="p-2 rounded-lg text-viva-800 hover:bg-viva-100 transition"
+                          className="p-2 rounded-lg text-coop-800 hover:bg-coop-100 transition"
                           aria-label="Próximo mês"
                         >
                           <svg stroke="currentColor" fill="currentColor" strokeWidth="0" viewBox="0 0 24 24" className="w-6 h-6"><path fill="none" d="M0 0h24v24H0V0z" /><path d="M8.59 16.59 13.17 12 8.59 7.41 10 6l6 6-6 6-1.41-1.41z" /></svg>
                         </button>
                       </header>
-                      <div className="grid grid-cols-7 px-3 text-center text-viva-700 my-2 text-sm font-medium">
+                      <div className="grid grid-cols-7 px-3 text-center text-coop-700 my-2 text-sm font-medium">
                         <span>Dom</span><span>Seg</span><span>Ter</span><span>Qua</span><span>Qui</span><span>Sex</span><span>Sáb</span>
                       </div>
                       <div className="grid grid-cols-7 gap-1.5 px-3 pb-4">
@@ -1926,7 +1926,7 @@ const Escalas = () => {
                                 onKeyDown={(e) => e.key === 'Enter' && setSelectedCalendarDay({ year, month, day })}
                                 className={`flex items-center justify-center w-full h-full rounded-lg cursor-pointer transition ${
                                   isToday(day)
-                                    ? 'bg-gray-200 border-2 border-white ring-4 ring-viva-500 font-bold text-gray-900'
+                                    ? 'bg-gray-200 border-2 border-white ring-4 ring-coop-500 font-bold text-gray-900'
                                     : isPastDay(day)
                                       ? 'bg-gray-200 opacity-50 text-gray-400 font-medium'
                                       : 'bg-gray-200 hover:bg-gray-300 font-medium text-gray-900'
@@ -1967,21 +1967,21 @@ const Escalas = () => {
                 };
                 return (
                   <div className="flex flex-col flex-1 overflow-hidden min-h-0">
-                    <p className="text-xl text-center my-2 font-display font-semibold text-viva-900">Gerenciamento de escalas</p>
-                    <div className="flex flex-row my-2 items-center border border-viva-200 rounded-xl p-3 justify-between mb-3">
+                    <p className="text-xl text-center my-2 font-display font-semibold text-coop-900">Gerenciamento de escalas</p>
+                    <div className="flex flex-row my-2 items-center border border-coop-200 rounded-xl p-3 justify-between mb-3">
                       <button
                         type="button"
                         onClick={() => setEditarEscalaYear((y) => y - 1)}
-                        className="p-2 rounded-lg text-viva-600 hover:bg-viva-100 transition-colors"
+                        className="p-2 rounded-lg text-coop-600 hover:bg-coop-100 transition-colors"
                         aria-label="Ano anterior"
                       >
                         <svg stroke="currentColor" fill="currentColor" strokeWidth="0" viewBox="0 0 448 512" className="w-5 h-5" xmlns="http://www.w3.org/2000/svg"><path d="M257.5 445.1l-22.2 22.2c-9.4 9.4-24.6 9.4-33.9 0L7 273c-9.4-9.4-9.4-24.6 0-33.9L201.4 44.7c9.4-9.4 24.6-9.4 33.9 0l22.2 22.2c9.5 9.5 9.3 25-.4 34.3L136.6 216H424c13.3 0 24 10.7 24 24v32c0 13.3-10.7 24-24 24H136.6l120.5 114.8c9.8 9.3 10 24.8.4 34.3z" /></svg>
                       </button>
-                      <span className="text-lg font-semibold text-viva-900 font-display">{editarEscalaYear}</span>
+                      <span className="text-lg font-semibold text-coop-900 font-display">{editarEscalaYear}</span>
                       <button
                         type="button"
                         onClick={() => setEditarEscalaYear((y) => y + 1)}
-                        className="p-2 rounded-lg text-viva-600 hover:bg-viva-100 transition-colors"
+                        className="p-2 rounded-lg text-coop-600 hover:bg-coop-100 transition-colors"
                         aria-label="Próximo ano"
                       >
                         <svg stroke="currentColor" fill="currentColor" strokeWidth="0" viewBox="0 0 448 512" className="w-5 h-5" xmlns="http://www.w3.org/2000/svg"><path d="M190.5 66.9l22.2-22.2c9.4-9.4 24.6-9.4 33.9 0L441 239c9.4 9.4 9.4 24.6 0 33.9L246.6 467.3c-9.4 9.4-24.6 9.4-33.9 0l-22.2-22.2c-9.5-9.5-9.3-25 .4-34.3L311.4 296H24c-13.3 0-24-10.7-24-24v-32c0-13.3 10.7-24 24-24h287.4L190.9 101.2c-9.8-9.3-10-24.8-.4-34.3z" /></svg>
@@ -2008,7 +2008,7 @@ const Escalas = () => {
                             statusColor = 'text-amber-600';
                           } else if (plantoesNoMes > 0) {
                             status = 'Publicada';
-                            statusColor = 'text-viva-600';
+                            statusColor = 'text-coop-600';
                           } else {
                             status = 'Sem plantões';
                             statusColor = 'text-gray-500';
@@ -2019,12 +2019,12 @@ const Escalas = () => {
                         return (
                           <div
                             key={month1Based}
-                            className={`flex w-full p-3 items-center border-b border-viva-100 last:border-b-0 ${isMesAtual ? 'bg-viva-100/80 ring-1 ring-viva-400/50' : ''}`}
+                            className={`flex w-full p-3 items-center border-b border-coop-100 last:border-b-0 ${isMesAtual ? 'bg-coop-100/80 ring-1 ring-coop-400/50' : ''}`}
                           >
                             <div className="flex-1 min-w-0">
-                              <p className="text-lg font-semibold text-viva-900 font-display">
+                              <p className="text-lg font-semibold text-coop-900 font-display">
                                 {monthNames[month1Based - 1]}
-                                {isMesAtual && <span className="ml-2 text-xs font-normal text-viva-600">(mês atual)</span>}
+                                {isMesAtual && <span className="ml-2 text-xs font-normal text-coop-600">(mês atual)</span>}
                               </p>
                               <p className={`text-sm ${statusColor}`}>{status}</p>
                             </div>
@@ -2080,13 +2080,13 @@ const Escalas = () => {
                 const equipeIdAlvo = selectedEquipeId!;
                 return (
                   <div className="py-2">
-                    <p className="font-medium text-viva-900 mb-3">Membros da equipe</p>
+                    <p className="font-medium text-coop-900 mb-3">Membros da equipe</p>
                     {!selectedEquipeId ? (
                       <p className="text-sm text-gray-500">Selecione uma equipe para ver os profissionais.</p>
                     ) : (
                       <>
-                        <div className="mb-4 pb-4 border-b border-viva-100">
-                          <p className="text-xs font-semibold uppercase tracking-wide text-viva-600 mb-2">Adicionar profissionais</p>
+                        <div className="mb-4 pb-4 border-b border-coop-100">
+                          <p className="text-xs font-semibold uppercase tracking-wide text-coop-600 mb-2">Adicionar profissionais</p>
                           <input
                             type="text"
                             className="input w-full py-2 text-sm mb-2"
@@ -2100,7 +2100,7 @@ const Escalas = () => {
                             <p className="text-xs text-red-600 font-medium mb-2">{membrosEquipeError}</p>
                           )}
                           {loadingMedicosMembrosEquipe && todosMedicos.length === 0 ? (
-                            <p className="text-sm text-viva-600 py-2">Carregando profissionais…</p>
+                            <p className="text-sm text-coop-600 py-2">Carregando profissionais…</p>
                           ) : medicosDisponiveis.length === 0 ? (
                             <p className="text-sm text-gray-500 py-1">
                               {todosMedicos.length === 0 && !loadingMedicosMembrosEquipe
@@ -2109,23 +2109,23 @@ const Escalas = () => {
                             </p>
                           ) : (
                             <>
-                              <ul className="max-h-44 overflow-y-auto space-y-1 rounded-lg border border-viva-200 bg-viva-50/50 p-1.5">
+                              <ul className="max-h-44 overflow-y-auto space-y-1 rounded-lg border border-coop-200 bg-coop-50/50 p-1.5">
                                 {medicosDisponiveis.map((m) => (
                                   <li
                                     key={m.id}
-                                    className="flex items-center gap-2 rounded-md px-2 py-1.5 bg-white border border-transparent hover:border-viva-100"
+                                    className="flex items-center gap-2 rounded-md px-2 py-1.5 bg-white border border-transparent hover:border-coop-100"
                                   >
                                     <input
                                       type="checkbox"
-                                      className="rounded border-viva-300 text-viva-600 focus:ring-viva-500 shrink-0"
+                                      className="rounded border-coop-300 text-coop-600 focus:ring-coop-500 shrink-0"
                                       checked={membrosEquipePickIds.includes(m.id)}
                                       onChange={() => toggleMembrosEquipePick(m.id)}
                                       disabled={membrosEquipeActionLoading}
                                       aria-label={`Selecionar ${m.nomeCompleto}`}
                                     />
                                     <div className="flex-1 min-w-0">
-                                      <p className="font-medium text-viva-900 text-sm truncate">{m.nomeCompleto}</p>
-                                      {m.crm ? <p className="text-xs text-viva-600">CRM: {m.crm}</p> : null}
+                                      <p className="font-medium text-coop-900 text-sm truncate">{m.nomeCompleto}</p>
+                                      {m.crm ? <p className="text-xs text-coop-600">CRM: {m.crm}</p> : null}
                                     </div>
                                     <button
                                       type="button"
@@ -2154,7 +2154,7 @@ const Escalas = () => {
                             </>
                           )}
                         </div>
-                        <p className="text-xs font-semibold uppercase tracking-wide text-viva-600 mb-2">Na equipe</p>
+                        <p className="text-xs font-semibold uppercase tracking-wide text-coop-600 mb-2">Na equipe</p>
                         {equipeMedicos.length === 0 ? (
                           <p className="text-sm text-gray-500">Nenhum profissional vinculado a esta equipe.</p>
                         ) : (
@@ -2181,15 +2181,15 @@ const Escalas = () => {
                                   (em: { id: string; medicoId: string; medico?: { nomeCompleto: string; crm?: string | null } }) => (
                                     <li
                                       key={em.id}
-                                      className="flex items-center justify-between gap-2 border border-viva-200 rounded-lg px-3 py-2 bg-white"
+                                      className="flex items-center justify-between gap-2 border border-coop-200 rounded-lg px-3 py-2 bg-white"
                                     >
                                       <div className="min-w-0">
-                                        <p className="font-medium text-viva-900 text-sm">{em.medico?.nomeCompleto ?? '—'}</p>
-                                        {em.medico?.crm && <p className="text-xs text-viva-600">CRM: {em.medico.crm}</p>}
+                                        <p className="font-medium text-coop-900 text-sm">{em.medico?.nomeCompleto ?? '—'}</p>
+                                        {em.medico?.crm && <p className="text-xs text-coop-600">CRM: {em.medico.crm}</p>}
                                       </div>
                                       <div className="flex items-center gap-2 shrink-0">
                                         {escalaAtualDaEquipe && alocadosIds.has(em.medicoId) && (
-                                          <span className="text-[10px] font-medium text-viva-600 bg-viva-100 px-2 py-0.5 rounded whitespace-nowrap">
+                                          <span className="text-[10px] font-medium text-coop-600 bg-coop-100 px-2 py-0.5 rounded whitespace-nowrap">
                                             Alocado na escala
                                           </span>
                                         )}
@@ -2222,14 +2222,14 @@ const Escalas = () => {
                 }
                 if (equipeEscalasResp === undefined) {
                   return (
-                    <div className="flex flex-col items-center justify-center py-12 text-viva-700">
+                    <div className="flex flex-col items-center justify-center py-12 text-coop-700">
                       <p className="text-sm">Carregando escalas da equipe…</p>
                     </div>
                   );
                 }
                 if (equipeEscalasForHistorico.length === 0) {
                   return (
-                    <div className="text-center py-8 text-viva-700 px-2">
+                    <div className="text-center py-8 text-coop-700 px-2">
                       <p className="font-medium mb-1">Histórico da escala</p>
                       <p className="text-sm">Nenhuma escala vinculada a esta equipe. Vincule uma escala para ver alocações, plantões e trocas.</p>
                     </div>
@@ -2241,7 +2241,7 @@ const Escalas = () => {
                   (loadingHistoricoDrawerMedicos || loadingHistoricoDrawerPlantoes || loadingTrocasHistorico)
                 ) {
                   return (
-                    <div className="flex flex-col items-center justify-center py-12 text-viva-700">
+                    <div className="flex flex-col items-center justify-center py-12 text-coop-700">
                       <p className="text-sm">Carregando histórico…</p>
                     </div>
                   );
@@ -2334,7 +2334,7 @@ const Escalas = () => {
 
                 if (historico.length === 0) {
                   return (
-                    <div className="text-center py-8 text-viva-700">
+                    <div className="text-center py-8 text-coop-700">
                       <p className="font-medium mb-1">Histórico da escala</p>
                       <p className="text-sm">Nenhuma atividade registrada nesta escala até o momento.</p>
                     </div>
@@ -2355,20 +2355,20 @@ const Escalas = () => {
 
                 return (
                   <div className="py-2">
-                    <p className="text-xs font-semibold uppercase tracking-wider text-viva-600 font-display mb-1">
+                    <p className="text-xs font-semibold uppercase tracking-wider text-coop-600 font-display mb-1">
                       Histórico da escala
                     </p>
                     {escalaHistoricoMeta && (
-                      <p className="text-xs text-viva-600 font-serif mb-1">
-                        Escala: <span className="font-medium text-viva-800">{escalaHistoricoMeta.nome}</span>
+                      <p className="text-xs text-coop-600 font-serif mb-1">
+                        Escala: <span className="font-medium text-coop-800">{escalaHistoricoMeta.nome}</span>
                         {equipeEscalasForHistorico.length > 1 && (
-                          <span className="block mt-1 text-viva-500">
+                          <span className="block mt-1 text-coop-500">
                             Esta equipe tem várias escalas. Ajuste a escala na tela &quot;Escalas e grades&quot; para ver outra.
                           </span>
                         )}
                       </p>
                     )}
-                    <p className="text-[11px] text-viva-500 font-serif mb-4">
+                    <p className="text-[11px] text-coop-500 font-serif mb-4">
                       Plantões listados conforme o mês da grade principal ({formatDayShort(gradeMonthStart)} –{' '}
                       {formatDayShort(gradeMonthEnd)}). Trocas incluem todo o período desta escala.
                     </p>
@@ -2378,11 +2378,11 @@ const Escalas = () => {
                         return (
                           <section key={mesKey} className="space-y-2">
                             <div className="sticky top-0 z-[1] bg-gradient-to-b from-white to-transparent pb-1 pt-0.5">
-                              <h3 className="text-sm font-semibold text-viva-800 font-display border-b border-viva-200 pb-2">
+                              <h3 className="text-sm font-semibold text-coop-800 font-display border-b border-coop-200 pb-2">
                                 {label}
                               </h3>
                               {trocasNoMes.length > 0 && (
-                                <p className="text-[11px] text-viva-600 font-serif mt-1.5">
+                                <p className="text-[11px] text-coop-600 font-serif mt-1.5">
                                   {trocasNoMes.length === 1
                                     ? '1 troca de plantão neste mês.'
                                     : `${trocasNoMes.length} trocas de plantão neste mês.`}
@@ -2393,13 +2393,13 @@ const Escalas = () => {
                               {itens.map((item) => (
                                 <li
                                   key={item.id}
-                                  className="flex items-start gap-3 rounded-xl border border-viva-200/70 bg-viva-50/40 px-3 py-2.5"
+                                  className="flex items-start gap-3 rounded-xl border border-coop-200/70 bg-coop-50/40 px-3 py-2.5"
                                 >
-                                  <span className="mt-0.5 inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-viva-200 text-viva-800 text-[10px] font-display leading-tight text-center px-0.5">
+                                  <span className="mt-0.5 inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-coop-200 text-coop-800 text-[10px] font-display leading-tight text-center px-0.5">
                                     {item.tipo === 'alocacao' ? 'AL' : item.tipo === 'plantao' ? 'PL' : 'TR'}
                                   </span>
                                   <div className="flex-1 min-w-0">
-                                    <p className="text-[11px] text-viva-600 font-serif">
+                                    <p className="text-[11px] text-coop-600 font-serif">
                                       {item.data.toLocaleString('pt-BR', {
                                         day: '2-digit',
                                         month: '2-digit',
@@ -2408,10 +2408,10 @@ const Escalas = () => {
                                         minute: '2-digit',
                                       })}
                                     </p>
-                                    <p className="text-sm font-medium text-viva-900 font-display leading-tight">
+                                    <p className="text-sm font-medium text-coop-900 font-display leading-tight">
                                       {item.titulo}
                                     </p>
-                                    <p className="text-xs text-viva-700 font-serif mt-0.5">{item.descricao}</p>
+                                    <p className="text-xs text-coop-700 font-serif mt-0.5">{item.descricao}</p>
                                   </div>
                                 </li>
                               ))}
@@ -2427,14 +2427,14 @@ const Escalas = () => {
                 const equipeEscalasList = (equipeEscalasResp?.data ?? []) as Escala[];
                 if (equipeEscalasResp === undefined) {
                   return (
-                    <div className="flex flex-col items-center justify-center py-12 text-viva-700">
+                    <div className="flex flex-col items-center justify-center py-12 text-coop-700">
                       <p className="text-sm">Carregando escalas…</p>
                     </div>
                   );
                 }
                 if (equipeEscalasList.length === 0) {
                   return (
-                    <div className="text-center py-8 text-viva-700">
+                    <div className="text-center py-8 text-coop-700">
                       <p className="font-medium mb-1">Relatório de horas</p>
                       <p className="text-sm">Nenhuma escala vinculada a esta equipe.</p>
                     </div>
@@ -2442,18 +2442,18 @@ const Escalas = () => {
                 }
                 if (loadingRegistrosEquipeRelatorio) {
                   return (
-                    <div className="flex flex-col items-center justify-center py-12 text-viva-700">
+                    <div className="flex flex-col items-center justify-center py-12 text-coop-700">
                       <p className="text-sm">Carregando registros de ponto…</p>
                     </div>
                   );
                 }
                 return (
                   <div className="space-y-5 text-left">
-                    <p className="text-xs font-semibold uppercase tracking-wider text-viva-600 font-display mb-3">
+                    <p className="text-xs font-semibold uppercase tracking-wider text-coop-600 font-display mb-3">
                       Relatório de horas
                     </p>
                     {escalasHorasPontoRelatorio.length === 0 ? (
-                      <p className="text-sm text-viva-600 rounded-xl border border-viva-200/80 bg-viva-50/40 px-3 py-2.5">
+                      <p className="text-sm text-coop-600 rounded-xl border border-coop-200/80 bg-coop-50/40 px-3 py-2.5">
                         Nenhuma escala encontrada para esta equipe.
                       </p>
                     ) : (
@@ -2461,18 +2461,18 @@ const Escalas = () => {
                         {escalasHorasPontoRelatorio.map(({ escala, linhas, encerrada }) => (
                           <li
                             key={escala.id}
-                            className="rounded-xl border border-viva-200/80 bg-white shadow-sm overflow-hidden"
+                            className="rounded-xl border border-coop-200/80 bg-white shadow-sm overflow-hidden"
                           >
-                            <div className="px-3 py-2.5 bg-viva-50/80 border-b border-viva-200/60 flex flex-wrap items-start justify-between gap-2">
+                            <div className="px-3 py-2.5 bg-coop-50/80 border-b border-coop-200/60 flex flex-wrap items-start justify-between gap-2">
                               <div className="min-w-0">
                                 {escala.contratoAtivo?.nome && (
-                                  <p className="text-[10px] font-semibold uppercase tracking-wide text-viva-500 mb-1">
+                                  <p className="text-[10px] font-semibold uppercase tracking-wide text-coop-500 mb-1">
                                     {fixMojibake(escala.contratoAtivo.nome)}
                                   </p>
                                 )}
-                                <p className="font-semibold text-viva-900 text-sm font-display">
-                                  <span className="text-viva-600 font-medium">Escala</span>
-                                  <span className="text-viva-400 mx-1.5" aria-hidden>
+                                <p className="font-semibold text-coop-900 text-sm font-display">
+                                  <span className="text-coop-600 font-medium">Escala</span>
+                                  <span className="text-coop-400 mx-1.5" aria-hidden>
                                     ·
                                   </span>
                                   {fixMojibake(escala.nome)}
@@ -2489,23 +2489,23 @@ const Escalas = () => {
                               </span>
                             </div>
                             {linhas.length === 0 ? (
-                              <p className="text-xs text-viva-600 px-3 py-3 font-serif">
+                              <p className="text-xs text-coop-600 px-3 py-3 font-serif">
                                 Nenhum registro de ponto com duração nesta escala no período (verifique se o
                                 profissional pertence a esta equipe e se o ponto foi registrado nesta escala).
                               </p>
                             ) : (
                               <table className="w-full text-sm">
                                 <thead>
-                                  <tr className="text-left text-viva-600 border-b border-viva-100">
+                                  <tr className="text-left text-coop-600 border-b border-coop-100">
                                     <th className="py-2 px-3 font-semibold">Profissional</th>
                                     <th className="py-2 px-3 font-semibold text-right">Total</th>
                                   </tr>
                                 </thead>
                                 <tbody>
                                   {linhas.map((row) => (
-                                    <tr key={row.medicoId} className="border-b border-viva-50 last:border-0">
-                                      <td className="py-2 px-3 text-viva-900">{row.nome}</td>
-                                      <td className="py-2 px-3 text-right font-semibold text-viva-700 tabular-nums">
+                                    <tr key={row.medicoId} className="border-b border-coop-50 last:border-0">
+                                      <td className="py-2 px-3 text-coop-900">{row.nome}</td>
+                                      <td className="py-2 px-3 text-right font-semibold text-coop-700 tabular-nums">
                                         {formatDuracaoMinutos(row.minutos)}
                                       </td>
                                     </tr>
@@ -2575,7 +2575,7 @@ const Escalas = () => {
                   </button>
                 </div>
                 <div className="flex items-center gap-3 p-3 my-2 flex-shrink-0 font-display">
-                  <button type="button" onClick={goPrevWeek} className="p-2 rounded-xl text-viva-600 hover:bg-viva-100 transition-colors" aria-label="Semana anterior">
+                  <button type="button" onClick={goPrevWeek} className="p-2 rounded-xl text-coop-600 hover:bg-coop-100 transition-colors" aria-label="Semana anterior">
                     <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 6l-6 6l6 6" /></svg>
                   </button>
                   <div className="flex flex-1 justify-center gap-2">
@@ -2588,8 +2588,8 @@ const Escalas = () => {
                           isPastDay(d)
                             ? 'bg-gray-300 text-gray-600 cursor-default'
                             : isSelectedDay(d)
-                              ? 'bg-viva-600 text-white border-2 border-white shadow-[0_0_0_2px] shadow-viva-500'
-                              : 'bg-viva-500 text-white/95 hover:bg-viva-600 hover:text-white'
+                              ? 'bg-coop-600 text-white border-2 border-white shadow-[0_0_0_2px] shadow-coop-500'
+                              : 'bg-coop-500 text-white/95 hover:bg-coop-600 hover:text-white'
                         }`}
                       >
                         <span className="text-[10px] font-semibold uppercase tracking-wider opacity-90">{dayNamesShort[d.getDay()]}</span>
@@ -2597,7 +2597,7 @@ const Escalas = () => {
                       </button>
                     ))}
                   </div>
-                  <button type="button" onClick={goNextWeek} className="p-2 rounded-xl text-viva-600 hover:bg-viva-100 transition-colors" aria-label="Próxima semana">
+                  <button type="button" onClick={goNextWeek} className="p-2 rounded-xl text-coop-600 hover:bg-coop-100 transition-colors" aria-label="Próxima semana">
                     <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 6l6 6l-6 6" /></svg>
                   </button>
                 </div>
@@ -2628,7 +2628,7 @@ const Escalas = () => {
                         const adicionalPercentualDia = adicionalPercentualDoDiaPorGrade.get(grade.id) ?? 0;
                         return (
                           <div key={grade.id} className="rounded-xl overflow-hidden my-2">
-                            <div className="p-4 text-white uppercase font-bold text-lg bg-viva-500 font-display flex items-center justify-between gap-3">
+                            <div className="p-4 text-white uppercase font-bold text-lg bg-coop-500 font-display flex items-center justify-between gap-3">
                               <div className="min-w-0">
                                 <div className="flex items-center gap-2 min-w-0">
                                   <p className="truncate">
@@ -2663,18 +2663,18 @@ const Escalas = () => {
                                 </button>
                               )}
                             </div>
-                            <div className="w-full flex flex-wrap gap-2 border border-viva-200 rounded-b-xl p-2 bg-white">
+                            <div className="w-full flex flex-wrap gap-2 border border-coop-200 rounded-b-xl p-2 bg-white">
                               {isMaster &&
                                 !!contratoAtivoIdContext &&
                                 plantoesDiaDateStr &&
                                 adicionalDiaOpenGradeId === grade.id && (
-                                  <div className="w-full mb-2 rounded-xl border border-viva-200 bg-viva-50/40 p-3">
-                                    <p className="text-[11px] text-viva-700 font-serif mb-2">
+                                  <div className="w-full mb-2 rounded-xl border border-coop-200 bg-coop-50/40 p-3">
+                                    <p className="text-[11px] text-coop-700 font-serif mb-2">
                                       Percentual para {plantoesDiaDateStr} ({grade.label}). Aplica sobre o valor base do turno.
                                     </p>
                                     <div className="flex flex-wrap items-end gap-2">
                                       <div className="min-w-[160px]">
-                                        <label className="block text-[10px] font-semibold uppercase tracking-wider text-viva-600 font-display mb-1">
+                                        <label className="block text-[10px] font-semibold uppercase tracking-wider text-coop-600 font-display mb-1">
                                           Percentual (%)
                                         </label>
           <input
@@ -2707,16 +2707,16 @@ const Escalas = () => {
                                   </div>
                                 )}
                               {alocados.length === 0 ? (
-                                <p className="text-sm text-viva-600 py-2 font-serif">Nenhum profissional alocado</p>
+                                <p className="text-sm text-coop-600 py-2 font-serif">Nenhum profissional alocado</p>
                               ) : (
                                 alocados.map((p) => (
                                   <div key={p.id} className="relative cursor-pointer flex flex-col items-center" title={p.medico.nomeCompleto}>
                                     <img
                                       alt={p.medico.nomeCompleto}
-                                      className="w-14 h-14 rounded-full bg-viva-100 object-cover border-2 border-viva-200"
+                                      className="w-14 h-14 rounded-full bg-coop-100 object-cover border-2 border-coop-200"
                                       src={`https://ui-avatars.com/api/?name=${encodeURIComponent(p.medico.nomeCompleto)}&background=F1F2F6&color=1C1F24&bold=true&size=256`}
                                     />
-                                    <span className="text-xs font-medium text-viva-800 mt-1 text-center line-clamp-2 max-w-[5rem]">{shortName(p.medico.nomeCompleto)}</span>
+                                    <span className="text-xs font-medium text-coop-800 mt-1 text-center line-clamp-2 max-w-[5rem]">{shortName(p.medico.nomeCompleto)}</span>
                                   </div>
                                 ))
                               )}
@@ -2741,19 +2741,19 @@ const Escalas = () => {
     <div className="space-y-6">
       {/* Hero */}
       <div className="card dashboard-hero col-span-full stagger-1 py-8 md:py-10">
-        <p className="text-xs font-semibold uppercase tracking-widest text-viva-600 mb-2 font-display">
+        <p className="text-xs font-semibold uppercase tracking-widest text-coop-600 mb-2 font-display">
           Área Master
         </p>
-        <h1 className="text-xl md:text-2xl font-bold text-viva-900 font-display leading-tight mb-2">
+        <h1 className="text-xl md:text-2xl font-bold text-coop-900 font-display leading-tight mb-2">
           Escalas
         </h1>
-        <p className="text-viva-700 font-serif text-base">
+        <p className="text-coop-700 font-serif text-base">
           Cadastre escalas, associe contratos ativos e aloque médicos na grade semanal.
         </p>
       </div>
 
-      <div className="card border-l-4 border-l-viva-500 stagger-2 flex flex-wrap items-center justify-between gap-4 bg-gradient-to-r from-viva-50/60 to-transparent">
-        <p className="text-viva-900 font-medium text-sm font-display">
+      <div className="card border-l-4 border-l-coop-500 stagger-2 flex flex-wrap items-center justify-between gap-4 bg-gradient-to-r from-coop-50/60 to-transparent">
+        <p className="text-coop-900 font-medium text-sm font-display">
           Subgrupos e equipes definem a estrutura dos plantões e valores.
         </p>
         <div className="flex flex-wrap items-center gap-2">
@@ -2778,12 +2778,12 @@ const Escalas = () => {
           </div>
       </div>
 
-      <main className="min-h-[calc(100vh-12rem)] flex flex-col p-5 bg-viva-100/30 flex-1 overflow-hidden">
-        <div className="flex-1 bg-white rounded-xl overflow-hidden flex flex-col shadow-sm border border-viva-200/60">
+      <main className="min-h-[calc(100vh-12rem)] flex flex-col p-5 bg-coop-100/30 flex-1 overflow-hidden">
+        <div className="flex-1 bg-white rounded-xl overflow-hidden flex flex-col shadow-sm border border-coop-200/60">
           {!selectedEscalaId ? (
             <>
-              <div className="flex items-center justify-between gap-4 p-4 border-b border-viva-200/80 flex-wrap">
-                <h3 className="text-sm font-semibold uppercase tracking-wider text-viva-600 font-display">Escalas</h3>
+              <div className="flex items-center justify-between gap-4 p-4 border-b border-coop-200/80 flex-wrap">
+                <h3 className="text-sm font-semibold uppercase tracking-wider text-coop-600 font-display">Escalas</h3>
                 <div className="flex items-center gap-3 flex-wrap">
                   <select
                     className="input max-w-xs"
@@ -2802,23 +2802,23 @@ const Escalas = () => {
               </div>
               <div className="overflow-y-auto flex-1 p-4">
         {loadingEscalas ? (
-                  <p className="text-sm text-viva-700 font-serif">Carregando escalas...</p>
+                  <p className="text-sm text-coop-700 font-serif">Carregando escalas...</p>
         ) : escalas.length === 0 ? (
-                  <p className="text-sm text-viva-700 font-serif">Nenhuma escala cadastrada. Clique em &quot;Nova escala&quot; para criar.</p>
+                  <p className="text-sm text-coop-700 font-serif">Nenhuma escala cadastrada. Clique em &quot;Nova escala&quot; para criar.</p>
         ) : (
           <div className="space-y-2">
             {escalas.map((escala) => (
               <div
                 key={escala.id}
-                        className="border rounded-xl p-3 transition border-viva-200/80 bg-viva-50/30 hover:bg-viva-50/50 flex flex-wrap items-center justify-between gap-2"
+                        className="border rounded-xl p-3 transition border-coop-200/80 bg-coop-50/30 hover:bg-coop-50/50 flex flex-wrap items-center justify-between gap-2"
               >
                   <button
                           type="button"
                           className="text-left min-w-0 flex-1"
                           onClick={() => setSelectedEscalaId(escala.id)}
                         >
-                          <p className="font-semibold text-viva-900 text-sm font-display">{escala.nome}</p>
-                          <p className="text-[10px] text-viva-600 mt-0.5 font-serif">
+                          <p className="font-semibold text-coop-900 text-sm font-display">{escala.nome}</p>
+                          <p className="text-[10px] text-coop-600 mt-0.5 font-serif">
                             {escala.contratoAtivo?.nome || '-'} · {toDateInput(escala.dataInicio)} até {toDateInput(escala.dataFim)} · Alocados: {escala._count?.alocacoes ?? 0}
                     </p>
                   </button>
@@ -2834,7 +2834,7 @@ const Escalas = () => {
             </>
           ) : (
             <>
-              <div className="flex items-center p-4 justify-between shrink-0 bg-viva-600 text-white" style={{ background: 'rgb(37, 111, 255)' }}>
+              <div className="flex items-center p-4 justify-between shrink-0 bg-coop-600 text-white" style={{ background: 'rgb(37, 111, 255)' }}>
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
@@ -2867,7 +2867,7 @@ const Escalas = () => {
               </div>
               <div
                 className={`overflow-hidden p-3 flex-1 flex min-h-0 transition-colors ${
-                  gradeSomenteLeitura ? 'bg-gradient-to-b from-viva-100/35 via-white to-viva-50/20' : ''
+                  gradeSomenteLeitura ? 'bg-gradient-to-b from-coop-100/35 via-white to-coop-50/20' : ''
                 }`}
               >
                 <div className="relative flex-1 flex flex-col overflow-y-auto overflow-x-auto min-w-0">
@@ -2878,17 +2878,17 @@ const Escalas = () => {
                   >
                     <thead className="sticky top-0 z-10 bg-white">
                       <tr>
-                        <th className="text-center border border-viva-200 p-1.5 font-semibold text-viva-800 font-display w-0 whitespace-nowrap">Nome</th>
-                        <th className="text-center border border-viva-200 p-1.5 font-semibold text-viva-800 font-display w-0 whitespace-nowrap">Turno</th>
+                        <th className="text-center border border-coop-200 p-1.5 font-semibold text-coop-800 font-display w-0 whitespace-nowrap">Nome</th>
+                        <th className="text-center border border-coop-200 p-1.5 font-semibold text-coop-800 font-display w-0 whitespace-nowrap">Turno</th>
                         {Array.from({ length: gradeMonthEnd.getDate() }, (_, i) => i + 1).map((day) => {
                           const d = new Date(gradeMonthStart.getFullYear(), gradeMonthStart.getMonth(), day);
                           const isWeekend = d.getDay() === 0 || d.getDay() === 6;
                           const dayLetters = ['D', 'S', 'T', 'Q', 'Q', 'S', 'S'];
                           return (
-                            <th key={day} className={`text-center border p-1 min-w-[32px] ${isWeekend ? 'bg-viva-200/60 border-viva-300' : 'border-viva-200'}`}>
+                            <th key={day} className={`text-center border p-1 min-w-[32px] ${isWeekend ? 'bg-coop-200/60 border-coop-300' : 'border-coop-200'}`}>
                               <div className="flex flex-col">
                                 <span>{dayLetters[d.getDay()]}</span>
-                                <span className="w-full h-px bg-viva-200" />
+                                <span className="w-full h-px bg-coop-200" />
                                 <span>{day}</span>
                               </div>
                             </th>
@@ -2931,14 +2931,14 @@ const Escalas = () => {
                             <tr key={`${rowGroupIndex}-${gradeSubIndex}`} className={gradeSubIndex === gradesForGrid.length - 1 ? 'tr-last' : ''}>
                               {gradeSubIndex === 0 ? (
                                 <td
-                                  className={`border border-viva-200 p-1.5 align-top ${row.medicoId === '' ? 'bg-viva-50/40' : 'bg-white'}`}
+                                  className={`border border-coop-200 p-1.5 align-top ${row.medicoId === '' ? 'bg-coop-50/40' : 'bg-white'}`}
                                   rowSpan={gradesForGrid.length}
                                 >
-                                  <p className="font-medium text-viva-900 text-xs">{row.label}</p>
-                                  <div className="text-[10px] text-viva-600">0h</div>
+                                  <p className="font-medium text-coop-900 text-xs">{row.label}</p>
+                                  <div className="text-[10px] text-coop-600">0h</div>
                                 </td>
                               ) : null}
-                              <td className="text-center border border-viva-200 p-1 text-viva-700 text-xs whitespace-nowrap">
+                              <td className="text-center border border-coop-200 p-1 text-coop-700 text-xs whitespace-nowrap">
                                 <span className="font-medium">{grade.label}</span> - {grade.regua[0]} até {grade.regua[1]}
                               </td>
                               {Array.from({ length: gradeMonthEnd.getDate() }, (_, i) => i + 1).map((day) => {
@@ -2956,7 +2956,7 @@ const Escalas = () => {
                                   <td
                                     key={day}
                                     title={gradeSomenteLeitura ? 'Somente leitura — use Editar escala abaixo' : undefined}
-                                    className={`border p-0 min-w-[32px] ${gradeSomenteLeitura ? 'cursor-default' : 'cursor-pointer'} ${isWeekend ? 'bg-viva-200/40 border-viva-300' : 'border-viva-200'}`}
+                                    className={`border p-0 min-w-[32px] ${gradeSomenteLeitura ? 'cursor-default' : 'cursor-pointer'} ${isWeekend ? 'bg-coop-200/40 border-coop-300' : 'border-coop-200'}`}
                                     onClick={async () => {
                                       if (gradeSomenteLeitura) return;
                                       // Plantão Vago: abre modal para definir vagas
@@ -3017,11 +3017,11 @@ const Escalas = () => {
                                       }
                                     }}
                                   >
-                                    <div className="flex items-center justify-center min-h-[40px] text-[11px] text-viva-800">
+                                    <div className="flex items-center justify-center min-h-[40px] text-[11px] text-coop-800">
                                       {row.medicoId === '' ? (
                                         vagas > 0 ? (
                                           <div
-                                            className="w-[26px] h-[26px] rounded-full overflow-hidden border-2 border-viva-600 bg-[#F1F2F6] text-viva-900 shadow-sm flex items-center justify-center text-[11px] font-semibold"
+                                            className="w-[26px] h-[26px] rounded-full overflow-hidden border-2 border-coop-600 bg-[#F1F2F6] text-coop-900 shadow-sm flex items-center justify-center text-[11px] font-semibold"
                                             title={`${vagas} vaga${vagas > 1 ? 's' : ''} em aberto`}
                                           >
                                             {vagas}
@@ -3030,12 +3030,12 @@ const Escalas = () => {
                                           ''
                                         )
                                       ) : pendingPlantaoKey === key && !cell ? (
-                                        <span className="inline-flex h-6 w-6 items-center justify-center rounded-full border-2 border-viva-500/70">
-                                          <span className="h-3 w-3 border-2 border-viva-500 border-t-transparent rounded-full animate-spin" />
+                                        <span className="inline-flex h-6 w-6 items-center justify-center rounded-full border-2 border-coop-500/70">
+                                          <span className="h-3 w-3 border-2 border-coop-500 border-t-transparent rounded-full animate-spin" />
                                         </span>
                                       ) : showInCell && cell?.medico ? (
                                         <div
-                                          className="w-[30px] laptop:w-[24px] aspect-square rounded-full overflow-hidden border-2 border-viva-600 shadow-sm"
+                                          className="w-[30px] laptop:w-[24px] aspect-square rounded-full overflow-hidden border-2 border-coop-600 shadow-sm"
                                           title={cell.medico.nomeCompleto}
                                         >
                                           <img
@@ -3065,9 +3065,9 @@ const Escalas = () => {
                       role="status"
                       aria-live="polite"
                     >
-                      <div className="flex items-center gap-2.5 rounded-2xl border border-viva-300/70 bg-white/95 px-4 py-2.5 shadow-lg ring-1 ring-black/[0.04] backdrop-blur-sm">
+                      <div className="flex items-center gap-2.5 rounded-2xl border border-coop-300/70 bg-white/95 px-4 py-2.5 shadow-lg ring-1 ring-black/[0.04] backdrop-blur-sm">
                         <span
-                          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-viva-600/10 text-viva-800"
+                          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-coop-600/10 text-coop-800"
                           aria-hidden
                         >
                           <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
@@ -3078,13 +3078,13 @@ const Escalas = () => {
                             />
                           </svg>
                         </span>
-                        <span className="font-semibold font-display text-sm text-viva-900">Escala publicada</span>
+                        <span className="font-semibold font-display text-sm text-coop-900">Escala publicada</span>
                       </div>
                     </div>
                   )}
                 </div>
               </div>
-              <div className="flex justify-between gap-2 border-t border-viva-200 p-3 items-center flex-wrap shrink-0">
+              <div className="flex justify-between gap-2 border-t border-coop-200 p-3 items-center flex-wrap shrink-0">
                 <div className="flex-1 min-w-[200px] max-w-md">
                   <input
                     type="text"
@@ -3097,7 +3097,7 @@ const Escalas = () => {
                   />
                 </div>
                 <div className="flex flex-col items-end gap-1 min-w-0">
-                  <p className={`text-sm whitespace-nowrap font-medium ${!selectedEscala ? 'text-gray-500' : selectedEscala.ativo ? 'text-viva-600' : 'text-amber-600'}`}>
+                  <p className={`text-sm whitespace-nowrap font-medium ${!selectedEscala ? 'text-gray-500' : selectedEscala.ativo ? 'text-coop-600' : 'text-amber-600'}`}>
                     {!selectedEscala
                       ? 'Sem escala'
                       : selectedEscala.ativo
@@ -3185,7 +3185,7 @@ const Escalas = () => {
       {escalaFormModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" onClick={() => resetForm()}>
           <div className="bg-white rounded-xl shadow-xl max-w-lg w-full p-6" onClick={(e) => e.stopPropagation()}>
-            <h3 className="text-xs font-semibold uppercase tracking-wider text-viva-600 mb-4 font-display">{editingEscalaId ? 'Editar escala' : 'Nova escala'}</h3>
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-coop-600 mb-4 font-display">{editingEscalaId ? 'Editar escala' : 'Nova escala'}</h3>
             <form className="grid grid-cols-1 md:grid-cols-2 gap-4" onSubmit={submitEscala}>
               <select className="input" value={form.contratoAtivoId} onChange={(e) => setForm((prev) => ({ ...prev, contratoAtivoId: e.target.value }))}>
                 <option value="">Selecione um contrato ativo</option>
@@ -3193,7 +3193,7 @@ const Escalas = () => {
               </select>
               <input className="input" placeholder="Nome da escala" value={form.nome} onChange={(e) => setForm((prev) => ({ ...prev, nome: e.target.value }))} />
               <textarea className="input md:col-span-2 min-h-[90px]" placeholder="Descrição (opcional)" value={form.descricao} onChange={(e) => setForm((prev) => ({ ...prev, descricao: e.target.value }))} />
-              <label className="flex items-center gap-2 text-xs font-medium text-viva-900 font-display">
+              <label className="flex items-center gap-2 text-xs font-medium text-coop-900 font-display">
                 <input type="checkbox" checked={form.ativo} onChange={(e) => setForm((prev) => ({ ...prev, ativo: e.target.checked }))} />
                 Escala ativa
               </label>
@@ -3217,13 +3217,13 @@ const Escalas = () => {
           }}
         >
           <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6" onClick={(e) => e.stopPropagation()}>
-            <h3 className="text-xs font-semibold uppercase tracking-wider text-viva-600 mb-2 font-display">
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-coop-600 mb-2 font-display">
               Replicar plantões para outro mês
             </h3>
-            <p className="text-sm text-viva-800 mb-4">
+            <p className="text-sm text-coop-800 mb-4">
               Os plantões do mês visível na grade ({formatMesAnoFromYM(mesOrigemGradeYM)}) serão copiados para o mesmo dia do mês de destino (ajustado ao último dia do mês, se necessário).
             </p>
-            <label className="block text-xs font-medium text-viva-900 mb-1.5">Mês de destino</label>
+            <label className="block text-xs font-medium text-coop-900 mb-1.5">Mês de destino</label>
             <input
               type="month"
               className="input w-full max-w-xs"
@@ -3266,7 +3266,7 @@ const Escalas = () => {
 
       {selectedEscalaId && (
         <div className="card stagger-5 hidden">
-          <h3 className="text-xs font-semibold uppercase tracking-wider text-viva-600 mb-4 font-display">Alocação de médicos na escala</h3>
+          <h3 className="text-xs font-semibold uppercase tracking-wider text-coop-600 mb-4 font-display">Alocação de médicos na escala</h3>
           <div className="flex gap-2 mb-4 flex-wrap items-start">
             <div ref={medicoAllocateRef} className="relative flex-1 min-w-[240px] max-w-md">
               <input
@@ -3293,22 +3293,22 @@ const Escalas = () => {
                 onFocus={() => setMedicoAllocateOpen(true)}
               />
               {medicoAllocateOpen && (
-                <ul className="absolute z-10 mt-1 w-full max-h-56 overflow-auto rounded-lg border border-viva-200 bg-white shadow-lg py-1">
+                <ul className="absolute z-10 mt-1 w-full max-h-56 overflow-auto rounded-lg border border-coop-200 bg-white shadow-lg py-1">
                   {(() => {
                     const allocatedIds = new Set(alocacoes.map((a) => a.medicoId));
                     const filtered = medicos.filter((m) => !allocatedIds.has(m.id));
                     if (loadingMedicosSuggest && filtered.length === 0) {
                       return (
-                        <li className="px-3 py-2 text-sm text-viva-600 font-serif">Buscando médicos...</li>
+                        <li className="px-3 py-2 text-sm text-coop-600 font-serif">Buscando médicos...</li>
                       );
                     }
                     return filtered.length === 0 ? (
-                      <li className="px-3 py-2 text-sm text-viva-600 font-serif">Nenhum médico encontrado</li>
+                      <li className="px-3 py-2 text-sm text-coop-600 font-serif">Nenhum médico encontrado</li>
                     ) : (
                       filtered.map((m) => (
                         <li
                           key={m.id}
-                          className="px-3 py-2 text-sm cursor-pointer hover:bg-viva-100 text-viva-900"
+                          className="px-3 py-2 text-sm cursor-pointer hover:bg-coop-100 text-coop-900"
                           onClick={() => {
                             rememberMedicoLabel(m);
                             setMedicoIdToAllocate(m.id);
@@ -3330,14 +3330,14 @@ const Escalas = () => {
           </div>
 
           {alocacoes.length === 0 ? (
-            <p className="text-sm text-viva-700 font-serif">Nenhum médico alocado.</p>
+            <p className="text-sm text-coop-700 font-serif">Nenhum médico alocado.</p>
           ) : (
             <div className="space-y-2">
               {alocacoes.map((a) => (
-                <div key={a.id} className="border border-viva-200 rounded-lg px-3 py-2 flex items-center justify-between">
+                <div key={a.id} className="border border-coop-200 rounded-lg px-3 py-2 flex items-center justify-between">
                   <div>
-                    <p className="font-medium text-viva-900">{a.medico.nomeCompleto}</p>
-                    <p className="text-[10px] text-viva-600 font-serif">
+                    <p className="font-medium text-coop-900">{a.medico.nomeCompleto}</p>
+                    <p className="text-[10px] text-coop-600 font-serif">
                       {a.medico.crm} | {a.medico.email || '-'}
                     </p>
                   </div>
@@ -3363,21 +3363,21 @@ const Escalas = () => {
             {cellModal.isPlantaoVagoRow ? (
               /* Modal Plantão Vago: divulgar quantidade de vagas */
               <div className="relative flex flex-col items-center p-6">
-                <h2 className="text-lg font-bold text-viva-900 font-display">Plantão Vago</h2>
+                <h2 className="text-lg font-bold text-coop-900 font-display">Plantão Vago</h2>
               <button
                 type="button"
-                  className="absolute top-4 right-4 p-1 rounded-lg hover:bg-viva-100 text-viva-600"
+                  className="absolute top-4 right-4 p-1 rounded-lg hover:bg-coop-100 text-coop-600"
                   onClick={() => setCellModal((m) => ({ ...m, open: false }))}
                   aria-label="Fechar"
               >
                   <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6L6 18M6 6l12 12" /></svg>
               </button>
-                <span className="inline-flex h-16 w-16 items-center justify-center rounded-full bg-viva-500 text-white mt-2">
+                <span className="inline-flex h-16 w-16 items-center justify-center rounded-full bg-coop-500 text-white mt-2">
                   <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="currentColor" strokeWidth="0"><path d="M8.243 7.34l-6.38 .925l-.113 .023a1 1 0 0 0 -.44 1.684l4.622 4.499l-1.09 6.355l-.013 .11a1 1 0 0 0 1.464 .944l5.706 -3l5.693 3l.1 .046a1 1 0 0 0 1.352 -1.1l-1.091 -6.355l4.624 -4.5l.078 -.085a1 1 0 0 0 -.633 -1.62l-6.38 -.926l-2.852 -5.78a1 1 0 0 0 -1.794 0l-2.853 5.78z" /></svg>
                         </span>
-                <p className="text-xs text-viva-600 mt-2">{cellModal.grade?.label} – {cellModal.date && formatDayShort(cellModal.date)}</p>
+                <p className="text-xs text-coop-600 mt-2">{cellModal.grade?.label} – {cellModal.date && formatDayShort(cellModal.date)}</p>
                 <div className="w-full mt-4">
-                  <label className="block text-sm font-medium text-viva-800 mb-1">Quantidade de vagas</label>
+                  <label className="block text-sm font-medium text-coop-800 mb-1">Quantidade de vagas</label>
                   <select
                     className="input w-full cursor-pointer"
                     value={plantaoVagoVagas}
@@ -3410,23 +3410,23 @@ const Escalas = () => {
                           ) : (
               <>
             {/* Header: turno com destaque */}
-            <div className="flex items-start justify-between gap-3 px-5 pt-5 pb-4 border-b border-viva-200/80 bg-gradient-to-br from-viva-50/80 to-white">
+            <div className="flex items-start justify-between gap-3 px-5 pt-5 pb-4 border-b border-coop-200/80 bg-gradient-to-br from-coop-50/80 to-white">
               <div className="flex items-center gap-3 min-w-0">
-                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-viva-500 text-white shadow-sm">
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-coop-500 text-white shadow-sm">
                   <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 20 20" aria-hidden><path d="M10 12a2 2 0 100-4 2 2 0 000 4z" /><path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z" clipRule="evenodd" /></svg>
                 </span>
                 <div className="min-w-0">
-                  <h2 className="text-base font-bold text-viva-900 font-display tracking-tight">
+                  <h2 className="text-base font-bold text-coop-900 font-display tracking-tight">
                     {cellModal.grade.label} · {cellModal.grade.tipo}
                   </h2>
-                  <p className="text-[11px] text-viva-600 font-medium mt-0.5">
+                  <p className="text-[11px] text-coop-600 font-medium mt-0.5">
                     {cellModal.grade.regua?.join(' – ')}
                   </p>
                         </div>
                   </div>
               <button
                 type="button"
-                className="p-2 rounded-xl hover:bg-viva-200/80 text-viva-600 transition-colors shrink-0"
+                className="p-2 rounded-xl hover:bg-coop-200/80 text-coop-600 transition-colors shrink-0"
                 onClick={() => setCellModal((m) => ({ ...m, open: false }))}
                 aria-label="Fechar"
               >
@@ -3435,24 +3435,24 @@ const Escalas = () => {
             </div>
 
             {/* Data e valor: chip destacado */}
-            <div className="px-5 py-4 border-b border-viva-100">
-              <div className="flex items-center gap-2 text-viva-700">
-                <svg className="h-4 w-4 text-viva-500 shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clipRule="evenodd" /></svg>
+            <div className="px-5 py-4 border-b border-coop-100">
+              <div className="flex items-center gap-2 text-coop-700">
+                <svg className="h-4 w-4 text-coop-500 shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clipRule="evenodd" /></svg>
                 <span className="font-medium font-display text-sm">
                   {formatDayShort(cellModal.date)} · {formatDayName(cellModal.date)}
               </span>
-                <span className="text-viva-400">·</span>
-                <span className="text-sm font-serif text-viva-700">{cellModal.grade.horario}</span>
+                <span className="text-coop-400">·</span>
+                <span className="text-sm font-serif text-coop-700">{cellModal.grade.horario}</span>
               </div>
               {(valorBaseModal != null || adicionalPercentualModal != null || valorFinalModal != null || plantaoSlotValor != null || alocacaoParaValor?.valorHora != null) && (
-                <div className="mt-2 text-xs text-viva-700 font-display space-y-1">
+                <div className="mt-2 text-xs text-coop-700 font-display space-y-1">
                   {valorBaseModal != null && (
                     <p className="font-semibold">
                       Valor base: {formatValorHora(valorBaseModal)}
                     </p>
                   )}
                   {valorBaseModal != null && adicionalPercentualModal != null && adicionalPercentualModal !== 0 && (
-                    <p className="font-semibold text-viva-800">
+                    <p className="font-semibold text-coop-800">
                       Adicional ({formatDayShort(cellModal.date)}): +{adicionalPercentualModal}%
                     </p>
                   )}
@@ -3461,7 +3461,7 @@ const Escalas = () => {
                       Valor gravado: {formatValorHora(plantaoSlotValor)}
                     </p>
                   ) : valorFinalModal != null ? (
-                    <p className="font-bold text-viva-900">
+                    <p className="font-bold text-coop-900">
                       Valor final: {formatValorHora(valorFinalModal)}
                     </p>
                   ) : alocacaoParaValor?.valorHora != null ? (
@@ -3476,15 +3476,15 @@ const Escalas = () => {
             {/* Conteúdo rolável */}
             <div className="px-5 py-5 overflow-y-auto flex-1">
               {cellModal.medico ? (
-                <div className="rounded-2xl border border-viva-200 bg-gradient-to-br from-white to-viva-50/30 p-4 mb-5">
-                  <p className="font-semibold text-viva-900 font-display">{cellModal.medico.nomeCompleto}</p>
-                  <p className="text-xs text-viva-600 mt-0.5">CRM: {cellModal.medico.crm}</p>
+                <div className="rounded-2xl border border-coop-200 bg-gradient-to-br from-white to-coop-50/30 p-4 mb-5">
+                  <p className="font-semibold text-coop-900 font-display">{cellModal.medico.nomeCompleto}</p>
+                  <p className="text-xs text-coop-600 mt-0.5">CRM: {cellModal.medico.crm}</p>
                   {(cellModal.medico.telefone || cellModal.medico.email) && (
-                    <p className="text-xs text-viva-600 mt-0.5">{cellModal.medico.telefone || cellModal.medico.email}</p>
+                    <p className="text-xs text-coop-600 mt-0.5">{cellModal.medico.telefone || cellModal.medico.email}</p>
                   )}
-                  <p className="text-[10px] text-viva-500 mt-2 font-serif">{cellModal.grade.horario}</p>
+                  <p className="text-[10px] text-coop-500 mt-2 font-serif">{cellModal.grade.horario}</p>
                   {(plantaoSlotValor != null || valorFinalModal != null || valorBaseModal != null || alocacaoParaValor?.valorHora != null) && (
-                    <p className="text-xs font-medium text-viva-700 mt-1">
+                    <p className="text-xs font-medium text-coop-700 mt-1">
                       Valor: {formatValorHora(plantaoSlotValor ?? valorFinalModal ?? valorBaseModal ?? alocacaoParaValor?.valorHora)}
                     </p>
                   )}
@@ -3500,22 +3500,22 @@ const Escalas = () => {
                   )}
                 </div>
               ) : (
-                <p className="text-sm text-viva-700 font-serif mb-5 rounded-xl bg-viva-50/50 border border-viva-200/60 px-3 py-2.5">
+                <p className="text-sm text-coop-700 font-serif mb-5 rounded-xl bg-coop-50/50 border border-coop-200/60 px-3 py-2.5">
                   Sem profissional atribuído a este plantão.
                 </p>
               )}
 
               {isMaster && selectedEscala?.contratoAtivoId && cellModal.date && cellModal.grade && (
-                <div className="rounded-2xl border border-viva-200 bg-white p-4 mb-5">
-                  <p className="text-xs font-semibold uppercase tracking-wider text-viva-700 font-display mb-2">
+                <div className="rounded-2xl border border-coop-200 bg-white p-4 mb-5">
+                  <p className="text-xs font-semibold uppercase tracking-wider text-coop-700 font-display mb-2">
                     Adicional por data (contrato)
                   </p>
-                  <p className="text-[11px] text-viva-600 font-serif mb-3">
+                  <p className="text-[11px] text-coop-600 font-serif mb-3">
                     Define um percentual para este dia e turno. O valor final do plantão será calculado como \(valor\\_base \\times (1 + percentual/100)\).
                   </p>
                   <div className="flex flex-wrap items-end gap-3">
                     <div className="min-w-[160px]">
-                      <label className="block text-[10px] font-semibold uppercase tracking-wider text-viva-600 font-display mb-1">
+                      <label className="block text-[10px] font-semibold uppercase tracking-wider text-coop-600 font-display mb-1">
                         Percentual (%)
                       </label>
                       <input
@@ -3549,8 +3549,8 @@ const Escalas = () => {
               )}
 
               {/* CTA: Atribuir médico (destaque visual) */}
-              <div className="rounded-2xl border-l-4 border-l-viva-500 bg-gradient-to-r from-viva-50/60 to-transparent p-4 mb-5">
-                <h3 className="text-xs font-semibold uppercase tracking-wider text-viva-700 font-display mb-3">
+              <div className="rounded-2xl border-l-4 border-l-coop-500 bg-gradient-to-r from-coop-50/60 to-transparent p-4 mb-5">
+                <h3 className="text-xs font-semibold uppercase tracking-wider text-coop-700 font-display mb-3">
                   Atribuir médico a este plantão
                 </h3>
                 <div className="flex gap-2 flex-wrap items-end">
@@ -3583,16 +3583,16 @@ const Escalas = () => {
                       onFocus={() => setMedicoAllocateCellOpen(true)}
                     />
                     {medicoAllocateCellOpen && (
-                      <ul className="absolute z-10 mt-1 w-full max-h-64 overflow-y-auto rounded-xl border border-viva-200 bg-white shadow-lg py-1">
+                      <ul className="absolute z-10 mt-1 w-full max-h-64 overflow-y-auto rounded-xl border border-coop-200 bg-white shadow-lg py-1">
                         {loadingMedicosSuggest && medicos.length === 0 ? (
-                          <li className="px-3 py-2 text-sm text-viva-600 font-serif">Buscando médicos...</li>
+                          <li className="px-3 py-2 text-sm text-coop-600 font-serif">Buscando médicos...</li>
                         ) : medicos.length === 0 ? (
-                          <li className="px-3 py-2 text-sm text-viva-600 font-serif">Nenhum médico encontrado</li>
+                          <li className="px-3 py-2 text-sm text-coop-600 font-serif">Nenhum médico encontrado</li>
                         ) : (
                           medicos.map((m) => (
                             <li
                               key={m.id}
-                              className="px-3 py-2 text-sm cursor-pointer hover:bg-viva-100 text-viva-900 font-display"
+                              className="px-3 py-2 text-sm cursor-pointer hover:bg-coop-100 text-coop-900 font-display"
                               onClick={() => {
                                 rememberMedicoLabel(m);
                                 setMedicoIdToAllocateCell(m.id);
@@ -3616,19 +3616,19 @@ const Escalas = () => {
                     Alocar
                   </button>
                 </div>
-                <p className="text-[11px] text-viva-600 mt-2 font-serif">
+                <p className="text-[11px] text-coop-600 mt-2 font-serif">
                   O médico ficará atribuído a este dia e turno ({cellModal.grade.label} – {formatDayShort(cellModal.date)}).
                 </p>
               </div>
 
-              <p className="text-[11px] text-viva-600 font-serif mb-4">
-                Valor definido em <Link to="/valores-plantao" className="font-semibold text-viva-800 underline hover:text-viva-900">Valores Hora/Plantão</Link>. Ao alocar, o valor de {cellModal.grade.label} será aplicado.
+              <p className="text-[11px] text-coop-600 font-serif mb-4">
+                Valor definido em <Link to="/valores-plantao" className="font-semibold text-coop-800 underline hover:text-coop-900">Valores Hora/Plantão</Link>. Ao alocar, o valor de {cellModal.grade.label} será aplicado.
                 </p>
 
                 {(medicoParaReplicar || cellModal.medico) && (
-                <div className="pt-4 mt-4 border-t border-viva-200">
-                  <h3 className="text-xs font-semibold uppercase tracking-wider text-viva-700 font-display mb-2">Repetir para outros dias</h3>
-                  <p className="text-xs text-viva-600 font-serif mb-3">
+                <div className="pt-4 mt-4 border-t border-coop-200">
+                  <h3 className="text-xs font-semibold uppercase tracking-wider text-coop-700 font-display mb-2">Repetir para outros dias</h3>
+                  <p className="text-xs text-coop-600 font-serif mb-3">
                     Aplica o médico{' '}
                     {cellModal.medico
                       ? cellModal.medico.nomeCompleto
@@ -3649,7 +3649,7 @@ const Escalas = () => {
                 )}
               </div>
 
-            <div className="px-5 py-4 border-t border-viva-200 bg-viva-50/30 flex justify-end">
+            <div className="px-5 py-4 border-t border-coop-200 bg-coop-50/30 flex justify-end">
               <button
                 type="button"
                 className="btn btn-secondary"
@@ -3673,10 +3673,10 @@ const Escalas = () => {
             className="bg-white rounded-xl shadow-xl max-w-sm w-full p-6"
             onClick={(e) => e.stopPropagation()}
           >
-            <h3 className="text-sm font-semibold uppercase tracking-wider text-viva-600 mb-2 font-display">
+            <h3 className="text-sm font-semibold uppercase tracking-wider text-coop-600 mb-2 font-display">
               Cancelar vagas em aberto
             </h3>
-            <p className="text-sm text-viva-700 font-serif mb-4">
+            <p className="text-sm text-coop-700 font-serif mb-4">
               Remover as vagas de plantão vago para <span className="font-semibold">{confirmClearVagas.label}</span>?
             </p>
             <div className="flex gap-2 justify-end">

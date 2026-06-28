@@ -14,7 +14,7 @@ export const TERMOS_CADASTRO_TITULO =
  */
 export const TERMOS_CADASTRO_TEXTO_COMPLETO = `1. Objeto e aceitação
 
-Ao submeter este formulário de cadastro na plataforma Viva Saúde (doravante, a "Plataforma"), operada em articulação com a instituição de saúde ou entidade contratante com quem o utilizador se pretende associar (doravante, a "Instituição"), o utilizador declara ter lido, compreendido e aceitado integralmente os presentes termos e declarações, sem reservas.
+Ao submeter este formulário de cadastro na plataforma COOPVITTA (doravante, a "Plataforma"), operada em articulação com a instituição de saúde ou entidade contratante com quem o utilizador se pretende associar (doravante, a "Instituição"), o utilizador declara ter lido, compreendido e aceitado integralmente os presentes termos e declarações, sem reservas.
 
 2. Veracidade e responsabilidade sobre as informações
 

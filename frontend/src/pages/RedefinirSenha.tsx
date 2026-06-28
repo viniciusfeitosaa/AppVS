@@ -4,6 +4,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { authService } from '../services/auth.service';
+import { BrandLogo } from '../components/brand/BrandLogo';
 
 const schema = z
   .object({
@@ -57,11 +58,11 @@ const RedefinirSenha = () => {
 
   if (!token) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-viva-950 py-12 px-4">
+      <div className="min-h-screen flex items-center justify-center bg-coop-950 py-12 px-4">
         <div className="max-w-md w-full bg-white p-10 rounded-2xl shadow-2xl text-center">
-          <img src={`${import.meta.env.BASE_URL}assets/logo.avif`} alt="Logo" className="h-20 w-auto mx-auto mb-4" />
+          <BrandLogo className="h-20 w-auto mx-auto mb-4" linkToSite />
           <p className="text-red-600 mb-4">{error}</p>
-          <Link to="/esqueci-senha" className="font-semibold text-viva-800 hover:text-viva-600">
+          <Link to="/esqueci-senha" className="font-semibold text-coop-800 hover:text-coop-600">
             Solicitar novo link
           </Link>
         </div>
@@ -70,15 +71,11 @@ const RedefinirSenha = () => {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-viva-950 py-12 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen flex items-center justify-center bg-coop-950 py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md w-full space-y-8 bg-white p-10 rounded-2xl shadow-2xl">
         <div className="flex flex-col items-center">
-          <img
-            src={`${import.meta.env.BASE_URL}assets/logo.avif`}
-            alt="Logo Viva Saúde"
-            className="h-24 w-auto mb-6"
-          />
-          <h1 className="text-xl font-bold text-viva-900">Nova senha</h1>
+          <BrandLogo className="h-24 w-auto mb-6" linkToSite />
+          <h1 className="text-xl font-bold text-coop-900">Nova senha</h1>
           <p className="text-sm text-gray-600 mt-1 text-center">
             Digite e confirme sua nova senha.
           </p>
@@ -105,7 +102,7 @@ const RedefinirSenha = () => {
             )}
 
             <div>
-              <label htmlFor="novaSenha" className="block text-sm font-semibold text-viva-800 mb-1">
+              <label htmlFor="novaSenha" className="block text-sm font-semibold text-coop-800 mb-1">
                 Nova senha
               </label>
               <div className="relative">
@@ -127,7 +124,7 @@ const RedefinirSenha = () => {
             </div>
 
             <div>
-              <label htmlFor="confirmarSenha" className="block text-sm font-semibold text-viva-800 mb-1">
+              <label htmlFor="confirmarSenha" className="block text-sm font-semibold text-coop-800 mb-1">
                 Confirmar senha
               </label>
               <div className="relative">
@@ -159,7 +156,7 @@ const RedefinirSenha = () => {
         )}
 
         <p className="text-sm text-center text-gray-600">
-          <Link to="/login" className="font-semibold text-viva-800 hover:text-viva-600">
+          <Link to="/login" className="font-semibold text-coop-800 hover:text-coop-600">
             Voltar ao login
           </Link>
         </p>

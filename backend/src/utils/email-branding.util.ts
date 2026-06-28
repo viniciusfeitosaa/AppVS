@@ -6,9 +6,20 @@ export function escapeHtmlAttr(value: string): string {
   return value.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
 }
 
-/** Logo: EMAIL_LOGO_URL ou frontend + /assets/logo.png (igual ao e-mail de redefinir senha). */
+export function getOrgDisplayName(): string {
+  return (process.env.ORG_DISPLAY_NAME || process.env.SMTP_FROM_NAME || 'COOPVITTA').trim() || 'COOPVITTA';
+}
+
+export function getEmailTagline(): string {
+  return (
+    process.env.ORG_EMAIL_TAGLINE ||
+    'Cooperativa de Trabalho dos Profissionais Assistenciais à Vida e à Saúde'
+  ).trim();
+}
+
+/** Logo: EMAIL_LOGO_URL ou frontend + /assets/logo-coopvitta.png */
 export function getEmailLogoUrl(): string {
-  const raw = (process.env.FRONTEND_URL || process.env.FRONTEND_APP_URL || 'https://sejavivasaude.com.br').trim();
+  const raw = (process.env.FRONTEND_URL || process.env.FRONTEND_APP_URL || 'https://app.coopvitta.cloud').trim();
   let origin = raw;
   try {
     origin = new URL(raw).origin;
@@ -22,7 +33,11 @@ export function getEmailLogoUrl(): string {
     return `${origin}${normalizedPath}`;
   }
   const prefix = (process.env.FRONTEND_ASSET_PREFIX || '').replace(/\/$/, '');
-  return `${origin}${prefix}/assets/logo.png`;
+  return `${origin}${prefix}/assets/logo-coopvitta.png`;
+}
+
+function orgDisplayName(): string {
+  return getOrgDisplayName();
 }
 
 /**
@@ -31,16 +46,19 @@ export function getEmailLogoUrl(): string {
  * Variáveis: {{submitter.name}}, {{submitter.link}}, {{template.name}}.
  */
 export function buildDocusealInviteEmailBody(variant: 'first' | 'second'): string {
+  const org = orgDisplayName();
   const year = new Date().getFullYear();
-  const rodape = [`© ${year} Viva Saúde · mensagem automática`, 'Dúvidas? Responda a este e-mail.'].join(
-    '\n'
-  );
+  const rodape = [
+    `© ${year} ${org} · mensagem automática`,
+    'Para aceder ao documento, confirme o código enviado ao seu e-mail (verificação de identidade).',
+    'Dúvidas? Responda a este e-mail.',
+  ].join('\n');
 
   if (variant === 'first') {
     return [
       `Olá {{submitter.name}},`,
       '',
-      'A **Viva Saúde** enviou-lhe um documento para **assinatura eletrónica**. Pode rever e assinar na ligação segura abaixo — **não é necessário instalar** nenhuma aplicação.',
+      `A **${org}** enviou-lhe um documento para **assinatura eletrónica avançada**. Para sua segurança, será solicitado um **código de verificação** enviado a este endereço de e-mail antes de abrir o documento.`,
       '',
       '**Documento**',
       '{{template.name}}',
@@ -50,10 +68,10 @@ export function buildDocusealInviteEmailBody(variant: 'first' | 'second'): strin
       'Ligação direta (copiar se precisar):',
       '{{submitter.link}}',
       '',
-      'Se não está à espera deste pedido, pode **ignorar** esta mensagem.',
+      'Se não está à espera deste pedido, **não utilize o link** e contacte-nos.',
       '',
       'Com os melhores cumprimentos,',
-      '**Equipe Viva Saúde**',
+      `**Equipe ${org}**`,
       '',
       rodape,
     ].join('\n');
@@ -62,7 +80,7 @@ export function buildDocusealInviteEmailBody(variant: 'first' | 'second'): strin
   return [
     `Olá {{submitter.name}},`,
     '',
-    '**Outro signatário já assinou.** Falta a sua parte para concluir o documento da **Viva Saúde**. Use a ligação segura abaixo — **sem instalação** de software.',
+    `**Outro signatário já assinou.** Falta a sua parte para concluir o documento da **${org}**. Será solicitado um **código de verificação** por e-mail antes do acesso.`,
     '',
     '**Documento**',
     '{{template.name}}',
@@ -73,7 +91,7 @@ export function buildDocusealInviteEmailBody(variant: 'first' | 'second'): strin
     '{{submitter.link}}',
     '',
     'Com os melhores cumprimentos,',
-    '**Equipe Viva Saúde**',
+    `**Equipe ${org}**`,
     '',
     rodape,
   ].join('\n');

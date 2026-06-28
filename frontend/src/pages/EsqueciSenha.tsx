@@ -4,6 +4,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { authService } from '../services/auth.service';
+import { BrandLogo } from '../components/brand/BrandLogo';
 
 const schema = z.object({
   email: z.string().email('E-mail inválido'),
@@ -40,11 +41,11 @@ const EsqueciSenha = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-viva-950 py-12 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen flex items-center justify-center bg-coop-950 py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md w-full space-y-8 bg-white p-10 rounded-2xl shadow-2xl">
         <div className="flex flex-col items-center">
-          <img src={`${import.meta.env.BASE_URL}assets/logo.avif`} alt="Logo Viva Saúde" className="h-24 w-auto mb-6" />
-          <h1 className="text-xl font-bold text-viva-900">Esqueci minha senha</h1>
+          <BrandLogo className="h-24 w-auto mb-6" linkToSite />
+          <h1 className="text-xl font-bold text-coop-900">Esqueci minha senha</h1>
           <p className="text-sm text-gray-600 mt-1 text-center">
             Informe o e-mail da sua conta para receber o link de redefinição.
           </p>
@@ -58,7 +59,7 @@ const EsqueciSenha = () => {
               </div>
             )}
             <div>
-              <label htmlFor="email" className="block text-sm font-semibold text-viva-800 mb-1">
+              <label htmlFor="email" className="block text-sm font-semibold text-coop-800 mb-1">
                 E-mail
               </label>
               <input
@@ -87,13 +88,13 @@ const EsqueciSenha = () => {
               {message}
             </div>
             {resetLink && (
-              <div className="bg-viva-50 border border-viva-200 rounded-lg p-3">
-                <p className="text-xs font-semibold text-viva-700 mb-2">
+              <div className="bg-coop-50 border border-coop-200 rounded-lg p-3">
+                <p className="text-xs font-semibold text-coop-700 mb-2">
                   Em ambiente de desenvolvimento, use o link abaixo:
                 </p>
                 <a
                   href={resetLink}
-                  className="text-sm text-viva-800 underline break-all"
+                  className="text-sm text-coop-800 underline break-all"
                   target="_blank"
                   rel="noopener noreferrer"
                 >
@@ -105,7 +106,7 @@ const EsqueciSenha = () => {
         )}
 
         <p className="text-sm text-center text-gray-600">
-          <Link to="/login" className="font-semibold text-viva-800 hover:text-viva-600">
+          <Link to="/login" className="font-semibold text-coop-800 hover:text-coop-600">
             Voltar ao login
           </Link>
         </p>

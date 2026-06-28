@@ -125,18 +125,18 @@ const AnunciarVagaWizard = ({ onPublicado }: Props) => {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-2 text-sm text-viva-700 font-serif">
+      <div className="flex items-center gap-2 text-sm text-coop-700 font-serif">
         <span
           className={`rounded-full px-3 py-1 font-display font-semibold ${
-            step === 1 ? 'bg-viva-900 text-white' : 'bg-viva-100 text-viva-800'
+            step === 1 ? 'bg-coop-900 text-white' : 'bg-coop-100 text-coop-800'
           }`}
         >
           1 · Dados da vaga
         </span>
-        <span className="text-viva-400">→</span>
+        <span className="text-coop-400">→</span>
         <span
           className={`rounded-full px-3 py-1 font-display font-semibold ${
-            step === 2 ? 'bg-viva-900 text-white' : 'bg-viva-100 text-viva-800'
+            step === 2 ? 'bg-coop-900 text-white' : 'bg-coop-100 text-coop-800'
           }`}
         >
           2 · Confirmação
@@ -147,13 +147,13 @@ const AnunciarVagaWizard = ({ onPublicado }: Props) => {
         <div className="grid gap-6 lg:grid-cols-2">
           <div className="space-y-4">
             <div>
-              <label className="block text-sm font-semibold text-viva-900 font-display mb-1.5">
+              <label className="block text-sm font-semibold text-coop-900 font-display mb-1.5">
                 Tipo de atendimento
               </label>
               <select
                 value={tipoSelect}
                 onChange={(e) => setTipoSelect(e.target.value)}
-                className="w-full rounded-xl border border-viva-200 bg-white px-3 py-2.5 text-sm text-viva-900 focus:border-viva-600 focus:outline-none focus:ring-2 focus:ring-viva-600/20"
+                className="w-full rounded-xl border border-coop-200 bg-white px-3 py-2.5 text-sm text-coop-900 focus:border-coop-600 focus:outline-none focus:ring-2 focus:ring-coop-600/20"
               >
                 {TIPOS_ATENDIMENTO_SUGESTOES.map((t) => (
                   <option key={t} value={t}>
@@ -167,13 +167,13 @@ const AnunciarVagaWizard = ({ onPublicado }: Props) => {
                   value={tipoOutro}
                   onChange={(e) => setTipoOutro(e.target.value)}
                   placeholder="Descreva o tipo"
-                  className="mt-2 w-full rounded-xl border border-viva-200 px-3 py-2.5 text-sm"
+                  className="mt-2 w-full rounded-xl border border-coop-200 px-3 py-2.5 text-sm"
                 />
               )}
             </div>
 
             <div>
-              <label className="block text-sm font-semibold text-viva-900 font-display mb-1.5">
+              <label className="block text-sm font-semibold text-coop-900 font-display mb-1.5">
                 Setor (unidade de saúde)
               </label>
               <input
@@ -181,12 +181,12 @@ const AnunciarVagaWizard = ({ onPublicado }: Props) => {
                 value={setor}
                 onChange={(e) => setSetor(e.target.value)}
                 placeholder="Ex.: Pediatria, Centro de imagem…"
-                className="w-full rounded-xl border border-viva-200 px-3 py-2.5 text-sm"
+                className="w-full rounded-xl border border-coop-200 px-3 py-2.5 text-sm"
               />
             </div>
 
             <div>
-              <p className="text-sm font-semibold text-viva-900 font-display mb-2">Valor</p>
+              <p className="text-sm font-semibold text-coop-900 font-display mb-2">Valor</p>
               <div className="flex flex-wrap gap-3">
                 <label className="flex items-center gap-2 text-sm cursor-pointer">
                   <input
@@ -194,7 +194,7 @@ const AnunciarVagaWizard = ({ onPublicado }: Props) => {
                     name="valor"
                     checked={valorACombinar}
                     onChange={() => setValorACombinar(true)}
-                    className="text-viva-900"
+                    className="text-coop-900"
                   />
                   Valor a combinar
                 </label>
@@ -204,20 +204,20 @@ const AnunciarVagaWizard = ({ onPublicado }: Props) => {
                     name="valor"
                     checked={!valorACombinar}
                     onChange={() => setValorACombinar(false)}
-                    className="text-viva-900"
+                    className="text-coop-900"
                   />
                   Informar valor
                 </label>
               </div>
               {!valorACombinar && (
-                <div className="mt-3 space-y-2 rounded-xl border border-viva-100 bg-viva-50/50 p-3">
+                <div className="mt-3 space-y-2 rounded-xl border border-coop-100 bg-coop-50/50 p-3">
                   <input
                     type="text"
                     inputMode="decimal"
                     value={valorReaisStr}
                     onChange={(e) => setValorReaisStr(e.target.value)}
                     placeholder="0,00"
-                    className="w-full rounded-lg border border-viva-200 px-3 py-2 text-sm"
+                    className="w-full rounded-lg border border-coop-200 px-3 py-2 text-sm"
                   />
                   <div className="flex gap-4 text-sm">
                     <label className="flex items-center gap-2 cursor-pointer">
@@ -244,7 +244,7 @@ const AnunciarVagaWizard = ({ onPublicado }: Props) => {
             </div>
 
             <div>
-              <p className="text-sm font-semibold text-viva-900 font-display mb-2">Dia do pagamento</p>
+              <p className="text-sm font-semibold text-coop-900 font-display mb-2">Dia do pagamento</p>
               <div className="flex flex-wrap gap-3">
                 <label className="flex items-center gap-2 text-sm cursor-pointer">
                   <input
@@ -269,7 +269,7 @@ const AnunciarVagaWizard = ({ onPublicado }: Props) => {
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-semibold text-viva-900 font-display mb-1.5">
+                <label className="block text-sm font-semibold text-coop-900 font-display mb-1.5">
                   Quantidade de vagas
                 </label>
                 <input
@@ -278,11 +278,11 @@ const AnunciarVagaWizard = ({ onPublicado }: Props) => {
                   max={999}
                   value={quantidadeVagas}
                   onChange={(e) => setQuantidadeVagas(Math.max(1, Number(e.target.value) || 1))}
-                  className="w-full rounded-xl border border-viva-200 px-3 py-2.5 text-sm"
+                  className="w-full rounded-xl border border-coop-200 px-3 py-2.5 text-sm"
                 />
               </div>
               <div>
-                <label className="block text-sm font-semibold text-viva-900 font-display mb-1.5">
+                <label className="block text-sm font-semibold text-coop-900 font-display mb-1.5">
                   Prazo da publicação (dias ativos)
                 </label>
                 <input
@@ -293,19 +293,19 @@ const AnunciarVagaWizard = ({ onPublicado }: Props) => {
                   onChange={(e) =>
                     setPrazoPublicacaoDias(Math.min(365, Math.max(1, Number(e.target.value) || 1)))
                   }
-                  className="w-full rounded-xl border border-viva-200 px-3 py-2.5 text-sm"
+                  className="w-full rounded-xl border border-coop-200 px-3 py-2.5 text-sm"
                 />
               </div>
             </div>
 
             <div>
-              <label className="block text-sm font-semibold text-viva-900 font-display mb-1.5">
+              <label className="block text-sm font-semibold text-coop-900 font-display mb-1.5">
                 Categoria do profissional
               </label>
               <select
                 value={categoriaProfissional}
                 disabled
-                className="w-full rounded-xl border border-viva-200 bg-viva-50 px-3 py-2.5 text-sm text-viva-800"
+                className="w-full rounded-xl border border-coop-200 bg-coop-50 px-3 py-2.5 text-sm text-coop-800"
               >
                 {CATEGORIAS_PROFISSIONAL.map((c) => (
                   <option key={c.value} value={c.value}>
@@ -319,7 +319,7 @@ const AnunciarVagaWizard = ({ onPublicado }: Props) => {
           <div className="space-y-4">
             <MiniCalendarioDias selected={diasVaga} onChange={setDiasVaga} />
             <div>
-              <label className="block text-sm font-semibold text-viva-900 font-display mb-1.5">
+              <label className="block text-sm font-semibold text-coop-900 font-display mb-1.5">
                 Descrição da vaga
               </label>
               <textarea
@@ -327,7 +327,7 @@ const AnunciarVagaWizard = ({ onPublicado }: Props) => {
                 onChange={(e) => setDescricao(e.target.value)}
                 rows={6}
                 placeholder="Requisitos, turno, observações…"
-                className="w-full rounded-xl border border-viva-200 px-3 py-2.5 text-sm font-serif resize-y min-h-[120px]"
+                className="w-full rounded-xl border border-coop-200 px-3 py-2.5 text-sm font-serif resize-y min-h-[120px]"
               />
             </div>
           </div>
@@ -335,44 +335,44 @@ const AnunciarVagaWizard = ({ onPublicado }: Props) => {
       )}
 
       {step === 2 && (
-        <div className="rounded-2xl border border-viva-200 bg-gradient-to-br from-white to-viva-50/40 p-5 space-y-4">
-          <h3 className="text-lg font-bold text-viva-950 font-display">Resumo</h3>
+        <div className="rounded-2xl border border-coop-200 bg-gradient-to-br from-white to-coop-50/40 p-5 space-y-4">
+          <h3 className="text-lg font-bold text-coop-950 font-display">Resumo</h3>
           <dl className="grid gap-2 text-sm">
             <div className="flex justify-between gap-4">
-              <dt className="text-viva-600 font-serif">Tipo de atendimento</dt>
-              <dd className="font-medium text-viva-900 text-right">{tipoAtendimentoFinal}</dd>
+              <dt className="text-coop-600 font-serif">Tipo de atendimento</dt>
+              <dd className="font-medium text-coop-900 text-right">{tipoAtendimentoFinal}</dd>
             </div>
             <div className="flex justify-between gap-4">
-              <dt className="text-viva-600 font-serif">Setor</dt>
-              <dd className="font-medium text-viva-900 text-right">{setor || '—'}</dd>
+              <dt className="text-coop-600 font-serif">Setor</dt>
+              <dd className="font-medium text-coop-900 text-right">{setor || '—'}</dd>
             </div>
             <div className="flex justify-between gap-4">
-              <dt className="text-viva-600 font-serif">Valor</dt>
-              <dd className="font-medium text-viva-900 text-right">
+              <dt className="text-coop-600 font-serif">Valor</dt>
+              <dd className="font-medium text-coop-900 text-right">
                 {valorACombinar
                   ? 'A combinar'
                   : `${formatCentavosBRL(reaisParaCentavos(valorReaisStr))} (${valorLiquidoBruto === 'LIQUIDO' ? 'Líquido' : 'Bruto'})`}
               </dd>
             </div>
             <div className="flex justify-between gap-4">
-              <dt className="text-viva-600 font-serif">Pagamento</dt>
-              <dd className="font-medium text-viva-900 text-right">{PAGAMENTO_LABEL[pagamento]}</dd>
+              <dt className="text-coop-600 font-serif">Pagamento</dt>
+              <dd className="font-medium text-coop-900 text-right">{PAGAMENTO_LABEL[pagamento]}</dd>
             </div>
             <div className="flex justify-between gap-4">
-              <dt className="text-viva-600 font-serif">Vagas / Prazo do anúncio</dt>
-              <dd className="font-medium text-viva-900 text-right">
+              <dt className="text-coop-600 font-serif">Vagas / Prazo do anúncio</dt>
+              <dd className="font-medium text-coop-900 text-right">
                 {quantidadeVagas} · {prazoPublicacaoDias} dias
               </dd>
             </div>
             <div className="flex justify-between gap-4">
-              <dt className="text-viva-600 font-serif">Dias da cobertura</dt>
-              <dd className="font-medium text-viva-900 text-right max-w-[60%]">
+              <dt className="text-coop-600 font-serif">Dias da cobertura</dt>
+              <dd className="font-medium text-coop-900 text-right max-w-[60%]">
                 {diasVaga.join(', ')}
               </dd>
             </div>
             <div>
-              <dt className="text-viva-600 font-serif mb-1">Descrição</dt>
-              <dd className="text-viva-900 font-serif whitespace-pre-wrap rounded-lg bg-white/80 p-3 border border-viva-100">
+              <dt className="text-coop-600 font-serif mb-1">Descrição</dt>
+              <dd className="text-coop-900 font-serif whitespace-pre-wrap rounded-lg bg-white/80 p-3 border border-coop-100">
                 {descricao}
               </dd>
             </div>
@@ -383,9 +383,9 @@ const AnunciarVagaWizard = ({ onPublicado }: Props) => {
               type="checkbox"
               checked={declaroResponsavel}
               onChange={(e) => setDeclaroResponsavel(e.target.checked)}
-              className="mt-1 rounded border-viva-300 text-viva-900"
+              className="mt-1 rounded border-coop-300 text-coop-900"
             />
-            <span className="text-sm text-viva-900 font-serif leading-relaxed">
+            <span className="text-sm text-coop-900 font-serif leading-relaxed">
               Declaro que sou o(a) responsável pelo setor informado nesta unidade de saúde e que as informações prestadas
               são verdadeiras, podendo responder por elas perante a instituição e os profissionais interessados.
             </span>
@@ -398,7 +398,7 @@ const AnunciarVagaWizard = ({ onPublicado }: Props) => {
           <button
             type="button"
             onClick={() => setStep(1)}
-            className="rounded-xl border border-viva-200 px-5 py-2.5 text-sm font-semibold text-viva-800 hover:bg-viva-50 font-display"
+            className="rounded-xl border border-coop-200 px-5 py-2.5 text-sm font-semibold text-coop-800 hover:bg-coop-50 font-display"
           >
             Voltar
           </button>
@@ -407,7 +407,7 @@ const AnunciarVagaWizard = ({ onPublicado }: Props) => {
           <button
             type="button"
             onClick={avancar}
-            className="rounded-xl bg-viva-900 px-6 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-viva-800 font-display"
+            className="rounded-xl bg-coop-900 px-6 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-coop-800 font-display"
           >
             Continuar para confirmação
           </button>
@@ -417,7 +417,7 @@ const AnunciarVagaWizard = ({ onPublicado }: Props) => {
             type="button"
             disabled={mutation.isPending}
             onClick={confirmar}
-            className="rounded-xl bg-viva-900 px-6 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-viva-800 disabled:opacity-60 font-display"
+            className="rounded-xl bg-coop-900 px-6 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-coop-800 disabled:opacity-60 font-display"
           >
             {mutation.isPending ? 'Publicando…' : 'Confirmar publicação da vaga'}
           </button>

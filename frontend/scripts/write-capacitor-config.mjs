@@ -41,7 +41,7 @@ if (serverUrl.endsWith('/app')) serverUrl = `${serverUrl}/`;
 
 const config = {
   appId: 'com.vivasaude.appvs',
-  appName: 'Viva Saúde',
+  appName: 'COOPVITTA',
   webDir: 'dist',
   // iOS: força o WKWebView a respeitar a Safe Area (notch / Dynamic Island)
   // sem depender exclusivamente de CSS env(safe-area-inset-*), que pode vir 0 em alguns cenários.

@@ -41,18 +41,40 @@ function moveSpaIntoAppFolder() {
   }
 }
 
+function copyPublicAssetsToApp() {
+  const appDir = path.join(distDir, 'app');
+  for (const name of [
+    'favicon-32.png',
+    'apple-touch-icon.png',
+    'icon-192.png',
+    'icon-512.png',
+    'AppIcon.png',
+    'manifest.webmanifest',
+    'coopvitta-icon.png',
+  ]) {
+    const src = path.join(distDir, name);
+    const dest = path.join(appDir, name);
+    if (fs.existsSync(src)) fs.copyFileSync(src, dest);
+  }
+}
+
 if (!useAppSubpath) {
   console.log('merge-landing: VITE_APP_BASE na raiz; nada a fazer.');
   process.exit(0);
 }
 
-if (!landingDir) {
-  moveSpaIntoAppFolder();
-  console.warn('merge-landing: pasta landing/ não encontrada; só SPA em /app/ (raiz sem site estático).');
+moveSpaIntoAppFolder();
+copyPublicAssetsToApp();
+
+if (process.env.SKIP_LANDING_MERGE === '1') {
+  console.log('merge-landing: SKIP_LANDING_MERGE=1 — SPA em /app/; raiz sem landing.');
   process.exit(0);
 }
 
-moveSpaIntoAppFolder();
+if (!landingDir) {
+  console.warn('merge-landing: pasta landing/ não encontrada; só SPA em /app/ (raiz sem site estático).');
+  process.exit(0);
+}
 
 const copy = (src, dest) => {
   const stat = fs.statSync(src);

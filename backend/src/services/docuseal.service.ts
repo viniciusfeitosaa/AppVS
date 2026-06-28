@@ -540,9 +540,23 @@ export async function docusealResendEmailSubmitterService(submitterId: number): 
 export type DocusealRequiredTemplate = {
   id: number;
   name: string;
-  /** Papel do primeiro signatário (médico); deve coincidir com o template no DocuSeal. */
+  /** Papel do primeiro signatário (médico/cooperado); deve coincidir com o template no DocuSeal. */
   role?: string;
+  /** Papel da segunda parte (cooperativa); omitir se `singleSubmitter`. */
+  secondRole?: string;
+  /** Só o cooperado assina (template com um signatário). */
+  singleSubmitter?: boolean;
 };
+
+/** 2FA por e-mail antes de abrir o documento (assinatura avançada — Lei 14.063/2020). Default: ativo. */
+function docusealRequireEmail2fa(): boolean {
+  const v = (process.env.DOCUSEAL_REQUIRE_EMAIL_2FA ?? 'true').trim().toLowerCase();
+  return !(v === 'false' || v === '0' || v === 'no');
+}
+
+function docuseal2faFlags(): { require_email_2fa?: true } {
+  return docusealRequireEmail2fa() ? { require_email_2fa: true } : {};
+}
 
 export function parseRequiredTemplates(): DocusealRequiredTemplate[] {
   const raw = process.env.DOCUSEAL_REQUIRED_TEMPLATES?.trim();
@@ -558,8 +572,11 @@ export function parseRequiredTemplates(): DocusealRequiredTemplate[] {
       const name = typeof o.name === 'string' ? o.name : '';
       if (!Number.isFinite(id) || id <= 0 || !name.trim()) continue;
       const roleRaw = o.role;
+      const secondRoleRaw = o.secondRole;
       const tpl: DocusealRequiredTemplate = { id, name: name.trim() };
       if (typeof roleRaw === 'string' && roleRaw.trim()) tpl.role = roleRaw.trim();
+      if (typeof secondRoleRaw === 'string' && secondRoleRaw.trim()) tpl.secondRole = secondRoleRaw.trim();
+      if (o.singleSubmitter === true) tpl.singleSubmitter = true;
       out.push(tpl);
     }
     return out;
@@ -590,7 +607,10 @@ function docusealInviteConfig(): DocusealInviteCfg {
 
   const firstRole = process.env.DOCUSEAL_FIRST_SUBMITTER_ROLE?.trim() || 'Primeira Parte';
   const secondRole = process.env.DOCUSEAL_SECOND_SUBMITTER_ROLE?.trim() || 'Segunda Parte';
-  const secondName = process.env.DOCUSEAL_SECOND_SUBMITTER_NAME?.trim() || 'Viva Saúde';
+  const secondName =
+    process.env.DOCUSEAL_SECOND_SUBMITTER_NAME?.trim() ||
+    process.env.ORG_DISPLAY_NAME?.trim() ||
+    'COOPVITTA';
   const secondEmail = normalizarEmailDocuseal(process.env.DOCUSEAL_SECOND_SUBMITTER_EMAIL);
   if (!secondEmail) return { ok: false };
 
@@ -622,6 +642,33 @@ export type DocusealCriarSubmissoesOpcoes = {
   /** Se definido, só estes template_id (têm de estar em DOCUSEAL_REQUIRED_TEMPLATES). */
   onlyTemplateIds?: number[];
 };
+
+function buildSubmittersForTemplate(
+  tpl: DocusealRequiredTemplate,
+  cfg: Extract<DocusealInviteCfg, { ok: true }>,
+  medico: { nomeCompleto: string; email: string },
+  emailMed: string
+): Array<Record<string, unknown>> {
+  const twoFa = docuseal2faFlags();
+  const first = {
+    role: tpl.role || cfg.firstRole,
+    name: medico.nomeCompleto.trim(),
+    email: emailMed,
+    ...twoFa,
+  };
+
+  if (tpl.singleSubmitter) return [first];
+
+  return [
+    first,
+    {
+      role: tpl.secondRole || cfg.secondRole,
+      name: cfg.secondName,
+      email: cfg.secondEmail,
+      ...twoFa,
+    },
+  ];
+}
 
 function findMedicoSubmitterRecord(row: Record<string, unknown>, emailNorm: string): Record<string, unknown> | null {
   const submittersRaw = readKey(row, 'submitters', 'Submitters');
@@ -879,9 +926,11 @@ export async function createDocusealSubmissionsForMedicoInvite(
     return { attempted: false, created: 0, errors: [] };
   }
 
+  const orgName =
+    process.env.ORG_DISPLAY_NAME?.trim() || process.env.DOCUSEAL_SECOND_SUBMITTER_NAME?.trim() || 'COOPVITTA';
   const subject =
     process.env.DOCUSEAL_INVITE_SUBJECT?.trim() ||
-    'Viva Saúde — documento para assinatura eletrónica';
+    `${orgName} — documento para assinatura eletrónica (verificação por e-mail)`;
   const customBody = process.env.DOCUSEAL_INVITE_BODY?.trim();
   const body = customBody ? customBody.replace(/\\n/g, '\n') : buildDocusealInviteEmailBody('first');
 
@@ -902,18 +951,7 @@ export async function createDocusealSubmissionsForMedicoInvite(
     for (const tpl of cfg.templates) {
       if (only != null && only.length > 0 && !only.includes(tpl.id)) continue;
 
-      const submitters = [
-        {
-          role: tpl.role || cfg.firstRole,
-          name: medico.nomeCompleto.trim(),
-          email: emailMed,
-        },
-        {
-          role: cfg.secondRole,
-          name: cfg.secondName,
-          email: cfg.secondEmail,
-        },
-      ];
+      const submitters = buildSubmittersForTemplate(tpl, cfg, medico, emailMed);
 
       const payload: Record<string, unknown> = {
         template_id: tpl.id,

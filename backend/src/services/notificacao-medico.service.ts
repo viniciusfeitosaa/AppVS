@@ -28,7 +28,7 @@ export async function notificarBoasVindasMedico(tenantId: string, medicoId: stri
     where: { id: tenantId },
     select: { nome: true },
   });
-  const marca = tenant?.nome?.trim() || 'Viva Saúde';
+  const marca = tenant?.nome?.trim() || 'COOPVITTA';
   const primeiro = nomeCompleto.trim().split(/\s+/)[0] || 'Profissional';
 
   await prisma.notificacaoMedico.create({

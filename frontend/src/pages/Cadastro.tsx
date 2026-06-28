@@ -11,6 +11,7 @@ import {
   profissaoExigeRegistroConselho,
 } from '../constants/profissaoConselho';
 import { TERMOS_CADASTRO_TEXTO_COMPLETO, TERMOS_CADASTRO_TITULO, TERMOS_CADASTRO_VERSAO } from '../constants/termosCadastro';
+import { BrandLogo } from '../components/brand/BrandLogo';
 import {
   CADASTRO_MAX_BYTES_PER_FILE,
   DOCUMENTOS_PERFIL_CADASTRO_ORDEM,
@@ -494,11 +495,7 @@ const Cadastro = () => {
       <div className="cadastro-panel max-w-2xl">
         <div className="cadastro-panel-inner">
           <header className="flex flex-col items-center text-center space-y-4 stagger-1">
-            <img
-              src={`${import.meta.env.BASE_URL}assets/logo.avif`}
-              alt="Logo Viva Saúde"
-              className="h-[4.25rem] w-auto select-none drop-shadow-[0_1px_2px_rgba(0,0,0,0.06)]"
-            />
+            <BrandLogo className="h-[4.25rem] w-auto select-none drop-shadow-[0_1px_2px_rgba(0,0,0,0.06)]" linkToSite />
             <div className="space-y-2 max-w-lg">
               <p className="cadastro-kicker">Novo cadastro</p>
               <h1 className="cadastro-title">Associe-se à plataforma</h1>

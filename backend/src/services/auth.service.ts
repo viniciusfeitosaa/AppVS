@@ -14,32 +14,7 @@ import tls from 'tls';
 import nodemailer from 'nodemailer';
 import { Resend } from 'resend';
 import twilio from 'twilio';
-
-const RESET_EMAIL_SUBJECT = 'Redefinir sua senha — Viva Saúde';
-
-function escapeHtmlAttr(value: string): string {
-  return value.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
-}
-
-/** Logo nos e-mails: EMAIL_LOGO_URL ou origin do frontend + /assets/logo.png. */
-function getResetEmailLogoUrl(): string {
-  const raw = (process.env.FRONTEND_URL || process.env.FRONTEND_APP_URL || 'https://sejavivasaude.com.br').trim();
-  let origin = raw;
-  try {
-    origin = new URL(raw).origin;
-  } catch {
-    origin = raw.replace(/\/$/, '');
-  }
-  const custom = process.env.EMAIL_LOGO_URL?.trim();
-  if (custom) {
-    // Permite EMAIL_LOGO_URL relativo (ex.: assets/logo.png ou /assets/logo.png).
-    if (/^https?:\/\//i.test(custom)) return custom;
-    const normalizedPath = custom.startsWith('/') ? custom : `/${custom}`;
-    return `${origin}${normalizedPath}`;
-  }
-  const prefix = (process.env.FRONTEND_ASSET_PREFIX || '').replace(/\/$/, '');
-  return `${origin}${prefix}/assets/logo.png`;
-}
+import { escapeHtmlAttr, getEmailLogoUrl, getOrgDisplayName, getEmailTagline } from '../utils/email-branding.util';
 
 /** Base do app para links de redefinição (prefira FRONTEND_APP_URL em produção). */
 function getResetPasswordAppBaseUrl(): string {
@@ -49,9 +24,15 @@ function getResetPasswordAppBaseUrl(): string {
   return fallback;
 }
 
+function resetEmailSubject(): string {
+  return `Redefinir sua senha — ${getOrgDisplayName()}`;
+}
+
 function buildResetPasswordEmailHtml(resetLink: string): string {
   const href = escapeHtmlAttr(resetLink);
-  const logoSrc = escapeHtmlAttr(getResetEmailLogoUrl());
+  const logoSrc = escapeHtmlAttr(getEmailLogoUrl());
+  const orgName = getOrgDisplayName();
+  const orgHtml = orgName.replace(/&/g, '&amp;').replace(/</g, '&lt;');
   const year = new Date().getFullYear();
   return `<!DOCTYPE html>
 <html lang="pt-BR">
@@ -59,48 +40,47 @@ function buildResetPasswordEmailHtml(resetLink: string): string {
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta http-equiv="x-ua-compatible" content="ie=edge">
-<title>Redefinir senha — Viva Saúde</title>
+<title>Redefinir senha — ${orgHtml}</title>
 </head>
 <body style="margin:0;padding:0;background-color:#f5f7fb;">
-<!-- Pré-visualização em alguns clientes de e-mail -->
-<div style="display:none;max-height:0;overflow:hidden;mso-hide:all;">Use o link seguro para criar uma nova senha na Viva Saúde. Válido por 1 hora.</div>
+<div style="display:none;max-height:0;overflow:hidden;mso-hide:all;">Use o link seguro para criar uma nova senha na ${orgHtml}. Válido por 1 hora.</div>
 <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="background-color:#f5f7fb;">
   <tr>
     <td align="center" style="padding:28px 14px 40px;">
       <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="max-width:520px;background-color:#ffffff;border-radius:20px;overflow:hidden;border:1px solid #e5e7eb;box-shadow:0 12px 40px rgba(15,23,42,0.08);">
         <tr>
           <td bgcolor="#f8fafc" style="padding:32px 28px 24px;text-align:center;background:linear-gradient(180deg,#f8fafc 0%,#ffffff 60%);border-bottom:1px solid #e5e7eb;">
-            <img src="${logoSrc}" alt="Viva Saúde" width="220" height="auto" style="display:block;margin:0 auto 12px;max-width:220px;height:auto;border:0;outline:none;text-decoration:none;">
-            <p style="margin:0;font-size:13px;letter-spacing:0.02em;color:#64748b;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;">Cuidado que conecta profissionais e instituições</p>
+            <img src="${logoSrc}" alt="${orgHtml}" width="220" height="auto" style="display:block;margin:0 auto 12px;max-width:220px;height:auto;border:0;outline:none;text-decoration:none;">
+            <p style="margin:0;font-size:13px;letter-spacing:0.02em;color:#64748b;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;">${getEmailTagline().replace(/&/g, '&amp;').replace(/</g, '&lt;')}</p>
           </td>
         </tr>
         <tr>
           <td style="padding:32px 32px 26px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;">
             <p style="margin:0 0 6px;font-size:15px;line-height:1.5;color:#374151;">Olá,</p>
             <h1 style="margin:0 0 18px;font-size:23px;font-weight:700;line-height:1.3;color:#0f172a;letter-spacing:-0.02em;">Redefinir sua senha de acesso</h1>
-            <p style="margin:0 0 16px;font-size:15px;line-height:1.65;color:#4b5563;">Recebemos um pedido para <strong style="color:#0f172a;font-weight:600;">criar uma nova senha</strong> para a sua conta na plataforma <strong style="color:#0f172a;">Viva Saúde</strong>.</p>
+            <p style="margin:0 0 16px;font-size:15px;line-height:1.65;color:#4b5563;">Recebemos um pedido para <strong style="color:#0f172a;font-weight:600;">criar uma nova senha</strong> para a sua conta na plataforma <strong style="color:#0f172a;">${orgHtml}</strong>.</p>
             <p style="margin:0 0 26px;font-size:15px;line-height:1.65;color:#4b5563;">Para continuar com segurança, toque no botão abaixo. O link é <strong style="color:#0f172a;">válido por 1 hora</strong> e só pode ser usado uma vez.</p>
             <table role="presentation" cellpadding="0" cellspacing="0" align="center" style="margin:0 auto 26px;">
               <tr>
-                <td style="border-radius:14px;background-color:#166534;box-shadow:0 4px 14px rgba(22,101,52,0.22);">
+                <td style="border-radius:14px;background-color:#0d9488;box-shadow:0 4px 14px rgba(13,148,136,0.22);">
                   <a href="${href}" target="_blank" rel="noopener noreferrer" style="display:inline-block;padding:15px 40px;font-size:15px;font-weight:600;color:#ffffff;text-decoration:none;border-radius:14px;">Criar nova senha</a>
                 </td>
               </tr>
             </table>
             <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="margin:0 0 8px;">
               <tr>
-                <td style="width:4px;background-color:#22c55e;border-radius:2px;"></td>
+                <td style="width:4px;background-color:#14b8a6;border-radius:2px;"></td>
                 <td style="padding-left:14px;">
                   <p style="margin:0;font-size:14px;line-height:1.6;color:#6b7280;"><strong style="color:#374151;">Não foi você?</strong> Ignore este e-mail com tranquilidade — a sua senha atual continua válida e nada será alterado.</p>
                 </td>
               </tr>
             </table>
-            <p style="margin:22px 0 0;padding-top:20px;border-top:1px solid #e5e7eb;font-size:14px;line-height:1.55;color:#4b5563;">Com os melhores cumprimentos,<br><strong style="color:#166534;">Equipe Viva Saúde</strong></p>
+            <p style="margin:22px 0 0;padding-top:20px;border-top:1px solid #e5e7eb;font-size:14px;line-height:1.55;color:#4b5563;">Com os melhores cumprimentos,<br><strong style="color:#0d9488;">Equipe ${orgHtml}</strong></p>
           </td>
         </tr>
         <tr>
           <td style="padding:18px 24px 22px;background-color:#f8fafc;text-align:center;font-size:11px;line-height:1.55;color:#94a3b8;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;">
-            © ${year} Viva Saúde. Este e-mail foi enviado automaticamente; não é necessário responder.<br>
+            © ${year} ${orgHtml}. Este e-mail foi enviado automaticamente; não é necessário responder.<br>
             Dúvidas? Fale connosco pelo canal de suporte da sua instituição ou pelo e-mail de contato oficial.
           </td>
         </tr>
@@ -120,14 +100,15 @@ export function previewResetPasswordEmailHtmlService(token?: string): string {
 }
 
 function buildResetPasswordEmailText(resetLink: string): string {
+  const orgName = getOrgDisplayName();
   const line = '─'.repeat(44);
   return [
-    'VIVA SAÚDE — Redefinição de senha',
+    `${orgName.toUpperCase()} — Redefinição de senha`,
     line,
     '',
     'Olá,',
     '',
-    'Recebemos um pedido para criar uma nova senha para a sua conta na plataforma Viva Saúde.',
+    `Recebemos um pedido para criar uma nova senha para a sua conta na plataforma ${orgName}.`,
     '',
     'Para continuar com segurança, abra o link abaixo no navegador. Ele é válido por 1 hora e só pode ser usado uma vez:',
     '',
@@ -139,7 +120,7 @@ function buildResetPasswordEmailText(resetLink: string): string {
     'Pode ignorar este e-mail com tranquilidade — a sua senha atual continua válida e nada será alterado.',
     '',
     'Com os melhores cumprimentos,',
-    'Equipe Viva Saúde',
+    `Equipe ${orgName}`,
     '',
     line,
     'Mensagem automática. Por favor, não responda a este e-mail.',
@@ -178,8 +159,10 @@ function normalizePhoneForWhatsApp(telefone: string | null | undefined): string 
   return withCountry.length >= 12 ? withCountry : null;
 }
 
-const RESET_WHATSAPP_BODY = (resetLink: string) =>
-  `*Viva Saúde* — Redefinição de senha\n\nPara criar uma nova senha, abra o link abaixo (válido por 1 hora):\n${resetLink}\n\nSe não foi você, ignore esta mensagem — a sua senha permanece a mesma.`;
+const RESET_WHATSAPP_BODY = (resetLink: string) => {
+  const orgName = getOrgDisplayName();
+  return `*${orgName}* — Redefinição de senha\n\nPara criar uma nova senha, abra o link abaixo (válido por 1 hora):\n${resetLink}\n\nSe não foi você, ignore esta mensagem — a sua senha permanece a mesma.`;
+};
 
 async function sendResetPasswordWhatsApp(toPhoneE164: string, resetLink: string): Promise<void> {
   const number = toPhoneE164.replace(/^\++/, '');
@@ -217,12 +200,12 @@ async function sendResetPasswordWhatsApp(toPhoneE164: string, resetLink: string)
 
 async function sendResetPasswordEmailResend(to: string, resetLink: string): Promise<void> {
   const apiKey = process.env.RESEND_API_KEY!;
-  const from = process.env.RESEND_FROM || 'Viva Saúde <onboarding@resend.dev>';
+  const from = process.env.RESEND_FROM || `${getOrgDisplayName()} <onboarding@resend.dev>`;
   const resend = new Resend(apiKey);
   const { data, error } = await resend.emails.send({
     from,
     to,
-    subject: RESET_EMAIL_SUBJECT,
+    subject: resetEmailSubject(),
     html: buildResetPasswordEmailHtml(resetLink),
     text: buildResetPasswordEmailText(resetLink),
   });
@@ -243,7 +226,7 @@ async function sendResetPasswordEmailSmtp(to: string, resetLink: string): Promis
   // Com SMTP_HOST=maddy ou 127.0.0.1 o cert do servidor é para mail.* — o Node precisa do nome certo para TLS/SNI.
   const tlsServername =
     process.env.SMTP_TLS_SERVERNAME?.trim() ||
-    (['maddy', '127.0.0.1', 'localhost'].includes(host) ? 'mail.vivasaude.cloud' : host);
+    (['maddy', '127.0.0.1', 'localhost'].includes(host) ? 'mail.coopvitta.cloud' : host);
   // Ligação ao hostname Docker (ex.: maddy) mas certificado emitido para mail.* — validar contra tlsServername.
   const tlsOptions: tls.ConnectionOptions = {
     servername: tlsServername,
@@ -263,10 +246,11 @@ async function sendResetPasswordEmailSmtp(to: string, resetLink: string): Promis
     tls: tlsOptions,
   });
   const from = process.env.SMTP_FROM || user;
+  const orgName = getOrgDisplayName();
   await transporter.sendMail({
-    from: from ? `Viva Saúde <${from}>` : user,
+    from: from ? `${orgName} <${from}>` : user,
     to,
-    subject: RESET_EMAIL_SUBJECT,
+    subject: resetEmailSubject(),
     text: buildResetPasswordEmailText(resetLink),
     html: buildResetPasswordEmailHtml(resetLink),
   });

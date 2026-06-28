@@ -1,0 +1,22 @@
+# Override opcional para o fork do AppVS na VPS COOPVITTA.
+# Renomeia containers e rede para não colidir com a VPS Viva Saúde (se copiar compose igual).
+#
+# Uso na pasta coopvitta-app (fork do AppVS):
+#   docker compose -f docker-compose.yml -f docker-compose.postgres.yml -f docker-compose.vps.yml up -d --build
+#
+# Copie para docker-compose.vps.yml ou use -f com este arquivo.
+
+services:
+  backend:
+    container_name: coopvitta-backend
+
+  frontend:
+    container_name: coopvitta-frontend
+
+  postgres:
+    container_name: coopvitta-postgres
+
+networks:
+  app-network:
+    name: coopvitta-network
+    driver: bridge

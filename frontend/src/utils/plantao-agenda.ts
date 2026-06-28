@@ -75,6 +75,6 @@ export function rotuloCurtoTipo(p: { tipoNome?: string | null; gradeId: string }
 export function plantaoChipClassesFromOrdem(p: { tipoOrdem?: number | null; gradeId: string }): string {
   const ord = p.tipoOrdem != null ? p.tipoOrdem : (p.gradeId || '').toLowerCase() === 'sn' ? 1 : 0;
   return ord % 2 === 1
-    ? 'bg-viva-200/60 text-viva-950 border-viva-400/50'
-    : 'bg-viva-100/95 text-viva-900 border-viva-200/80';
+    ? 'bg-coop-200/60 text-coop-950 border-coop-400/50'
+    : 'bg-coop-100/95 text-coop-900 border-coop-200/80';
 }

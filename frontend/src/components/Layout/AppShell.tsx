@@ -8,6 +8,7 @@ import { pontoService } from '../../services/ponto.service';
 import { ModuloSistema } from '../../constants/modulos';
 import NotificationBell from './NotificationBell';
 import GlobalToasts from './GlobalToasts';
+import { BrandLogo } from '../brand/BrandLogo';
 
 type MenuItem = { to: string; label: string };
 type MenuGroup = { title: string; items: MenuItem[] };
@@ -248,11 +249,11 @@ const AppShell = () => {
   return (
     <div className="app-shell min-h-screen">
       <GlobalToasts />
-      <header className="sticky top-0 z-30 isolate border-b border-viva-200/60 bg-white/95 backdrop-blur-xl shadow-[0_4px_24px_-12px_rgba(8,50,20,0.1)] ring-1 ring-viva-900/[0.03]">
+      <header className="sticky top-0 z-30 isolate border-b border-coop-200/60 bg-white/95 backdrop-blur-xl shadow-[0_4px_24px_-12px_rgba(8,50,20,0.1)] ring-1 ring-coop-900/[0.03]">
         <div className="max-w-screen-2xl mx-auto px-4 md:px-6 lg:px-8">
           <div className="h-16 flex items-center justify-between gap-3">
             <div className="flex items-center gap-3">
-              <img src={`${import.meta.env.BASE_URL}assets/logo-horizontal.png`} alt="Logo Viva Saúde" className="h-12 w-auto" />
+              <BrandLogo className="h-12 w-auto" linkToSite />
             </div>
 
             <nav className="hidden lg:flex items-center gap-1.5">
@@ -288,14 +289,14 @@ const AppShell = () => {
                     className="nav-pill nav-pill-inactive font-display flex items-center gap-1.5"
                   >
                     {group.title}
-                    <svg className="w-3.5 h-3.5 text-viva-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="w-3.5 h-3.5 text-coop-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                     </svg>
                   </button>
 
                   {openDesktopGroup === group.title && (
                     <div
-                      className="absolute left-0 top-full mt-2 min-w-56 z-50 overflow-hidden rounded-2xl border border-viva-200/70 bg-gradient-to-b from-white via-white to-viva-50/[0.35] p-2 shadow-[0_16px_48px_-12px_rgba(8,50,20,0.18),0_4px_16px_-4px_rgba(8,50,20,0.08)] ring-1 ring-viva-900/[0.04] backdrop-blur-xl animate-fade-in"
+                      className="absolute left-0 top-full mt-2 min-w-56 z-50 overflow-hidden rounded-2xl border border-coop-200/70 bg-gradient-to-b from-white via-white to-coop-50/[0.35] p-2 shadow-[0_16px_48px_-12px_rgba(8,50,20,0.18),0_4px_16px_-4px_rgba(8,50,20,0.08)] ring-1 ring-coop-900/[0.04] backdrop-blur-xl animate-fade-in"
                     >
                       {group.items.map((item) => (
                         <NavLink
@@ -305,8 +306,8 @@ const AppShell = () => {
                           className={({ isActive }) =>
                             `block px-3 py-2.5 rounded-xl text-sm font-medium transition font-display ${
                               isActive
-                                ? 'bg-viva-900 text-white'
-                                : 'text-viva-800 hover:bg-viva-50'
+                                ? 'bg-coop-900 text-white'
+                                : 'text-coop-800 hover:bg-coop-50'
                             }`
                           }
                         >
@@ -323,7 +324,7 @@ const AppShell = () => {
               <NotificationBell />
               <button
                 onClick={logout}
-                className="hidden md:inline-flex px-4 py-2 rounded-xl text-sm font-semibold text-white bg-viva-900 hover:bg-viva-800 transition shadow-sm font-display"
+                className="hidden md:inline-flex px-4 py-2 rounded-xl text-sm font-semibold text-white bg-coop-900 hover:bg-coop-800 transition shadow-sm font-display"
               >
                 Sair
               </button>
@@ -348,8 +349,8 @@ const AppShell = () => {
               className={({ isActive }) =>
                 `min-h-[52px] px-1 py-1 text-[11px] font-semibold text-center transition flex flex-col items-center justify-center gap-1 rounded-xl font-display ${
                   isActive
-                    ? 'text-viva-900 bg-viva-100/90'
-                    : 'text-viva-700 hover:bg-viva-50/60'
+                    ? 'text-coop-900 bg-coop-100/90'
+                    : 'text-coop-700 hover:bg-coop-50/60'
                 }`
               }
             >
@@ -359,7 +360,7 @@ const AppShell = () => {
           ))}
           <button
             onClick={() => setIsMoreMenuOpen(true)}
-            className="min-h-[52px] px-1 py-1 text-[11px] font-semibold text-viva-700 hover:bg-viva-50/60 transition flex flex-col items-center justify-center gap-1 rounded-xl font-display"
+            className="min-h-[52px] px-1 py-1 text-[11px] font-semibold text-coop-700 hover:bg-coop-50/60 transition flex flex-col items-center justify-center gap-1 rounded-xl font-display"
           >
             <span className="text-lg leading-none">⋯</span>
             <span>Mais</span>
@@ -375,12 +376,12 @@ const AppShell = () => {
             onClick={() => setIsMoreMenuOpen(false)}
           />
           <aside className="fixed right-0 top-0 bottom-0 z-50 w-80 max-w-[90vw] bg-white/98 backdrop-blur-xl border-l border-[var(--app-border)] shadow-2xl rounded-l-2xl overflow-hidden flex flex-col animate-slide-in-right">
-            <div className="flex-none border-b border-viva-200/60 bg-gradient-to-b from-viva-50/50 to-transparent px-5 py-4">
+            <div className="flex-none border-b border-coop-200/60 bg-gradient-to-b from-coop-50/50 to-transparent px-5 py-4">
               <div className="flex items-center justify-between">
-                <h3 className="text-sm font-bold uppercase tracking-widest text-viva-700 font-display">Menu</h3>
+                <h3 className="text-sm font-bold uppercase tracking-widest text-coop-700 font-display">Menu</h3>
                 <button
                   onClick={() => setIsMoreMenuOpen(false)}
-                  className="flex items-center justify-center w-9 h-9 rounded-xl bg-viva-100 text-viva-700 hover:bg-viva-200 transition"
+                  className="flex items-center justify-center w-9 h-9 rounded-xl bg-coop-100 text-coop-700 hover:bg-coop-200 transition"
                   aria-label="Fechar"
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -391,9 +392,9 @@ const AppShell = () => {
             </div>
 
             <div className="flex-1 overflow-y-auto p-5">
-              <div className="rounded-2xl border border-viva-200/60 bg-gradient-to-br from-viva-50/80 to-viva-100/40 px-4 py-3">
-                <p className="text-sm font-semibold text-viva-900 truncate font-display">{user?.nomeCompleto || 'Usuário'}</p>
-                <p className="text-xs text-viva-600 mt-0.5 font-serif">
+              <div className="rounded-2xl border border-coop-200/60 bg-gradient-to-br from-coop-50/80 to-coop-100/40 px-4 py-3">
+                <p className="text-sm font-semibold text-coop-900 truncate font-display">{user?.nomeCompleto || 'Usuário'}</p>
+                <p className="text-xs text-coop-600 mt-0.5 font-serif">
                   {isMaster ? 'Perfil Master' : 'Perfil Profissional'}
                 </p>
               </div>
@@ -404,7 +405,7 @@ const AppShell = () => {
                   onClick={() => setIsMoreMenuOpen(false)}
                   className={({ isActive }) =>
                     `flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition ${
-                      isActive ? 'bg-viva-900 text-white shadow-sm' : 'bg-viva-100/60 text-viva-900 hover:bg-viva-100'
+                      isActive ? 'bg-coop-900 text-white shadow-sm' : 'bg-coop-100/60 text-coop-900 hover:bg-coop-100'
                     }`
                   }
                 >
@@ -412,7 +413,7 @@ const AppShell = () => {
                     <>
                       <span
                         className={`flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center ${
-                          isActive ? 'bg-white/20 text-white' : 'bg-viva-200/50 text-viva-700'
+                          isActive ? 'bg-white/20 text-white' : 'bg-coop-200/50 text-coop-700'
                         }`}
                       >
                         {getMobileIcon(dashboardItem.label)}
@@ -424,7 +425,7 @@ const AppShell = () => {
 
                 {menuGroups.map((group) => (
                   <div key={group.title}>
-                    <p className="text-[11px] font-semibold uppercase tracking-wider text-viva-600 mb-2 px-1 font-display">{group.title}</p>
+                    <p className="text-[11px] font-semibold uppercase tracking-wider text-coop-600 mb-2 px-1 font-display">{group.title}</p>
                     <div className="space-y-1">
                       {group.items.map((item) => (
                         <NavLink
@@ -433,7 +434,7 @@ const AppShell = () => {
                           onClick={() => setIsMoreMenuOpen(false)}
                           className={({ isActive }) =>
                             `flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition ${
-                              isActive ? 'bg-viva-900 text-white shadow-sm' : 'bg-viva-100/60 text-viva-900 hover:bg-viva-100'
+                              isActive ? 'bg-coop-900 text-white shadow-sm' : 'bg-coop-100/60 text-coop-900 hover:bg-coop-100'
                             }`
                           }
                         >
@@ -441,7 +442,7 @@ const AppShell = () => {
                             <>
                               <span
                                 className={`flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center ${
-                                  isActive ? 'bg-white/20 text-white' : 'bg-viva-200/50 text-viva-700'
+                                  isActive ? 'bg-white/20 text-white' : 'bg-coop-200/50 text-coop-700'
                                 }`}
                               >
                                 {getMobileIcon(item.label)}
@@ -457,10 +458,10 @@ const AppShell = () => {
               </nav>
             </div>
 
-            <div className="flex-none p-5 border-t border-viva-200/60 bg-viva-50/30">
+            <div className="flex-none p-5 border-t border-coop-200/60 bg-coop-50/30">
               <button
                 onClick={logout}
-                className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-sm font-semibold text-white bg-viva-900 hover:bg-viva-800 transition shadow-sm"
+                className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-sm font-semibold text-white bg-coop-900 hover:bg-coop-800 transition shadow-sm"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />

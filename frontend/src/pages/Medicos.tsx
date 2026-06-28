@@ -230,7 +230,7 @@ const Medicos = () => {
   if (!isMaster) {
     return (
       <div className="card border-l-4 border-red-400">
-        <h2 className="text-xl font-bold text-viva-900 mb-2">Acesso restrito</h2>
+        <h2 className="text-xl font-bold text-coop-900 mb-2">Acesso restrito</h2>
         <p className="text-gray-600">Esta área é exclusiva para o perfil Master.</p>
       </div>
     );
@@ -268,7 +268,7 @@ const Medicos = () => {
 
   return (
     <div className="card hover:shadow-lg transition-shadow">
-      <h2 className="text-2xl font-bold text-viva-900 mb-1">Médicos</h2>
+      <h2 className="text-2xl font-bold text-coop-900 mb-1">Médicos</h2>
       <p className="text-gray-600 mb-6">Lista de profissionais vinculados ao seu tenant.</p>
 
       <form
@@ -303,7 +303,7 @@ const Medicos = () => {
           )}
         </div>
         <div className="flex items-center gap-2">
-          <label htmlFor="filter-status" className="text-sm font-medium text-viva-800 whitespace-nowrap">
+          <label htmlFor="filter-status" className="text-sm font-medium text-coop-800 whitespace-nowrap">
             Status:
           </label>
           <select
@@ -329,10 +329,10 @@ const Medicos = () => {
         </p>
       ) : (
         <>
-          <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-viva-200/60 bg-viva-50/50 px-4 py-3">
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-coop-200/60 bg-coop-50/50 px-4 py-3">
             <div className="min-w-[220px] flex-1">
-              <p className="text-[10px] font-semibold uppercase tracking-wider text-viva-600 font-display">Profissional selecionado</p>
-              <p className="text-sm font-semibold text-viva-900 font-display truncate">{selectedLabel}</p>
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-coop-600 font-display">Profissional selecionado</p>
+              <p className="text-sm font-semibold text-coop-900 font-display truncate">{selectedLabel}</p>
             </div>
             <div className="flex flex-wrap items-center gap-2">
               <button
@@ -349,7 +349,7 @@ const Medicos = () => {
           <div className="overflow-x-auto">
             <table className="min-w-full text-sm">
               <thead>
-                <tr className="text-left text-viva-700 border-b">
+                <tr className="text-left text-coop-700 border-b">
                   <th className="py-2 pr-4">Nome</th>
                   <th className="py-2 pr-4">Profissão</th>
                   <th className="py-2 pr-4">CRM</th>
@@ -376,12 +376,12 @@ const Medicos = () => {
                   <tr
                     key={medico.id}
                     className={`border-b last:border-b-0 cursor-pointer ${
-                      selectedMedico?.id === medico.id ? 'bg-viva-50/70' : 'hover:bg-viva-50/40'
+                      selectedMedico?.id === medico.id ? 'bg-coop-50/70' : 'hover:bg-coop-50/40'
                     }`}
                     onClick={() => setSelectedMedico(medico)}
                     title="Clique para selecionar"
                   >
-                    <td className="py-2 pr-4 font-medium text-viva-900">
+                    <td className="py-2 pr-4 font-medium text-coop-900">
                       {fixMojibake(medico.nomeCompleto)}
                     </td>
                     <td className="py-2 pr-4 text-gray-700">{fixMojibake(medico.profissao ?? '-')}</td>
@@ -412,7 +412,7 @@ const Medicos = () => {
                             </p>
                             <button
                               type="button"
-                              className="text-xs font-semibold text-viva-700 hover:text-viva-900 underline-offset-2 hover:underline"
+                              className="text-xs font-semibold text-coop-700 hover:text-coop-900 underline-offset-2 hover:underline"
                               onClick={() => setEquipesModalMedico(medico)}
                             >
                               Gerir equipes
@@ -434,10 +434,10 @@ const Medicos = () => {
                     </td>
                     <td className="py-2 pr-4" onClick={(e) => e.stopPropagation()}>
                       {isLoading ? (
-                        <span className="text-xs text-viva-400">…</span>
+                        <span className="text-xs text-coop-400">…</span>
                       ) : !docusealResumoResp?.data?.configured ? (
                         <span
-                          className="text-xs text-viva-400"
+                          className="text-xs text-coop-400"
                           title="No servidor: DOCUSEAL_URL (URL público do DocuSeal) + DOCUSEAL_API_KEY (token em Definições → API)."
                         >
                           —
@@ -450,9 +450,9 @@ const Medicos = () => {
                           Erro
                         </span>
                       ) : !emailChaveDocuseal(medico.email) ? (
-                        <span className="text-xs text-viva-500">Sem e-mail</span>
+                        <span className="text-xs text-coop-500">Sem e-mail</span>
                       ) : loadingDocusealResumo ? (
-                        <span className="text-xs text-viva-500">…</span>
+                        <span className="text-xs text-coop-500">…</span>
                       ) : (
                         (() => {
                           const k = emailChaveDocuseal(medico.email);
@@ -520,7 +520,7 @@ const Medicos = () => {
                               type="button"
                               onClick={open}
                               title="Pedidos de assinatura concluídos nos documentos configurados, ou nada a tratar. Abra para rever o detalhe."
-                              className="text-xs font-semibold text-viva-700 bg-viva-100/90 border border-viva-200/80 rounded-full px-2.5 py-0.5 hover:bg-viva-100 transition"
+                              className="text-xs font-semibold text-coop-700 bg-coop-100/90 border border-coop-200/80 rounded-full px-2.5 py-0.5 hover:bg-coop-100 transition"
                             >
                               Concluído
                             </button>
@@ -535,8 +535,8 @@ const Medicos = () => {
           </div>
 
           {totalPages > 1 && (
-            <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-viva-200 pt-4">
-              <p className="text-sm text-viva-700">
+            <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-coop-200 pt-4">
+              <p className="text-sm text-coop-700">
                 Exibindo <strong>{from}</strong> a <strong>{to}</strong> de <strong>{total}</strong> médicos
               </p>
               <div className="flex items-center gap-2">
@@ -544,18 +544,18 @@ const Medicos = () => {
                   type="button"
                   onClick={() => setPage((p) => Math.max(1, p - 1))}
                   disabled={page <= 1}
-                  className="px-3 py-1.5 rounded-lg text-sm font-semibold text-viva-800 bg-viva-100 hover:bg-viva-200 disabled:opacity-50 disabled:cursor-not-allowed transition"
+                  className="px-3 py-1.5 rounded-lg text-sm font-semibold text-coop-800 bg-coop-100 hover:bg-coop-200 disabled:opacity-50 disabled:cursor-not-allowed transition"
                 >
                   Anterior
                 </button>
-                <span className="text-sm text-viva-700 px-2">
+                <span className="text-sm text-coop-700 px-2">
                   Página {page} de {totalPages}
                 </span>
                 <button
                   type="button"
                   onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
                   disabled={page >= totalPages}
-                  className="px-3 py-1.5 rounded-lg text-sm font-semibold text-viva-800 bg-viva-100 hover:bg-viva-200 disabled:opacity-50 disabled:cursor-not-allowed transition"
+                  className="px-3 py-1.5 rounded-lg text-sm font-semibold text-coop-800 bg-coop-100 hover:bg-coop-200 disabled:opacity-50 disabled:cursor-not-allowed transition"
                 >
                   Próxima
                 </button>
@@ -578,20 +578,20 @@ const Medicos = () => {
             }}
           >
             <div
-              className="card w-full max-w-lg border border-viva-200/70 shadow-2xl my-8"
+              className="card w-full max-w-lg border border-coop-200/70 shadow-2xl my-8"
               onClick={(e) => e.stopPropagation()}
             >
-              <div className="flex items-start justify-between gap-3 border-b border-viva-100 px-4 py-3">
+              <div className="flex items-start justify-between gap-3 border-b border-coop-100 px-4 py-3">
                 <div className="min-w-0">
-                  <h3 id="equipes-medico-modal-title" className="text-base font-bold text-viva-900 font-display">
+                  <h3 id="equipes-medico-modal-title" className="text-base font-bold text-coop-900 font-display">
                     Equipes do profissional
                   </h3>
-                  <p className="text-xs text-viva-600 font-serif truncate">{fixMojibake(equipesModalMedico.nomeCompleto)}</p>
-                  <p className="text-[10px] text-viva-500">{formatCRM(equipesModalMedico.crm ?? '')}</p>
+                  <p className="text-xs text-coop-600 font-serif truncate">{fixMojibake(equipesModalMedico.nomeCompleto)}</p>
+                  <p className="text-[10px] text-coop-500">{formatCRM(equipesModalMedico.crm ?? '')}</p>
                 </div>
                 <button
                   type="button"
-                  className="btn text-sm border border-viva-300 bg-white text-viva-800 shrink-0"
+                  className="btn text-sm border border-coop-300 bg-white text-coop-800 shrink-0"
                   onClick={() => {
                     setEquipesModalMedico(null);
                     setBuscaEquipesModal('');
@@ -607,9 +607,9 @@ const Medicos = () => {
                   </p>
                 )}
                 {loadingTodasEquipes ? (
-                  <p className="text-sm text-viva-600 font-serif">A carregar equipes…</p>
+                  <p className="text-sm text-coop-600 font-serif">A carregar equipes…</p>
                 ) : todasEquipesOrdenadas.length === 0 ? (
-                  <p className="text-sm text-viva-700 font-serif">Não há equipes cadastradas neste tenant.</p>
+                  <p className="text-sm text-coop-700 font-serif">Não há equipes cadastradas neste tenant.</p>
                 ) : (
                   <>
                     <label htmlFor="busca-equipes-modal" className="sr-only">
@@ -627,11 +627,11 @@ const Medicos = () => {
                     />
                     <div className="max-h-[min(65vh,420px)] overflow-y-auto -mx-1 px-1">
                       {equipesModalFiltradas.length === 0 ? (
-                        <p className="text-sm text-viva-600 font-serif py-2">
+                        <p className="text-sm text-coop-600 font-serif py-2">
                           Nenhuma equipe corresponde à pesquisa.
                         </p>
                       ) : (
-                        <ul className="divide-y divide-viva-100">
+                        <ul className="divide-y divide-coop-100">
                           {equipesModalFiltradas.map((eq) => {
                             const isMember = (equipesModalMedico.equipes ?? []).some((e) => e.id === eq.id);
                             const mid = equipesModalMedico.id;
@@ -647,19 +647,19 @@ const Medicos = () => {
                             return (
                               <li key={eq.id} className="flex flex-wrap items-center justify-between gap-2 py-3 first:pt-0">
                                 <div className="min-w-0 flex-1">
-                                  <p className="text-sm font-semibold text-viva-900">{fixMojibake(eq.nome)}</p>
+                                  <p className="text-sm font-semibold text-coop-900">{fixMojibake(eq.nome)}</p>
                                   {eq.subgrupo ? (
-                                    <p className="text-[11px] text-viva-600 mt-0.5">
+                                    <p className="text-[11px] text-coop-600 mt-0.5">
                                       <span>{fixMojibake(eq.subgrupo.nome)}</span>
                                       {contratosEq.length > 0 ? (
                                         <>
-                                          <span className="text-viva-400"> · </span>
+                                          <span className="text-coop-400"> · </span>
                                           <span>{contratosEq.map((n) => fixMojibake(n)).join(', ')}</span>
                                         </>
                                       ) : null}
                                     </p>
                                   ) : contratosEq.length > 0 ? (
-                                    <p className="text-[11px] text-viva-600 mt-0.5">{contratosEq.map((n) => fixMojibake(n)).join(', ')}</p>
+                                    <p className="text-[11px] text-coop-600 mt-0.5">{contratosEq.map((n) => fixMojibake(n)).join(', ')}</p>
                                   ) : null}
                                   {!eq.ativo ? (
                                     <span className="mt-1 inline-block text-[10px] font-bold uppercase text-amber-900 bg-amber-100 px-2 py-0.5 rounded-full">
@@ -717,18 +717,18 @@ const Medicos = () => {
                 }}
               >
                 <div
-                  className="card w-full max-w-sm border border-viva-200/90 shadow-xl"
+                  className="card w-full max-w-sm border border-coop-200/90 shadow-xl"
                   onClick={(e) => e.stopPropagation()}
                 >
-                  <h3 id="confirm-add-equipe-title" className="text-base font-bold text-viva-900 font-display px-4 pt-4">
+                  <h3 id="confirm-add-equipe-title" className="text-base font-bold text-coop-900 font-display px-4 pt-4">
                     Adicionar à equipe?
                   </h3>
-                  <p className="text-sm text-viva-700 font-serif px-4 pt-2 pb-1">
+                  <p className="text-sm text-coop-700 font-serif px-4 pt-2 pb-1">
                     Adicionar <strong>{fixMojibake(equipesModalMedico.nomeCompleto)}</strong> à equipe{' '}
                     <strong>{confirmAddMedicoEquipe.equipeNome}</strong>?
                   </p>
-                  <p className="text-xs text-viva-600 font-serif px-4 pb-4">Confirme para evitar alterações por engano.</p>
-                  <div className="flex flex-wrap justify-end gap-2 border-t border-viva-100 px-4 py-3">
+                  <p className="text-xs text-coop-600 font-serif px-4 pb-4">Confirme para evitar alterações por engano.</p>
+                  <div className="flex flex-wrap justify-end gap-2 border-t border-coop-100 px-4 py-3">
                     <button
                       type="button"
                       className="btn btn-secondary"
@@ -768,20 +768,20 @@ const Medicos = () => {
             onClick={() => setDocusealModalMedico(null)}
           >
             <div
-              className="card w-full max-w-lg border border-viva-200/70 shadow-2xl my-8"
+              className="card w-full max-w-lg border border-coop-200/70 shadow-2xl my-8"
               onClick={(e) => e.stopPropagation()}
             >
-              <div className="flex items-start justify-between gap-3 border-b border-viva-100 px-4 py-3">
+              <div className="flex items-start justify-between gap-3 border-b border-coop-100 px-4 py-3">
                 <div className="min-w-0">
-                  <h3 id="docuseal-modal-title" className="text-base font-bold text-viva-900 font-display">
+                  <h3 id="docuseal-modal-title" className="text-base font-bold text-coop-900 font-display">
                     Documentos para assinatura (DocuSeal)
                   </h3>
-                  <p className="text-xs text-viva-600 font-serif truncate">{fixMojibake(docusealModalMedico.nomeCompleto)}</p>
-                  <p className="text-[10px] text-viva-500 truncate">{docusealModalMedico.email || '—'}</p>
+                  <p className="text-xs text-coop-600 font-serif truncate">{fixMojibake(docusealModalMedico.nomeCompleto)}</p>
+                  <p className="text-[10px] text-coop-500 truncate">{docusealModalMedico.email || '—'}</p>
                 </div>
                 <button
                   type="button"
-                  className="btn text-sm border border-viva-300 bg-white text-viva-800 shrink-0"
+                  className="btn text-sm border border-coop-300 bg-white text-coop-800 shrink-0"
                   onClick={() => setDocusealModalMedico(null)}
                 >
                   Fechar
@@ -789,17 +789,17 @@ const Medicos = () => {
               </div>
               <div className="px-4 py-4 max-h-[min(70vh,520px)] overflow-y-auto">
                 {loadingPainelDoc ? (
-                  <p className="text-sm text-viva-600 font-serif">A carregar documentos…</p>
+                  <p className="text-sm text-coop-600 font-serif">A carregar documentos…</p>
                 ) : (() => {
                   const pd = painelDocResp?.data;
                   if (!pd) {
-                    return <p className="text-sm text-viva-600 font-serif">Sem dados.</p>;
+                    return <p className="text-sm text-coop-600 font-serif">Sem dados.</p>;
                   }
                   if (!pd.configured) {
                     return (
-                      <p className="text-sm text-viva-700 font-serif">
-                        DocuSeal não está ligado. Defina <code className="text-xs bg-viva-100 px-1 rounded">DOCUSEAL_URL</code> +{' '}
-                        <code className="text-xs bg-viva-100 px-1 rounded">DOCUSEAL_API_KEY</code> no servidor.
+                      <p className="text-sm text-coop-700 font-serif">
+                        DocuSeal não está ligado. Defina <code className="text-xs bg-coop-100 px-1 rounded">DOCUSEAL_URL</code> +{' '}
+                        <code className="text-xs bg-coop-100 px-1 rounded">DOCUSEAL_API_KEY</code> no servidor.
                       </p>
                     );
                   }
@@ -808,7 +808,7 @@ const Medicos = () => {
                   }
                   if (pd.documentos.length === 0) {
                     return (
-                      <p className="text-sm text-viva-700 font-serif">
+                      <p className="text-sm text-coop-700 font-serif">
                         Nenhum documento de assinatura está configurado para este ambiente.
                       </p>
                     );
@@ -826,10 +826,10 @@ const Medicos = () => {
                         {pd.documentos.map((doc) => (
                           <li
                             key={doc.templateId}
-                            className="rounded-lg border border-viva-200/60 bg-viva-50/40 p-3 text-sm"
+                            className="rounded-lg border border-coop-200/60 bg-coop-50/40 p-3 text-sm"
                           >
                             <div className="flex flex-wrap items-start justify-between gap-2">
-                              <p className="font-semibold text-viva-900">{doc.templateName}</p>
+                              <p className="font-semibold text-coop-900">{doc.templateName}</p>
                               <span
                                 className={`text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full shrink-0 ${
                                   doc.status === 'nao_enviado'
@@ -845,7 +845,7 @@ const Medicos = () => {
                               </span>
                             </div>
                             {doc.submissionId != null && doc.submissionId > 0 ? (
-                              <p className="text-[10px] text-viva-500 mt-0.5">Submissão #{doc.submissionId}</p>
+                              <p className="text-[10px] text-coop-500 mt-0.5">Submissão #{doc.submissionId}</p>
                             ) : null}
                             <div className="mt-2 flex flex-wrap gap-2">
                               {doc.status === 'nao_enviado' ? (
@@ -929,17 +929,17 @@ const Medicos = () => {
             onClick={() => setPontoModalOpen(false)}
           >
             <div
-              className="card w-full sm:max-w-5xl border border-viva-200/70 shadow-2xl overflow-hidden flex flex-col rounded-none sm:rounded-2xl h-[100svh] sm:h-auto sm:max-h-[90vh]"
+              className="card w-full sm:max-w-5xl border border-coop-200/70 shadow-2xl overflow-hidden flex flex-col rounded-none sm:rounded-2xl h-[100svh] sm:h-auto sm:max-h-[90vh]"
               onClick={(e) => e.stopPropagation()}
             >
-              <div className="flex-none bg-white/95 backdrop-blur-sm border-b border-viva-100 px-4 sm:px-5 py-4 flex items-start justify-between gap-3">
+              <div className="flex-none bg-white/95 backdrop-blur-sm border-b border-coop-100 px-4 sm:px-5 py-4 flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <h3 className="text-base font-bold text-viva-900 font-display">Histórico de pontos</h3>
-                  <p className="text-xs text-viva-600 font-serif truncate">{selectedLabel}</p>
+                  <h3 className="text-base font-bold text-coop-900 font-display">Histórico de pontos</h3>
+                  <p className="text-xs text-coop-600 font-serif truncate">{selectedLabel}</p>
                 </div>
                 <button
                   type="button"
-                  className="btn text-sm border border-viva-300 bg-white text-viva-800"
+                  className="btn text-sm border border-coop-300 bg-white text-coop-800"
                   onClick={() => setPontoModalOpen(false)}
                 >
                   Fechar
@@ -947,13 +947,13 @@ const Medicos = () => {
               </div>
 
               <div className="flex-1 overflow-y-auto px-4 sm:px-5 pb-5">
-                <div className="mt-4 flex flex-wrap items-end gap-3 rounded-xl border border-viva-200/60 bg-viva-50/50 p-3">
+                <div className="mt-4 flex flex-wrap items-end gap-3 rounded-xl border border-coop-200/60 bg-coop-50/50 p-3">
                   <div className="min-w-[160px]">
-                    <label className="block text-[10px] font-semibold uppercase tracking-wider text-viva-600 font-display mb-1">Início</label>
+                    <label className="block text-[10px] font-semibold uppercase tracking-wider text-coop-600 font-display mb-1">Início</label>
                     <input type="date" className="input w-full" value={pontoInicio} onChange={(e) => setPontoInicio(e.target.value)} />
                   </div>
                   <div className="min-w-[160px]">
-                    <label className="block text-[10px] font-semibold uppercase tracking-wider text-viva-600 font-display mb-1">Fim</label>
+                    <label className="block text-[10px] font-semibold uppercase tracking-wider text-coop-600 font-display mb-1">Fim</label>
                     <input type="date" className="input w-full" value={pontoFim} onChange={(e) => setPontoFim(e.target.value)} />
                   </div>
                   <button
@@ -970,14 +970,14 @@ const Medicos = () => {
 
                 <div className="mt-4">
                   {loadingPontos ? (
-                    <p className="text-sm text-viva-700">Carregando registros...</p>
+                    <p className="text-sm text-coop-700">Carregando registros...</p>
                   ) : registrosPonto.length === 0 ? (
-                    <p className="text-sm text-viva-700">Nenhum registro encontrado.</p>
+                    <p className="text-sm text-coop-700">Nenhum registro encontrado.</p>
                   ) : (
                     <div className="overflow-x-auto">
                       <table className="min-w-full text-sm">
                         <thead>
-                          <tr className="text-left text-viva-700 border-b">
+                          <tr className="text-left text-coop-700 border-b">
                             <th className="py-2 pr-4">Check-in</th>
                             <th className="py-2 pr-4">Check-out</th>
                             <th className="py-2 pr-4">Duração</th>
@@ -995,11 +995,11 @@ const Medicos = () => {
                           const hasFoto = typeof r.fotoCheckinCaminho === 'string' && r.fotoCheckinCaminho.trim().length > 0;
                             return (
                               <tr key={r.id} className="border-b last:border-b-0">
-                                <td className="py-2 pr-4 text-viva-900">{checkIn}</td>
-                                <td className="py-2 pr-4 text-viva-900">{checkOut}</td>
-                                <td className="py-2 pr-4 text-viva-900">{dur}</td>
-                                <td className="py-2 pr-4 text-viva-900">{escalaNome}</td>
-                                <td className="py-2 pr-4 text-viva-900">{r.origem ?? '—'}</td>
+                                <td className="py-2 pr-4 text-coop-900">{checkIn}</td>
+                                <td className="py-2 pr-4 text-coop-900">{checkOut}</td>
+                                <td className="py-2 pr-4 text-coop-900">{dur}</td>
+                                <td className="py-2 pr-4 text-coop-900">{escalaNome}</td>
+                                <td className="py-2 pr-4 text-coop-900">{r.origem ?? '—'}</td>
                                 <td className="py-2 pr-4">
                                   {hasFoto ? (
                                     <button
@@ -1026,7 +1026,7 @@ const Medicos = () => {
                                       Ver
                                     </button>
                                   ) : (
-                                    <span className="text-xs text-viva-600">—</span>
+                                    <span className="text-xs text-coop-600">—</span>
                                   )}
                                 </td>
                               </tr>

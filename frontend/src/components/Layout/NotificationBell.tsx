@@ -165,7 +165,7 @@ const NotificationBell = () => {
             queryClient.invalidateQueries({ queryKey: ['medico', 'notificacoes'] });
           }
         }}
-        className="relative flex items-center justify-center w-10 h-10 rounded-xl border border-viva-200/70 bg-white/90 text-viva-800 shadow-[0_1px_2px_rgba(8,50,20,0.05)] hover:bg-viva-50/95 hover:border-viva-200 transition"
+        className="relative flex items-center justify-center w-10 h-10 rounded-xl border border-coop-200/70 bg-white/90 text-coop-800 shadow-[0_1px_2px_rgba(8,50,20,0.05)] hover:bg-coop-50/95 hover:border-coop-200 transition"
         aria-label="Notificações"
         aria-expanded={open}
       >
@@ -178,7 +178,7 @@ const NotificationBell = () => {
           />
         </svg>
         {unreadCount > 0 && (
-          <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 flex items-center justify-center rounded-full bg-viva-900 text-[10px] font-bold text-white">
+          <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 flex items-center justify-center rounded-full bg-coop-900 text-[10px] font-bold text-white">
             {unreadCount > 99 ? '99+' : unreadCount}
           </span>
         )}
@@ -187,13 +187,13 @@ const NotificationBell = () => {
       {open && (
         <div
           className="absolute right-0 top-full mt-2 w-[min(100vw-2rem,22rem)] max-h-[min(70vh,440px)] z-50 flex flex-col overflow-hidden animate-fade-in rounded-2xl
-          border border-viva-200/70 bg-gradient-to-b from-white via-white to-viva-50/[0.35]
+          border border-coop-200/70 bg-gradient-to-b from-white via-white to-coop-50/[0.35]
           shadow-[0_16px_48px_-12px_rgba(8,50,20,0.18),0_4px_16px_-4px_rgba(8,50,20,0.08)]
-          ring-1 ring-viva-900/[0.04] backdrop-blur-xl"
+          ring-1 ring-coop-900/[0.04] backdrop-blur-xl"
         >
-          <div className="flex-none flex items-center justify-between gap-2 px-4 py-3 border-b border-viva-200/50 bg-gradient-to-r from-viva-50/95 via-white/90 to-viva-50/40">
+          <div className="flex-none flex items-center justify-between gap-2 px-4 py-3 border-b border-coop-200/50 bg-gradient-to-r from-coop-50/95 via-white/90 to-coop-50/40">
             <div className="flex items-center gap-2.5 min-w-0">
-              <span className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-xl bg-viva-900/5 text-viva-800 ring-1 ring-viva-900/10">
+              <span className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-xl bg-coop-900/5 text-coop-800 ring-1 ring-coop-900/10">
                 <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
                   <path
                     strokeLinecap="round"
@@ -204,8 +204,8 @@ const NotificationBell = () => {
                 </svg>
               </span>
               <div className="min-w-0">
-                <p className="text-xs font-bold uppercase tracking-[0.14em] text-viva-900 font-display">Notificações</p>
-                <p className="text-[10px] text-viva-600 font-serif mt-0.5 truncate">
+                <p className="text-xs font-bold uppercase tracking-[0.14em] text-coop-900 font-display">Notificações</p>
+                <p className="text-[10px] text-coop-600 font-serif mt-0.5 truncate">
                   {loadingServer && isMedico
                     ? 'Atualizando…'
                     : merged.length === 0
@@ -219,14 +219,14 @@ const NotificationBell = () => {
                 <>
                   <button
                     type="button"
-                    className="text-[11px] text-viva-700 hover:text-viva-950 font-medium px-2.5 py-1.5 rounded-lg hover:bg-viva-100/90 transition font-display"
+                    className="text-[11px] text-coop-700 hover:text-coop-950 font-medium px-2.5 py-1.5 rounded-lg hover:bg-coop-100/90 transition font-display"
                     onClick={() => void handleMarkAllRead()}
                   >
                     Lidas
                   </button>
                   <button
                     type="button"
-                    className="text-[11px] text-viva-600 hover:text-red-700 font-medium px-2.5 py-1.5 rounded-lg hover:bg-red-50/90 transition"
+                    className="text-[11px] text-coop-600 hover:text-red-700 font-medium px-2.5 py-1.5 rounded-lg hover:bg-red-50/90 transition"
                     onClick={() => void handleClear()}
                   >
                     Limpar
@@ -236,11 +236,11 @@ const NotificationBell = () => {
             </div>
           </div>
 
-          <div className="flex-1 overflow-y-auto min-h-0 bg-viva-50/20">
+          <div className="flex-1 overflow-y-auto min-h-0 bg-coop-50/20">
             {merged.length === 0 ? (
               <div className="flex flex-col items-center justify-center px-6 py-10 text-center">
-                <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-viva-100/90 to-viva-50/50 ring-1 ring-viva-200/50 shadow-[inset_0_1px_0_rgba(255,255,255,0.6)]">
-                  <svg className="h-8 w-8 text-viva-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
+                <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-coop-100/90 to-coop-50/50 ring-1 ring-coop-200/50 shadow-[inset_0_1px_0_rgba(255,255,255,0.6)]">
+                  <svg className="h-8 w-8 text-coop-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
                     <path
                       strokeLinecap="round"
                       strokeLinejoin="round"
@@ -249,8 +249,8 @@ const NotificationBell = () => {
                     />
                   </svg>
                 </div>
-                <p className="text-xs font-semibold text-viva-900 font-display">Tudo em dia</p>
-                <p className="mt-1.5 text-[11px] text-viva-600 font-serif leading-relaxed max-w-[17rem]">
+                <p className="text-xs font-semibold text-coop-900 font-display">Tudo em dia</p>
+                <p className="mt-1.5 text-[11px] text-coop-600 font-serif leading-relaxed max-w-[17rem]">
                   {isMedico
                     ? 'Quando você for alocado a uma equipe, a uma escala ou quando surgir uma escala nova no seu contrato, avisaremos aqui.'
                     : 'Ações concluídas e avisos do sistema aparecerão aqui.'}
@@ -269,20 +269,20 @@ const NotificationBell = () => {
                     <button
                       type="button"
                       className={`w-full text-left rounded-xl px-3 py-2.5 transition border shadow-sm
-                        ${!row.read ? 'bg-white border-viva-200/80 border-l-[3px] border-l-viva-600 ring-1 ring-viva-900/[0.03]' : 'bg-white/80 border-viva-200/35 hover:bg-white hover:border-viva-200/55'}`}
+                        ${!row.read ? 'bg-white border-coop-200/80 border-l-[3px] border-l-coop-600 ring-1 ring-coop-900/[0.03]' : 'bg-white/80 border-coop-200/35 hover:bg-white hover:border-coop-200/55'}`}
                       onClick={() => void handleMarkRead(row)}
                     >
                       <div className="flex gap-2.5">
                         <span className={`mt-1.5 flex-shrink-0 w-2 h-2 rounded-full ${kindDot[row.kind]}`} aria-hidden />
                         <div className="min-w-0 flex-1">
                           {display.title && (
-                            <p className="text-xs font-semibold text-viva-900 font-display truncate">{display.title}</p>
+                            <p className="text-xs font-semibold text-coop-900 font-display truncate">{display.title}</p>
                           )}
-                          <p className="text-[11px] text-viva-800 font-serif leading-snug break-words">{display.message}</p>
+                          <p className="text-[11px] text-coop-800 font-serif leading-snug break-words">{display.message}</p>
                           <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-                            <span className="text-[10px] text-viva-500 tabular-nums">{formatTime(row.createdAt)}</span>
+                            <span className="text-[10px] text-coop-500 tabular-nums">{formatTime(row.createdAt)}</span>
                             {row.source && (
-                              <span className="text-[10px] font-medium text-viva-500 uppercase tracking-wide">
+                              <span className="text-[10px] font-medium text-coop-500 uppercase tracking-wide">
                                 {row.source}
                               </span>
                             )}

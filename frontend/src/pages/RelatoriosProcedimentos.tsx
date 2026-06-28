@@ -2839,7 +2839,7 @@ const RelatoriosProcedimentos = () => {
   if (!isMaster) {
     return (
       <div className="card border-l-4 border-red-400 max-w-2xl mx-auto">
-        <h2 className="text-lg font-bold text-viva-900">Acesso restrito</h2>
+        <h2 className="text-lg font-bold text-coop-900">Acesso restrito</h2>
       </div>
     );
   }
@@ -2848,7 +2848,7 @@ const RelatoriosProcedimentos = () => {
     <div className="max-w-[92rem] mx-auto space-y-5 pb-10 px-2 sm:px-3">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
         <div>
-          <h1 className="text-xl sm:text-2xl font-bold text-viva-900 font-display">Relatório de procedimentos</h1>
+          <h1 className="text-xl sm:text-2xl font-bold text-coop-900 font-display">Relatório de procedimentos</h1>
         </div>
         <button
           type="button"
@@ -2861,11 +2861,11 @@ const RelatoriosProcedimentos = () => {
         </button>
       </div>
 
-      <div className="rounded-2xl border border-viva-200/70 bg-white shadow-[var(--card-shadow)] overflow-hidden">
-        <div className="flex items-center justify-between gap-2 px-4 py-2.5 bg-viva-50/40 border-b border-viva-200/50">
-          <span className="text-[11px] font-semibold uppercase tracking-widest text-viva-500 font-display">Mês de referência</span>
-          <div className="flex items-center gap-2 text-sm text-viva-800">
-            <span className="text-viva-500">Ano</span>
+      <div className="rounded-2xl border border-coop-200/70 bg-white shadow-[var(--card-shadow)] overflow-hidden">
+        <div className="flex items-center justify-between gap-2 px-4 py-2.5 bg-coop-50/40 border-b border-coop-200/50">
+          <span className="text-[11px] font-semibold uppercase tracking-widest text-coop-500 font-display">Mês de referência</span>
+          <div className="flex items-center gap-2 text-sm text-coop-800">
+            <span className="text-coop-500">Ano</span>
             <select
               className="input w-auto min-w-[96px] py-1 text-sm h-8"
               value={ano}
@@ -2882,7 +2882,7 @@ const RelatoriosProcedimentos = () => {
         <div className="px-2 sm:px-3 py-3">
           <div className="relative mx-auto max-w-5xl px-1">
             <div
-              className="pointer-events-none absolute left-6 right-6 top-[19px] h-[3px] rounded-full bg-gradient-to-r from-viva-100/30 via-viva-200/90 to-viva-100/30 shadow-[inset_0_1px_0_rgba(255,255,255,0.6)]"
+              className="pointer-events-none absolute left-6 right-6 top-[19px] h-[3px] rounded-full bg-gradient-to-r from-coop-100/30 via-coop-200/90 to-coop-100/30 shadow-[inset_0_1px_0_rgba(255,255,255,0.6)]"
               aria-hidden
             />
             <div
@@ -2903,11 +2903,11 @@ const RelatoriosProcedimentos = () => {
                   className={[
                     'group relative shrink-0 flex min-w-[3.35rem] sm:min-w-[3.65rem] flex-col items-center rounded-2xl px-2 py-2',
                     'font-display font-bold transition-all duration-200 ease-out',
-                    'outline-none focus-visible:ring-2 focus-visible:ring-viva-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white',
+                    'outline-none focus-visible:ring-2 focus-visible:ring-coop-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white',
                     'active:scale-[0.96] motion-reduce:transition-none motion-reduce:active:scale-100',
                     at
-                      ? 'bg-gradient-to-b from-white via-white to-viva-50/70 text-viva-950 shadow-[0_6px_20px_-8px_rgba(15,23,42,0.18),inset_0_1px_0_rgba(255,255,255,0.95)] ring-1 ring-viva-200/90'
-                      : 'text-viva-500 hover:bg-white/70 hover:text-viva-800 hover:shadow-[0_3px_12px_-6px_rgba(15,23,42,0.12)]',
+                      ? 'bg-gradient-to-b from-white via-white to-coop-50/70 text-coop-950 shadow-[0_6px_20px_-8px_rgba(15,23,42,0.18),inset_0_1px_0_rgba(255,255,255,0.95)] ring-1 ring-coop-200/90'
+                      : 'text-coop-500 hover:bg-white/70 hover:text-coop-800 hover:shadow-[0_3px_12px_-6px_rgba(15,23,42,0.12)]',
                   ]
                     .filter(Boolean)
                     .join(' ')}
@@ -2924,8 +2924,8 @@ const RelatoriosProcedimentos = () => {
                         className={[
                           'h-[19px] w-[19px] rounded-full border-[2.5px] bg-white transition-colors duration-200',
                           at
-                            ? 'border-viva-400/95 shadow-[inset_0_1px_3px_rgba(15,23,42,0.07)] ring-2 ring-viva-200/50 ring-offset-2 ring-offset-white'
-                            : 'border-slate-300/90 group-hover:border-viva-300/95 group-hover:shadow-[inset_0_1px_2px_rgba(15,23,42,0.04)]',
+                            ? 'border-coop-400/95 shadow-[inset_0_1px_3px_rgba(15,23,42,0.07)] ring-2 ring-coop-200/50 ring-offset-2 ring-offset-white'
+                            : 'border-slate-300/90 group-hover:border-coop-300/95 group-hover:shadow-[inset_0_1px_2px_rgba(15,23,42,0.04)]',
                         ].join(' ')}
                       />
                     )}
@@ -2933,7 +2933,7 @@ const RelatoriosProcedimentos = () => {
                   <span
                     className={[
                       'mt-2 block capitalize leading-none tracking-wide text-[10px] sm:text-[11px]',
-                      at ? 'text-viva-900 font-bold' : 'text-viva-500 group-hover:text-viva-800 font-semibold',
+                      at ? 'text-coop-900 font-bold' : 'text-coop-500 group-hover:text-coop-800 font-semibold',
                     ].join(' ')}
                   >
                     {m.label}
@@ -2946,19 +2946,19 @@ const RelatoriosProcedimentos = () => {
         </div>
       </div>
 
-      <div className="relative overflow-hidden rounded-2xl border border-viva-200/50 bg-white shadow-[var(--card-shadow)]">
+      <div className="relative overflow-hidden rounded-2xl border border-coop-200/50 bg-white shadow-[var(--card-shadow)]">
         <div
-          className="pointer-events-none h-[3px] shrink-0 bg-gradient-to-r from-viva-600/85 via-teal-500/70 to-emerald-500/55 opacity-95"
+          className="pointer-events-none h-[3px] shrink-0 bg-gradient-to-r from-coop-600/85 via-teal-500/70 to-emerald-500/55 opacity-95"
           aria-hidden
         />
-        <header className="relative border-b border-viva-100/80 bg-gradient-to-br from-white via-viva-50/25 to-teal-50/10 px-4 sm:px-6 py-4 sm:py-5">
+        <header className="relative border-b border-coop-100/80 bg-gradient-to-br from-white via-coop-50/25 to-teal-50/10 px-4 sm:px-6 py-4 sm:py-5">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div className="space-y-1.5 max-w-2xl min-w-[12rem]">
               <p className="font-display text-[10px] font-bold uppercase tracking-[0.22em] text-teal-700/90">
                 Produção deste período
               </p>
-              <h2 className="font-display text-base font-bold tracking-tight text-viva-900 sm:text-lg">Quem recebe o repasse</h2>
-              <p className="font-serif text-xs leading-relaxed text-viva-600 max-w-md">
+              <h2 className="font-display text-base font-bold tracking-tight text-coop-900 sm:text-lg">Quem recebe o repasse</h2>
+              <p className="font-serif text-xs leading-relaxed text-coop-600 max-w-md">
                 Identifique médicos para o repasse e registe cirurgias por importação (.xlsx) ou lançamento manual.
               </p>
               {errMedicos && (
@@ -2982,7 +2982,7 @@ const RelatoriosProcedimentos = () => {
           <div
             role="tablist"
             aria-label="Forma de lançamento"
-            className="inline-flex w-full max-w-full flex-wrap gap-1 rounded-2xl border border-viva-200/50 bg-gradient-to-b from-slate-100/90 to-slate-50/60 p-1 shadow-inner"
+            className="inline-flex w-full max-w-full flex-wrap gap-1 rounded-2xl border border-coop-200/50 bg-gradient-to-b from-slate-100/90 to-slate-50/60 p-1 shadow-inner"
           >
             <button
               type="button"
@@ -2997,10 +2997,10 @@ const RelatoriosProcedimentos = () => {
               }}
               className={[
                 'min-h-[42px] flex-1 rounded-[12px] px-4 py-2.5 font-display text-xs font-semibold outline-none transition-all duration-200 sm:flex-none sm:min-w-[13rem]',
-                'focus-visible:ring-2 focus-visible:ring-viva-500 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-40',
+                'focus-visible:ring-2 focus-visible:ring-coop-500 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-40',
                 modoEntradaLanc === 'upload'
-                  ? 'relative bg-white text-viva-950 shadow-[0_2px_10px_-4px_rgba(15,23,42,0.18)] ring-1 ring-viva-200/60'
-                  : 'text-viva-600 hover:bg-white/55 hover:text-viva-950',
+                  ? 'relative bg-white text-coop-950 shadow-[0_2px_10px_-4px_rgba(15,23,42,0.18)] ring-1 ring-coop-200/60'
+                  : 'text-coop-600 hover:bg-white/55 hover:text-coop-950',
               ].join(' ')}
             >
               Importar Excel
@@ -3018,10 +3018,10 @@ const RelatoriosProcedimentos = () => {
               }}
               className={[
                 'min-h-[42px] flex-1 rounded-[12px] px-4 py-2.5 font-display text-xs font-semibold outline-none transition-all duration-200 sm:flex-none sm:min-w-[13rem]',
-                'focus-visible:ring-2 focus-visible:ring-viva-500 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-40',
+                'focus-visible:ring-2 focus-visible:ring-coop-500 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-40',
                 modoEntradaLanc === 'manual'
-                  ? 'relative bg-white text-viva-950 shadow-[0_2px_10px_-4px_rgba(15,23,42,0.18)] ring-1 ring-viva-200/60'
-                  : 'text-viva-600 hover:bg-white/55 hover:text-viva-950',
+                  ? 'relative bg-white text-coop-950 shadow-[0_2px_10px_-4px_rgba(15,23,42,0.18)] ring-1 ring-coop-200/60'
+                  : 'text-coop-600 hover:bg-white/55 hover:text-coop-950',
               ].join(' ')}
             >
               Preencher manualmente
@@ -3030,15 +3030,15 @@ const RelatoriosProcedimentos = () => {
 
           {modoEntradaLanc === 'upload' && (
             <div className="space-y-5" aria-busy={importProcessing}>
-              <div className="relative overflow-hidden rounded-2xl border border-viva-200/40 bg-gradient-to-br from-white via-slate-50/40 to-viva-50/20 shadow-[inset_0_1px_0_rgba(255,255,255,0.85),0_14px_40px_-24px_rgba(15,23,42,0.12)]">
+              <div className="relative overflow-hidden rounded-2xl border border-coop-200/40 bg-gradient-to-br from-white via-slate-50/40 to-coop-50/20 shadow-[inset_0_1px_0_rgba(255,255,255,0.85),0_14px_40px_-24px_rgba(15,23,42,0.12)]">
                 <div
                   className="pointer-events-none absolute inset-0 opacity-[0.5] bg-[radial-gradient(circle_at_center,rgb(148_163_184/0.085)_1.5px,transparent_1.5px)] [background-size:20px_20px]"
                   aria-hidden
                 />
                 <div className="relative space-y-4 p-4 sm:p-6">
                   <div className="flex flex-col gap-4 sm:flex-row sm:items-stretch">
-                    <div className="flex shrink-0 flex-row items-center gap-3 rounded-xl border border-white/70 bg-white/75 px-4 py-3 shadow-sm ring-1 ring-viva-200/35 sm:flex-col sm:text-center">
-                      <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-gradient-to-br from-teal-50 to-viva-50 ring-1 ring-teal-200/50">
+                    <div className="flex shrink-0 flex-row items-center gap-3 rounded-xl border border-white/70 bg-white/75 px-4 py-3 shadow-sm ring-1 ring-coop-200/35 sm:flex-col sm:text-center">
+                      <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-gradient-to-br from-teal-50 to-coop-50 ring-1 ring-teal-200/50">
                         <svg
                           xmlns="http://www.w3.org/2000/svg"
                           viewBox="0 0 24 24"
@@ -3058,22 +3058,22 @@ const RelatoriosProcedimentos = () => {
                       </div>
                       <div className="min-w-0 sm:px-0">
                         <p className="font-display text-[11px] font-bold uppercase tracking-wider text-teal-800/95">Hospitalar</p>
-                        <p className="font-display text-sm font-bold tracking-tight text-viva-900">Planilha Excel</p>
-                        <p className="font-serif text-[10px] leading-tight text-viva-500">.xlsx · .xls · pront.+TUSS</p>
+                        <p className="font-display text-sm font-bold tracking-tight text-coop-900">Planilha Excel</p>
+                        <p className="font-serif text-[10px] leading-tight text-coop-500">.xlsx · .xls · pront.+TUSS</p>
                       </div>
                     </div>
                     <div className="min-w-0 flex-1 space-y-3">
                       <div className="flex flex-wrap items-center gap-2">
                         <button
                           type="button"
-                          className="btn btn-secondary btn-sm font-display ring-1 ring-viva-200/50"
+                          className="btn btn-secondary btn-sm font-display ring-1 ring-coop-200/50"
                           onClick={baixarModeloLancamentosXlsx}
                         >
                           Descarregar modelo
                         </button>
                         <button
                           type="button"
-                          className="btn btn-secondary btn-sm font-display ring-1 ring-viva-200/50"
+                          className="btn btn-secondary btn-sm font-display ring-1 ring-coop-200/50"
                           disabled={local.concluido || importProcessing}
                           onClick={() => xlsxImportRef.current?.click()}
                         >
@@ -3099,7 +3099,7 @@ const RelatoriosProcedimentos = () => {
                         >
                           Ou colar do Excel
                         </label>
-                        <p className="mt-1 font-serif text-[11px] leading-snug text-viva-600">
+                        <p className="mt-1 font-serif text-[11px] leading-snug text-coop-600">
                           Selecione as células na planilha, copie (Ctrl+C) e cole aqui. O conteúdo colado é texto com tab entre colunas — o mesmo dado que no .xlsx.
                         </p>
                         <textarea
@@ -3120,13 +3120,13 @@ const RelatoriosProcedimentos = () => {
                         <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1">
                           <button
                             type="button"
-                            className="btn btn-secondary btn-sm font-display ring-1 ring-viva-200/45"
+                            className="btn btn-secondary btn-sm font-display ring-1 ring-coop-200/45"
                             disabled={local.concluido || importProcessing}
                             onClick={processarTextoColadoLancamentos}
                           >
                             Processar texto colado
                           </button>
-                          <span className="font-serif text-[10px] text-viva-500">Atalho: Ctrl+Enter</span>
+                          <span className="font-serif text-[10px] text-coop-500">Atalho: Ctrl+Enter</span>
                         </div>
                       </div>
                       {importProcessing && (
@@ -3140,8 +3140,8 @@ const RelatoriosProcedimentos = () => {
                     aria-hidden
                   />
                   <div className="min-w-0">
-                    <p className="text-sm font-display font-semibold text-viva-950">A ler e analisar a planilha…</p>
-                    <p className="font-serif text-[11px] text-viva-600 mt-1 leading-snug">
+                    <p className="text-sm font-display font-semibold text-coop-950">A ler e analisar a planilha…</p>
+                    <p className="font-serif text-[11px] text-coop-600 mt-1 leading-snug">
                       Ficheiros grandes levam vários segundos. Este passo faz a leitura do Excel na totalidade antes de mostrar o resultado.
                     </p>
                   </div>
@@ -3187,8 +3187,8 @@ const RelatoriosProcedimentos = () => {
                   local.concluido || importProcessing
                     ? 'border-slate-200 bg-slate-50 text-slate-400 cursor-not-allowed'
                     : importDragActive
-                      ? 'border-teal-500/90 bg-teal-50/50 text-viva-950 shadow-[inset_0_0_0_1px_rgba(45,212,191,0.35)] cursor-pointer scale-[1.01]'
-                      : 'border-viva-200/90 bg-white/90 text-viva-800 hover:border-teal-400/70 hover:bg-gradient-to-br hover:from-white hover:to-teal-50/20 cursor-pointer',
+                      ? 'border-teal-500/90 bg-teal-50/50 text-coop-950 shadow-[inset_0_0_0_1px_rgba(45,212,191,0.35)] cursor-pointer scale-[1.01]'
+                      : 'border-coop-200/90 bg-white/90 text-coop-800 hover:border-teal-400/70 hover:bg-gradient-to-br hover:from-white hover:to-teal-50/20 cursor-pointer',
                 ].join(' ')}
                 >
                 {!(local.concluido || importProcessing) ? (
@@ -3203,10 +3203,10 @@ const RelatoriosProcedimentos = () => {
                 ) : (
                   <span className="mx-auto mb-3 block h-10 w-10 rounded-xl bg-slate-200/80" aria-hidden />
                 )}
-                <p className="font-display text-sm font-semibold text-viva-900 tracking-tight">
+                <p className="font-display text-sm font-semibold text-coop-900 tracking-tight">
                   {importProcessing ? 'Aguarde, a processar o ficheiro…' : 'Largue aqui o ficheiro Excel ou clique para selecionar'}
                 </p>
-                <p className="font-serif text-[11px] text-viva-600 mt-2 max-w-[20rem] mx-auto leading-snug">
+                <p className="font-serif text-[11px] text-coop-600 mt-2 max-w-[20rem] mx-auto leading-snug">
                   {importProcessing
                     ? 'Não feche esta página até aparecer mensagem ou pré-visualização.'
                     : 'Cirurgia com dois nomes separados por « / » e valor total — cruza automaticamente com a base TUSS.'}
@@ -3216,9 +3216,9 @@ const RelatoriosProcedimentos = () => {
                   </div>
 
               {importPreview && importPreview.linhas.length > 0 && (
-                <div className="rounded-lg border border-viva-200 bg-white overflow-hidden shadow-sm">
-                  <div className="border-b border-viva-200/80 bg-amber-50/50 px-3 py-2">
-                    <p className="text-xs font-display font-bold text-viva-900">
+                <div className="rounded-lg border border-coop-200 bg-white overflow-hidden shadow-sm">
+                  <div className="border-b border-coop-200/80 bg-amber-50/50 px-3 py-2">
+                    <p className="text-xs font-display font-bold text-coop-900">
                       Pré-visualização ({importPreview.linhas.length} lançamento
                       {importPreview.linhas.length !== 1 ? 's' : ''}) — ainda não gravado
                     </p>
@@ -3256,25 +3256,25 @@ const RelatoriosProcedimentos = () => {
                           return (
                             <tr
                               key={l.id}
-                              className={i % 2 ? 'bg-viva-50/30' : 'bg-white border-t border-slate-100'}
+                              className={i % 2 ? 'bg-coop-50/30' : 'bg-white border-t border-slate-100'}
                             >
-                              <td className="px-1.5 py-1 font-semibold text-viva-900">{i + 1}</td>
-                              <td className="px-1.5 py-1 text-viva-800">{formatarDataISO(l.dataProcedimento)}</td>
+                              <td className="px-1.5 py-1 font-semibold text-coop-900">{i + 1}</td>
+                              <td className="px-1.5 py-1 text-coop-800">{formatarDataISO(l.dataProcedimento)}</td>
                               <td
-                                className="px-1.5 py-1 font-serif text-viva-800 max-w-[7rem] truncate"
+                                className="px-1.5 py-1 font-serif text-coop-800 max-w-[7rem] truncate"
                                 title={l.nomePaciente || undefined}
                               >
                                 {l.nomePaciente || '—'}
                               </td>
-                              <td className="px-1.5 py-1 font-mono text-viva-700">{l.prontuario || '—'}</td>
+                              <td className="px-1.5 py-1 font-mono text-coop-700">{l.prontuario || '—'}</td>
                               <td
-                                className="px-1.5 py-1 font-serif text-viva-800 max-w-[10rem] sm:max-w-[14rem] [overflow-wrap:anywhere] align-top"
+                                className="px-1.5 py-1 font-serif text-coop-800 max-w-[10rem] sm:max-w-[14rem] [overflow-wrap:anywhere] align-top"
                                 title={l.nome1 || undefined}
                               >
                                 {l.nome1 || '—'}
                               </td>
                               <td
-                                className="px-1.5 py-1 font-serif text-viva-800 max-w-[10rem] sm:max-w-[14rem] [overflow-wrap:anywhere] align-top"
+                                className="px-1.5 py-1 font-serif text-coop-800 max-w-[10rem] sm:max-w-[14rem] [overflow-wrap:anywhere] align-top"
                                 title={l.nome2 || undefined}
                               >
                                 {l.nome2 || '—'}
@@ -3284,10 +3284,10 @@ const RelatoriosProcedimentos = () => {
                               <td className="px-1.5 py-1 font-mono [overflow-wrap:anywhere]">{l.codigo2}</td>
                               <td className="px-1.5 py-1 text-right tabular-nums">{l.valorPrimeiro}</td>
                               <td className="px-1.5 py-1 text-right tabular-nums">{l.valorSegundo}</td>
-                              <td className="px-1.5 py-1 font-serif text-viva-800 max-w-[9rem] [overflow-wrap:anywhere]">
+                              <td className="px-1.5 py-1 font-serif text-coop-800 max-w-[9rem] [overflow-wrap:anywhere]">
                                 {m1}
                               </td>
-                              <td className="px-1.5 py-1 font-serif text-viva-800 max-w-[9rem] [overflow-wrap:anywhere]">
+                              <td className="px-1.5 py-1 font-serif text-coop-800 max-w-[9rem] [overflow-wrap:anywhere]">
                                 {m2}
                               </td>
                               <td className="px-1.5 py-1 text-right font-mono font-semibold tabular-nums">
@@ -3299,7 +3299,7 @@ const RelatoriosProcedimentos = () => {
                       </tbody>
                     </table>
                   </div>
-                  <div className="flex flex-wrap items-center justify-end gap-2 border-t border-viva-200/70 bg-viva-50/40 px-3 py-2.5">
+                  <div className="flex flex-wrap items-center justify-end gap-2 border-t border-coop-200/70 bg-coop-50/40 px-3 py-2.5">
                     <button
                       type="button"
                       className="btn btn-secondary btn-sm font-display"
@@ -3346,12 +3346,12 @@ const RelatoriosProcedimentos = () => {
                               <p className="font-display text-[11px] font-bold uppercase tracking-wide text-amber-900/90">
                                 Linha {aviso.sheetLine} da planilha
                               </p>
-                              <p className="mt-0.5 font-serif text-[11px] text-viva-800 [overflow-wrap:anywhere]">
+                              <p className="mt-0.5 font-serif text-[11px] text-coop-800 [overflow-wrap:anywhere]">
                                 {aviso.draft.nomePaciente || '—'}
                                 {aviso.draft.nome1 ? (
                                   <>
                                     {' '}
-                                    · <span className="text-viva-700">{aviso.draft.nome1}</span>
+                                    · <span className="text-coop-700">{aviso.draft.nome1}</span>
                                   </>
                                 ) : null}
                               </p>
@@ -3387,12 +3387,12 @@ const RelatoriosProcedimentos = () => {
           <>
           <div
             id="entrada-manual-lanc"
-            className="rounded-xl border border-viva-200/70 bg-white/80 p-3 sm:p-3.5 scroll-mt-24"
+            className="rounded-xl border border-coop-200/70 bg-white/80 p-3 sm:p-3.5 scroll-mt-24"
           >
-            <p className="text-[10px] font-semibold uppercase text-viva-500 font-display mb-2">Dados do procedimento</p>
+            <p className="text-[10px] font-semibold uppercase text-coop-500 font-display mb-2">Dados do procedimento</p>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
               <div>
-                <label className="text-[10px] font-semibold uppercase text-viva-500 font-display">Data</label>
+                <label className="text-[10px] font-semibold uppercase text-coop-500 font-display">Data</label>
                 <input
                   type="date"
                   className="input w-full h-8 text-xs mt-0.5"
@@ -3406,7 +3406,7 @@ const RelatoriosProcedimentos = () => {
                 />
               </div>
               <div>
-                <label className="text-[10px] font-semibold uppercase text-viva-500 font-display">Paciente</label>
+                <label className="text-[10px] font-semibold uppercase text-coop-500 font-display">Paciente</label>
                 <input
                   className="input w-full h-8 text-xs mt-0.5"
                   placeholder="Nome do paciente"
@@ -3420,7 +3420,7 @@ const RelatoriosProcedimentos = () => {
                 />
               </div>
               <div>
-                <label className="text-[10px] font-semibold uppercase text-viva-500 font-display">Prontuário</label>
+                <label className="text-[10px] font-semibold uppercase text-coop-500 font-display">Prontuário</label>
                 <input
                   className="input w-full h-8 text-xs mt-0.5"
                   placeholder="Número do prontuário"
@@ -3438,13 +3438,13 @@ const RelatoriosProcedimentos = () => {
           <div className="space-y-3">
           <div
             className={`rounded-xl border p-3 sm:p-3.5 grid grid-cols-1 sm:grid-cols-[auto_1fr] gap-3 ${
-              rascunhoProfs.incluirProfissional1 ? 'border-viva-200/80 bg-viva-50/25' : 'border-viva-200/50 bg-stone-50/40'
+              rascunhoProfs.incluirProfissional1 ? 'border-coop-200/80 bg-coop-50/25' : 'border-coop-200/50 bg-stone-50/40'
             }`}
           >
-            <label className="inline-flex sm:flex sm:flex-col sm:items-start sm:pt-0.5 items-center gap-2.5 text-sm text-viva-800 font-medium shrink-0">
+            <label className="inline-flex sm:flex sm:flex-col sm:items-start sm:pt-0.5 items-center gap-2.5 text-sm text-coop-800 font-medium shrink-0">
               <input
                 type="checkbox"
-                className="h-4 w-4 rounded border-viva-300 text-viva-800"
+                className="h-4 w-4 rounded border-coop-300 text-coop-800"
                 checked={rascunhoProfs.incluirProfissional1}
                 onChange={(e) => {
                   setRascunhoProfs((p) => {
@@ -3458,7 +3458,7 @@ const RelatoriosProcedimentos = () => {
             </label>
             <div className="space-y-2 min-w-0">
               <div ref={boxMed1Ref} className="relative" onClick={(e) => e.stopPropagation()}>
-                <label className="text-[10px] font-semibold uppercase text-viva-500 font-display">Buscar no corpo clínico</label>
+                <label className="text-[10px] font-semibold uppercase text-coop-500 font-display">Buscar no corpo clínico</label>
                 <input
                   className="input w-full h-8 text-xs mt-0.5"
                   placeholder="Filtrar por nome ou CRM — ou deixe vazio para listar todos"
@@ -3470,13 +3470,13 @@ const RelatoriosProcedimentos = () => {
                   onFocus={() => setMedAbrir1(true)}
                 />
                 {medAbrir1 && (
-                  <ul className="absolute z-30 mt-1 w-full min-w-0 max-h-64 overflow-y-auto rounded-lg border border-viva-200 bg-white text-xs shadow-lg">
+                  <ul className="absolute z-30 mt-1 w-full min-w-0 max-h-64 overflow-y-auto rounded-lg border border-coop-200 bg-white text-xs shadow-lg">
                     {carregandoMedicos ? (
-                      <li className="px-2 py-2.5 text-viva-500">A carregar o corpo clínico…</li>
+                      <li className="px-2 py-2.5 text-coop-500">A carregar o corpo clínico…</li>
                     ) : errMedicos ? (
                       <li className="px-2 py-2.5 text-amber-800">Erro ao carregar a lista.</li>
                     ) : sugestoesMedicos1.length === 0 ? (
-                      <li className="px-2 py-2.5 text-viva-500">Nenhum profissional{medBusca1.trim() ? ' com este filtro' : ''}.</li>
+                      <li className="px-2 py-2.5 text-coop-500">Nenhum profissional{medBusca1.trim() ? ' com este filtro' : ''}.</li>
                     ) : (
                       <>
                         {sugestoesMedicos1.map((m) => (
@@ -3497,10 +3497,10 @@ const RelatoriosProcedimentos = () => {
                                 setMedAbrir1(false);
                                 setMedBusca1('');
                               }}
-                              className="w-full text-left px-2 py-2 hover:bg-viva-50"
+                              className="w-full text-left px-2 py-2 hover:bg-coop-50"
                             >
                               {m.nomeCompleto}
-                              {m.crm && <span className="text-viva-500"> · {m.crm}</span>}
+                              {m.crm && <span className="text-coop-500"> · {m.crm}</span>}
                             </button>
                           </li>
                         ))}
@@ -3513,7 +3513,7 @@ const RelatoriosProcedimentos = () => {
                 (() => {
                   const rot = rotuloQuem(rascunhoProfs.profissional1Nome, rascunhoProfs.profissional1Crm);
                   return rot ? (
-                    <div className="mt-1.5 rounded-lg border border-emerald-200/80 bg-emerald-50/90 px-2.5 py-2 text-xs text-viva-800">
+                    <div className="mt-1.5 rounded-lg border border-emerald-200/80 bg-emerald-50/90 px-2.5 py-2 text-xs text-coop-800">
                       <div className="flex items-start justify-between gap-2">
                         <p className="text-[10px] font-bold uppercase text-emerald-800/90 font-display">1.º no próximo lançamento</p>
                         <button
@@ -3543,13 +3543,13 @@ const RelatoriosProcedimentos = () => {
           </div>
           <div
             className={`rounded-xl border p-3 sm:p-3.5 grid grid-cols-1 sm:grid-cols-[auto_1fr] gap-3 ${
-              rascunhoProfs.incluirProfissional2 ? 'border-viva-200/80 bg-viva-50/25' : 'border-viva-200/50 bg-stone-50/40'
+              rascunhoProfs.incluirProfissional2 ? 'border-coop-200/80 bg-coop-50/25' : 'border-coop-200/50 bg-stone-50/40'
             }`}
           >
-            <label className="inline-flex sm:flex sm:flex-col sm:items-start sm:pt-0.5 items-center gap-2.5 text-sm text-viva-800 font-medium shrink-0">
+            <label className="inline-flex sm:flex sm:flex-col sm:items-start sm:pt-0.5 items-center gap-2.5 text-sm text-coop-800 font-medium shrink-0">
               <input
                 type="checkbox"
-                className="h-4 w-4 rounded border-viva-300 text-viva-800"
+                className="h-4 w-4 rounded border-coop-300 text-coop-800"
                 checked={rascunhoProfs.incluirProfissional2}
                 onChange={(e) => {
                   setRascunhoProfs((p) => {
@@ -3563,7 +3563,7 @@ const RelatoriosProcedimentos = () => {
             </label>
             <div className="space-y-2 min-w-0">
               <div ref={boxMed2Ref} className="relative" onClick={(e) => e.stopPropagation()}>
-                <label className="text-[10px] font-semibold uppercase text-viva-500 font-display">Buscar no corpo clínico</label>
+                <label className="text-[10px] font-semibold uppercase text-coop-500 font-display">Buscar no corpo clínico</label>
                 <input
                   className="input w-full h-8 text-xs mt-0.5"
                   placeholder="Filtrar por nome ou CRM — ou deixe vazio para listar todos"
@@ -3575,13 +3575,13 @@ const RelatoriosProcedimentos = () => {
                   onFocus={() => setMedAbrir2(true)}
                 />
                 {medAbrir2 && (
-                  <ul className="absolute z-30 mt-1 w-full min-w-0 max-h-64 overflow-y-auto rounded-lg border border-viva-200 bg-white text-xs shadow-lg">
+                  <ul className="absolute z-30 mt-1 w-full min-w-0 max-h-64 overflow-y-auto rounded-lg border border-coop-200 bg-white text-xs shadow-lg">
                     {carregandoMedicos ? (
-                      <li className="px-2 py-2.5 text-viva-500">A carregar o corpo clínico…</li>
+                      <li className="px-2 py-2.5 text-coop-500">A carregar o corpo clínico…</li>
                     ) : errMedicos ? (
                       <li className="px-2 py-2.5 text-amber-800">Erro ao carregar a lista.</li>
                     ) : sugestoesMedicos2.length === 0 ? (
-                      <li className="px-2 py-2.5 text-viva-500">Nenhum profissional{medBusca2.trim() ? ' com este filtro' : ''}.</li>
+                      <li className="px-2 py-2.5 text-coop-500">Nenhum profissional{medBusca2.trim() ? ' com este filtro' : ''}.</li>
                     ) : (
                       <>
                         {sugestoesMedicos2.map((m) => (
@@ -3602,10 +3602,10 @@ const RelatoriosProcedimentos = () => {
                                 setMedAbrir2(false);
                                 setMedBusca2('');
                               }}
-                              className="w-full text-left px-2 py-2 hover:bg-viva-50"
+                              className="w-full text-left px-2 py-2 hover:bg-coop-50"
                             >
                               {m.nomeCompleto}
-                              {m.crm && <span className="text-viva-500"> · {m.crm}</span>}
+                              {m.crm && <span className="text-coop-500"> · {m.crm}</span>}
                             </button>
                           </li>
                         ))}
@@ -3618,7 +3618,7 @@ const RelatoriosProcedimentos = () => {
                 (() => {
                   const rot = rotuloQuem(rascunhoProfs.profissional2Nome, rascunhoProfs.profissional2Crm);
                   return rot ? (
-                    <div className="mt-1.5 rounded-lg border border-emerald-200/80 bg-emerald-50/90 px-2.5 py-2 text-xs text-viva-800">
+                    <div className="mt-1.5 rounded-lg border border-emerald-200/80 bg-emerald-50/90 px-2.5 py-2 text-xs text-coop-800">
                       <div className="flex items-start justify-between gap-2">
                         <p className="text-[10px] font-bold uppercase text-emerald-800/90 font-display">2.º no próximo lançamento</p>
                         <button
@@ -3657,12 +3657,12 @@ const RelatoriosProcedimentos = () => {
         )}
         {modoEntradaLanc === 'manual' && (
         <div
-          className="px-4 sm:px-5 py-4 sm:py-5 border-t border-viva-200/50 bg-gradient-to-b from-amber-50/25 to-amber-50/5"
+          className="px-4 sm:px-5 py-4 sm:py-5 border-t border-coop-200/50 bg-gradient-to-b from-amber-50/25 to-amber-50/5"
           ref={boxBuscaRef}
           onClick={(e) => e.stopPropagation()}
         >
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-          <h2 className="text-sm font-bold text-viva-900 font-display">Procedimentos</h2>
+          <h2 className="text-sm font-bold text-coop-900 font-display">Procedimentos</h2>
           <button
             type="button"
             className="btn btn-secondary btn-sm font-display shrink-0"
@@ -3685,7 +3685,7 @@ const RelatoriosProcedimentos = () => {
           {busca && (
             <button
               type="button"
-              className="absolute right-1 top-1/2 -translate-y-1/2 w-8 h-8 text-viva-500 hover:text-viva-800"
+              className="absolute right-1 top-1/2 -translate-y-1/2 w-8 h-8 text-coop-500 hover:text-coop-800"
               onClick={() => setBusca('')}
             >
               ×
@@ -3693,27 +3693,27 @@ const RelatoriosProcedimentos = () => {
           )}
           {abrirSugestoes && busca.trim().length >= 2 && sugestoes.length > 0 && (
             <ul
-              className="absolute z-20 mt-1 w-full max-h-56 overflow-y-auto rounded-xl border border-viva-200 bg-white py-1 shadow-lg"
+              className="absolute z-20 mt-1 w-full max-h-56 overflow-y-auto rounded-xl border border-coop-200 bg-white py-1 shadow-lg"
             >
               {sugestoes.map((b) => (
                 <li key={b.id}>
                   <button
                     type="button"
                     onClick={() => selecionarProcedimentoBase(b)}
-                    className="w-full text-left px-3 py-2.5 text-xs sm:text-sm hover:bg-viva-50 border-b border-viva-100/80 last:border-0"
+                    className="w-full text-left px-3 py-2.5 text-xs sm:text-sm hover:bg-coop-50 border-b border-coop-100/80 last:border-0"
                   >
                     <span className="font-mono text-amber-900/90 font-medium">{b.instrumento}</span>
-                    <span className="text-viva-500 mx-1">|</span>
-                    <span className="text-viva-800">
+                    <span className="text-coop-500 mx-1">|</span>
+                    <span className="text-coop-800">
                       {b.nome1.slice(0, 56)}
                       {b.nome1.length > 56 ? '…' : ''}
                       {' '}
-                      <span className="text-viva-500">|</span>
+                      <span className="text-coop-500">|</span>
                       {' '}
                       {b.nome2.slice(0, 56)}
                       {b.nome2.length > 56 ? '…' : ''}
                     </span>
-                    <span className="block text-viva-500 text-[10px] mt-0.5 pl-0 font-serif">{b.codigo1}</span>
+                    <span className="block text-coop-500 text-[10px] mt-0.5 pl-0 font-serif">{b.codigo1}</span>
                   </button>
                 </li>
               ))}
@@ -3723,40 +3723,40 @@ const RelatoriosProcedimentos = () => {
         {linhaPendente && (
           <div className="mt-4 rounded-xl border-2 border-dashed border-amber-400/80 bg-amber-50/40 p-3 sm:p-4">
             <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
-              <h3 className="text-sm font-bold text-viva-900 font-display">Pré-visualização</h3>
+              <h3 className="text-sm font-bold text-coop-900 font-display">Pré-visualização</h3>
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-2 text-xs">
-              <div className="rounded-lg border border-viva-200/70 bg-white px-2 py-1.5">
-                <p className="text-[10px] text-viva-500 font-display uppercase">Ins.</p>
-                <p className="text-viva-900 font-medium mt-0.5 [overflow-wrap:anywhere]">{linhaPendente.instrumento || '—'}</p>
+              <div className="rounded-lg border border-coop-200/70 bg-white px-2 py-1.5">
+                <p className="text-[10px] text-coop-500 font-display uppercase">Ins.</p>
+                <p className="text-coop-900 font-medium mt-0.5 [overflow-wrap:anywhere]">{linhaPendente.instrumento || '—'}</p>
               </div>
-              <div className="rounded-lg border border-viva-200/70 bg-white px-2 py-1.5">
-                <p className="text-[10px] text-viva-500 font-display uppercase">Cód. 1</p>
-                <p className="text-viva-900 font-medium mt-0.5 [overflow-wrap:anywhere]">{linhaPendente.codigo1 || '—'}</p>
+              <div className="rounded-lg border border-coop-200/70 bg-white px-2 py-1.5">
+                <p className="text-[10px] text-coop-500 font-display uppercase">Cód. 1</p>
+                <p className="text-coop-900 font-medium mt-0.5 [overflow-wrap:anywhere]">{linhaPendente.codigo1 || '—'}</p>
               </div>
-              <div className="rounded-lg border border-viva-200/70 bg-white px-2 py-1.5 col-span-2">
-                <p className="text-[10px] text-viva-500 font-display uppercase">1.º procedimento</p>
-                <p className="text-viva-900 font-medium mt-0.5 [overflow-wrap:anywhere]">{linhaPendente.nome1 || '—'}</p>
+              <div className="rounded-lg border border-coop-200/70 bg-white px-2 py-1.5 col-span-2">
+                <p className="text-[10px] text-coop-500 font-display uppercase">1.º procedimento</p>
+                <p className="text-coop-900 font-medium mt-0.5 [overflow-wrap:anywhere]">{linhaPendente.nome1 || '—'}</p>
               </div>
-              <div className="rounded-lg border border-viva-200/70 bg-white px-2 py-1.5">
-                <p className="text-[10px] text-viva-500 font-display uppercase">R$ 1</p>
-                <p className="text-viva-900 font-mono tabular-nums mt-0.5 text-right">{linhaPendente.valorPrimeiro || '0,00'}</p>
+              <div className="rounded-lg border border-coop-200/70 bg-white px-2 py-1.5">
+                <p className="text-[10px] text-coop-500 font-display uppercase">R$ 1</p>
+                <p className="text-coop-900 font-mono tabular-nums mt-0.5 text-right">{linhaPendente.valorPrimeiro || '0,00'}</p>
               </div>
-              <div className="rounded-lg border border-viva-200/70 bg-white px-2 py-1.5">
-                <p className="text-[10px] text-viva-500 font-display uppercase">Cód. 2</p>
-                <p className="text-viva-900 font-medium mt-0.5 [overflow-wrap:anywhere]">{linhaPendente.codigo2 || '—'}</p>
+              <div className="rounded-lg border border-coop-200/70 bg-white px-2 py-1.5">
+                <p className="text-[10px] text-coop-500 font-display uppercase">Cód. 2</p>
+                <p className="text-coop-900 font-medium mt-0.5 [overflow-wrap:anywhere]">{linhaPendente.codigo2 || '—'}</p>
               </div>
-              <div className="rounded-lg border border-viva-200/70 bg-white px-2 py-1.5 col-span-2">
-                <p className="text-[10px] text-viva-500 font-display uppercase">2.º procedimento</p>
-                <p className="text-viva-900 font-medium mt-0.5 [overflow-wrap:anywhere]">{linhaPendente.nome2 || '—'}</p>
+              <div className="rounded-lg border border-coop-200/70 bg-white px-2 py-1.5 col-span-2">
+                <p className="text-[10px] text-coop-500 font-display uppercase">2.º procedimento</p>
+                <p className="text-coop-900 font-medium mt-0.5 [overflow-wrap:anywhere]">{linhaPendente.nome2 || '—'}</p>
               </div>
-              <div className="rounded-lg border border-viva-200/70 bg-white px-2 py-1.5">
-                <p className="text-[10px] text-viva-500 font-display uppercase">R$ 2</p>
-                <p className="text-viva-900 font-mono tabular-nums mt-0.5 text-right">{linhaPendente.valorSegundo || '0,00'}</p>
+              <div className="rounded-lg border border-coop-200/70 bg-white px-2 py-1.5">
+                <p className="text-[10px] text-coop-500 font-display uppercase">R$ 2</p>
+                <p className="text-coop-900 font-mono tabular-nums mt-0.5 text-right">{linhaPendente.valorSegundo || '0,00'}</p>
               </div>
             </div>
             <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-              <p className="text-xs font-mono text-viva-800">
+              <p className="text-xs font-mono text-coop-800">
                 Contrib. bruta:{' '}
                 {BRL.format(
                   round2(
@@ -3801,12 +3801,12 @@ const RelatoriosProcedimentos = () => {
       </div>
 
       <div
-        className="rounded-2xl border border-viva-200/60 bg-white overflow-hidden shadow-[var(--card-shadow)]"
+        className="rounded-2xl border border-coop-200/60 bg-white overflow-hidden shadow-[var(--card-shadow)]"
         id="secao-lancamentos-mes"
       >
-        <div className="px-4 py-3 border-b border-viva-200/50 bg-viva-50/30 flex flex-wrap items-center justify-between gap-2">
+        <div className="px-4 py-3 border-b border-coop-200/50 bg-coop-50/30 flex flex-wrap items-center justify-between gap-2">
           <div className="flex flex-wrap items-center gap-2 min-w-0">
-            <h2 className="text-sm font-bold text-viva-900 font-display">Lançamentos do mês</h2>
+            <h2 className="text-sm font-bold text-coop-900 font-display">Lançamentos do mês</h2>
             {local.concluido && (
               <span
                 className="inline-flex items-center rounded-full border border-slate-600/50 bg-slate-800 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white font-display shrink-0"
@@ -3825,10 +3825,10 @@ const RelatoriosProcedimentos = () => {
           </p>
         )}
         {linhasTotais.length === 0 ? (
-          <p className="p-6 text-sm text-viva-600 text-center font-serif">Nada lançado.</p>
+          <p className="p-6 text-sm text-coop-600 text-center font-serif">Nada lançado.</p>
         ) : (
           <>
-            <div className="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 py-2.5 border-b border-viva-200/50 bg-viva-50/25 text-[11px] sm:text-xs">
+            <div className="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 py-2.5 border-b border-coop-200/50 bg-coop-50/25 text-[11px] sm:text-xs">
               <div className="flex flex-wrap items-center gap-2">
                 <button
                   type="button"
@@ -3961,14 +3961,14 @@ const RelatoriosProcedimentos = () => {
                 </thead>
                 <tbody>
                   {linhasTotais.map((l, i) => (
-                    <tr key={l.id} className={i % 2 ? 'bg-viva-50/20' : 'bg-white border-t border-slate-100/90'}>
+                    <tr key={l.id} className={i % 2 ? 'bg-coop-50/20' : 'bg-white border-t border-slate-100/90'}>
                       <td className="p-0.5 sm:p-1 align-middle min-w-0">
                         <div className="flex items-center justify-center gap-1">
                           <button
                             type="button"
                             onClick={() => editar(l.id)}
                             disabled={local.concluido}
-                            className="text-viva-700 text-xs w-7 h-7 rounded hover:bg-viva-50 shrink-0 inline-flex items-center justify-center disabled:pointer-events-none disabled:opacity-40 disabled:hover:bg-transparent"
+                            className="text-coop-700 text-xs w-7 h-7 rounded hover:bg-coop-50 shrink-0 inline-flex items-center justify-center disabled:pointer-events-none disabled:opacity-40 disabled:hover:bg-transparent"
                             title={
                               local.concluido
                                 ? 'Mês fechado — reabra o mês para editar'
@@ -3995,12 +3995,12 @@ const RelatoriosProcedimentos = () => {
                         </div>
                       </td>
                       <td className="p-0.5 sm:p-1 align-middle min-w-0">
-                        <div className="w-full min-w-0 max-w-full h-6 flex items-center justify-center text-[9px] sm:text-[10px] font-semibold text-viva-900 py-0 px-0.5">
+                        <div className="w-full min-w-0 max-w-full h-6 flex items-center justify-center text-[9px] sm:text-[10px] font-semibold text-coop-900 py-0 px-0.5">
                           {i + 1}
                         </div>
                       </td>
                       <td className="p-0.5 sm:p-1 align-middle min-w-0">
-                        <div className="w-full min-w-0 max-w-full h-6 flex items-center justify-center text-[9px] sm:text-[10px] text-viva-900 py-0 px-0.5">
+                        <div className="w-full min-w-0 max-w-full h-6 flex items-center justify-center text-[9px] sm:text-[10px] text-coop-900 py-0 px-0.5">
                           {formatarDataISO(l.dataProcedimento)}
                         </div>
                       </td>
@@ -4020,7 +4020,7 @@ const RelatoriosProcedimentos = () => {
                         if (k === 'ins') {
                           return (
                             <td key={k} className="p-0.5 sm:p-1 align-middle min-w-0">
-                              <div className="w-full min-w-0 max-w-full min-h-6 flex items-center text-[9px] sm:text-[10px] text-viva-900 py-0 px-0.5 [overflow-wrap:anywhere]">
+                              <div className="w-full min-w-0 max-w-full min-h-6 flex items-center text-[9px] sm:text-[10px] text-coop-900 py-0 px-0.5 [overflow-wrap:anywhere]">
                                 {l.instrumento}
                               </div>
                             </td>
@@ -4029,7 +4029,7 @@ const RelatoriosProcedimentos = () => {
                         if (k === 'cod1') {
                           return (
                             <td key={k} className="p-0.5 sm:p-1 align-middle min-w-0">
-                              <div className="w-full min-w-0 max-w-full min-h-6 flex items-center text-[9px] sm:text-[10px] text-viva-900 py-0 px-0.5 [overflow-wrap:anywhere]">
+                              <div className="w-full min-w-0 max-w-full min-h-6 flex items-center text-[9px] sm:text-[10px] text-coop-900 py-0 px-0.5 [overflow-wrap:anywhere]">
                                 {l.codigo1}
                               </div>
                             </td>
@@ -4038,7 +4038,7 @@ const RelatoriosProcedimentos = () => {
                         if (k === 'proc1') {
                           return (
                             <td key={k} className="p-0.5 sm:p-1 align-top min-w-0">
-                              <div className="w-full min-w-0 max-w-full min-h-[1.6rem] py-0.5 text-[9px] sm:text-[10px] leading-tight text-viva-900 [overflow-wrap:anywhere]">
+                              <div className="w-full min-w-0 max-w-full min-h-[1.6rem] py-0.5 text-[9px] sm:text-[10px] leading-tight text-coop-900 [overflow-wrap:anywhere]">
                                 {l.nome1}
                               </div>
                             </td>
@@ -4047,7 +4047,7 @@ const RelatoriosProcedimentos = () => {
                         if (k === 'v1') {
                           return (
                             <td key={k} className="p-0.5 sm:p-1 align-middle min-w-0">
-                              <div className="w-full min-w-0 max-w-full h-6 flex items-center justify-end text-[9px] sm:text-[10px] text-right tabular-nums text-viva-900 py-0 px-0.5">
+                              <div className="w-full min-w-0 max-w-full h-6 flex items-center justify-end text-[9px] sm:text-[10px] text-right tabular-nums text-coop-900 py-0 px-0.5">
                                 {l.valorPrimeiro}
                               </div>
                             </td>
@@ -4057,7 +4057,7 @@ const RelatoriosProcedimentos = () => {
                           return (
                             <td
                               key={k}
-                              className="p-0.5 sm:p-1 text-[8px] sm:text-[9px] text-viva-800 font-serif border-l border-slate-200/80 align-middle min-w-0 [overflow-wrap:anywhere]"
+                              className="p-0.5 sm:p-1 text-[8px] sm:text-[9px] text-coop-800 font-serif border-l border-slate-200/80 align-middle min-w-0 [overflow-wrap:anywhere]"
                             >
                               {(() => {
                                 const q = quemRepasseEfetivo(l, local);
@@ -4071,7 +4071,7 @@ const RelatoriosProcedimentos = () => {
                         if (k === 'cod2') {
                           return (
                             <td key={k} className="p-0.5 sm:p-1 align-middle min-w-0">
-                              <div className="w-full min-w-0 max-w-full min-h-6 flex items-center text-[9px] sm:text-[10px] text-viva-900 py-0 px-0.5 [overflow-wrap:anywhere]">
+                              <div className="w-full min-w-0 max-w-full min-h-6 flex items-center text-[9px] sm:text-[10px] text-coop-900 py-0 px-0.5 [overflow-wrap:anywhere]">
                                 {l.codigo2}
                               </div>
                             </td>
@@ -4080,7 +4080,7 @@ const RelatoriosProcedimentos = () => {
                         if (k === 'proc2') {
                           return (
                             <td key={k} className="p-0.5 sm:p-1 align-top min-w-0">
-                              <div className="w-full min-w-0 max-w-full min-h-[1.6rem] py-0.5 text-[9px] sm:text-[10px] leading-tight text-viva-900 [overflow-wrap:anywhere]">
+                              <div className="w-full min-w-0 max-w-full min-h-[1.6rem] py-0.5 text-[9px] sm:text-[10px] leading-tight text-coop-900 [overflow-wrap:anywhere]">
                                 {l.nome2}
                               </div>
                             </td>
@@ -4089,7 +4089,7 @@ const RelatoriosProcedimentos = () => {
                         if (k === 'v2') {
                           return (
                             <td key={k} className="p-0.5 sm:p-1 align-middle min-w-0">
-                              <div className="w-full min-w-0 max-w-full h-6 flex items-center justify-end text-[9px] sm:text-[10px] text-right tabular-nums text-viva-900 py-0 px-0.5">
+                              <div className="w-full min-w-0 max-w-full h-6 flex items-center justify-end text-[9px] sm:text-[10px] text-right tabular-nums text-coop-900 py-0 px-0.5">
                                 {l.valorSegundo}
                               </div>
                             </td>
@@ -4099,7 +4099,7 @@ const RelatoriosProcedimentos = () => {
                           return (
                             <td
                               key={k}
-                              className="p-0.5 sm:p-1 text-[8px] sm:text-[9px] text-viva-800 font-serif align-middle min-w-0 [overflow-wrap:anywhere]"
+                              className="p-0.5 sm:p-1 text-[8px] sm:text-[9px] text-coop-800 font-serif align-middle min-w-0 [overflow-wrap:anywhere]"
                             >
                               {(() => {
                                 const q = quemRepasseEfetivo(l, local);
@@ -4113,7 +4113,7 @@ const RelatoriosProcedimentos = () => {
                         return (
                           <td
                             key={k}
-                            className="p-0.5 sm:p-1 font-mono text-[9px] sm:text-[10px] font-bold text-viva-800 tabular-nums text-right align-middle min-w-0"
+                            className="p-0.5 sm:p-1 font-mono text-[9px] sm:text-[10px] font-bold text-coop-800 tabular-nums text-right align-middle min-w-0"
                           >
                             {BRL.format(l.bruto)}
                           </td>
@@ -4126,7 +4126,7 @@ const RelatoriosProcedimentos = () => {
             </div>
             ) : modoVisualLanc === 'resumo' ? (
               <div className="px-3 sm:px-4 py-3">
-                <div className="overflow-x-auto rounded-xl border border-viva-200/60">
+                <div className="overflow-x-auto rounded-xl border border-coop-200/60">
                   <table className="min-w-[700px] w-full text-xs sm:text-sm">
                     <thead>
                       <tr className="bg-slate-800/95 text-white font-display text-[10px] sm:text-xs">
@@ -4172,21 +4172,21 @@ const RelatoriosProcedimentos = () => {
                         })}
                       </tr>
                     </thead>
-                    <tbody className="text-viva-800">
+                    <tbody className="text-coop-800">
                       {resumoMedicos.map((r, i) => (
-                        <tr key={r.medico} className={i % 2 ? 'bg-viva-50/25' : 'bg-white border-t border-slate-100/90'}>
+                        <tr key={r.medico} className={i % 2 ? 'bg-coop-50/25' : 'bg-white border-t border-slate-100/90'}>
                           {colsResumo.medico ? (
                             <td className="px-3 py-2 font-serif [overflow-wrap:anywhere]">{r.medico}</td>
                           ) : (
                             <td className="px-3 py-2 text-center font-display text-slate-400 bg-slate-100/95">Oculta</td>
                           )}
                           {colsResumo.repasse ? (
-                            <td className="px-3 py-2 text-center font-display font-semibold text-viva-700">{r.repasseTxt}</td>
+                            <td className="px-3 py-2 text-center font-display font-semibold text-coop-700">{r.repasseTxt}</td>
                           ) : (
                             <td className="px-3 py-2 text-center font-display text-slate-400 bg-slate-100/95">Oculta</td>
                           )}
                           {colsResumo.recebe ? (
-                            <td className="px-3 py-2 text-right font-mono font-bold tabular-nums text-viva-900">
+                            <td className="px-3 py-2 text-right font-mono font-bold tabular-nums text-coop-900">
                               {BRL.format(r.recebe)}
                             </td>
                           ) : (
@@ -4200,7 +4200,7 @@ const RelatoriosProcedimentos = () => {
               </div>
             ) : (
               <div className="px-3 sm:px-4 py-3">
-                <div className="overflow-x-auto rounded-xl border border-viva-200/60">
+                <div className="overflow-x-auto rounded-xl border border-coop-200/60">
                   <table className="min-w-[860px] w-full text-xs sm:text-sm">
                     <thead>
                       <tr className="bg-slate-800/95 text-white font-display text-[10px] sm:text-xs">
@@ -4211,9 +4211,9 @@ const RelatoriosProcedimentos = () => {
                         <th className="px-3 py-2.5 text-left">Data da cirurgia</th>
                       </tr>
                     </thead>
-                    <tbody className="text-viva-800">
+                    <tbody className="text-coop-800">
                       {tabelaPacientes.map((r, i) => (
-                        <tr key={`${r.prontuario}-${r.paciente}-${i}`} className={i % 2 ? 'bg-viva-50/25' : 'bg-white border-t border-slate-100/90'}>
+                        <tr key={`${r.prontuario}-${r.paciente}-${i}`} className={i % 2 ? 'bg-coop-50/25' : 'bg-white border-t border-slate-100/90'}>
                           <td className="px-3 py-2 font-mono tabular-nums">{r.prontuario}</td>
                           <td className="px-3 py-2 font-serif [overflow-wrap:anywhere]">{r.paciente}</td>
                           <td className="px-3 py-2 font-serif [overflow-wrap:anywhere]">{r.medicoPrincipal}</td>
@@ -4229,18 +4229,18 @@ const RelatoriosProcedimentos = () => {
           </>
         )}
         {linhasTotais.length > 0 && (
-          <div className="flex items-center justify-end gap-2 px-4 py-2 border-t border-viva-200/60 bg-viva-50/20">
+          <div className="flex items-center justify-end gap-2 px-4 py-2 border-t border-coop-200/60 bg-coop-50/20">
             {modoVisualLanc === 'pacientes' ? (
               <>
-                <span className="text-xs text-viva-500 font-serif">Total de registros</span>
-                <span className="text-lg font-bold text-viva-900 font-mono tabular-nums">
+                <span className="text-xs text-coop-500 font-serif">Total de registros</span>
+                <span className="text-lg font-bold text-coop-900 font-mono tabular-nums">
                   {tabelaPacientes.length}
                 </span>
               </>
             ) : (
               <>
-                <span className="text-xs text-viva-500 font-serif">Soma</span>
-                <span className="text-lg font-bold text-viva-900 font-mono tabular-nums">
+                <span className="text-xs text-coop-500 font-serif">Soma</span>
+                <span className="text-lg font-bold text-coop-900 font-mono tabular-nums">
                   {BRL.format(modoVisualLanc === 'resumo' ? somaResumoMedicos : valorBruto)}
                 </span>
               </>
@@ -4255,9 +4255,9 @@ const RelatoriosProcedimentos = () => {
           { t: `Margem coop. (${MARGEM_COOP_PCT}%)`, v: BRL.format(margemRetidaTotal) },
           { t: `Repasse (${PCT.format(REPASSE_FRAC_LINHA * 100)}%)`, v: BRL.format(repasseTotal) },
         ].map((c) => (
-          <div key={c.t} className="rounded-2xl border border-viva-200/50 bg-gradient-to-b from-viva-50/40 to-white p-3">
-            <p className="text-[10px] font-semibold uppercase text-viva-500 font-display tracking-wide">{c.t}</p>
-            <p className="text-sm sm:text-base font-bold text-viva-900 font-mono tabular-nums mt-0.5">{c.v}</p>
+          <div key={c.t} className="rounded-2xl border border-coop-200/50 bg-gradient-to-b from-coop-50/40 to-white p-3">
+            <p className="text-[10px] font-semibold uppercase text-coop-500 font-display tracking-wide">{c.t}</p>
+            <p className="text-sm sm:text-base font-bold text-coop-900 font-mono tabular-nums mt-0.5">{c.v}</p>
           </div>
         ))}
       </div>
@@ -4265,7 +4265,7 @@ const RelatoriosProcedimentos = () => {
       <div className="flex flex-wrap items-center justify-end">
         <button
           type="button"
-          className="text-sm text-viva-800 underline font-display"
+          className="text-sm text-coop-800 underline font-display"
           onClick={() => {
             const vis = local.mostrarDetalheCalculo !== false;
             persist({ ...local, mostrarDetalheCalculo: !vis });
@@ -4276,24 +4276,24 @@ const RelatoriosProcedimentos = () => {
       </div>
 
       {local.mostrarDetalheCalculo !== false && (
-      <div className="rounded-2xl border border-viva-200/50 bg-white overflow-hidden">
-        <h2 className="text-sm font-bold text-viva-900 font-display px-4 py-3 border-b border-viva-200/50">Detalhe do cálculo</h2>
+      <div className="rounded-2xl border border-coop-200/50 bg-white overflow-hidden">
+        <h2 className="text-sm font-bold text-coop-900 font-display px-4 py-3 border-b border-coop-200/50">Detalhe do cálculo</h2>
         <div className="overflow-x-auto">
           <table className="min-w-full text-sm">
             <thead>
-              <tr className="bg-viva-100/50 text-viva-800 text-left text-xs font-display">
+              <tr className="bg-coop-100/50 text-coop-800 text-left text-xs font-display">
                 <th className="px-3 py-2.5 w-[28%]">Etapas</th>
                 <th className="px-3 py-2.5 w-[50%]">Fórmula</th>
                 <th className="px-3 py-2.5 text-right">R$</th>
               </tr>
             </thead>
-            <tbody className="text-viva-800 font-serif text-xs sm:text-sm">
-              <tr className="border-b border-viva-100">
+            <tbody className="text-coop-800 font-serif text-xs sm:text-sm">
+              <tr className="border-b border-coop-100">
                 <td className="px-3 py-2 font-bold font-display">Valor cobrança</td>
                 <td className="px-3 py-2">Soma por linha: 1.º + 2.º (contribuição bruta)</td>
                 <td className="px-3 py-2 text-right font-mono font-semibold">{BRL.format(valorBruto)}</td>
               </tr>
-              <tr className="border-b border-viva-100">
+              <tr className="border-b border-coop-100">
                 <td className="px-3 py-2 font-bold font-display">Margem cooperativa</td>
                 <td className="px-3 py-2">
                   Por linha: margem = {MARGEM_COOP_PCT}% do bruto; repasse da linha = {PCT.format(REPASSE_FRAC_LINHA * 100)}% do
@@ -4301,21 +4301,21 @@ const RelatoriosProcedimentos = () => {
                 </td>
                 <td className="px-3 py-2 text-right font-mono">−{BRL.format(margemRetidaTotal)}</td>
               </tr>
-              <tr className="border-b border-viva-100">
+              <tr className="border-b border-coop-100">
                 <td className="px-3 py-2 font-bold font-display">Repasse aos médicos</td>
                 <td className="px-3 py-2">
                   Soma por linha: {PCT.format(REPASSE_FRAC_LINHA * 100)}% do bruto (valor a dividir entre 1.º e 2.º)
                 </td>
                 <td className="px-3 py-2 text-right font-mono font-semibold">{BRL.format(repasseTotal)}</td>
               </tr>
-              <tr className="border-b border-viva-100">
+              <tr className="border-b border-coop-100">
                 <td className="px-3 py-2 font-bold font-display">Rep. 1.º méd.</td>
                 <td className="px-3 py-2">
                   Parte do repasse da linha quando incluído. Ver <span className="font-display">Lançamentos do mês</span>.
                 </td>
                 <td className="px-3 py-2 text-right font-mono">{BRL.format(repasse1)}</td>
               </tr>
-              <tr className="border-b border-viva-100">
+              <tr className="border-b border-coop-100">
                 <td className="px-3 py-2 font-bold font-display">Rep. 2.º méd.</td>
                 <td className="px-3 py-2">
                   Quando há 1.º e 2.º: 2.º recebe até {PCT.format(r2Pct * 100)}% do que couber ao 1.º na mesma linha
@@ -4323,7 +4323,7 @@ const RelatoriosProcedimentos = () => {
                 </td>
                 <td className="px-3 py-2 text-right font-mono">{BRL.format(repasse2)}</td>
               </tr>
-              <tr className="bg-viva-50/30">
+              <tr className="bg-coop-50/30">
                 <td className="px-3 py-2 font-bold font-display">Repasse total</td>
                 <td className="px-3 py-2">Soma dos repasses 1.º + 2.º (equivale ao total «Repasse aos médicos», salvo arredondamentos)</td>
                 <td className="px-3 py-2 text-right font-mono font-bold">{BRL.format(repasseTotal)}</td>
@@ -4334,8 +4334,8 @@ const RelatoriosProcedimentos = () => {
       </div>
       )}
 
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 rounded-2xl border border-viva-200/50 p-4 bg-viva-50/30">
-        <p className="text-sm text-viva-800 font-serif font-display font-bold">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 rounded-2xl border border-coop-200/50 p-4 bg-coop-50/30">
+        <p className="text-sm text-coop-800 font-serif font-display font-bold">
           {mesesNomes[Number(mesMM) - 1]} {ano}
         </p>
         <button
@@ -4353,19 +4353,19 @@ const RelatoriosProcedimentos = () => {
           role="dialog"
           aria-modal="true"
         >
-          <button type="button" className="absolute inset-0 bg-viva-950/50 backdrop-blur-sm" onClick={cancelarParametros} aria-label="Fechar" />
-          <div className="relative z-10 w-full sm:max-w-lg bg-white sm:rounded-2xl border border-viva-200/70 shadow-2xl max-h-[95dvh] flex flex-col rounded-t-2xl sm:rounded-2xl mt-8 sm:mt-0">
-            <div className="px-5 py-3 border-b border-viva-200/60">
-              <h2 className="text-lg font-bold text-viva-900 font-display">Parâmetros do cálculo</h2>
+          <button type="button" className="absolute inset-0 bg-coop-950/50 backdrop-blur-sm" onClick={cancelarParametros} aria-label="Fechar" />
+          <div className="relative z-10 w-full sm:max-w-lg bg-white sm:rounded-2xl border border-coop-200/70 shadow-2xl max-h-[95dvh] flex flex-col rounded-t-2xl sm:rounded-2xl mt-8 sm:mt-0">
+            <div className="px-5 py-3 border-b border-coop-200/60">
+              <h2 className="text-lg font-bold text-coop-900 font-display">Parâmetros do cálculo</h2>
             </div>
             <div className="p-5 space-y-4 overflow-y-auto">
-              <p className="text-sm text-viva-700 leading-snug">
+              <p className="text-sm text-coop-700 leading-snug">
                 O repasse por linha é <strong>{PCT.format(REPASSE_FRAC_LINHA * 100)}% da contribuição bruta</strong> (soma dos
                 valores 1.º e 2.º); a cooperativa retém <strong>{MARGEM_COOP_PCT}%</strong>. Não há deflator nem custo
                 administrativo no cálculo.
               </p>
               <div>
-                <label className="text-sm font-semibold text-viva-800">Rep. 2.º no repasse da linha %</label>
+                <label className="text-sm font-semibold text-coop-800">Rep. 2.º no repasse da linha %</label>
                 <input
                   className="input w-full mt-0.5"
                   value={rascunho.repasse2MedPct}
@@ -4373,18 +4373,18 @@ const RelatoriosProcedimentos = () => {
                   disabled={!(rascunho.incluirProfissional1 && rascunho.incluirProfissional2)}
                 />
               </div>
-              <div className="pt-1 border-t border-viva-200/50">
-                <p className="text-sm font-semibold text-viva-800">Quem recebe</p>
+              <div className="pt-1 border-t border-coop-200/50">
+                <p className="text-sm font-semibold text-coop-800">Quem recebe</p>
                 <div className="space-y-3">
                   <div
                     className={`rounded-lg border p-2.5 ${
-                      rascunho.incluirProfissional1 ? 'border-viva-200/80' : 'border-viva-200/40'
+                      rascunho.incluirProfissional1 ? 'border-coop-200/80' : 'border-coop-200/40'
                     }`}
                   >
-                    <label className="inline-flex items-center gap-2 text-sm font-medium text-viva-800">
+                    <label className="inline-flex items-center gap-2 text-sm font-medium text-coop-800">
                       <input
                         type="checkbox"
-                        className="h-4 w-4 rounded border-viva-300"
+                        className="h-4 w-4 rounded border-coop-300"
                         checked={rascunho.incluirProfissional1}
                         onChange={(e) => setRascunho((d) => ({ ...d, incluirProfissional1: e.target.checked }))}
                       />
@@ -4393,13 +4393,13 @@ const RelatoriosProcedimentos = () => {
                   </div>
                   <div
                     className={`rounded-lg border p-2.5 ${
-                      rascunho.incluirProfissional2 ? 'border-viva-200/80' : 'border-viva-200/40'
+                      rascunho.incluirProfissional2 ? 'border-coop-200/80' : 'border-coop-200/40'
                     }`}
                   >
-                    <label className="inline-flex items-center gap-2 text-sm font-medium text-viva-800">
+                    <label className="inline-flex items-center gap-2 text-sm font-medium text-coop-800">
                       <input
                         type="checkbox"
-                        className="h-4 w-4 rounded border-viva-300"
+                        className="h-4 w-4 rounded border-coop-300"
                         checked={rascunho.incluirProfissional2}
                         onChange={(e) => setRascunho((d) => ({ ...d, incluirProfissional2: e.target.checked }))}
                       />
@@ -4409,7 +4409,7 @@ const RelatoriosProcedimentos = () => {
                 </div>
               </div>
             </div>
-            <div className="p-3 border-t border-viva-200/50 flex flex-wrap justify-end gap-2 bg-viva-50/30">
+            <div className="p-3 border-t border-coop-200/50 flex flex-wrap justify-end gap-2 bg-coop-50/30">
               <button type="button" className="btn btn-secondary" onClick={cancelarParametros}>
                 Cancelar
               </button>
@@ -4430,15 +4430,15 @@ const RelatoriosProcedimentos = () => {
         >
           <button
             type="button"
-            className="absolute inset-0 bg-viva-950/50 backdrop-blur-sm"
+            className="absolute inset-0 bg-coop-950/50 backdrop-blur-sm"
             onClick={() => setModalBaseProcedimentos(false)}
             aria-label="Fechar"
           />
-          <div className="relative z-10 flex h-[min(90dvh,800px)] w-full max-w-6xl flex-col sm:rounded-2xl sm:border sm:border-viva-200/70 sm:shadow-2xl sm:mt-0 mt-8 bg-white">
-            <div className="flex items-center justify-between gap-2 border-b border-viva-200/60 px-4 py-3 sm:px-5">
+          <div className="relative z-10 flex h-[min(90dvh,800px)] w-full max-w-6xl flex-col sm:rounded-2xl sm:border sm:border-coop-200/70 sm:shadow-2xl sm:mt-0 mt-8 bg-white">
+            <div className="flex items-center justify-between gap-2 border-b border-coop-200/60 px-4 py-3 sm:px-5">
               <h2
                 id="titulo-base-procedimentos"
-                className="text-lg font-bold text-viva-900 font-display"
+                className="text-lg font-bold text-coop-900 font-display"
               >
                 Base de procedimentos
               </h2>
@@ -4451,7 +4451,7 @@ const RelatoriosProcedimentos = () => {
               </button>
             </div>
             <div className="min-h-0 flex-1 overflow-auto px-3 sm:px-4 pb-4">
-              <table className="w-full min-w-[880px] border-collapse text-left text-xs text-viva-800">
+              <table className="w-full min-w-[880px] border-collapse text-left text-xs text-coop-800">
                 <thead className="sticky top-0 z-[1] bg-slate-800/95 text-[10px] font-display font-semibold uppercase text-white sm:text-xs">
                   <tr>
                     <th className="px-2 py-2.5 sm:px-3">Instrumento</th>
@@ -4468,7 +4468,7 @@ const RelatoriosProcedimentos = () => {
                   {procedimentosBase.map((b, idx) => (
                     <tr
                       key={b.id}
-                      className={idx % 2 ? 'bg-viva-50/30' : 'bg-white border-t border-slate-100/90'}
+                      className={idx % 2 ? 'bg-coop-50/30' : 'bg-white border-t border-slate-100/90'}
                     >
                       <td className="px-2 py-1.5 sm:px-3 align-top font-mono font-medium text-amber-900/90">
                         {b.instrumento}
@@ -4479,7 +4479,7 @@ const RelatoriosProcedimentos = () => {
                       <td className="px-2 py-1.5 sm:px-3 align-top font-mono [overflow-wrap:anywhere]">{b.codigo2}</td>
                       <td className="px-2 py-1.5 sm:px-3 align-top [overflow-wrap:anywhere]">{b.nome2}</td>
                       <td className="px-2 py-1.5 sm:px-3 text-right font-mono tabular-nums">{BRL.format(b.valor2)}</td>
-                      <td className="px-2 py-1.5 sm:px-3 text-[10px] sm:text-xs text-viva-600 [overflow-wrap:anywhere]">
+                      <td className="px-2 py-1.5 sm:px-3 text-[10px] sm:text-xs text-coop-600 [overflow-wrap:anywhere]">
                         {chaveDeBase(b)}
                       </td>
                     </tr>

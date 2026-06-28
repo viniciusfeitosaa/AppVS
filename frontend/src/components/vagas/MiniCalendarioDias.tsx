@@ -51,27 +51,27 @@ const MiniCalendarioDias = ({ selected, onChange }: Props) => {
   const monthLabel = new Date(year, month, 1).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
 
   return (
-    <div className="rounded-2xl border border-viva-200/80 bg-white p-4 shadow-sm">
+    <div className="rounded-2xl border border-coop-200/80 bg-white p-4 shadow-sm">
       <div className="flex items-center justify-between gap-2 mb-3">
         <button
           type="button"
           onClick={goPrev}
-          className="rounded-lg px-2 py-1 text-sm font-semibold text-viva-800 hover:bg-viva-100"
+          className="rounded-lg px-2 py-1 text-sm font-semibold text-coop-800 hover:bg-coop-100"
           aria-label="Mês anterior"
         >
           ‹
         </button>
-        <span className="text-sm font-bold capitalize text-viva-950 font-display">{monthLabel}</span>
+        <span className="text-sm font-bold capitalize text-coop-950 font-display">{monthLabel}</span>
         <button
           type="button"
           onClick={goNext}
-          className="rounded-lg px-2 py-1 text-sm font-semibold text-viva-800 hover:bg-viva-100"
+          className="rounded-lg px-2 py-1 text-sm font-semibold text-coop-800 hover:bg-coop-100"
           aria-label="Próximo mês"
         >
           ›
         </button>
       </div>
-      <div className="grid grid-cols-7 gap-1 text-center text-[10px] font-semibold uppercase tracking-wide text-viva-600 mb-1">
+      <div className="grid grid-cols-7 gap-1 text-center text-[10px] font-semibold uppercase tracking-wide text-coop-600 mb-1">
         {weekDays.map((w) => (
           <div key={w} className="py-1">
             {w}
@@ -94,10 +94,10 @@ const MiniCalendarioDias = ({ selected, onChange }: Props) => {
               onClick={() => !isPast && toggle(cell.n)}
               className={`aspect-square rounded-xl text-xs font-semibold transition ${
                 isPast
-                  ? 'cursor-not-allowed text-viva-300 bg-viva-50/50'
+                  ? 'cursor-not-allowed text-coop-300 bg-coop-50/50'
                   : isOn
-                    ? 'bg-viva-900 text-white shadow-sm'
-                    : 'text-viva-800 hover:bg-viva-100'
+                    ? 'bg-coop-900 text-white shadow-sm'
+                    : 'text-coop-800 hover:bg-coop-100'
               }`}
             >
               {cell.n}
@@ -105,7 +105,7 @@ const MiniCalendarioDias = ({ selected, onChange }: Props) => {
           );
         })}
       </div>
-      <p className="mt-3 text-xs text-viva-600 font-serif">Toque nos dias em que a cobertura será necessária.</p>
+      <p className="mt-3 text-xs text-coop-600 font-serif">Toque nos dias em que a cobertura será necessária.</p>
     </div>
   );
 };

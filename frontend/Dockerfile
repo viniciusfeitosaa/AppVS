@@ -13,6 +13,7 @@ COPY landing ./landing
 ARG VITE_API_URL
 ENV VITE_API_URL=$VITE_API_URL
 ENV VITE_APP_BASE=/app/
+ENV SKIP_LANDING_MERGE=1
 
 RUN test -n "$VITE_API_URL" || (echo "Defina VITE_API_URL no .env na raiz (ex.: http://IP:3001/api)" >&2 && exit 1)
 
