@@ -2,10 +2,10 @@
   'use strict';
 
   var WA_NUMBER = '551140402345';
-  var form = document.getElementById('leadForm');
+  var form = document.getElementById('medicoLeadForm');
   if (!form) return;
 
-  var whatsappInput = document.getElementById('leadWhatsapp');
+  var whatsappInput = document.getElementById('medicoWhatsapp');
   if (whatsappInput) {
     whatsappInput.addEventListener('input', function () {
       var digits = whatsappInput.value.replace(/\D/g, '').slice(0, 11);
@@ -22,7 +22,7 @@
   }
 
   function showFeedback(msg, type) {
-    var el = document.getElementById('formFeedback');
+    var el = document.getElementById('medicoFormFeedback');
     if (!el) return;
     el.textContent = msg;
     el.hidden = false;
@@ -35,43 +35,42 @@
     input.closest('.form-row')?.classList.toggle('has-error', hasError);
   }
 
-  ['leadName', 'leadRole', 'leadInstitution', 'leadCity', 'leadVolume', 'leadSpecialties', 'leadChallenge', 'leadWhatsapp'].forEach(function (id) {
-    var input = document.getElementById(id);
-    if (!input) return;
-    var evt = input.tagName === 'SELECT' ? 'change' : 'input';
-    input.addEventListener(evt, function () {
+  form.querySelectorAll('input, select, textarea').forEach(function (input) {
+    if (input.type === 'checkbox') return;
+    input.addEventListener('input', function () {
+      if (input.value.trim()) setFieldError(input, false);
+    });
+    input.addEventListener('change', function () {
       if (input.value.trim()) setFieldError(input, false);
     });
   });
 
   function saveLeadLocal(data) {
     try {
-      var leads = JSON.parse(localStorage.getItem('viva_leads') || '[]');
+      var leads = JSON.parse(localStorage.getItem('viva_medico_leads') || '[]');
       data.at = new Date().toISOString();
       leads.push(data);
-      localStorage.setItem('viva_leads', JSON.stringify(leads.slice(-50)));
+      localStorage.setItem('viva_medico_leads', JSON.stringify(leads.slice(-50)));
     } catch (e) {}
   }
 
   form.addEventListener('submit', function (e) {
     e.preventDefault();
     var fields = {
-      name: document.getElementById('leadName'),
-      role: document.getElementById('leadRole'),
-      institution: document.getElementById('leadInstitution'),
-      city: document.getElementById('leadCity'),
-      volume: document.getElementById('leadVolume'),
-      specialties: document.getElementById('leadSpecialties'),
-      challenge: document.getElementById('leadChallenge'),
-      whatsapp: document.getElementById('leadWhatsapp')
+      name: document.getElementById('medicoName'),
+      crm: document.getElementById('medicoCrm'),
+      specialty: document.getElementById('medicoSpecialty'),
+      city: document.getElementById('medicoCity'),
+      email: document.getElementById('medicoEmail'),
+      whatsapp: document.getElementById('medicoWhatsapp'),
+      availability: document.getElementById('medicoAvailability')
     };
-    var consent = document.getElementById('leadConsent');
+    var consent = document.getElementById('medicoConsent');
 
     var hasError = false;
     Object.keys(fields).forEach(function (key) {
       var input = fields[key];
-      if (!input) return;
-      var empty = !input.value.trim();
+      var empty = !(input && input.value.trim());
       setFieldError(input, empty);
       if (empty) hasError = true;
     });
@@ -94,42 +93,40 @@
 
     var payload = {
       name: fields.name.value.trim(),
-      role: fields.role.value.trim(),
-      institution: fields.institution.value.trim(),
+      crm: fields.crm.value.trim(),
+      specialty: fields.specialty.value.trim(),
       city: fields.city.value.trim(),
-      volume: fields.volume.value.trim(),
-      specialties: fields.specialties.value.trim(),
-      challenge: fields.challenge.value.trim(),
-      whatsapp: fields.whatsapp.value.trim()
+      email: fields.email.value.trim(),
+      whatsapp: fields.whatsapp.value.trim(),
+      availability: fields.availability.value.trim()
     };
     saveLeadLocal(payload);
 
     fetch('/api/leads', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(Object.assign({ source: 'landing-home' }, payload))
+      body: JSON.stringify(Object.assign({ source: 'landing-medico' }, payload))
     }).catch(function () {});
 
     var text = [
-      'Olá! Gostaria de receber uma proposta da Viva Saúde para gestão integral de escalas.',
+      'Olá! Sou médico e tenho interesse em oportunidades com a Viva Saúde.',
       '',
       'Nome: ' + payload.name,
-      'Cargo: ' + payload.role,
-      'Instituição: ' + payload.institution,
+      'CRM: ' + payload.crm,
+      'Especialidade: ' + payload.specialty,
       'Cidade/Estado: ' + payload.city,
-      'Volume de plantões: ' + payload.volume,
-      'Especialidades: ' + payload.specialties,
-      'Principal desafio: ' + payload.challenge,
-      'WhatsApp: ' + payload.whatsapp
+      'E-mail: ' + payload.email,
+      'WhatsApp: ' + payload.whatsapp,
+      'Disponibilidade: ' + payload.availability
     ].join('\n');
 
-    var success = document.getElementById('formSuccess');
+    var success = document.getElementById('medicoFormSuccess');
     if (success) {
       form.hidden = true;
       success.hidden = false;
       success.focus?.();
     } else {
-      showFeedback('Recebemos seu contato! Nossa equipe falará com você em breve.', 'success');
+      showFeedback('Recebemos seu interesse! Nossa equipe falará com você em breve.', 'success');
     }
 
     window.open('https://wa.me/' + WA_NUMBER + '?text=' + encodeURIComponent(text), '_blank', 'noopener');

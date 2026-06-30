@@ -28,7 +28,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700;800&family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
     <link rel="preload" as="image" href="assets/photos/hero-gestao-equipe.png" fetchpriority="high" />
-    <link rel="stylesheet" href="css/style.css?v=38" />
+    <link rel="stylesheet" href="css/style.css?v=44" />
     <script type="application/ld+json">
     {
       "@context": "https://schema.org",
@@ -131,14 +131,16 @@
         </a>
         <nav class="nav" id="mainNav" aria-label="Menu principal">
           <ul class="nav-links">
-            <li><a href="/para-instituicoes/">Para Instituições</a></li>
-            <li><a href="/para-medicos/">Para Médicos</a></li>
-            <li><a href="/como-funciona/">Como Funciona</a></li>
-            <li><a href="/quem-somos/">Quem Somos</a></li>
+            <li><a href="/para-instituicoes/"><span class="nav-t-long">Para Instituições</span><span class="nav-t-short">Instituições</span></a></li>
+            <li><a href="/para-medicos/"><span class="nav-t-long">Para Médicos</span><span class="nav-t-short">Médicos</span></a></li>
+            <li><a href="/como-funciona/"><span class="nav-t-long">Como Funciona</span><span class="nav-t-short">Como funciona</span></a></li>
+            <li><a href="/app-viva-saude/" class="nav-link-app"><span class="nav-t-long">App Viva Saúde</span><span class="nav-t-short">App</span></a></li>
+            <li><a href="/quem-somos/"><span class="nav-t-long">Quem Somos</span><span class="nav-t-short">Quem somos</span></a></li>
+            <li><a href="/blog/">Blog</a></li>
           </ul>
           <div class="header-actions">
-            <a href="/app/login" class="nav-link-login">Área do Associado</a>
-            <a href="#cta-final" class="btn btn-cta-nav">Falar com a Equipe</a>
+            <a href="/app/login" class="nav-link-login"><span class="nav-t-long">Área do Associado</span><span class="nav-t-short">Associado</span></a>
+            <a href="#cta-final" class="btn btn-cta-nav"><span class="nav-t-long">Falar com a Equipe</span><span class="nav-t-short">Contato</span></a>
           </div>
         </nav>
         <button type="button" class="nav-toggle" id="navToggle" aria-label="Abrir menu" aria-expanded="false">
@@ -533,21 +535,35 @@
       <section id="app" class="section app-section">
         <div class="container app-grid">
           <div class="app-content" data-animate="fade-up">
-            <h2 class="section-title section-title-light">Transparência, segurança e gestão de verdade</h2>
+            <p class="app-eyebrow">Diferencial estratégico</p>
+            <h2 class="section-title section-title-light">App Viva Saúde: gestão na palma da mão</h2>
             <div class="app-copy section-lead section-lead-light">
-              <p>A Viva Saúde não se resume a montar uma escala ou entregar um aplicativo. Gerenciamos a rotina do médico: contratos, plantões, presença, substituições e conformidade, com equipe dedicada do nosso lado.</p>
-              <p>O App Viva Saúde entra como extensão natural dessa gestão, exclusivo para o profissional associado: nele o médico consulta plantões, registra ponto, solicita troca ou cessão, descobre novas oportunidades de serviço e acompanha, com transparência, o que tem a receber.</p>
+              <p>O App Viva Saúde leva para o celular tudo o que a Viva Saúde já conduz na gestão integral de escalas e na rotina do médico associado. É o canal oficial da operação: transparência, controle e comunicação em tempo real, sem depender de planilhas, grupos ou ligações de última hora.</p>
+              <p>Pelo app, o profissional consulta a escala de plantões, registra o ponto digital com segurança, solicita troca ou cessão de plantões e encontra novas vagas de trabalho compatíveis com seu perfil. Também é possível acompanhar documentos, visualizar recebimentos e acionar o suporte da equipe Viva Saúde quando precisar. Para gestores, a mesma ferramenta reforça o acompanhamento da operação com indicadores e visão consolidada da escala.</p>
             </div>
-            <div class="app-store-btns">
-              <a href="https://apps.apple.com/br/app/viva-saude/id6772163116" class="store-badge-link store-badge-link--apple" aria-label="Baixar na App Store" target="_blank" rel="noopener noreferrer">
-                <img src="assets/app-store-badge.svg" alt="" width="120" height="40" loading="lazy" />
-              </a>
-              <a href="https://play.google.com/store/apps/details?id=com.vivasaude.appvs" class="store-badge-link store-badge-link--google" aria-label="Disponível no Google Play" target="_blank" rel="noopener noreferrer">
-                <img src="assets/google-play-badge.png" alt="" width="120" height="40" loading="lazy" />
-              </a>
+            <div class="app-download-row" aria-label="Baixar o App Viva Saúde">
+              <div class="app-download-col">
+                <a href="https://apps.apple.com/br/app/viva-saude/id6772163116" class="store-badge-link store-badge-link--apple" aria-label="Baixar na App Store" target="_blank" rel="noopener noreferrer">
+                  <img src="assets/app-store-badge.svg" alt="" width="120" height="40" loading="lazy" />
+                </a>
+                <div class="app-qr-item">
+                  <img src="https://api.qrserver.com/v1/create-qr-code/?size=108x108&amp;data=https%3A%2F%2Fapps.apple.com%2Fbr%2Fapp%2Fviva-saude%2Fid6772163116" alt="QR Code App Store" width="108" height="108" loading="lazy" />
+                  <span>App Store</span>
+                </div>
+              </div>
+              <div class="app-download-col">
+                <a href="https://play.google.com/store/apps/details?id=com.vivasaude.appvs" class="store-badge-link store-badge-link--google" aria-label="Disponível no Google Play" target="_blank" rel="noopener noreferrer">
+                  <img src="assets/google-play-badge.png" alt="" width="120" height="40" loading="lazy" />
+                </a>
+                <div class="app-qr-item">
+                  <img src="https://api.qrserver.com/v1/create-qr-code/?size=108x108&amp;data=https%3A%2F%2Fplay.google.com%2Fstore%2Fapps%2Fdetails%3Fid%3Dcom.vivasaude.appvs" alt="QR Code Google Play" width="108" height="108" loading="lazy" />
+                  <span>Google Play</span>
+                </div>
+              </div>
             </div>
+            <a href="/app-viva-saude/" class="app-page-link">Conheça todas as funcionalidades do App →</a>
           </div>
-          <div class="app-mockup" data-animate="fade-up">
+          <div class="app-mockup app-mockup--trio" data-animate="fade-up">
             <div class="phone-frame phone-frame-back">
               <div class="phone-screen phone-screen--capture">
                 <img
@@ -560,12 +576,24 @@
                 />
               </div>
             </div>
-            <div class="phone-frame phone-frame-front">
+            <div class="phone-frame phone-frame-mid">
               <div class="phone-screen phone-screen--capture">
                 <img
                   src="assets/app-screenshot-dashboard.png"
-                  alt="Tela do App Viva Saúde: dashboard do profissional com escalas, informações pessoais e navegação"
-                  class="phone-screen-screenshot"
+                  alt="Tela do App Viva Saúde: dashboard com escalas e informações do profissional"
+                  class="phone-screen-screenshot phone-screen-screenshot--mid"
+                  width="390"
+                  height="844"
+                  loading="lazy"
+                />
+              </div>
+            </div>
+            <div class="phone-frame phone-frame-front">
+              <div class="phone-screen phone-screen--capture">
+                <img
+                  src="assets/app-screenshot-ponto.png"
+                  alt="Tela do App Viva Saúde: registro de ponto digital do associado"
+                  class="phone-screen-screenshot phone-screen-screenshot--front"
                   width="390"
                   height="844"
                   loading="lazy"
@@ -633,25 +661,57 @@
               <li><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/></svg>Resposta em até 1 dia útil</li>
             </ul>
           </div>
-          <div class="partnership-wa-panel" data-animate="fade-up">
-            <div class="partnership-wa-card">
-              <div class="partnership-wa-icon" aria-hidden="true">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.435 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+          <div class="lead-form-panel" data-animate="fade-up">
+            <form id="leadForm" class="lead-form" novalidate>
+              <div class="form-row">
+                <label for="leadName">Nome completo</label>
+                <input type="text" id="leadName" name="name" required autocomplete="name" />
               </div>
-              <p class="partnership-wa-eyebrow">Contato comercial</p>
-              <h3 class="partnership-wa-title">Fale direto com nossa equipe no WhatsApp</h3>
-              <p class="partnership-wa-text">Conte sobre sua instituição e receba uma proposta de gestão integral de escalas, sem formulários, com atendimento humano.</p>
-              <ul class="partnership-wa-hints">
-                <li>Nome da instituição e cidade</li>
-                <li>Volume aproximado de plantões ou especialidades</li>
-                <li>Principal desafio da escala hoje</li>
-              </ul>
-              <a href="https://wa.me/551140402345?text=Ol%C3%A1!%20Gostaria%20de%20receber%20uma%20proposta%20da%20Viva%20Sa%C3%BAde%20para%20gest%C3%A3o%20integral%20de%20escalas." class="btn btn-whatsapp-lg" id="whatsappDirect" target="_blank" rel="noopener noreferrer">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.435 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
-                Abrir conversa no WhatsApp
-              </a>
-              <p class="partnership-wa-meta">(11) 4040-2345 · Resposta em até 1 dia útil</p>
-              <p class="partnership-wa-legal">Ao entrar em contato, você concorda com nossa <a href="/politica-privacidade/" target="_blank" rel="noopener">Política de Privacidade</a>.</p>
+              <div class="form-row">
+                <label for="leadRole">Cargo / Função</label>
+                <input type="text" id="leadRole" name="role" required />
+              </div>
+              <div class="form-row">
+                <label for="leadInstitution">Nome da Instituição</label>
+                <input type="text" id="leadInstitution" name="institution" required />
+              </div>
+              <div class="form-row">
+                <label for="leadCity">Cidade / Estado</label>
+                <input type="text" id="leadCity" name="city" required />
+              </div>
+              <div class="form-row">
+                <label for="leadVolume">Volume aproximado de plantões</label>
+                <input type="text" id="leadVolume" name="volume" required placeholder="Ex.: 120 plantões/mês" />
+              </div>
+              <div class="form-row">
+                <label for="leadSpecialties">Especialidades principais</label>
+                <input type="text" id="leadSpecialties" name="specialties" required placeholder="Ex.: clínica, pediatria, UTI" />
+              </div>
+              <div class="form-row">
+                <label for="leadChallenge">Principal desafio da escala hoje</label>
+                <textarea id="leadChallenge" name="challenge" required rows="3" placeholder="Conte o que mais impacta sua operação"></textarea>
+              </div>
+              <div class="form-row">
+                <label for="leadWhatsapp">WhatsApp</label>
+                <input type="tel" id="leadWhatsapp" name="whatsapp" required placeholder="(11) 99999-9999" inputmode="tel" />
+              </div>
+              <label class="form-consent">
+                <input type="checkbox" id="leadConsent" name="consent" required />
+                <span>Li e aceito a <a href="/politica-privacidade/" target="_blank" rel="noopener">Política de Privacidade</a> e os <a href="/termos-de-uso/" target="_blank" rel="noopener">Termos de Uso</a>, e autorizo o contato da equipe Viva Saúde.</span>
+              </label>
+              <div class="form-actions">
+                <button type="submit" class="btn btn-gold">Solicitar Proposta de Gestão</button>
+                <a href="https://wa.me/551140402345" class="btn btn-ghost" id="whatsappDirect" target="_blank" rel="noopener noreferrer">Prefiro falar pelo WhatsApp</a>
+              </div>
+              <p id="formFeedback" class="form-feedback" role="status" hidden></p>
+            </form>
+            <div class="form-success" id="formSuccess" hidden tabindex="-1">
+              <svg class="form-success-check" viewBox="0 0 56 56" aria-hidden="true">
+                <circle cx="28" cy="28" r="26" />
+                <path d="M16 29.5 24.5 38 40 20" />
+              </svg>
+              <h3>Recebemos seu contato!</h3>
+              <p>Nossa equipe vai falar com você em até 1 dia útil. Você também pode continuar a conversa no WhatsApp.</p>
             </div>
           </div>
         </div>
@@ -685,6 +745,7 @@
           <h4>Informações</h4>
           <ul>
             <li><a href="/#faq">FAQ</a></li>
+            <li><a href="/blog/">Blog</a></li>
             <li><a href="/politica-privacidade/">Política de Privacidade</a></li>
             <li><a href="/politica-cookies/">Política de Cookies</a></li>
             <li><a href="/termos-de-uso/">Termos de Uso</a></li>
@@ -729,5 +790,6 @@
     <script src="js/design-loader.js"></script>
     <script src="js/animations.js"></script>
     <script src="js/landing-ui.js?v=2"></script>
+    <script src="js/contact-form.js"></script>
   </body>
 </html>

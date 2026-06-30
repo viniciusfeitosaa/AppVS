@@ -2,6 +2,22 @@
   'use strict';
   var WA = '551140402345';
 
+  function maskWhatsapp(input) {
+    if (!input) return;
+    input.addEventListener('input', function () {
+      var digits = input.value.replace(/\D/g, '').slice(0, 11);
+      if (digits.length <= 10) {
+        input.value = digits
+          .replace(/(\d{2})(\d)/, '($1) $2')
+          .replace(/(\d{4})(\d)/, '$1-$2');
+      } else {
+        input.value = digits
+          .replace(/(\d{2})(\d)/, '($1) $2')
+          .replace(/(\d{5})(\d)/, '$1-$2');
+      }
+    });
+  }
+
   function showFeedback(form, msg, type) {
     var el = form.querySelector('.form-feedback') || document.getElementById('b2bFormFeedback');
     if (!el) return;
@@ -32,6 +48,9 @@
   }
 
   document.querySelectorAll('[data-wa-form]').forEach(function (form) {
+    var waInput = form.querySelector('[name="whatsapp"]');
+    maskWhatsapp(waInput);
+
     form.addEventListener('submit', function (e) {
       e.preventDefault();
       var lines = ['Olá! Gostaria de receber uma proposta da Viva Saúde para gestão de escalas.', ''];
@@ -44,7 +63,8 @@
         if (input.required && !v) valid = false;
         if (v && input.name) {
           payload[input.name] = v;
-          var label = input.labels && input.labels[0] ? input.labels[0].textContent.replace(':', '').trim() : input.name;
+          var labelEl = input.labels && input.labels[0] ? input.labels[0] : null;
+          var label = labelEl ? labelEl.textContent.replace(':', '').trim() : input.name;
           lines.push(label + ': ' + v);
         }
       });

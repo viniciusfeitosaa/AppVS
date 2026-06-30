@@ -22,7 +22,7 @@
   <meta name="twitter:image" content="https://www.sejavivasaude.com.br/assets/og-image.jpg" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link rel="stylesheet" href="../css/style.css?v=38" />
+  <link rel="stylesheet" href="../css/style.css?v=42" />
   <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Poppins:wght@400;500;600&display=swap" rel="stylesheet" />
 </head>
 <body>
@@ -31,14 +31,16 @@
       <a href="/" class="logo"><img src="../assets/logo.png" alt="Viva Saúde" class="logo-img" /></a>
       <nav class="nav" id="mainNav" aria-label="Menu principal">
         <ul class="nav-links">
-          <li><a href="/para-instituicoes/" class="is-active" aria-current="page">Para Instituições</a></li>
-          <li><a href="/para-medicos/">Para Médicos</a></li>
-          <li><a href="/como-funciona/">Como Funciona</a></li>
-          <li><a href="/quem-somos/">Quem Somos</a></li>
+          <li><a href="/para-instituicoes/" class="is-active" aria-current="page"><span class="nav-t-long">Para Instituições</span><span class="nav-t-short">Instituições</span></a></li>
+          <li><a href="/para-medicos/"><span class="nav-t-long">Para Médicos</span><span class="nav-t-short">Médicos</span></a></li>
+          <li><a href="/como-funciona/"><span class="nav-t-long">Como Funciona</span><span class="nav-t-short">Como funciona</span></a></li>
+          <li><a href="/app-viva-saude/" class="nav-link-app"><span class="nav-t-long">App Viva Saúde</span><span class="nav-t-short">App</span></a></li>
+          <li><a href="/quem-somos/"><span class="nav-t-long">Quem Somos</span><span class="nav-t-short">Quem somos</span></a></li>
+          <li><a href="/blog/">Blog</a></li>
         </ul>
         <div class="header-actions">
-          <a href="/app/login" class="nav-link-login">Área do Associado</a>
-          <a href="#form-b2b" class="btn btn-cta-nav">Falar com a Equipe</a>
+          <a href="/app/login" class="nav-link-login"><span class="nav-t-long">Área do Associado</span><span class="nav-t-short">Associado</span></a>
+          <a href="#form-b2b" class="btn btn-cta-nav"><span class="nav-t-long">Falar com a Equipe</span><span class="nav-t-short">Contato</span></a>
         </div>
       </nav>
       <button type="button" class="nav-toggle" id="navToggle" aria-label="Abrir menu" aria-expanded="false"><span></span><span></span><span></span></button>
@@ -140,18 +142,70 @@
         <blockquote class="testimonial-card"><p>"O que mais me surpreendeu foi o suporte. Qualquer imprevisto, a equipe da Viva Saúde está lá."</p><footer><span class="testimonial-avatar" aria-hidden="true">C</span><span class="testimonial-id"><strong>Dra. Carolina Duarte</strong><span>Diretoria Clínica, Clínica Regional, Crateús/CE</span></span></footer></blockquote>
       </section>
 
-      <section id="form-b2b" class="content-block cta-final cta-final-subpage">
-        <h2>Vamos conversar sobre a sua instituição?</h2>
-        <p class="cta-final-lead">Conte como é a operação da sua instituição e receba uma proposta de gestão integral sob medida.</p>
-        <ul class="cta-final-points">
-          <li><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/></svg>Nome da instituição e cidade</li>
-          <li><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/></svg>Volume aproximado de plantões ou especialidades</li>
-          <li><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/></svg>Principal desafio da escala hoje</li>
-        </ul>
-        <div class="cta-final-actions">
-          <a href="https://wa.me/551140402345?text=Ol%C3%A1!%20Gostaria%20de%20receber%20uma%20proposta%20da%20Viva%20Sa%C3%BAde%20para%20gest%C3%A3o%20integral%20de%20escalas." class="btn btn-gold" target="_blank" rel="noopener noreferrer">Falar com a equipe no WhatsApp</a>
-          <p class="cta-final-meta">(11) 4040-2345 · Resposta em até 1 dia útil</p>
-          <p class="cta-final-legal">Ao entrar em contato, você concorda com nossa <a href="/politica-privacidade/" target="_blank" rel="noopener">Política de Privacidade</a> e os <a href="/termos-de-uso/" target="_blank" rel="noopener">Termos de Uso</a>.</p>
+      <section id="form-b2b" class="content-block cta-final cta-final-subpage cta-final-split">
+        <div class="cta-final-split-inner">
+          <div class="cta-final-copy">
+            <h2>Vamos conversar sobre a sua instituição?</h2>
+            <p class="cta-final-lead">Preencha o formulário e nossa equipe comercial preparará uma proposta de gestão integral sob medida.</p>
+            <ul class="cta-final-points">
+              <li><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/></svg>Análise inicial da sua operação</li>
+              <li><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/></svg>Proposta personalizada de gestão</li>
+              <li><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/></svg>Resposta em até 1 dia útil</li>
+            </ul>
+          </div>
+          <div class="lead-form-panel">
+            <form class="lead-form" data-wa-form novalidate>
+              <div class="form-row">
+                <label for="b2bNome">Nome completo</label>
+                <input type="text" id="b2bNome" name="nome" required autocomplete="name" />
+              </div>
+              <div class="form-row">
+                <label for="b2bCargo">Cargo / Função</label>
+                <input type="text" id="b2bCargo" name="cargo" required />
+              </div>
+              <div class="form-row">
+                <label for="b2bInstituicao">Nome da Instituição</label>
+                <input type="text" id="b2bInstituicao" name="instituicao" required />
+              </div>
+              <div class="form-row">
+                <label for="b2bCidade">Cidade / Estado</label>
+                <input type="text" id="b2bCidade" name="cidade" required />
+              </div>
+              <div class="form-row">
+                <label for="b2bVolume">Volume aproximado de plantões</label>
+                <input type="text" id="b2bVolume" name="volume" required placeholder="Ex.: 120 plantões/mês" />
+              </div>
+              <div class="form-row">
+                <label for="b2bEspecialidades">Especialidades principais</label>
+                <input type="text" id="b2bEspecialidades" name="especialidades" required />
+              </div>
+              <div class="form-row">
+                <label for="b2bDesafio">Principal desafio da escala</label>
+                <textarea id="b2bDesafio" name="desafio" required rows="3"></textarea>
+              </div>
+              <div class="form-row">
+                <label for="b2bWhatsapp">WhatsApp</label>
+                <input type="tel" id="b2bWhatsapp" name="whatsapp" required placeholder="(11) 99999-9999" inputmode="tel" />
+              </div>
+              <label class="form-consent">
+                <input type="checkbox" name="consent" required />
+                <span>Li e aceito a <a href="/politica-privacidade/" target="_blank" rel="noopener">Política de Privacidade</a> e os <a href="/termos-de-uso/" target="_blank" rel="noopener">Termos de Uso</a>.</span>
+              </label>
+              <div class="form-actions">
+                <button type="submit" class="btn btn-gold">Solicitar Proposta de Gestão</button>
+                <a href="https://wa.me/551140402345" class="btn btn-ghost" target="_blank" rel="noopener noreferrer">Prefiro falar pelo WhatsApp</a>
+              </div>
+              <p class="form-feedback" role="status" hidden></p>
+            </form>
+            <div class="form-success" id="b2bFormSuccess" hidden tabindex="-1">
+              <svg class="form-success-check" viewBox="0 0 56 56" aria-hidden="true">
+                <circle cx="28" cy="28" r="26" />
+                <path d="M16 29.5 24.5 38 40 20" />
+              </svg>
+              <h3>Recebemos seu contato!</h3>
+              <p>Nossa equipe vai falar com você em até 1 dia útil.</p>
+            </div>
+          </div>
         </div>
       </section>
     </div>
@@ -184,6 +238,7 @@
         <h4>Informações</h4>
         <ul>
           <li><a href="/#faq">FAQ</a></li>
+          <li><a href="/blog/">Blog</a></li>
           <li><a href="/politica-privacidade/">Política de Privacidade</a></li>
           <li><a href="/politica-cookies/">Política de Cookies</a></li>
           <li><a href="/termos-de-uso/">Termos de Uso</a></li>
@@ -203,5 +258,6 @@
   </footer>
   <a href="https://wa.me/551140402345" class="whatsapp-float" aria-label="WhatsApp"><svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.435 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg></a>
   <script src="../js/landing-ui.js?v=2"></script>
+  <script src="../js/subpage-form.js"></script>
 </body>
 </html>
