@@ -894,3 +894,65 @@ export const validateDeleteSelfAccount = [
     .withMessage('Digite EXCLUIR (em maiúsculas) para confirmar'),
   handleValidationErrors,
 ];
+
+export const validateSlugParam = (paramName: string) => [
+  param(paramName)
+    .trim()
+    .matches(/^[a-z0-9]+(?:-[a-z0-9]+)*$/)
+    .withMessage(`${paramName} inválido`),
+  handleValidationErrors,
+];
+
+export const validateCreateBlogComment = [
+  body('autorNome').trim().isLength({ min: 2, max: 120 }).withMessage('Nome inválido'),
+  body('autorEmail').trim().isEmail().withMessage('E-mail inválido'),
+  body('conteudo').trim().isLength({ min: 3, max: 2000 }).withMessage('Comentário inválido'),
+  body('consentimentoLgpd')
+    .custom((v) => v === true)
+    .withMessage('É necessário aceitar a política de privacidade'),
+  handleValidationErrors,
+];
+
+export const validateCreateBlogPost = [
+  body('titulo').trim().isLength({ min: 3, max: 255 }).withMessage('Título inválido'),
+  body('categoryId').isUUID().withMessage('Categoria inválida'),
+  body('resumo').trim().isLength({ min: 10, max: 320 }).withMessage('Resumo inválido'),
+  body('conteudo').trim().isLength({ min: 10 }).withMessage('Conteúdo inválido'),
+  body('slug').optional().trim().isLength({ max: 120 }),
+  body('capaUrl').optional({ values: 'null' }).trim().isLength({ max: 500 }),
+  body('seoTitle').optional({ values: 'null' }).trim().isLength({ max: 255 }),
+  body('seoDescription').optional({ values: 'null' }).trim().isLength({ max: 320 }),
+  body('status')
+    .optional()
+    .isIn(['RASCUNHO', 'PUBLICADO', 'ARQUIVADO'])
+    .withMessage('Status inválido'),
+  handleValidationErrors,
+];
+
+export const validateUpdateBlogPost = [
+  body('titulo').optional().trim().isLength({ min: 3, max: 255 }),
+  body('categoryId').optional().isUUID(),
+  body('resumo').optional().trim().isLength({ min: 10, max: 320 }),
+  body('conteudo').optional().trim().isLength({ min: 10 }),
+  body('slug').optional().trim().isLength({ max: 120 }),
+  body('capaUrl').optional({ values: 'null' }).trim().isLength({ max: 500 }),
+  body('seoTitle').optional({ values: 'null' }).trim().isLength({ max: 255 }),
+  body('seoDescription').optional({ values: 'null' }).trim().isLength({ max: 320 }),
+  body('status')
+    .optional()
+    .isIn(['RASCUNHO', 'PUBLICADO', 'ARQUIVADO'])
+    .withMessage('Status inválido'),
+  handleValidationErrors,
+];
+
+export const validateReplyBlogComment = [
+  body('respostaTexto').trim().isLength({ min: 3, max: 2000 }).withMessage('Resposta inválida'),
+  handleValidationErrors,
+];
+
+export const validateCreateBlogCategory = [
+  body('nome').trim().isLength({ min: 2, max: 120 }).withMessage('Nome da categoria inválido'),
+  body('slug').optional().trim().isLength({ max: 80 }),
+  body('ordem').optional().isInt({ min: 0 }),
+  handleValidationErrors,
+];

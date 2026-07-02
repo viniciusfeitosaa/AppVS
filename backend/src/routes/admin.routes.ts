@@ -88,6 +88,7 @@ import { authenticateToken, requireAnyModuleAccess, requireModuleAccess, require
 import { uploadDocumentoEnviado } from '../middleware/upload.middleware';
 import { ModuloSistema, UserRole } from '@prisma/client';
 import { validateUUIDParam, validateCreateEscala, validateUpdateEscala, validateCreateEscalaPlantao, validateReplicarPlantoesMes, validateAlocarMedicoEscala, validateUpsertAdicionalPlantao, validateListAdicionaisPlantao, validateRemoverAdicionalPlantao, validateCreateTipoPlantao, validateUpdateTipoPlantao, validateSetConfigPonto } from '../middleware/validation.middleware';
+import blogAdminRoutes from './blog-admin.routes';
 
 const router = Router();
 
@@ -280,5 +281,7 @@ router.delete('/escalas/:id/subgrupos/:subgrupoId', requireModuleAccess(ModuloSi
 router.get('/escalas/:id/equipes', requireModuleAccess(ModuloSistema.ESCALAS), listEscalaEquipesController);
 router.post('/escalas/:id/equipes', requireModuleAccess(ModuloSistema.ESCALAS), addEquipeToEscalaController);
 router.delete('/escalas/:id/equipes/:equipeId', requireModuleAccess(ModuloSistema.ESCALAS), removeEquipeFromEscalaController);
+
+router.use('/blog', blogAdminRoutes);
 
 export default router;

@@ -97,6 +97,9 @@ model Tenant {
   solicitacoesTrocaPlantao SolicitacaoTrocaPlantao[]
   vagas                   Vaga[]
   vagaInteresses          VagaInteresse[]
+  blogCategories          BlogCategory[]
+  blogPosts               BlogPost[]
+  blogComments            BlogComment[]
 
   @@map("tenants")
   @@index([slug])
@@ -161,6 +164,8 @@ model UsuarioMaster {
   tenant       Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   sessoes      SessaoMaster[]
   auditoriaLog Auditoria[]   @relation("auditoria_master")
+  blogPosts    BlogPost[]
+  blogCommentRespostas BlogComment[] @relation("blog_comment_respostas")
 
   @@map("usuarios_master")
   @@unique([tenantId, email])
@@ -827,4 +832,84 @@ model Auditoria {
   @@index([masterId])
   @@index([acao])
   @@index([createdAt])
+}
+
+enum BlogPostStatus {
+  RASCUNHO
+  PUBLICADO
+  ARQUIVADO
+}
+
+enum BlogCommentStatus {
+  PENDENTE
+  APROVADO
+  REJEITADO
+}
+
+model BlogCategory {
+  id        String   @id @default(uuid())
+  tenantId  String   @map("tenant_id")
+  slug      String   @db.VarChar(80)
+  nome      String   @db.VarChar(120)
+  ordem     Int      @default(0)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  tenant Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  posts  BlogPost[]
+
+  @@unique([tenantId, slug])
+  @@index([tenantId, ordem])
+  @@map("blog_categories")
+}
+
+model BlogPost {
+  id             String         @id @default(uuid())
+  tenantId       String         @map("tenant_id")
+  categoryId     String         @map("category_id")
+  slug           String         @db.VarChar(120)
+  titulo         String         @db.VarChar(255)
+  resumo         String         @db.VarChar(320)
+  conteudo       String         @db.Text
+  capaUrl        String?        @map("capa_url") @db.VarChar(500)
+  status         BlogPostStatus @default(RASCUNHO)
+  publicadoEm    DateTime?      @map("publicado_em")
+  autorId        String         @map("autor_id")
+  seoTitle       String?        @map("seo_title") @db.VarChar(255)
+  seoDescription String?        @map("seo_description") @db.VarChar(320)
+  createdAt      DateTime       @default(now()) @map("created_at")
+  updatedAt      DateTime       @updatedAt @map("updated_at")
+
+  tenant     Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  category   BlogCategory  @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  autor      UsuarioMaster @relation(fields: [autorId], references: [id], onDelete: Restrict)
+  comentarios BlogComment[]
+
+  @@unique([tenantId, slug])
+  @@index([tenantId, status, publicadoEm])
+  @@index([categoryId])
+  @@map("blog_posts")
+}
+
+model BlogComment {
+  id              String            @id @default(uuid())
+  tenantId        String            @map("tenant_id")
+  postId          String            @map("post_id")
+  autorNome       String            @map("autor_nome") @db.VarChar(120)
+  autorEmail      String            @map("autor_email") @db.VarChar(255)
+  conteudo        String            @db.Text
+  status          BlogCommentStatus @default(PENDENTE)
+  respostaTexto   String?           @map("resposta_texto") @db.Text
+  respondidoPorId String?           @map("respondido_por_id")
+  respondidoEm    DateTime?         @map("respondido_em")
+  consentimentoLgpd Boolean         @default(false) @map("consentimento_lgpd")
+  createdAt       DateTime          @default(now()) @map("created_at")
+
+  tenant        Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  post          BlogPost       @relation(fields: [postId], references: [id], onDelete: Cascade)
+  respondidoPor UsuarioMaster? @relation("blog_comment_respostas", fields: [respondidoPorId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, status, createdAt])
+  @@index([postId, status])
+  @@map("blog_comments")
 }

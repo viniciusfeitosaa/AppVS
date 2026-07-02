@@ -5,6 +5,13 @@
   [build.environment]
     VITE_API_URL = "https://appvs.onrender.com/api"
 
+# Proxy API → Render (landing estática usa fetch('/api/...'))
+[[redirects]]
+  from = "/api/*"
+  to = "https://appvs.onrender.com/api/:splat"
+  status = 200
+  force = true
+
 # Antes do catch-all /app/*: ficheiros estáticos com nome conflituoso com o prefixo
 [[redirects]]
   from = "/app/vite.svg"
@@ -30,6 +37,16 @@
   from = "/login/*"
   to = "/app/login"
   status = 302
+
+# Legado: URLs antigas do blog → /blog/#slug
+[[redirects]]
+  from = "/blog/artigo/*"
+  to = "/blog/#:splat"
+  status = 301
+[[redirects]]
+  from = "/blog/artigos/*"
+  to = "/blog/"
+  status = 301
 
 # Ícone na raiz do publish (public/vite.svg → /vite.svg)
 [[redirects]]
