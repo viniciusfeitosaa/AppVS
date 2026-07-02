@@ -34,17 +34,47 @@
 
   highlightCurrentNav();
 
+  if (mainNav && window.matchMedia('(max-width: 1280px)').matches) {
+    mainNav.setAttribute('aria-hidden', mainNav.classList.contains('is-open') ? 'false' : 'true');
+  }
+
   function setNavOpen(open) {
     if (!mainNav || !navToggle) return;
     mainNav.classList.toggle('is-open', open);
     navToggle.classList.toggle('is-active', open);
     navToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+    navToggle.setAttribute('aria-label', open ? 'Fechar menu' : 'Abrir menu');
     document.body.classList.toggle('nav-open', open);
+    mainNav.setAttribute('aria-hidden', open ? 'false' : 'true');
+    if (navBackdrop) {
+      navBackdrop.hidden = !open;
+      navBackdrop.setAttribute('aria-hidden', open ? 'false' : 'true');
+    }
+    document.documentElement.style.overflow = open ? 'hidden' : '';
+    document.body.style.overflow = open ? 'hidden' : '';
+  }
+
+  var navBackdrop = document.getElementById('navBackdrop');
+  if (!navBackdrop) {
+    navBackdrop = document.createElement('button');
+    navBackdrop.type = 'button';
+    navBackdrop.id = 'navBackdrop';
+    navBackdrop.className = 'nav-backdrop';
+    navBackdrop.hidden = true;
+    navBackdrop.setAttribute('aria-label', 'Fechar menu');
+    navBackdrop.setAttribute('tabindex', '-1');
+    document.body.appendChild(navBackdrop);
   }
 
   if (navToggle && mainNav) {
-    navToggle.addEventListener('click', function () {
+    navToggle.addEventListener('click', function (e) {
+      e.preventDefault();
+      e.stopPropagation();
       setNavOpen(!mainNav.classList.contains('is-open'));
+    });
+
+    navBackdrop.addEventListener('click', function () {
+      setNavOpen(false);
     });
 
     mainNav.querySelectorAll('a').forEach(function (link) {
@@ -53,10 +83,11 @@
       });
     });
 
-    document.body.addEventListener('click', function (e) {
-      if (!mainNav.classList.contains('is-open')) return;
-      if (mainNav.contains(e.target) || navToggle.contains(e.target)) return;
-      setNavOpen(false);
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape' && mainNav.classList.contains('is-open')) {
+        setNavOpen(false);
+        navToggle.focus();
+      }
     });
   }
 

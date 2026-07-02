@@ -1,7 +1,12 @@
 import env from '../config/env';
 import { prisma } from '../config/database';
+import type { Tenant } from '@prisma/client';
+
+let defaultTenantCache: Tenant | null = null;
 
 export const getDefaultTenant = async () => {
+  if (defaultTenantCache) return defaultTenantCache;
+
   const tenant = await prisma.tenant.findFirst({
     where: {
       slug: env.TENANT_DEFAULT_SLUG,
@@ -17,5 +22,6 @@ export const getDefaultTenant = async () => {
     };
   }
 
+  defaultTenantCache = tenant;
   return tenant;
 };

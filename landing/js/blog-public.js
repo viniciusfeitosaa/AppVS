@@ -2,6 +2,9 @@
   'use strict';
 
   var API_BASE = '/api/blog';
+  var LIST_CACHE_KEY = 'viva_blog_list_v1';
+  var LIST_CACHE_TTL_MS = 2 * 60 * 1000;
+  var listRequest = null;
 
   function apiFetch(path) {
     return fetch(API_BASE + path, {
@@ -14,6 +17,38 @@
         return body;
       });
     });
+  }
+
+  function readListCache() {
+    try {
+      var raw = sessionStorage.getItem(LIST_CACHE_KEY);
+      if (!raw) return null;
+      var parsed = JSON.parse(raw);
+      if (!parsed || !parsed.data || Date.now() - parsed.ts > LIST_CACHE_TTL_MS) return null;
+      return parsed.data;
+    } catch (_e) {
+      return null;
+    }
+  }
+
+  function writeListCache(data) {
+    try {
+      sessionStorage.setItem(LIST_CACHE_KEY, JSON.stringify({ ts: Date.now(), data: data }));
+    } catch (_e) {}
+  }
+
+  function fetchBlogList() {
+    if (listRequest) return listRequest;
+    listRequest = apiFetch('/categories')
+      .then(function (body) {
+        var data = body.data || [];
+        writeListCache(data);
+        return data;
+      })
+      .finally(function () {
+        listRequest = null;
+      });
+    return listRequest;
   }
 
   function escapeHtml(text) {
@@ -232,15 +267,23 @@
 
     setView('list');
     document.title = 'Blog | Viva Saúde';
-    root.innerHTML = '<p class="blog-loading" aria-live="polite">Carregando artigos…</p>';
 
-    apiFetch('/categories')
-      .then(function (body) {
-        renderBlogList(root, body.data || []);
+    var cached = readListCache();
+    if (cached) {
+      renderBlogList(root, cached);
+    } else {
+      root.innerHTML = '<p class="blog-loading" aria-live="polite">Carregando artigos…</p>';
+    }
+
+    fetchBlogList()
+      .then(function (data) {
+        renderBlogList(root, data);
       })
       .catch(function (err) {
-        root.innerHTML =
-          '<p class="blog-error" role="alert">Não foi possível carregar os artigos. ' + escapeHtml(err.message) + '</p>';
+        if (!cached) {
+          root.innerHTML =
+            '<p class="blog-error" role="alert">Não foi possível carregar os artigos. ' + escapeHtml(err.message) + '</p>';
+        }
       });
   }
 

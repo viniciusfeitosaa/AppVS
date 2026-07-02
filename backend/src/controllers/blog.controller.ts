@@ -28,9 +28,14 @@ const handleServiceError = (res: Response, error: unknown) => {
   });
 };
 
+const setPublicBlogListCache = (res: Response) => {
+  res.set('Cache-Control', 'public, max-age=120, stale-while-revalidate=600');
+};
+
 export const listPublicCategoriesController = async (_req: Request, res: Response) => {
   try {
     const data = await listPublicCategoriesService();
+    setPublicBlogListCache(res);
     return res.json({ success: true, data });
   } catch (error) {
     return handleServiceError(res, error);

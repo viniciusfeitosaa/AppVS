@@ -18,31 +18,46 @@ const commentIncludePublic = {
 
 export const listPublicCategoriesService = async () => {
   const tenant = await getDefaultTenant();
-  const categories = await prisma.blogCategory.findMany({
-    where: { tenantId: tenant.id },
-    orderBy: [{ ordem: 'asc' }, { nome: 'asc' }],
-    include: {
-      posts: {
-        where: { status: BlogPostStatus.PUBLICADO },
-        orderBy: { publicadoEm: 'desc' },
-        select: {
-          id: true,
-          slug: true,
-          titulo: true,
-          resumo: true,
-          capaUrl: true,
-          publicadoEm: true,
-        },
+
+  const [categories, posts] = await Promise.all([
+    prisma.blogCategory.findMany({
+      where: { tenantId: tenant.id },
+      orderBy: [{ ordem: 'asc' }, { nome: 'asc' }],
+      select: { id: true, slug: true, nome: true },
+    }),
+    prisma.blogPost.findMany({
+      where: {
+        tenantId: tenant.id,
+        status: BlogPostStatus.PUBLICADO,
       },
-    },
-  });
+      orderBy: { publicadoEm: 'desc' },
+      select: {
+        slug: true,
+        titulo: true,
+        resumo: true,
+        capaUrl: true,
+        publicadoEm: true,
+        categoryId: true,
+      },
+    }),
+  ]);
+
+  const postsByCategory = new Map<string, typeof posts>();
+  for (const post of posts) {
+    const list = postsByCategory.get(post.categoryId);
+    if (list) list.push(post);
+    else postsByCategory.set(post.categoryId, [post]);
+  }
 
   return categories.map((cat) => ({
     slug: cat.slug,
     nome: cat.nome,
-    posts: cat.posts.map((p) => ({
-      ...p,
-      url: `/blog/#${p.slug}`,
+    posts: (postsByCategory.get(cat.id) || []).map((p) => ({
+      slug: p.slug,
+      titulo: p.titulo,
+      resumo: p.resumo,
+      capaUrl: p.capaUrl,
+      publicadoEm: p.publicadoEm,
     })),
   }));
 };
