@@ -1,10 +1,12 @@
 import { Router, Request, Response } from 'express';
 import { body, validationResult } from 'express-validator';
+import { publicFormLimiter } from '../middleware/rate-limit.middleware';
 
 const router = Router();
 
 router.post(
   '/',
+  publicFormLimiter,
   [
     body('name').trim().isLength({ min: 2, max: 200 }),
     body('role').optional().trim().isLength({ max: 200 }),

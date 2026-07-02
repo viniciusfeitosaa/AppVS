@@ -116,16 +116,24 @@ export async function aprovarCadastroPendenteService(tenantId: string, masterId:
   }
 
   try {
-    const { enviarEmailCadastroAprovado } = await import('./cadastro-publico-email.service');
-    await enviarEmailCadastroAprovado({
-      to: m.email,
+    const emailTo = (m.email ?? '').trim().toLowerCase();
+    if (!emailTo) throw new Error('Médico sem e-mail');
+    const { enqueueEmailJob } = await import('../jobs/email-queue');
+    const queued = await enqueueEmailJob({
+      type: 'cadastro-aprovado',
+      to: emailTo,
       nomeCompleto: m.nomeCompleto,
       nomeInstituicao,
     });
-    const emailLog = (m.email ?? '').trim().toLowerCase();
-    if (emailLog) {
-      console.log('[cadastro-pendente] E-mail de cadastro aprovado enviado para:', emailLog);
+    if (!queued) {
+      const { enviarEmailCadastroAprovado } = await import('./cadastro-publico-email.service');
+      await enviarEmailCadastroAprovado({
+        to: m.email,
+        nomeCompleto: m.nomeCompleto,
+        nomeInstituicao,
+      });
     }
+    console.log('[cadastro-pendente] E-mail de cadastro aprovado enfileirado/enviado para:', emailTo);
   } catch (err) {
     console.error('[cadastro-pendente] Falha no e-mail de cadastro aprovado (SMTP/Resend não configurado ou erro de envio):', err);
   }

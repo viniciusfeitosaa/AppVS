@@ -2,28 +2,15 @@ import fs from 'fs';
 import { defineConfig, loadEnv } from 'vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
-import { landingDevPlugin } from './vite-plugin-landing-dev';
 
-const landingIndex = path.resolve(__dirname, '../landing/index.html');
-
-// Raiz `/` para Docker e domínio dedicado. Em dev, default `/app/` se existir landing/.
-// https://vitejs.dev/config/
+// COOPVITTA: SPA na raiz — sem landing estática.
 export default defineConfig(({ command, mode }) => {
   const env = loadEnv(mode, __dirname, '');
-  const landingExists = fs.existsSync(landingIndex);
-  const isServe = command === 'serve';
-  const configuredBase = env.VITE_APP_BASE?.trim();
-  const base = configuredBase || (isServe && landingExists ? '/app/' : '/');
-
-  if (isServe && landingExists && base !== '/app/') {
-    console.warn(
-      '[vite] VITE_APP_BASE não é /app/ — a landing estática em / não será servida; use VITE_APP_BASE=/app/ no .env.',
-    );
-  }
+  const base = env.VITE_APP_BASE?.trim() || '/';
 
   return {
     base,
-    plugins: [react(), landingDevPlugin()],
+    plugins: [react()],
     resolve: {
       alias: {
         '@': path.resolve(__dirname, './src'),

@@ -1,7 +1,7 @@
 {
   "name": "COOPVITTA",
   "short_name": "COOPVITTA",
-  "start_url": "/app/",
+  "start_url": "/",
   "scope": "/",
   "display": "standalone",
   "background_color": "#ffffff",

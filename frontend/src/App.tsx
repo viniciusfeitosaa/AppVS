@@ -68,14 +68,15 @@ function AppRoutes() {
 
   return (
     <Routes>
-      <Route 
-        path="/login" 
+      <Route
+        path="/"
         element={
           <LoginGuard>
             <Login />
           </LoginGuard>
-        } 
+        }
       />
+      <Route path="/login" element={<Navigate to="/" replace />} />
       <Route
         path="/cadastro"
         element={
@@ -175,7 +176,7 @@ function AppRoutes() {
           element={<Perfil />}
         />
       </Route>
-      <Route path="*" element={<Navigate to="/login" replace />} />
+      <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
 }

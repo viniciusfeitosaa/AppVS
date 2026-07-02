@@ -1,20 +1,39 @@
 import 'dotenv/config';
+import type { Server } from 'http';
+import type { Socket } from 'net';
 import { createApp } from './app';
 import env from './config/env';
 import { connectDatabase, disconnectDatabase } from './config/database';
+import { connectRedis, disconnectRedis } from './config/redis';
+import { markShuttingDown } from './config/shutdown';
+import { startEmailQueue, stopEmailQueue } from './jobs/email-queue';
+import { safeLogger } from './utils/safe-logger';
 
 const PORT = parseInt(env.PORT) || 3001;
+const activeConnections = new Set<Socket>();
 
-// Conecta ao banco em background (não bloqueia o listen; Render precisa da porta aberta logo)
 function connectDatabaseInBackground() {
   connectDatabase().catch((err) => {
-    console.error('❌ Conexão ao banco em background falhou:', err?.message ?? err);
+    safeLogger.error('Conexão ao banco em background falhou:', err?.message ?? err);
     console.log('⏳ O servidor está no ar; novas tentativas a cada 30s...');
     setTimeout(connectDatabaseInBackground, 30000);
   });
 }
 
-// Inicializar servidor
+function trackConnections(server: Server) {
+  server.on('connection', (socket) => {
+    activeConnections.add(socket);
+    socket.on('close', () => activeConnections.delete(socket));
+  });
+}
+
+function closeActiveConnections() {
+  for (const socket of activeConnections) {
+    socket.destroy();
+  }
+  activeConnections.clear();
+}
+
 function startServer() {
   try {
     const app = createApp();
@@ -24,33 +43,38 @@ function startServer() {
       console.log(`📝 Ambiente: ${env.NODE_ENV}`);
       console.log(`🌐 Escutando em 0.0.0.0 (necessário para Render)`);
       connectDatabaseInBackground();
+      void connectRedis().then((ok) => {
+        if (ok) startEmailQueue();
+      });
     });
 
-    // Graceful shutdown
-    const shutdown = async () => {
-      console.log('\n🛑 Encerrando servidor...');
+    trackConnections(server);
+
+    const shutdown = async (signal: string) => {
+      markShuttingDown();
+      safeLogger.info(`Recebido ${signal}; encerrando graciosamente...`);
 
       server.close(async () => {
-        console.log('✅ Servidor HTTP encerrado');
-
+        safeLogger.info('Servidor HTTP encerrado (sem novas conexões)');
+        await stopEmailQueue();
+        await disconnectRedis();
         await disconnectDatabase();
         process.exit(0);
       });
 
-      // Forçar encerramento após 10 segundos
       setTimeout(() => {
-        console.error('❌ Forçando encerramento...');
+        safeLogger.warn('Timeout de shutdown; fechando conexões ativas...');
+        closeActiveConnections();
         process.exit(1);
       }, 10000);
     };
 
-    process.on('SIGTERM', shutdown);
-    process.on('SIGINT', shutdown);
+    process.on('SIGTERM', () => void shutdown('SIGTERM'));
+    process.on('SIGINT', () => void shutdown('SIGINT'));
   } catch (error) {
-    console.error('❌ Erro ao iniciar servidor:', error);
+    safeLogger.error('Erro ao iniciar servidor:', error);
     process.exit(1);
   }
 }
 
-// Iniciar servidor
 startServer();

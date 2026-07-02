@@ -14,6 +14,7 @@ import tls from 'tls';
 import nodemailer from 'nodemailer';
 import { Resend } from 'resend';
 import twilio from 'twilio';
+import { fetchWithTimeout } from '../utils/fetch-with-timeout';
 import {
   escapeHtmlAttr,
   getEmailLogoUrl,
@@ -170,7 +171,7 @@ async function sendResetPasswordWhatsApp(toPhoneE164: string, resetLink: string)
     const baseUrl = (process.env.EVOLUTION_API_URL || '').replace(/\/$/, '');
     const instance = process.env.EVOLUTION_INSTANCE!;
     const apiKey = process.env.EVOLUTION_API_KEY!;
-    const res = await fetch(`${baseUrl}/message/sendText/${instance}`, {
+    const res = await fetchWithTimeout(`${baseUrl}/message/sendText/${instance}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -252,6 +253,27 @@ async function sendResetPasswordEmailSmtp(to: string, resetLink: string): Promis
     text: buildResetPasswordEmailText(resetLink),
     html: buildResetPasswordEmailHtml(resetLink),
   });
+}
+
+/** Usado pelo worker BullMQ e como fallback síncrono. */
+export async function sendResetPasswordEmailJob(to: string, resetLink: string): Promise<void> {
+  if (hasSmtpConfig()) {
+    await sendResetPasswordEmailSmtp(to, resetLink);
+    return;
+  }
+  if (hasResendConfig()) {
+    await sendResetPasswordEmailResend(to, resetLink);
+    return;
+  }
+  throw new Error('Nenhum provedor de e-mail configurado (SMTP ou RESEND_API_KEY)');
+}
+
+async function queueOrSendResetEmail(to: string, resetLink: string): Promise<void> {
+  const { enqueueEmailJob } = await import('../jobs/email-queue');
+  const queued = await enqueueEmailJob({ type: 'reset-password', to, resetLink });
+  if (!queued) {
+    await sendResetPasswordEmailJob(to, resetLink);
+  }
 }
 
 export interface LoginResult {
@@ -806,11 +828,20 @@ export const registerPublicMedicoService = async (
   });
 
   try {
-    await enviarEmailsPosCadastroPublico({
+    const { enqueueEmailJob } = await import('../jobs/email-queue');
+    const queued = await enqueueEmailJob({
+      type: 'cadastro-pos',
       to: medico.email || email,
       nomeCompleto: medico.nomeCompleto,
       versaoTermos: TERMOS_CADASTRO_VERSAO,
     });
+    if (!queued) {
+      await enviarEmailsPosCadastroPublico({
+        to: medico.email || email,
+        nomeCompleto: medico.nomeCompleto,
+        versaoTermos: TERMOS_CADASTRO_VERSAO,
+      });
+    }
   } catch (err) {
     console.error('[cadastro-publico] envio de e-mails pós-cadastro:', err);
   }
@@ -888,22 +919,8 @@ export async function esqueciSenhaService(email: string): Promise<{
       }
     }
   } else {
-    const sendEmail = async () => {
-      // SMTP próprio (ex.: Maddy) tem prioridade sobre Resend quando ambos existem no .env
-      if (hasSmtpConfig()) {
-        console.log('[esqueci-senha] Enviando e-mail via SMTP para:', normalizedEmail);
-        await sendResetPasswordEmailSmtp(normalizedEmail, resetLink);
-        return;
-      }
-      if (hasResendConfig()) {
-        console.log('[esqueci-senha] Enviando e-mail via Resend para:', normalizedEmail);
-        await sendResetPasswordEmailResend(normalizedEmail, resetLink);
-        return;
-      }
-      throw new Error('Nenhum provedor de e-mail configurado (SMTP ou RESEND_API_KEY)');
-    };
     try {
-      await sendEmail();
+      await queueOrSendResetEmail(normalizedEmail, resetLink);
     } catch (err: any) {
       console.error('[esqueci-senha] Falha ao enviar e-mail:', err?.message || err, err?.code || '');
       if (process.env.NODE_ENV === 'production') {

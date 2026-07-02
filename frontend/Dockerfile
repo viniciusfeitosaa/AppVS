@@ -1,4 +1,4 @@
-# Build a partir da raiz do repositório (AppVS): permite copiar landing/ + frontend/
+# Build a partir da raiz do repositório (coopvitta-app)
 # docker compose: context: . , dockerfile: frontend/Dockerfile
 FROM node:18-alpine AS builder
 
@@ -8,11 +8,10 @@ COPY frontend/package*.json ./
 RUN npm ci
 
 COPY frontend/ ./
-COPY landing ./landing
 
 ARG VITE_API_URL
 ENV VITE_API_URL=$VITE_API_URL
-ENV VITE_APP_BASE=/app/
+ENV VITE_APP_BASE=/
 
 RUN test -n "$VITE_API_URL" || (echo "Defina VITE_API_URL no .env na raiz (ex.: http://IP:3001/api)" >&2 && exit 1)
 

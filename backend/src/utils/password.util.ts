@@ -1,7 +1,8 @@
 import bcrypt from 'bcryptjs';
 import env from '../config/env';
 
-const SALT_ROUNDS = parseInt(env.BCRYPT_ROUNDS) || 12;
+/** OWASP: BCrypt com custo ≥ 12 (Argon2id seria alternativa; BCrypt já atende). */
+const SALT_ROUNDS = Math.max(12, parseInt(env.BCRYPT_ROUNDS, 10) || 12);
 
 /**
  * Gera hash da senha

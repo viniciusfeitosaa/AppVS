@@ -20,14 +20,32 @@ const envSchema = z.object({
 
   // JWT
   JWT_SECRET: z.string().min(32, 'JWT_SECRET deve ter pelo menos 32 caracteres'),
-  JWT_EXPIRES_IN: z.string().default('24h'),
+  JWT_EXPIRES_IN: z.string().default('15m'),
   JWT_REFRESH_SECRET: z.string().min(32, 'JWT_REFRESH_SECRET deve ter pelo menos 32 caracteres'),
   JWT_REFRESH_EXPIRES_IN: z.string().default('7d'),
 
+  // Redis (rate limit distribuído + filas BullMQ)
+  REDIS_URL: z.string().optional(),
+
+  // Timeouts
+  HTTP_REQUEST_TIMEOUT_MS: z.string().default('30000'),
+  HTTP_EXTERNAL_TIMEOUT_MS: z.string().default('10000'),
+  PRISMA_QUERY_TIMEOUT_MS: z.string().default('10000'),
+
+  // Rate limit por rota sensível (req/min por IP)
+  RATE_LIMIT_AUTH_MAX_PER_MIN: z.string().default('100'),
+  RATE_LIMIT_PUBLIC_FORM_MAX_PER_MIN: z.string().default('30'),
   // Segurança
   BCRYPT_ROUNDS: z.string().default('12'),
-  RATE_LIMIT_WINDOW_MS: z.string().default('900000'), // 15 minutos
-  RATE_LIMIT_MAX_REQUESTS: z.string().default('500'), // requisições por janela (dashboard faz várias em paralelo)
+  RATE_LIMIT_WINDOW_MS: z.string().default('900000'),
+  RATE_LIMIT_MAX_REQUESTS: z.string().default('500'),
+
+  // Criptografia em repouso (AES-256-GCM) — opcional; gere com openssl rand -hex 32
+  FIELD_ENCRYPTION_KEY: z.string().optional(),
+
+  // Circuit breaker para APIs externas
+  CIRCUIT_BREAKER_FAILURE_THRESHOLD: z.string().default('5'),
+  CIRCUIT_BREAKER_RESET_MS: z.string().default('60000'),
 
   // CORS
   FRONTEND_URL: z.string().url().optional(),

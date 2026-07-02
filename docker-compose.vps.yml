@@ -9,6 +9,11 @@ services:
   backend:
     container_name: coopvitta-backend
     ports: !reset []
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
 
   frontend:
     container_name: coopvitta-frontend
@@ -16,6 +21,9 @@ services:
 
   postgres:
     container_name: coopvitta-postgres
+
+  redis:
+    container_name: coopvitta-redis
 
 networks:
   app-network:

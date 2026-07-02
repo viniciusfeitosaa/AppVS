@@ -12,6 +12,7 @@
  * Convite (POST /admin/medicos/:id/invite): DOCUSEAL_REQUIRED_TEMPLATES + DOCUSEAL_SECOND_SUBMITTER_EMAIL, etc.
  */
 import { buildDocusealInviteEmailBody } from '../utils/email-branding.util';
+import { fetchWithTimeout } from '../utils/fetch-with-timeout';
 
 const DOCUSEAL_DEFAULT_WEB = 'https://docuseal.com';
 
@@ -176,7 +177,7 @@ async function fetchSubmissionsPaginated(
       if (after !== undefined) qs.set('after', String(after));
       if (opts.q != null && opts.q.length > 0) qs.set('q', opts.q);
 
-      const resp = await fetch(`${apiBase}/submissions?${qs}`, {
+      const resp = await fetchWithTimeout(`${apiBase}/submissions?${qs}`, {
         method: 'GET',
         headers: { 'X-Auth-Token': token },
         signal: ctrl.signal,
@@ -514,7 +515,7 @@ export async function docusealResendEmailSubmitterService(submitterId: number): 
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), 15000);
   try {
-    const resp = await fetch(`${c.apiBase}/submitters/${submitterId}`, {
+    const resp = await fetchWithTimeout(`${c.apiBase}/submitters/${submitterId}`, {
       method: 'PUT',
       headers: {
         'X-Auth-Token': c.token,
@@ -962,7 +963,7 @@ export async function createDocusealSubmissionsForMedicoInvite(
       };
       if (cfg.replyTo) payload.reply_to = cfg.replyTo;
 
-      const resp = await fetch(`${cfg.apiBase}/submissions`, {
+      const resp = await fetchWithTimeout(`${cfg.apiBase}/submissions`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

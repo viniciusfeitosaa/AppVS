@@ -74,6 +74,27 @@ const prismaClientSingleton = () => {
           : ['error'],
   });
 
+  const queryTimeoutMs = Math.max(
+    1000,
+    parseInt(process.env.PRISMA_QUERY_TIMEOUT_MS || '10000', 10)
+  );
+  if (process.env.SKIP_PRISMA_QUERY_TIMEOUT !== '1') {
+    client.$use(async (params, next) => {
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        timer = setTimeout(
+          () => reject(new Error(`Query timeout (${queryTimeoutMs}ms): ${params.model}.${params.action}`)),
+          queryTimeoutMs
+        );
+      });
+      try {
+        return await Promise.race([next(params), timeoutPromise]);
+      } finally {
+        if (timer) clearTimeout(timer);
+      }
+    });
+  }
+
   // Logar queries lentas (instrumentação para reduzir “delay” percebido no app).
   if (process.env.PRISMA_LOG_SLOW_QUERIES === '1') {
     client.$use(async (params, next) => {

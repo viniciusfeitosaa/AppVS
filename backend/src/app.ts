@@ -1,8 +1,12 @@
 import express, { Express, Request, Response, NextFunction } from 'express';
 import cors from 'cors';
-import helmet from 'helmet';
-import rateLimit from 'express-rate-limit';
 import env from './config/env';
+import { buildHelmetMiddleware } from './config/helmet.config';
+import { isShuttingDown } from './config/shutdown';
+import { globalApiLimiter } from './middleware/rate-limit.middleware';
+import { requestTimeoutMiddleware } from './middleware/request-timeout.middleware';
+import { sanitizeBodyMiddleware } from './middleware/sanitize.middleware';
+import { safeLogger } from './utils/safe-logger';
 
 // Importar rotas
 import authRoutes from './routes/auth.routes';
@@ -19,7 +23,19 @@ const app: Express = express();
 app.set('trust proxy', 1);
 
 // Middleware de segurança
-app.use(helmet());
+app.use(buildHelmetMiddleware());
+
+// Desligamento gracioso: rejeita novas requisições durante SIGTERM
+app.use((_req: Request, res: Response, next: NextFunction) => {
+  if (isShuttingDown()) {
+    res.setHeader('Connection', 'close');
+    return res.status(503).json({
+      success: false,
+      error: 'Servidor em manutenção. Tente novamente em instantes.',
+    });
+  }
+  return next();
+});
 
 // CORS – origem de produção sempre permitida; demais vêm do env (trim para evitar espaços)
 const originsFromEnv = [
@@ -47,22 +63,16 @@ app.use(
   })
 );
 
-// Rate limiting global (evita 429 ao carregar dashboard com várias queries em paralelo)
+// Rate limiting global (Redis se REDIS_URL; senão memória)
 const rateWindowMs = parseInt(env.RATE_LIMIT_WINDOW_MS, 10) || 900000;
 const rateMax = Math.max(100, parseInt(env.RATE_LIMIT_MAX_REQUESTS, 10) || 500);
-const limiter = rateLimit({
-  windowMs: rateWindowMs,
-  max: rateMax,
-  message: 'Muitas requisições deste IP, tente novamente mais tarde.',
-  standardHeaders: true,
-  legacyHeaders: false,
-});
+app.use('/api', globalApiLimiter(rateWindowMs, rateMax));
 
-app.use('/api', limiter);
-
-// Body parser
+// Timeout HTTP + sanitização de body JSON
+app.use(requestTimeoutMiddleware(parseInt(env.HTTP_REQUEST_TIMEOUT_MS, 10) || 30000));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+app.use(sanitizeBodyMiddleware);
 // Arquivos em uploads/ não são mais servidos publicamente (ver rotas autenticadas em medico/ponto/admin).
 
 // Observabilidade básica (tempo por request) — habilite com REQUEST_LOG_MS=200 (exemplo).
@@ -124,12 +134,25 @@ app.use((req: Request, res: Response) => {
   });
 });
 
-// Middleware de tratamento de erros
+// Middleware de tratamento de erros — nunca expõe stack trace em produção
 app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
-  console.error('Erro:', err);
+  safeLogger.error('Erro não tratado:', err);
 
-  res.status(500).json({
-    error: 'Erro interno do servidor',
+  const isTimeout = /timeout/i.test(err.message);
+  const isCircuitOpen = /indisponível/i.test(err.message);
+
+  if (isCircuitOpen) {
+    return res.status(503).json({
+      success: false,
+      error: 'Serviço temporariamente indisponível. Tente novamente em instantes.',
+    });
+  }
+
+  return res.status(isTimeout ? 503 : 500).json({
+    success: false,
+    error: isTimeout
+      ? 'Operação excedeu o tempo limite.'
+      : 'Erro interno do servidor',
     message: env.NODE_ENV === 'development' ? err.message : undefined,
   });
 });
