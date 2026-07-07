@@ -22,13 +22,13 @@ import {
 } from '../middleware/validation.middleware';
 import { authenticateToken } from '../middleware/auth.middleware';
 import { maybeRegisterPublicUploadMiddleware } from '../middleware/upload.middleware';
-import { authStrictLimiter } from '../middleware/rate-limit.middleware';
+import { authStrictLimiter, loginLimiter } from '../middleware/rate-limit.middleware';
 
 const router = Router();
 
-router.post('/login', authStrictLimiter, validateEmailLogin, loginController);
-router.post('/login-medico', authStrictLimiter, validateMedicoLogin, loginMedicoController);
-router.post('/login-master', authStrictLimiter, validateMasterLogin, loginMasterController);
+router.post('/login', loginLimiter, validateEmailLogin, loginController);
+router.post('/login-medico', loginLimiter, validateMedicoLogin, loginMedicoController);
+router.post('/login-master', loginLimiter, validateMasterLogin, loginMasterController);
 router.post('/accept-invite', authStrictLimiter, validateAcceptInvite, acceptInviteController);
 router.post('/esqueci-senha', authStrictLimiter, validateEsqueciSenha, esqueciSenhaController);
 router.post('/redefinir-senha', authStrictLimiter, validateRedefinirSenha, redefinirSenhaController);

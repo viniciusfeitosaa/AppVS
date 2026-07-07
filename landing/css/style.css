@@ -1008,7 +1008,7 @@ main {
     align-items: stretch;
     gap: 0.65rem;
     margin-top: 1.25rem;
-    padding: 1.25rem 0 0;
+    padding: 1.25rem 0 calc(1.25rem + var(--cookie-banner-height, 0px));
     border-left: none;
     border-top: 1px solid rgba(26, 64, 17, 0.1);
   }
@@ -1026,7 +1026,12 @@ main {
 
   .nav-link-login {
     text-align: center;
-    padding: 0.75rem;
+    padding: 0.85rem 1rem;
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    touch-action: manipulation;
   }
 
   .nav-toggle {
@@ -1054,6 +1059,26 @@ body.nav-open {
   overflow: hidden;
 }
 
+/* Menu mobile acima do banner de cookies (LGPD) */
+@media (max-width: 1280px) {
+  body.nav-open .nav-backdrop {
+    z-index: 1590;
+  }
+
+  body.nav-open .nav {
+    z-index: 1600;
+  }
+
+  body.nav-open .nav-toggle {
+    z-index: 1602;
+  }
+
+  body.nav-open .cookie-banner {
+    z-index: 900;
+    pointer-events: none;
+  }
+}
+
 .nav-backdrop {
   position: fixed;
   inset: 0;
@@ -1071,9 +1096,11 @@ body.nav-open {
   display: none !important;
 }
 
-/* Header acima do overlay */
-body.nav-open .header {
-  z-index: 1003;
+@media (max-width: 1280px) {
+  /* Header e drawer acima do overlay e do banner de cookies */
+  body.nav-open .header {
+    z-index: 1601;
+  }
 }
 
 @media (max-width: 768px) {

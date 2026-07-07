@@ -349,7 +349,7 @@ const ValoresPonto = () => {
   if (!isMaster) {
     return (
       <div className="card border-l-4 border-red-400">
-        <h2 className="text-xl font-bold text-coop-900 mb-2">Acesso restrito</h2>
+        <h2 className="text-xl font-bold text-viva-900 mb-2">Acesso restrito</h2>
         <p className="text-gray-600">Somente o perfil Master pode configurar valores e horas do ponto eletrônico.</p>
       </div>
     );
@@ -357,8 +357,8 @@ const ValoresPonto = () => {
 
   return (
     <div className="space-y-6">
-      <div className="card border-l-4 border-coop-500">
-        <h2 className="text-2xl font-bold text-coop-900 mb-1">Horas e valor – Ponto Eletrônico</h2>
+      <div className="card border-l-4 border-viva-500">
+        <h2 className="text-2xl font-bold text-viva-900 mb-1">Horas e valor – Ponto Eletrônico</h2>
         <p className="text-gray-600">
           Por <strong>Contrato</strong>, <strong>Subgrupo</strong> e <strong>Equipe</strong>, defina as <strong>horas previstas no mês</strong> e os <strong>valores por hora</strong> (repasse ao profissional e cobrança). Se não escolher equipe, a configuração vale para todo o subgrupo. Use a seção &quot;Dias úteis do mês&quot; para consultar quantos dias úteis tem cada mês.
         </p>
@@ -376,13 +376,13 @@ const ValoresPonto = () => {
       )}
 
       <div className="card">
-        <h3 className="text-lg font-bold text-coop-900 mb-4">Contrato, subgrupo e equipe</h3>
+        <h3 className="text-lg font-bold text-viva-900 mb-4">Contrato, subgrupo e equipe</h3>
         {loadingOpcoes ? (
           <p className="text-sm text-gray-600">Carregando opções...</p>
         ) : (
           <div className="flex flex-wrap gap-6">
             <div className="min-w-[200px]">
-              <label className="block text-sm font-semibold text-coop-800 mb-1">Contrato</label>
+              <label className="block text-sm font-semibold text-viva-800 mb-1">Contrato</label>
               <select
                 className="input w-full"
                 value={contratoId}
@@ -395,7 +395,7 @@ const ValoresPonto = () => {
               </select>
             </div>
             <div className="min-w-[200px]">
-              <label className="block text-sm font-semibold text-coop-800 mb-1">Subgrupo</label>
+              <label className="block text-sm font-semibold text-viva-800 mb-1">Subgrupo</label>
               <select
                 className="input w-full"
                 value={subgrupoId}
@@ -409,7 +409,7 @@ const ValoresPonto = () => {
               </select>
             </div>
             <div className="min-w-[220px]">
-              <label className="block text-sm font-semibold text-coop-800 mb-1">Equipe</label>
+              <label className="block text-sm font-semibold text-viva-800 mb-1">Equipe</label>
               <select
                 className="input w-full"
                 value={equipeId}
@@ -427,13 +427,13 @@ const ValoresPonto = () => {
       </div>
 
       <div className="card">
-        <h3 className="text-lg font-bold text-coop-900 mb-2">Dias úteis do mês</h3>
+        <h3 className="text-lg font-bold text-viva-900 mb-2">Dias úteis do mês</h3>
         <p className="text-sm text-gray-600 mb-4">
           Quantidade de dias úteis (segunda a sexta) no mês selecionado. Ex.: fevereiro de 2026 possui 20 dias úteis.
         </p>
         <div className="flex flex-wrap items-end gap-4">
           <div>
-            <label className="block text-sm font-semibold text-coop-800 mb-1">Mês</label>
+            <label className="block text-sm font-semibold text-viva-800 mb-1">Mês</label>
             <select
               className="input w-[180px]"
               value={mes}
@@ -445,7 +445,7 @@ const ValoresPonto = () => {
             </select>
           </div>
           <div>
-            <label className="block text-sm font-semibold text-coop-800 mb-1">Ano</label>
+            <label className="block text-sm font-semibold text-viva-800 mb-1">Ano</label>
             <select
               className="input w-[120px]"
               value={ano}
@@ -456,9 +456,9 @@ const ValoresPonto = () => {
               ))}
             </select>
           </div>
-          <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-coop-100 border border-coop-200">
-            <span className="text-coop-900 font-semibold">
-              {MESES[mes - 1]} de {ano}: <strong className="text-coop-800">{diasUteis} dias úteis</strong>
+          <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-viva-100 border border-viva-200">
+            <span className="text-viva-900 font-semibold">
+              {MESES[mes - 1]} de {ano}: <strong className="text-viva-800">{diasUteis} dias úteis</strong>
             </span>
           </div>
         </div>
@@ -466,7 +466,7 @@ const ValoresPonto = () => {
 
       {temContratoESubgrupo && (
         <div className="card">
-          <h3 className="text-lg font-bold text-coop-900 mb-4">Horas previstas e valores por hora</h3>
+          <h3 className="text-lg font-bold text-viva-900 mb-4">Horas previstas e valores por hora</h3>
           {loadingConfig ? (
             <p className="text-sm text-gray-600">Carregando configuração...</p>
           ) : (
@@ -476,10 +476,10 @@ const ValoresPonto = () => {
                 <strong>Relatório de Horas</strong>, cada batida <strong>sem escala</strong> usa o valor do <strong>dia do check-in</strong>. Dia em branco usa o
                 primeiro valor preenchido da semana (seg → dom) como fallback no sistema.
               </p>
-              <div className="p-4 rounded-xl border border-coop-200 bg-white space-y-5">
+              <div className="p-4 rounded-xl border border-viva-200 bg-white space-y-5">
                 <div className="flex flex-wrap items-end gap-4">
                   <div className="min-w-[200px]">
-                    <label className="block text-sm font-semibold text-coop-800 mb-1">Horas previstas no mês</label>
+                    <label className="block text-sm font-semibold text-viva-800 mb-1">Horas previstas no mês</label>
                     <input
                       type="number"
                       min={0}
@@ -492,17 +492,17 @@ const ValoresPonto = () => {
                   </div>
                 </div>
 
-                <div className="border-t border-coop-100 pt-4">
-                  <h4 className="text-base font-bold text-coop-900 mb-1">Valor hora por dia (ponto sem escala)</h4>
+                <div className="border-t border-viva-100 pt-4">
+                  <h4 className="text-base font-bold text-viva-900 mb-1">Valor hora por dia (ponto sem escala)</h4>
                   <p className="text-sm text-gray-600 mb-4">
                     Preencha repasse e cobrança por dia. Configurações antigas com um único valor aparecem repetidas em todos os dias até você ajustar.
                   </p>
 
-                  <div className="p-4 rounded-xl border border-coop-200 bg-white space-y-4">
+                  <div className="p-4 rounded-xl border border-viva-200 bg-white space-y-4">
                     <div>
-                      <p className="text-sm font-semibold text-coop-900">
+                      <p className="text-sm font-semibold text-viva-900">
                         Semana (seg–dom){' '}
-                        <span className="font-normal text-coop-600">(ponto sem escala)</span>
+                        <span className="font-normal text-viva-600">(ponto sem escala)</span>
                       </p>
                       <p className="text-xs text-gray-600 mt-1">
                         Use → na segunda para copiar o valor para ter–dom. Um único salvar grava repasse e cobrança da semana (seg–dom).
@@ -510,17 +510,17 @@ const ValoresPonto = () => {
                     </div>
 
                     <div>
-                      <p className="text-sm font-semibold text-coop-800 mb-2">Repasse (R$/h)</p>
+                      <p className="text-sm font-semibold text-viva-800 mb-2">Repasse (R$/h)</p>
                       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                         {DIAS_SEMANA.map(({ key, label }) => (
                           <div
                             key={key}
-                            className="flex flex-wrap items-end gap-2 p-4 rounded-xl border border-coop-200 bg-coop-50/30"
+                            className="flex flex-wrap items-end gap-2 p-4 rounded-xl border border-viva-200 bg-viva-50/30"
                           >
                             <div className="min-w-[200px] flex-1">
-                              <label className="block text-sm font-semibold text-coop-800 mb-1">
+                              <label className="block text-sm font-semibold text-viva-800 mb-1">
                                 {label}{' '}
-                                <span className="font-normal text-coop-600">(Repasse R$/h)</span>
+                                <span className="font-normal text-viva-600">(Repasse R$/h)</span>
                               </label>
                               <input
                                 type="text"
@@ -552,17 +552,17 @@ const ValoresPonto = () => {
                     </div>
 
                     <div className="pt-2">
-                      <p className="text-sm font-semibold text-coop-800 mb-2">Cobrança (R$/h)</p>
+                      <p className="text-sm font-semibold text-viva-800 mb-2">Cobrança (R$/h)</p>
                       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                         {DIAS_SEMANA.map(({ key, label }) => (
                           <div
                             key={key}
-                            className="flex flex-wrap items-end gap-2 p-4 rounded-xl border border-coop-200 bg-coop-50/30"
+                            className="flex flex-wrap items-end gap-2 p-4 rounded-xl border border-viva-200 bg-viva-50/30"
                           >
                             <div className="min-w-[200px] flex-1">
-                              <label className="block text-sm font-semibold text-coop-800 mb-1">
+                              <label className="block text-sm font-semibold text-viva-800 mb-1">
                                 {label}{' '}
-                                <span className="font-normal text-coop-600">(Cobrança R$/h)</span>
+                                <span className="font-normal text-viva-600">(Cobrança R$/h)</span>
                               </label>
                               <input
                                 type="text"
@@ -602,14 +602,14 @@ const ValoresPonto = () => {
                 </div>
               </div>
 
-              <div className="border-t border-coop-200 pt-4">
-                <h4 className="text-base font-bold text-coop-900 mb-2">Horário de entrada e saída</h4>
+              <div className="border-t border-viva-200 pt-4">
+                <h4 className="text-base font-bold text-viva-900 mb-2">Horário de entrada e saída</h4>
                 <p className="text-sm text-gray-600 mb-4">
                   Defina o horário exato de chegada e saída da equipe. A <strong>tolerância</strong> (em minutos) vale para os dois: o profissional pode bater ponto de entrada entre (entrada − tolerância) e (entrada + tolerância), e de saída entre (saída − tolerância) e (saída + tolerância). Após o fim da tolerância, atrasos são registrados apenas a título de organização, sem penalidade.
                 </p>
-                <div className="flex flex-wrap items-end gap-4 p-4 rounded-xl border border-coop-200 bg-coop-50/30">
+                <div className="flex flex-wrap items-end gap-4 p-4 rounded-xl border border-viva-200 bg-viva-50/30">
                   <div className="min-w-[140px]">
-                    <label className="block text-sm font-semibold text-coop-800 mb-1">Horário de entrada</label>
+                    <label className="block text-sm font-semibold text-viva-800 mb-1">Horário de entrada</label>
                     <input
                       type="time"
                       className="input w-full max-w-[140px]"
@@ -618,7 +618,7 @@ const ValoresPonto = () => {
                     />
                   </div>
                   <div className="min-w-[140px]">
-                    <label className="block text-sm font-semibold text-coop-800 mb-1">Horário de saída</label>
+                    <label className="block text-sm font-semibold text-viva-800 mb-1">Horário de saída</label>
                     <input
                       type="time"
                       className="input w-full max-w-[140px]"
@@ -627,7 +627,7 @@ const ValoresPonto = () => {
                     />
                   </div>
                   <div className="min-w-[160px]">
-                    <label className="block text-sm font-semibold text-coop-800 mb-1">Tolerância (min)</label>
+                    <label className="block text-sm font-semibold text-viva-800 mb-1">Tolerância (min)</label>
                     <input
                       type="number"
                       min={0}
@@ -650,7 +650,7 @@ const ValoresPonto = () => {
                 </div>
               </div>
 
-              <div className="border-t border-coop-200 pt-4">
+              <div className="border-t border-viva-200 pt-4">
                 <PontoEnderecoMapaBlock
                   geo={geo}
                   title="Localização do ponto (opcional)"
@@ -664,9 +664,9 @@ const ValoresPonto = () => {
                     </p>
                   }
                 />
-                <div className="flex flex-wrap items-end gap-4 p-4 rounded-xl border border-coop-200 bg-coop-50/30 mt-3">
+                <div className="flex flex-wrap items-end gap-4 p-4 rounded-xl border border-viva-200 bg-viva-50/30 mt-3">
                   <div className="min-w-[140px]">
-                    <label className="block text-sm font-semibold text-coop-800 mb-1">Raio (metros)</label>
+                    <label className="block text-sm font-semibold text-viva-800 mb-1">Raio (metros)</label>
                     <input
                       type="number"
                       min={0}
@@ -690,7 +690,7 @@ const ValoresPonto = () => {
               </div>
             </div>
           )}
-          <p className="text-xs text-coop-600 mt-4">
+          <p className="text-xs text-viva-600 mt-4">
             Estas informações podem ser usadas em relatórios e cálculos de produtividade por subgrupo ou por equipe. Os horários e a tolerância definem a janela em que o check-in e o checkout são aceitos e o registro de atrasos (sem penalidade). A localização e o raio, quando definidos, restringem onde o profissional pode bater ponto.
           </p>
         </div>

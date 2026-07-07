@@ -50,19 +50,19 @@ const HistoricoPontos = () => {
   return (
     <div className="space-y-6">
       <div className="card dashboard-hero py-8 md:py-10">
-        <p className="text-xs font-semibold uppercase tracking-widest text-coop-600 mb-2 font-display">
+        <p className="text-xs font-semibold uppercase tracking-widest text-viva-600 mb-2 font-display">
           Ponto eletrônico
         </p>
-        <h1 className="text-xl md:text-2xl font-bold text-coop-900 font-display leading-tight mb-2">
+        <h1 className="text-xl md:text-2xl font-bold text-viva-900 font-display leading-tight mb-2">
           Histórico de pontos e valores
         </h1>
-        <p className="text-coop-700 font-serif text-base">
+        <p className="text-viva-700 font-serif text-base">
           Veja seus registros por mês e o acumulado de valor previsto.
         </p>
       </div>
 
       <div className="card">
-        <label htmlFor="mesRefHistorico" className="block text-sm font-semibold text-coop-800 mb-1">
+        <label htmlFor="mesRefHistorico" className="block text-sm font-semibold text-viva-800 mb-1">
           Mês de referência
         </label>
         <input
@@ -76,36 +76,36 @@ const HistoricoPontos = () => {
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="card">
-          <p className="text-xs uppercase tracking-wide text-coop-600">Registros no mês</p>
-          <p className="text-2xl font-bold text-coop-900 mt-1">{payload?.totalRegistros ?? 0}</p>
+          <p className="text-xs uppercase tracking-wide text-viva-600">Registros no mês</p>
+          <p className="text-2xl font-bold text-viva-900 mt-1">{payload?.totalRegistros ?? 0}</p>
         </div>
         <div className="card">
-          <p className="text-xs uppercase tracking-wide text-coop-600">Total de horas</p>
-          <p className="text-2xl font-bold text-coop-900 mt-1">{formatDuration(payload?.totalMinutos ?? 0)}</p>
+          <p className="text-xs uppercase tracking-wide text-viva-600">Total de horas</p>
+          <p className="text-2xl font-bold text-viva-900 mt-1">{formatDuration(payload?.totalMinutos ?? 0)}</p>
         </div>
-        <div className="card border-l-4 border-coop-500">
-          <p className="text-xs uppercase tracking-wide text-coop-600">Valor acumulado do mês</p>
-          <p className="text-2xl font-bold text-coop-900 mt-1">{formatCurrency(payload?.totalValor)}</p>
+        <div className="card border-l-4 border-viva-500">
+          <p className="text-xs uppercase tracking-wide text-viva-600">Valor acumulado do mês</p>
+          <p className="text-2xl font-bold text-viva-900 mt-1">{formatCurrency(payload?.totalValor)}</p>
         </div>
       </div>
 
       <div className="card">
         <div className="mb-4">
-          <h2 className="text-lg font-bold text-coop-900">Registros do mês</h2>
-          <p className="text-xs text-coop-600 mt-1">
+          <h2 className="text-lg font-bold text-viva-900">Registros do mês</h2>
+          <p className="text-xs text-viva-600 mt-1">
             O valor considera a mesma base de cálculo exibida ao Master.
           </p>
         </div>
 
         {isLoading ? (
-          <p className="text-sm text-coop-700">Carregando histórico...</p>
+          <p className="text-sm text-viva-700">Carregando histórico...</p>
         ) : registros.length === 0 ? (
-          <p className="text-sm text-coop-700">Nenhum registro encontrado para este mês.</p>
+          <p className="text-sm text-viva-700">Nenhum registro encontrado para este mês.</p>
         ) : (
           <div className="overflow-x-auto">
             <table className="min-w-full text-sm">
               <thead>
-                <tr className="text-left text-coop-700 border-b">
+                <tr className="text-left text-viva-700 border-b">
                   <th className="py-2 pr-4">Escala</th>
                   <th className="py-2 pr-4">Equipe</th>
                   <th className="py-2 pr-4">Entrada</th>
@@ -118,10 +118,10 @@ const HistoricoPontos = () => {
               <tbody>
                 {registros.map((r) => (
                   <tr key={r.id} className="border-b last:border-b-0">
-                    <td className="py-2 pr-4 text-coop-900 font-medium">{r.escala?.nome ?? 'Ponto sem escala'}</td>
-                    <td className="py-2 pr-4 text-coop-900">{r.equipe ?? '—'}</td>
-                    <td className="py-2 pr-4 text-coop-900">{formatDateTime(r.checkInAt)}</td>
-                    <td className="py-2 pr-4 text-coop-900">{formatDateTime(r.checkOutAt)}</td>
+                    <td className="py-2 pr-4 text-viva-900 font-medium">{r.escala?.nome ?? 'Ponto sem escala'}</td>
+                    <td className="py-2 pr-4 text-viva-900">{r.equipe ?? '—'}</td>
+                    <td className="py-2 pr-4 text-viva-900">{formatDateTime(r.checkInAt)}</td>
+                    <td className="py-2 pr-4 text-viva-900">{formatDateTime(r.checkOutAt)}</td>
                     <td className="py-2 pr-4">
                       {r.checkInAtrasado ? (
                         <span className="inline-flex items-center rounded-full bg-amber-100 text-amber-800 px-2 py-0.5 text-xs font-medium">
@@ -133,8 +133,8 @@ const HistoricoPontos = () => {
                         </span>
                       )}
                     </td>
-                    <td className="py-2 pr-4 text-coop-900">{formatDuration(r.duracaoMinutos)}</td>
-                    <td className="py-2 pr-4 text-coop-900 font-semibold">{formatCurrency(r.valor)}</td>
+                    <td className="py-2 pr-4 text-viva-900">{formatDuration(r.duracaoMinutos)}</td>
+                    <td className="py-2 pr-4 text-viva-900 font-semibold">{formatCurrency(r.valor)}</td>
                   </tr>
                 ))}
               </tbody>

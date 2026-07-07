@@ -1,9 +1,8 @@
 # Override VPS COOPVITTA: nomes de containers, rede e sem portas publicadas no host.
 #
-# Uso:
-#   docker compose -f docker-compose.yml -f docker-compose.postgres.yml -f docker-compose.vps.yml up -d --build
-#
-# NPM alcança frontend/backend pela rede proxy-network — não expor 3001/8082/5432.
+# ⚠️ NÃO usar na VPS da Viva Saúde (187.77.247.33). Este ficheiro é só para a VPS
+# dedicada da COOPVITTA (187.127.35.253). Na Viva Saúde suba apenas:
+#   docker compose -f docker-compose.yml -f docker-compose.postgres.yml up -d
 
 services:
   backend:

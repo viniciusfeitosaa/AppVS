@@ -246,7 +246,7 @@ const RelatoriosPontoEletronico = () => {
   if (!isMaster) {
     return (
       <div className="card border-l-4 border-red-400">
-        <h2 className="text-xl font-bold text-coop-900 mb-2">Acesso restrito</h2>
+        <h2 className="text-xl font-bold text-viva-900 mb-2">Acesso restrito</h2>
         <p className="text-gray-600">Esta área é exclusiva para o perfil Master.</p>
       </div>
     );
@@ -254,16 +254,16 @@ const RelatoriosPontoEletronico = () => {
 
   return (
     <div className="space-y-6">
-      <div className="card border-l-4 border-coop-500">
-        <h2 className="text-2xl font-bold text-coop-900 mb-1">Relatórios de ponto eletrônico</h2>
+      <div className="card border-l-4 border-viva-500">
+        <h2 className="text-2xl font-bold text-viva-900 mb-1">Relatórios de ponto eletrônico</h2>
         <p className="text-gray-600">Consolidado mensal de entradas e saídas por profissional.</p>
       </div>
 
       <div className="card">
-        <h3 className="text-lg font-bold text-coop-900 mb-4">Filtros</h3>
+        <h3 className="text-lg font-bold text-viva-900 mb-4">Filtros</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-4">
           <div>
-            <label htmlFor="mesRef" className="block text-sm font-semibold text-coop-800 mb-1">
+            <label htmlFor="mesRef" className="block text-sm font-semibold text-viva-800 mb-1">
               Mês
             </label>
             <input
@@ -276,7 +276,7 @@ const RelatoriosPontoEletronico = () => {
           </div>
 
           <div>
-            <label htmlFor="contratoId" className="block text-sm font-semibold text-coop-800 mb-1">
+            <label htmlFor="contratoId" className="block text-sm font-semibold text-viva-800 mb-1">
               Contrato
             </label>
             <select
@@ -299,7 +299,7 @@ const RelatoriosPontoEletronico = () => {
           </div>
 
           <div>
-            <label htmlFor="subgrupoId" className="block text-sm font-semibold text-coop-800 mb-1">
+            <label htmlFor="subgrupoId" className="block text-sm font-semibold text-viva-800 mb-1">
               Subgrupo
             </label>
             <select
@@ -322,7 +322,7 @@ const RelatoriosPontoEletronico = () => {
           </div>
 
           <div>
-            <label htmlFor="equipeId" className="block text-sm font-semibold text-coop-800 mb-1">
+            <label htmlFor="equipeId" className="block text-sm font-semibold text-viva-800 mb-1">
               Equipe
             </label>
             <select
@@ -349,19 +349,19 @@ const RelatoriosPontoEletronico = () => {
 
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
         <div className="card">
-          <p className="text-xs uppercase tracking-wide text-coop-600">Registros no mês</p>
-          <p className="text-2xl font-bold text-coop-900 mt-1">{linhasTabela.length}</p>
+          <p className="text-xs uppercase tracking-wide text-viva-600">Registros no mês</p>
+          <p className="text-2xl font-bold text-viva-900 mt-1">{linhasTabela.length}</p>
         </div>
-        <div className="card border-l-4 border-coop-500">
-          <p className="text-xs uppercase tracking-wide text-coop-600">Total de horas do mês</p>
-          <p className="text-2xl font-bold text-coop-900 mt-1">{formatDuration(totalMinutosMes)}</p>
+        <div className="card border-l-4 border-viva-500">
+          <p className="text-xs uppercase tracking-wide text-viva-600">Total de horas do mês</p>
+          <p className="text-2xl font-bold text-viva-900 mt-1">{formatDuration(totalMinutosMes)}</p>
         </div>
       </div>
 
       <div className="card">
         <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
           <div>
-            <h3 className="text-lg font-bold text-coop-900">Pontos registrados</h3>
+            <h3 className="text-lg font-bold text-viva-900">Pontos registrados</h3>
             <p className="text-xs text-gray-600 mt-1">Profissional, entrada, saída e total do dia.</p>
           </div>
           <div className="flex items-center gap-2">
@@ -385,15 +385,15 @@ const RelatoriosPontoEletronico = () => {
         </div>
 
         {isLoading ? (
-          <p className="text-sm text-coop-700">Carregando registros...</p>
+          <p className="text-sm text-viva-700">Carregando registros...</p>
         ) : linhasTabela.length === 0 ? (
-          <p className="text-sm text-coop-700">Nenhum ponto encontrado para os filtros selecionados.</p>
+          <p className="text-sm text-viva-700">Nenhum ponto encontrado para os filtros selecionados.</p>
         ) : (
           <>
             <div className="overflow-x-auto">
               <table className="min-w-full text-sm">
                 <thead>
-                  <tr className="text-left text-coop-700 border-b">
+                  <tr className="text-left text-viva-700 border-b">
                     <th className="py-2 pr-4">Profissional</th>
                     <th className="py-2 pr-4">Hora da entrada</th>
                     <th className="py-2 pr-4">Hora da saída</th>
@@ -404,10 +404,10 @@ const RelatoriosPontoEletronico = () => {
                 <tbody>
                   {linhasTabela.map((row) => (
                     <tr key={row.id} className="border-b last:border-b-0">
-                      <td className="py-2 pr-4 font-medium text-coop-900">{row.profissional}</td>
-                      <td className="py-2 pr-4 text-coop-900">{row.entrada}</td>
-                      <td className="py-2 pr-4 text-coop-900">{row.saida}</td>
-                      <td className="py-2 pr-4 text-coop-900">
+                      <td className="py-2 pr-4 font-medium text-viva-900">{row.profissional}</td>
+                      <td className="py-2 pr-4 text-viva-900">{row.entrada}</td>
+                      <td className="py-2 pr-4 text-viva-900">{row.saida}</td>
+                      <td className="py-2 pr-4 text-viva-900">
                         {row.atrasado ? (
                           <span className="inline-flex items-center rounded-full bg-amber-100 text-amber-800 px-2 py-0.5 text-xs font-medium">
                             Atrasado ({row.minutosAtraso} min)
@@ -418,15 +418,15 @@ const RelatoriosPontoEletronico = () => {
                           </span>
                         )}
                       </td>
-                      <td className="py-2 pr-4 text-coop-900">{formatDuration(row.minutos)}</td>
+                      <td className="py-2 pr-4 text-viva-900">{formatDuration(row.minutos)}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
-            <div className="mt-4 border-t border-coop-200 pt-3 flex items-center justify-end">
-              <p className="text-sm font-semibold text-coop-900">
-                Total de horas do mês: <span className="text-coop-700">{formatDuration(totalMinutosMes)}</span>
+            <div className="mt-4 border-t border-viva-200 pt-3 flex items-center justify-end">
+              <p className="text-sm font-semibold text-viva-900">
+                Total de horas do mês: <span className="text-viva-700">{formatDuration(totalMinutosMes)}</span>
               </p>
             </div>
           </>

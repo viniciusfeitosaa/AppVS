@@ -400,7 +400,7 @@ const MeuCalendarioPlantoes = () => {
   if (!isMedico) {
     return (
       <div className="card border-l-4 border-amber-500">
-        <p className="text-sm text-coop-800 font-serif">Esta área é para profissionais.</p>
+        <p className="text-sm text-viva-800 font-serif">Esta área é para profissionais.</p>
         <Link to="/dashboard" className="btn btn-secondary text-sm mt-3 inline-block">
           Voltar
         </Link>
@@ -411,8 +411,8 @@ const MeuCalendarioPlantoes = () => {
   if (carregandoContextoPonto) {
     return (
       <div className="card flex flex-col items-center justify-center py-16 gap-3">
-        <div className="animate-spin rounded-full h-10 w-10 border-2 border-coop-200 border-t-coop-600" />
-        <p className="text-sm text-coop-600 font-serif">Carregando…</p>
+        <div className="animate-spin rounded-full h-10 w-10 border-2 border-viva-200 border-t-viva-600" />
+        <p className="text-sm text-viva-600 font-serif">Carregando…</p>
       </div>
     );
   }
@@ -420,9 +420,9 @@ const MeuCalendarioPlantoes = () => {
   if (!temContratoComEscala) {
     return (
       <div className="space-y-4 max-w-lg">
-        <div className="card border-l-4 border-coop-500">
-          <h1 className="text-lg font-bold text-coop-900 font-display mb-2">Calendário de plantões</h1>
-          <p className="text-sm text-coop-700 font-serif leading-relaxed">
+        <div className="card border-l-4 border-viva-500">
+          <h1 className="text-lg font-bold text-viva-900 font-display mb-2">Calendário de plantões</h1>
+          <p className="text-sm text-viva-700 font-serif leading-relaxed">
             O calendário de escalas e plantões está disponível apenas para contratos que utilizam <strong>escala de
             plantão</strong>. Nos seus vínculos atuais o ponto é registrado sem essa grade — use o{' '}
             <strong>Ponto eletrônico</strong> para entrada e saída.
@@ -443,29 +443,29 @@ const MeuCalendarioPlantoes = () => {
   return (
     <div className="space-y-6 max-w-5xl mx-auto px-1 sm:px-0">
       <div>
-        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-coop-600 font-display">Escala</p>
-        <h1 className="text-xl md:text-2xl font-bold text-coop-900 font-display tracking-tight">
+        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-viva-600 font-display">Escala</p>
+        <h1 className="text-xl md:text-2xl font-bold text-viva-900 font-display tracking-tight">
           Calendário de plantões
         </h1>
       </div>
 
-      <div className="relative overflow-hidden rounded-3xl border border-[var(--app-border)] bg-gradient-to-br from-white via-coop-50/35 to-white p-4 shadow-[var(--card-shadow)] sm:p-6 stagger-1">
+      <div className="relative overflow-hidden rounded-3xl border border-[var(--app-border)] bg-gradient-to-br from-white via-viva-50/35 to-white p-4 shadow-[var(--card-shadow)] sm:p-6 stagger-1">
         <div
           aria-hidden
-          className="pointer-events-none absolute -right-16 -top-16 h-40 w-40 rounded-full bg-coop-200/25 blur-3xl"
+          className="pointer-events-none absolute -right-16 -top-16 h-40 w-40 rounded-full bg-viva-200/25 blur-3xl"
         />
         <div
           aria-hidden
-          className="pointer-events-none absolute -bottom-12 -left-10 h-32 w-32 rounded-full bg-coop-100/40 blur-2xl"
+          className="pointer-events-none absolute -bottom-12 -left-10 h-32 w-32 rounded-full bg-viva-100/40 blur-2xl"
         />
 
         <div className="relative">
-          <div className="mb-5 border-b border-coop-200/60 pb-5">
-            <h2 className="mb-2.5 text-xs font-semibold uppercase tracking-wider text-coop-600 font-display">
+          <div className="mb-5 border-b border-viva-200/60 pb-5">
+            <h2 className="mb-2.5 text-xs font-semibold uppercase tracking-wider text-viva-600 font-display">
               Equipes para visualizar
             </h2>
             {equipes.length === 0 ? (
-              <p className="text-xs text-coop-600 font-serif">Nenhuma equipe vinculada para filtrar.</p>
+              <p className="text-xs text-viva-600 font-serif">Nenhuma equipe vinculada para filtrar.</p>
             ) : (
               <div className="flex flex-wrap items-center gap-1.5">
                 <button
@@ -473,8 +473,8 @@ const MeuCalendarioPlantoes = () => {
                   onClick={() => setSelectedEquipeIds(null)}
                   className={`min-h-[32px] rounded-xl border px-2.5 py-1 text-[10px] font-semibold leading-none transition font-display active:scale-[0.98] ${
                     selectedEquipeIds === null
-                      ? 'border-coop-800 bg-coop-900 text-white shadow-sm'
-                      : 'border-coop-200 bg-white/90 text-coop-600 hover:border-coop-300 hover:bg-coop-50 hover:text-coop-800'
+                      ? 'border-viva-800 bg-viva-900 text-white shadow-sm'
+                      : 'border-viva-200 bg-white/90 text-viva-600 hover:border-viva-300 hover:bg-viva-50 hover:text-viva-800'
                   }`}
                 >
                   Todas
@@ -489,8 +489,8 @@ const MeuCalendarioPlantoes = () => {
                       onClick={() => toggleEquipeChip(e.id)}
                       className={`min-h-[32px] max-w-full rounded-xl border px-2.5 py-1 text-[10px] font-semibold leading-snug transition font-display active:scale-[0.98] ${
                         active
-                          ? 'border-coop-800 bg-coop-900 text-white shadow-sm'
-                          : 'border-coop-200 bg-white/90 text-coop-700 hover:border-coop-300 hover:bg-coop-50'
+                          ? 'border-viva-800 bg-viva-900 text-white shadow-sm'
+                          : 'border-viva-200 bg-white/90 text-viva-700 hover:border-viva-300 hover:bg-viva-50'
                       }`}
                     >
                       {fixMojibake(e.nome)}
@@ -505,18 +505,18 @@ const MeuCalendarioPlantoes = () => {
             <button
               type="button"
               onClick={prevMonth}
-              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-sm text-coop-500 transition hover:bg-coop-50 hover:text-coop-900"
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-sm text-viva-500 transition hover:bg-viva-50 hover:text-viva-900"
               aria-label="Mês anterior"
             >
               <span aria-hidden>←</span>
             </button>
-            <h2 className="min-w-0 flex-1 text-center text-sm font-medium capitalize tracking-tight text-coop-900 sm:text-base">
+            <h2 className="min-w-0 flex-1 text-center text-sm font-medium capitalize tracking-tight text-viva-900 sm:text-base">
               {monthLabel}
             </h2>
             <button
               type="button"
               onClick={nextMonth}
-              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-sm text-coop-500 transition hover:bg-coop-50 hover:text-coop-900"
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-sm text-viva-500 transition hover:bg-viva-50 hover:text-viva-900"
               aria-label="Próximo mês"
             >
               <span aria-hidden>→</span>
@@ -524,14 +524,14 @@ const MeuCalendarioPlantoes = () => {
           </div>
 
           {isLoading ? (
-            <p className="py-14 text-center text-sm text-coop-600 font-serif">Carregando calendário…</p>
+            <p className="py-14 text-center text-sm text-viva-600 font-serif">Carregando calendário…</p>
           ) : (
             <>
               <div className="-mx-1 overflow-x-auto pb-1 sm:mx-0">
                 <div className="min-w-[min(100%,36rem)] sm:min-w-0">
-                  <div className="grid grid-cols-7 gap-px text-center text-[9px] font-semibold uppercase tracking-wider text-coop-600 sm:gap-1 sm:text-[10px] sm:tracking-wide">
+                  <div className="grid grid-cols-7 gap-px text-center text-[9px] font-semibold uppercase tracking-wider text-viva-600 sm:gap-1 sm:text-[10px] sm:tracking-wide">
                     {WEEK_DAYS.map((d) => (
-                      <div key={d} className="rounded-md bg-coop-100/70 py-1.5 text-coop-800 sm:py-2">
+                      <div key={d} className="rounded-md bg-viva-100/70 py-1.5 text-viva-800 sm:py-2">
                         <span className="sm:hidden">{d.slice(0, 1)}</span>
                         <span className="hidden sm:inline">{d}</span>
                       </div>
@@ -543,7 +543,7 @@ const MeuCalendarioPlantoes = () => {
                         return (
                           <div
                             key={cell.key}
-                            className="min-h-[58px] rounded-md bg-coop-50/50 min-w-0 sm:min-h-[84px] sm:rounded-lg"
+                            className="min-h-[58px] rounded-md bg-viva-50/50 min-w-0 sm:min-h-[84px] sm:rounded-lg"
                           />
                         );
                       }
@@ -558,15 +558,15 @@ const MeuCalendarioPlantoes = () => {
                           type="button"
                           key={cell.key}
                           onClick={() => setDayModalKey(cell.key)}
-                          className={`text-left min-h-[58px] rounded-md border p-0.5 flex flex-col gap-0.5 min-w-0 transition sm:min-h-[84px] sm:rounded-lg sm:p-1 cursor-pointer focus:outline-none focus:ring-2 focus:ring-coop-400/60 focus:ring-offset-1 ${
+                          className={`text-left min-h-[58px] rounded-md border p-0.5 flex flex-col gap-0.5 min-w-0 transition sm:min-h-[84px] sm:rounded-lg sm:p-1 cursor-pointer focus:outline-none focus:ring-2 focus:ring-viva-400/60 focus:ring-offset-1 ${
                             isToday
-                              ? 'border-coop-500 bg-coop-50/90 ring-1 ring-coop-300/50'
-                              : 'border-coop-200/70 bg-white hover:border-coop-300/80 hover:bg-coop-50/30'
+                              ? 'border-viva-500 bg-viva-50/90 ring-1 ring-viva-300/50'
+                              : 'border-viva-200/70 bg-white hover:border-viva-300/80 hover:bg-viva-50/30'
                           }`}
                         >
                           <span
                             className={`text-[10px] font-bold tabular-nums shrink-0 sm:text-[11px] ${
-                              isToday ? 'text-coop-900' : 'text-coop-600'
+                              isToday ? 'text-viva-900' : 'text-viva-600'
                             }`}
                           >
                             {cell.day}
@@ -589,7 +589,7 @@ const MeuCalendarioPlantoes = () => {
                 </div>
               </div>
               {plantoes.length === 0 && (
-                <p className="mt-4 text-center text-xs text-coop-600 font-serif">
+                <p className="mt-4 text-center text-xs text-viva-600 font-serif">
                   Nenhum plantão seu neste mês nesta visualização.
                 </p>
               )}
@@ -608,11 +608,11 @@ const MeuCalendarioPlantoes = () => {
             <div className="mb-3 flex flex-wrap items-end justify-between gap-2 border-b border-amber-200/60 pb-3">
               <div>
                 <p className="text-[10px] font-semibold uppercase tracking-wider text-amber-800 font-display">Trocas</p>
-                <h2 className="text-sm font-bold text-coop-900 font-display tracking-tight">Quem quer trocar ou ceder</h2>
+                <h2 className="text-sm font-bold text-viva-900 font-display tracking-tight">Quem quer trocar ou ceder</h2>
               </div>
               <Link
                 to="/dashboard"
-                className="text-xs font-semibold text-coop-700 underline-offset-2 hover:text-coop-900 hover:underline font-display"
+                className="text-xs font-semibold text-viva-700 underline-offset-2 hover:text-viva-900 hover:underline font-display"
               >
                 Aceitar no painel
               </Link>
@@ -634,12 +634,12 @@ const MeuCalendarioPlantoes = () => {
                 {trocasEnviadasVis.map((t) => (
                   <li
                     key={`troca-e-${t.id}`}
-                    className="rounded-xl border border-coop-200/70 bg-coop-50/50 px-3 py-2 text-xs text-coop-900 font-serif leading-snug"
+                    className="rounded-xl border border-viva-200/70 bg-viva-50/50 px-3 py-2 text-xs text-viva-900 font-serif leading-snug"
                   >
-                    <span className="font-semibold text-coop-800 font-display">Enviada por você · </span>
+                    <span className="font-semibold text-viva-800 font-display">Enviada por você · </span>
                     {labelTrocaEnviadaResumo(t)}
                     {t.escalaNome ? (
-                      <span className="mt-0.5 block text-[10px] text-coop-600">{fixMojibake(t.escalaNome)}</span>
+                      <span className="mt-0.5 block text-[10px] text-viva-600">{fixMojibake(t.escalaNome)}</span>
                     ) : null}
                   </li>
                 ))}
@@ -648,39 +648,39 @@ const MeuCalendarioPlantoes = () => {
           </div>
         </div>
 
-        <div className="relative overflow-hidden rounded-3xl border border-[var(--app-border)] bg-gradient-to-br from-white via-coop-50/35 to-white p-4 shadow-[var(--card-shadow)] sm:p-5 stagger-3">
+        <div className="relative overflow-hidden rounded-3xl border border-[var(--app-border)] bg-gradient-to-br from-white via-viva-50/35 to-white p-4 shadow-[var(--card-shadow)] sm:p-5 stagger-3">
           <div
             aria-hidden
-            className="pointer-events-none absolute -bottom-10 -right-8 h-24 w-24 rounded-full bg-coop-200/25 blur-2xl"
+            className="pointer-events-none absolute -bottom-10 -right-8 h-24 w-24 rounded-full bg-viva-200/25 blur-2xl"
           />
           <div className="relative">
-            <div className="mb-3 flex flex-wrap items-end justify-between gap-2 border-b border-coop-200/60 pb-3">
+            <div className="mb-3 flex flex-wrap items-end justify-between gap-2 border-b border-viva-200/60 pb-3">
               <div>
-                <p className="text-[10px] font-semibold uppercase tracking-wider text-coop-600 font-display">Vagas</p>
-                <h2 className="text-sm font-bold text-coop-900 font-display tracking-tight">Oportunidades publicadas</h2>
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-viva-600 font-display">Vagas</p>
+                <h2 className="text-sm font-bold text-viva-900 font-display tracking-tight">Oportunidades publicadas</h2>
               </div>
               {!vagasDesabilitado ? (
                 <Link
                   to="/vagas"
-                  className="text-xs font-semibold text-coop-700 underline-offset-2 hover:text-coop-900 hover:underline font-display"
+                  className="text-xs font-semibold text-viva-700 underline-offset-2 hover:text-viva-900 hover:underline font-display"
                 >
                   Ver todas
                 </Link>
               ) : null}
             </div>
             {modulosLoading ? (
-              <div className="flex items-center gap-2 text-xs text-coop-600 font-serif">
-                <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-coop-200 border-t-coop-600" />
+              <div className="flex items-center gap-2 text-xs text-viva-600 font-serif">
+                <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-viva-200 border-t-viva-600" />
                 Carregando módulos…
               </div>
             ) : vagasDesabilitado ? (
-              <p className="text-xs text-coop-600 font-serif leading-relaxed">
+              <p className="text-xs text-viva-600 font-serif leading-relaxed">
                 O módulo Vagas não está habilitado para o seu perfil. Peça ao administrador para ativá-lo se precisar ver
                 plantões vagos publicados.
               </p>
             ) : vagasLoading ? (
-              <div className="flex items-center gap-2 text-xs text-coop-600 font-serif">
-                <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-coop-200 border-t-coop-600" />
+              <div className="flex items-center gap-2 text-xs text-viva-600 font-serif">
+                <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-viva-200 border-t-viva-600" />
                 Carregando vagas…
               </div>
             ) : vagasOutros.length === 0 ? null : (
@@ -696,15 +696,15 @@ const MeuCalendarioPlantoes = () => {
                   return (
                     <li
                       key={v.id}
-                      className="rounded-xl border border-coop-200/70 bg-white/80 px-3 py-2 text-xs text-coop-900 font-serif leading-snug"
+                      className="rounded-xl border border-viva-200/70 bg-white/80 px-3 py-2 text-xs text-viva-900 font-serif leading-snug"
                     >
-                      <span className="font-semibold text-coop-900 font-display">{v.tipoAtendimento}</span>
-                      <span className="text-coop-600"> · {v.setor}</span>
-                      <span className="mt-0.5 block text-[10px] text-coop-600">
+                      <span className="font-semibold text-viva-900 font-display">{v.tipoAtendimento}</span>
+                      <span className="text-viva-600"> · {v.setor}</span>
+                      <span className="mt-0.5 block text-[10px] text-viva-600">
                         {fixMojibake(v.publicador.nomeCompleto)}
                         {v.publicador.crm ? ` · CRM ${v.publicador.crm}` : ''}
                       </span>
-                      {dias ? <span className="mt-0.5 block text-[10px] text-coop-500">Dias: {dias}</span> : null}
+                      {dias ? <span className="mt-0.5 block text-[10px] text-viva-500">Dias: {dias}</span> : null}
                     </li>
                   );
                 })}
@@ -726,11 +726,11 @@ const MeuCalendarioPlantoes = () => {
             aria-modal="true"
             aria-labelledby="dia-plantao-titulo"
           >
-            <h3 id="dia-plantao-titulo" className="text-lg font-semibold text-coop-900 font-display capitalize">
+            <h3 id="dia-plantao-titulo" className="text-lg font-semibold text-viva-900 font-display capitalize">
               {labelDiaCompleto(dayModalKey)}
             </h3>
             {(byDay.get(dayModalKey) ?? []).length === 0 ? (
-              <p className="text-sm text-coop-600 font-serif">Nenhum plantão seu neste dia.</p>
+              <p className="text-sm text-viva-600 font-serif">Nenhum plantão seu neste dia.</p>
             ) : (
               <ul className="space-y-3">
                 {(byDay.get(dayModalKey) ?? []).map((p) => {
@@ -740,11 +740,11 @@ const MeuCalendarioPlantoes = () => {
                   return (
                     <li
                       key={p.id}
-                      className="rounded-xl border border-coop-200/80 bg-coop-50/40 p-3 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between"
+                      className="rounded-xl border border-viva-200/80 bg-viva-50/40 p-3 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between"
                     >
                       <div className="min-w-0 flex-1">
-                        <p className="text-sm font-semibold text-coop-900">{fixMojibake(p.escalaNome || 'Escala')}</p>
-                        <p className="text-xs text-coop-600 mt-1">
+                        <p className="text-sm font-semibold text-viva-900">{fixMojibake(p.escalaNome || 'Escala')}</p>
+                        <p className="text-xs text-viva-600 mt-1">
                           {rotuloCurtoTipo(p)} · {faixaExibicaoPlantao(p)}
                         </p>
                       </div>
@@ -758,7 +758,7 @@ const MeuCalendarioPlantoes = () => {
                             Trocar / ceder
                           </button>
                         ) : (
-                          <span className="text-xs text-coop-600 text-right sm:max-w-[11rem]">
+                          <span className="text-xs text-viva-600 text-right sm:max-w-[11rem]">
                             {!podeContrato
                               ? 'Troca não habilitada neste contrato.'
                               : isPlantaoAindaFuturoAgenda(p.data, p)
@@ -787,7 +787,7 @@ const MeuCalendarioPlantoes = () => {
             className="bg-white rounded-2xl shadow-xl max-w-md w-full p-5 flex flex-col gap-4 max-h-[90vh] overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
           >
-            <h3 className="text-lg font-semibold text-coop-900 font-display">
+            <h3 className="text-lg font-semibold text-viva-900 font-display">
               {trocaStep === 1
                 ? trocaAcaoTipo === null
                   ? 'Trocar ou ceder plantão'
@@ -800,14 +800,14 @@ const MeuCalendarioPlantoes = () => {
             </h3>
             {trocaStep === 1 ? (
               <>
-                <p className="text-sm text-coop-700">O que você deseja fazer?</p>
-                <div className="flex rounded-xl border border-coop-200 p-1 gap-1 bg-coop-50/50">
+                <p className="text-sm text-viva-700">O que você deseja fazer?</p>
+                <div className="flex rounded-xl border border-viva-200 p-1 gap-1 bg-viva-50/50">
                   <button
                     type="button"
                     className={`flex-1 text-sm py-2.5 rounded-lg font-medium transition-colors ${
                       trocaAcaoTipo === 'PERMUTA'
-                        ? 'bg-coop-600 text-white shadow-sm'
-                        : 'text-coop-800 hover:bg-white/80'
+                        ? 'bg-viva-600 text-white shadow-sm'
+                        : 'text-viva-800 hover:bg-white/80'
                     }`}
                     onClick={() => {
                       setTrocaAcaoTipo('PERMUTA');
@@ -820,8 +820,8 @@ const MeuCalendarioPlantoes = () => {
                     type="button"
                     className={`flex-1 text-sm py-2.5 rounded-lg font-medium transition-colors ${
                       trocaAcaoTipo === 'CEDER'
-                        ? 'bg-coop-600 text-white shadow-sm'
-                        : 'text-coop-800 hover:bg-white/80'
+                        ? 'bg-viva-600 text-white shadow-sm'
+                        : 'text-viva-800 hover:bg-white/80'
                     }`}
                     onClick={() => {
                       setTrocaAcaoTipo('CEDER');
@@ -833,19 +833,19 @@ const MeuCalendarioPlantoes = () => {
                 </div>
                 {trocaAcaoTipo != null ? (
                   <>
-                    <p className="text-xs text-coop-600 font-serif leading-relaxed">
+                    <p className="text-xs text-viva-600 font-serif leading-relaxed">
                       {trocaAcaoTipo === 'CEDER'
                         ? 'Quem aceitar fica com o seu plantão; não precisa ceder um dele.'
                         : 'Troca pelo plantão de um colega. À equipe: quem aceitar escolhe o dele na troca.'}
                     </p>
-                    <p className="text-sm text-coop-700 pt-1">Quem pode receber o pedido?</p>
-                    <div className="flex rounded-xl border border-coop-200 p-1 gap-1 bg-coop-50/50">
+                    <p className="text-sm text-viva-700 pt-1">Quem pode receber o pedido?</p>
+                    <div className="flex rounded-xl border border-viva-200 p-1 gap-1 bg-viva-50/50">
                       <button
                         type="button"
                         className={`flex-1 text-sm py-2.5 rounded-lg font-medium transition-colors ${
                           trocaDestinoModo === 'colega'
-                            ? 'bg-coop-600 text-white shadow-sm'
-                            : 'text-coop-800 hover:bg-white/80'
+                            ? 'bg-viva-600 text-white shadow-sm'
+                            : 'text-viva-800 hover:bg-white/80'
                         }`}
                         onClick={() => {
                           setTrocaDestinoModo('colega');
@@ -859,8 +859,8 @@ const MeuCalendarioPlantoes = () => {
                         type="button"
                         className={`flex-1 text-sm py-2.5 rounded-lg font-medium transition-colors ${
                           trocaDestinoModo === 'equipe'
-                            ? 'bg-coop-600 text-white shadow-sm'
-                            : 'text-coop-800 hover:bg-white/80'
+                            ? 'bg-viva-600 text-white shadow-sm'
+                            : 'text-viva-800 hover:bg-white/80'
                         }`}
                         onClick={() => {
                           setTrocaDestinoModo('equipe');
@@ -872,7 +872,7 @@ const MeuCalendarioPlantoes = () => {
                       </button>
                     </div>
                     {trocaDestinoModo === 'equipe' ? (
-                      <p className="text-sm text-coop-700 font-serif leading-relaxed">
+                      <p className="text-sm text-viva-700 font-serif leading-relaxed">
                         {trocaAcaoTipo === 'CEDER' ? (
                           <>
                             Colegas da escala veem o pedido. <strong>O primeiro a aceitar</strong> fica com o plantão, sem
@@ -887,7 +887,7 @@ const MeuCalendarioPlantoes = () => {
                       </p>
                     ) : (
                       <>
-                        <label className="text-xs font-semibold text-coop-600 uppercase tracking-wide">Profissional</label>
+                        <label className="text-xs font-semibold text-viva-600 uppercase tracking-wide">Profissional</label>
                         <select
                           value={selectedColegaId ?? ''}
                           onChange={(e) => {
@@ -906,16 +906,16 @@ const MeuCalendarioPlantoes = () => {
                           ))}
                         </select>
                         {selectedColegaId && trocaAcaoTipo === 'PERMUTA' ? (
-                          <div className="flex flex-col gap-2 pt-1 border-t border-coop-100">
-                            <label className="text-xs font-semibold text-coop-600 uppercase tracking-wide">
+                          <div className="flex flex-col gap-2 pt-1 border-t border-viva-100">
+                            <label className="text-xs font-semibold text-viva-600 uppercase tracking-wide">
                               Plantão do colega
                             </label>
-                            <p className="text-xs text-coop-600 font-serif">
+                            <p className="text-xs text-viva-600 font-serif">
                               Plantões de <strong>{selectedColega ? fixMojibake(selectedColega.nomeCompleto) : '—'}</strong> nesta
                               escala.
                             </p>
                             {plantoesColegaFetching ? (
-                              <p className="text-sm text-coop-600 font-serif">Carregando…</p>
+                              <p className="text-sm text-viva-600 font-serif">Carregando…</p>
                             ) : plantoesColegaList.length === 0 ? (
                               <p className="text-sm text-amber-800 font-serif">Nenhum plantão disponível para troca.</p>
                             ) : (
@@ -934,7 +934,7 @@ const MeuCalendarioPlantoes = () => {
                             )}
                           </div>
                         ) : selectedColegaId && trocaAcaoTipo === 'CEDER' ? (
-                          <p className="text-sm text-coop-700 font-serif pt-1 border-t border-coop-100">
+                          <p className="text-sm text-viva-700 font-serif pt-1 border-t border-viva-100">
                             O plantão será cedido a <strong>{selectedColega ? fixMojibake(selectedColega.nomeCompleto) : '—'}</strong>{' '}
                             se ele(a) aceitar.
                           </p>
@@ -975,10 +975,10 @@ const MeuCalendarioPlantoes = () => {
               <>
                 {trocaDestinoModo === 'equipe' ? (
                   <>
-                    <p className="text-sm text-coop-700 leading-relaxed">
+                    <p className="text-sm text-viva-700 leading-relaxed">
                       Confirme o envio do seu plantão à <strong>equipe</strong>:
                     </p>
-                    <ul className="text-sm text-coop-800 list-disc pl-5 space-y-1 font-serif">
+                    <ul className="text-sm text-viva-800 list-disc pl-5 space-y-1 font-serif">
                       <li>
                         Seu plantão em{' '}
                         <strong>
@@ -999,11 +999,11 @@ const MeuCalendarioPlantoes = () => {
                   </>
                 ) : trocaAcaoTipo === 'CEDER' ? (
                   <>
-                    <p className="text-sm text-coop-700 leading-relaxed">
+                    <p className="text-sm text-viva-700 leading-relaxed">
                       Confirme a <strong>cessão</strong> para{' '}
                       <strong>{selectedColega ? fixMojibake(selectedColega.nomeCompleto) : '—'}</strong>:
                     </p>
-                    <ul className="text-sm text-coop-800 list-disc pl-5 space-y-1 font-serif">
+                    <ul className="text-sm text-viva-800 list-disc pl-5 space-y-1 font-serif">
                       <li>
                         Seu plantão em{' '}
                         <strong>
@@ -1019,11 +1019,11 @@ const MeuCalendarioPlantoes = () => {
                   </>
                 ) : (
                   <>
-                    <p className="text-sm text-coop-700 leading-relaxed">
+                    <p className="text-sm text-viva-700 leading-relaxed">
                       Confirme a <strong>troca</strong> com{' '}
                       <strong>{selectedColega ? fixMojibake(selectedColega.nomeCompleto) : '—'}</strong>:
                     </p>
-                    <ul className="text-sm text-coop-800 list-disc pl-5 space-y-1 font-serif">
+                    <ul className="text-sm text-viva-800 list-disc pl-5 space-y-1 font-serif">
                       <li>
                         Você fica com o plantão dele em{' '}
                         <strong>

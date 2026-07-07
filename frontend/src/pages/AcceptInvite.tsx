@@ -61,11 +61,11 @@ const AcceptInvite = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-coop-950 py-12 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen flex items-center justify-center bg-viva-950 py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md w-full space-y-8 bg-white p-10 rounded-2xl shadow-2xl">
         <div className="flex flex-col items-center">
           <BrandLogo className="h-24 w-auto mb-6" linkToSite />
-          <h1 className="text-xl font-semibold text-coop-900">Ativar conta</h1>
+          <h1 className="text-xl font-semibold text-viva-900">Ativar conta</h1>
         </div>
 
         <form className="mt-6 space-y-5" onSubmit={handleSubmit(onSubmit)}>
@@ -81,7 +81,7 @@ const AcceptInvite = () => {
           )}
 
           <div>
-            <label htmlFor="password" className="block text-sm font-semibold text-coop-800 mb-1">
+            <label htmlFor="password" className="block text-sm font-semibold text-viva-800 mb-1">
               Nova senha
             </label>
             <div className="relative">
@@ -103,7 +103,7 @@ const AcceptInvite = () => {
           </div>
 
           <div>
-            <label htmlFor="confirmPassword" className="block text-sm font-semibold text-coop-800 mb-1">
+            <label htmlFor="confirmPassword" className="block text-sm font-semibold text-viva-800 mb-1">
               Confirmar senha
             </label>
             <div className="relative">

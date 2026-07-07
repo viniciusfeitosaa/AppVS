@@ -1,9 +1,9 @@
 import { Link } from 'react-router-dom';
 import { FormWizard } from '../features/cadastro-coop/components/wizard/FormWizard';
-import '../features/cadastro-coop/cadastro-coop-theme.css';
+import '../features/cadastro-coop/cadastro-viva-theme.css';
 
 const CadastroCoop = () => (
-  <div className="cadastro-coop-root">
+  <div className="cadastro-viva-root">
     <FormWizard embedded />
     <p className="text-center text-sm pb-6" style={{ color: 'var(--text-muted)' }}>
       Já possui cadastro?{' '}

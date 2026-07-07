@@ -78,8 +78,27 @@
     });
 
     mainNav.querySelectorAll('a').forEach(function (link) {
-      link.addEventListener('click', function () {
+      link.addEventListener('click', function (e) {
+        var href = link.getAttribute('href');
+        var drawerNav = window.matchMedia('(max-width: 1280px)').matches;
+
+        if (!drawerNav) {
+          setNavOpen(false);
+          return;
+        }
+
+        if (!href || href.charAt(0) === '#') {
+          setNavOpen(false);
+          return;
+        }
+
+        // Fecha o drawer e navega com pequeno atraso para evitar clique fantasma no conteúdo atrás.
+        e.preventDefault();
+        e.stopPropagation();
         setNavOpen(false);
+        window.setTimeout(function () {
+          window.location.assign(href);
+        }, 50);
       });
     });
 

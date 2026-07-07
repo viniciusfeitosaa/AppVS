@@ -47,8 +47,8 @@ const Vagas = () => {
   if (!isMedico) {
     return (
       <div className="card border-l-4 border-red-400">
-        <h2 className="text-base font-bold text-coop-900 mb-2 font-display">Acesso restrito</h2>
-        <p className="text-sm text-coop-700 font-serif">
+        <h2 className="text-base font-bold text-viva-900 mb-2 font-display">Acesso restrito</h2>
+        <p className="text-sm text-viva-700 font-serif">
           A área de vagas é exclusiva para profissionais com perfil médico.
         </p>
       </div>
@@ -58,8 +58,8 @@ const Vagas = () => {
   if (!modulosLoading && vagasDesabilitado) {
     return (
       <div className="card border-l-4 border-amber-500">
-        <h2 className="text-base font-bold text-coop-900 mb-2 font-display">Acesso ao módulo</h2>
-        <p className="text-sm text-coop-700 font-serif">
+        <h2 className="text-base font-bold text-viva-900 mb-2 font-display">Acesso ao módulo</h2>
+        <p className="text-sm text-viva-700 font-serif">
           O módulo Vagas não está habilitado para o seu perfil neste tenant. Peça ao administrador para ativar o módulo
           em Configurações ou em Minha Conta.
         </p>
@@ -73,18 +73,18 @@ const Vagas = () => {
   return (
     <div className="space-y-6">
       <header>
-        <h1 className="text-2xl md:text-3xl font-bold text-coop-950 font-display tracking-tight">Vagas</h1>
-        <p className="mt-1 text-sm text-coop-700 font-serif max-w-2xl">
+        <h1 className="text-2xl md:text-3xl font-bold text-viva-950 font-display tracking-tight">Vagas</h1>
+        <p className="mt-1 text-sm text-viva-700 font-serif max-w-2xl">
           Veja oportunidades, demonstre interesse, gerencie suas publicações e candidatos.
         </p>
       </header>
 
-      <div className="flex flex-wrap gap-2 rounded-2xl border border-coop-200/80 bg-coop-50/40 p-1.5">
+      <div className="flex flex-wrap gap-2 rounded-2xl border border-viva-200/80 bg-viva-50/40 p-1.5">
         <button
           type="button"
           onClick={() => setAba('disponiveis')}
           className={`flex-1 min-w-[120px] rounded-xl px-3 py-2.5 text-sm font-semibold font-display transition ${
-            aba === 'disponiveis' ? 'bg-white text-coop-950 shadow-sm ring-1 ring-coop-200' : 'text-coop-700 hover:bg-white/60'
+            aba === 'disponiveis' ? 'bg-white text-viva-950 shadow-sm ring-1 ring-viva-200' : 'text-viva-700 hover:bg-white/60'
           }`}
         >
           Disponíveis
@@ -93,7 +93,7 @@ const Vagas = () => {
           type="button"
           onClick={() => setAba('publicadas')}
           className={`flex-1 min-w-[120px] rounded-xl px-3 py-2.5 text-sm font-semibold font-display transition ${
-            aba === 'publicadas' ? 'bg-white text-coop-950 shadow-sm ring-1 ring-coop-200' : 'text-coop-700 hover:bg-white/60'
+            aba === 'publicadas' ? 'bg-white text-viva-950 shadow-sm ring-1 ring-viva-200' : 'text-viva-700 hover:bg-white/60'
           }`}
         >
           Minhas publicações
@@ -102,7 +102,7 @@ const Vagas = () => {
           type="button"
           onClick={() => setAba('anunciar')}
           className={`flex-1 min-w-[120px] rounded-xl px-3 py-2.5 text-sm font-semibold font-display transition ${
-            aba === 'anunciar' ? 'bg-white text-coop-950 shadow-sm ring-1 ring-coop-200' : 'text-coop-700 hover:bg-white/60'
+            aba === 'anunciar' ? 'bg-white text-viva-950 shadow-sm ring-1 ring-viva-200' : 'text-viva-700 hover:bg-white/60'
           }`}
         >
           Anunciar
@@ -110,16 +110,16 @@ const Vagas = () => {
       </div>
 
       {aba === 'disponiveis' && (
-        <div className="card border-l-4 border-coop-600 shadow-sm">
+        <div className="card border-l-4 border-viva-600 shadow-sm">
           {modulosLoading || vagasLoading ? (
             <div className="flex items-center gap-3 py-2">
-              <div className="h-9 w-9 rounded-xl border-2 border-coop-200 border-t-coop-700 animate-spin" />
-              <p className="text-sm text-coop-700 font-serif">Carregando…</p>
+              <div className="h-9 w-9 rounded-xl border-2 border-viva-200 border-t-viva-700 animate-spin" />
+              <p className="text-sm text-viva-700 font-serif">Carregando…</p>
             </div>
           ) : (
             <>
               {mensagem && (
-                <p className="text-sm text-coop-800 font-serif leading-relaxed mb-4">{mensagem}</p>
+                <p className="text-sm text-viva-800 font-serif leading-relaxed mb-4">{mensagem}</p>
               )}
               {itens.length === 0 ? null : (
                 <ul className="space-y-4">
@@ -146,8 +146,8 @@ const Vagas = () => {
 
       {aba === 'publicadas' && (
         <div className="card border-l-4 border-amber-600/90 shadow-sm">
-          <h2 className="text-lg font-bold text-coop-950 font-display mb-2">Minhas publicações</h2>
-          <p className="text-sm text-coop-700 font-serif mb-4">
+          <h2 className="text-lg font-bold text-viva-950 font-display mb-2">Minhas publicações</h2>
+          <p className="text-sm text-viva-700 font-serif mb-4">
             Vagas que você criou, interesses recebidos e opção de aceitar ou recusar candidatos.
           </p>
           <MinhasPublicacoesPanel
@@ -158,8 +158,8 @@ const Vagas = () => {
 
       {aba === 'anunciar' && (
         <div className="card border-l-4 border-emerald-700/80 shadow-sm">
-          <h2 className="text-lg font-bold text-coop-950 font-display mb-1">Publicar vaga</h2>
-          <p className="text-sm text-coop-700 font-serif mb-6">
+          <h2 className="text-lg font-bold text-viva-950 font-display mb-1">Publicar vaga</h2>
+          <p className="text-sm text-viva-700 font-serif mb-6">
             Preencha os dados, confirme sua responsabilidade pelo setor e publique.
           </p>
           <AnunciarVagaWizard onPublicado={() => setAba('publicadas')} />

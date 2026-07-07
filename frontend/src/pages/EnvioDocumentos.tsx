@@ -128,7 +128,7 @@ const EnvioDocumentos = () => {
   if (!isMaster) {
     return (
       <div className="card border-l-4 border-red-400">
-        <h2 className="text-xl font-bold text-coop-900 mb-2">Acesso restrito</h2>
+        <h2 className="text-xl font-bold text-viva-900 mb-2">Acesso restrito</h2>
         <p className="text-gray-600">Esta área é exclusiva para o perfil Master.</p>
       </div>
     );
@@ -136,8 +136,8 @@ const EnvioDocumentos = () => {
 
   return (
     <div className="space-y-6">
-      <div className="card border-l-4 border-coop-500">
-        <h2 className="text-2xl font-bold text-coop-900 mb-1">Envio de Documentos</h2>
+      <div className="card border-l-4 border-viva-500">
+        <h2 className="text-2xl font-bold text-viva-900 mb-1">Envio de Documentos</h2>
         <p className="text-gray-600 mb-6">
           Envie um arquivo e associe a um profissional. O documento ficará disponível na tela inicial do profissional.
         </p>
@@ -146,9 +146,9 @@ const EnvioDocumentos = () => {
           {/* Área de upload e associação */}
           <div className="space-y-4">
             <div>
-              <label className="block text-sm font-semibold text-coop-800 mb-1">Arquivo</label>
+              <label className="block text-sm font-semibold text-viva-800 mb-1">Arquivo</label>
               <div
-                className="border-2 border-dashed border-coop-200 rounded-xl p-6 text-center hover:border-coop-400 transition cursor-pointer bg-coop-50/50"
+                className="border-2 border-dashed border-viva-200 rounded-xl p-6 text-center hover:border-viva-400 transition cursor-pointer bg-viva-50/50"
                 onClick={() => fileInputRef.current?.click()}
               >
                 <input
@@ -160,20 +160,20 @@ const EnvioDocumentos = () => {
                 />
                 {arquivo ? (
                   <>
-                    <p className="text-coop-900 font-medium">{fixMojibake(arquivo.name)}</p>
-                    <p className="text-sm text-coop-600 mt-1">{formatBytes(arquivo.size)}</p>
+                    <p className="text-viva-900 font-medium">{fixMojibake(arquivo.name)}</p>
+                    <p className="text-sm text-viva-600 mt-1">{formatBytes(arquivo.size)}</p>
                   </>
                 ) : (
                   <>
-                    <p className="text-coop-700">Clique ou arraste um arquivo aqui</p>
-                    <p className="text-sm text-coop-600 mt-1">PDF, Word, Excel ou imagem (máx. 15 MB)</p>
+                    <p className="text-viva-700">Clique ou arraste um arquivo aqui</p>
+                    <p className="text-sm text-viva-600 mt-1">PDF, Word, Excel ou imagem (máx. 15 MB)</p>
                   </>
                 )}
               </div>
             </div>
 
             <div>
-              <label className="block text-sm font-semibold text-coop-800 mb-1">Título (opcional)</label>
+              <label className="block text-sm font-semibold text-viva-800 mb-1">Título (opcional)</label>
               <input
                 type="text"
                 className="input w-full"
@@ -184,7 +184,7 @@ const EnvioDocumentos = () => {
             </div>
 
             <div>
-              <label className="block text-sm font-semibold text-coop-800 mb-1">Enviar para o profissional</label>
+              <label className="block text-sm font-semibold text-viva-800 mb-1">Enviar para o profissional</label>
               <div className="relative">
                 <input
                   type="text"
@@ -201,14 +201,14 @@ const EnvioDocumentos = () => {
                   onFocus={() => setMedicoDropdownOpen(true)}
                 />
                 {medicoDropdownOpen && (
-                  <ul className="absolute z-10 mt-1 w-full max-h-52 overflow-auto rounded-lg border border-coop-200 bg-white shadow-lg py-1">
+                  <ul className="absolute z-10 mt-1 w-full max-h-52 overflow-auto rounded-lg border border-viva-200 bg-white shadow-lg py-1">
                     {medicosFiltered.length === 0 ? (
                       <li className="px-3 py-2 text-sm text-gray-500">Nenhum profissional encontrado</li>
                     ) : (
                       medicosFiltered.map((m) => (
                         <li
                           key={m.id}
-                          className="px-3 py-2 text-sm cursor-pointer hover:bg-coop-100 text-coop-900"
+                          className="px-3 py-2 text-sm cursor-pointer hover:bg-viva-100 text-viva-900"
                           onClick={() => {
                             setMedicoId(m.id);
                             setMedicoSearch('');
@@ -239,9 +239,9 @@ const EnvioDocumentos = () => {
 
           {/* Lista de documentos enviados */}
           <div>
-            <h3 className="text-lg font-bold text-coop-900 mb-3">Documentos enviados</h3>
+            <h3 className="text-lg font-bold text-viva-900 mb-3">Documentos enviados</h3>
             <div className="mb-2">
-              <label className="block text-xs text-coop-600 mb-1">Filtrar por profissional</label>
+              <label className="block text-xs text-viva-600 mb-1">Filtrar por profissional</label>
               <select
                 className="input w-full max-w-xs"
                 value={filterMedicoId}
@@ -256,13 +256,13 @@ const EnvioDocumentos = () => {
               </select>
             </div>
             {loadingDocs ? (
-              <p className="text-coop-600">Carregando...</p>
+              <p className="text-viva-600">Carregando...</p>
             ) : documentos.length === 0 ? (
               <p className="text-gray-500 text-sm">Nenhum documento enviado ainda.</p>
             ) : (
-              <div className="border border-coop-200 rounded-lg overflow-hidden">
+              <div className="border border-viva-200 rounded-lg overflow-hidden">
                 <table className="w-full text-sm">
-                  <thead className="bg-coop-100 text-coop-800">
+                  <thead className="bg-viva-100 text-viva-800">
                     <tr>
                       <th className="text-left px-3 py-2">Documento</th>
                       <th className="text-left px-3 py-2">Profissional</th>
@@ -273,20 +273,20 @@ const EnvioDocumentos = () => {
                   </thead>
                   <tbody>
                     {documentos.map((doc) => (
-                      <tr key={doc.id} className="border-t border-coop-100">
+                      <tr key={doc.id} className="border-t border-viva-100">
                         <td className="px-3 py-2">
-                          <span className="font-medium text-coop-900">
+                          <span className="font-medium text-viva-900">
                             {doc.titulo || fixMojibake(doc.nomeArquivo)}
                           </span>
                           {doc.titulo && (
                             <span className="block text-xs text-gray-500">{doc.nomeArquivo}</span>
                           )}
                         </td>
-                        <td className="px-3 py-2 text-coop-800">
+                        <td className="px-3 py-2 text-viva-800">
                           {doc.medico ? fixMojibake(doc.medico.nomeCompleto) : '-'}
                         </td>
                         <td className="px-3 py-2 text-gray-600">{formatDate(doc.createdAt)}</td>
-                        <td className="px-3 py-2 text-coop-800">
+                        <td className="px-3 py-2 text-viva-800">
                           {doc.aceitoEm ? (
                             <span className="text-green-800 font-medium">{formatDate(doc.aceitoEm)}</span>
                           ) : (

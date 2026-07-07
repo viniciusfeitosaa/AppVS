@@ -86,7 +86,7 @@ api.interceptors.response.use(
       localStorage.removeItem('accessToken');
       localStorage.removeItem('refreshToken');
       localStorage.removeItem('user');
-      window.location.href = `${base}/`;
+      window.location.href = `${base}/login`;
     }
     // Não redirecionar para acesso negado em erros de ponto (ex.: check-in duplo, ponto já fechado)
     const isPontoRoute = requestUrl.includes('/ponto/');

@@ -466,8 +466,8 @@ const Dashboard = () => {
     return (
       <div className="min-h-[60vh] flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-2 border-coop-200 border-t-coop-600 mx-auto" />
-          <p className="mt-4 text-coop-700 font-medium">Carregando...</p>
+          <div className="animate-spin rounded-full h-12 w-12 border-2 border-viva-200 border-t-viva-600 mx-auto" />
+          <p className="mt-4 text-viva-700 font-medium">Carregando...</p>
         </div>
       </div>
     );
@@ -477,21 +477,21 @@ const Dashboard = () => {
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
       {/* Hero */}
       <div className="card dashboard-hero col-span-full stagger-1 py-8 md:py-10">
-        <p className="text-xs font-semibold uppercase tracking-widest text-coop-600 mb-2 font-display">
+        <p className="text-xs font-semibold uppercase tracking-widest text-viva-600 mb-2 font-display">
           {isMaster ? 'Acesso Master' : 'Acesso Profissional'}
         </p>
-        <h1 className="text-xl md:text-2xl font-bold text-coop-900 font-display leading-tight mb-2">
+        <h1 className="text-xl md:text-2xl font-bold text-viva-900 font-display leading-tight mb-2">
           Bem-vindo, {fixMojibake(primeiroSegundoNome(displayUser?.nomeCompleto))}!
         </h1>
-        <p className="text-coop-700 font-serif text-base">
-          Sistema de gestão COOPVITTA
+        <p className="text-viva-700 font-serif text-base">
+          Sistema de gestão Viva Saúde
         </p>
       </div>
 
       {isMedico && !isMaster && temContratoComEscala && (temProximosPlantoes || listaEscalas.length > 0) && (
         <div className="col-span-full stagger-2 space-y-3">
           <div className="flex flex-wrap items-center justify-between gap-2 px-1">
-            <h2 className="text-sm font-semibold text-coop-800 font-display">Suas próximas escalas</h2>
+            <h2 className="text-sm font-semibold text-viva-800 font-display">Suas próximas escalas</h2>
             <Link
               to="/meu-calendario-plantoes"
               className="btn btn-secondary text-xs sm:text-sm shrink-0"
@@ -500,19 +500,19 @@ const Dashboard = () => {
             </Link>
           </div>
           {!temProximosPlantoes && (
-            <p className="text-xs text-coop-600 px-1 font-serif leading-relaxed">
+            <p className="text-xs text-viva-600 px-1 font-serif leading-relaxed">
               Não há plantões futuros em destaque. Abra o calendário para ver todas as suas alocações por mês.
             </p>
           )}
           {/* Próxima escala */}
           {proxima && (
-            <div className="card flex flex-wrap items-center justify-between gap-4 border-l-4 border-l-coop-500 bg-gradient-to-r from-coop-50/60 to-transparent">
+            <div className="card flex flex-wrap items-center justify-between gap-4 border-l-4 border-l-viva-500 bg-gradient-to-r from-viva-50/60 to-transparent">
               <div className="min-w-0">
-                <p className="text-xs font-semibold uppercase tracking-wider text-coop-600 mb-0.5">Próxima escala</p>
-                <p className="text-coop-900 font-medium text-sm">
-                  Você tem escala para <span className="font-bold text-coop-800">{fixMojibake(proxima.escalaNome || 'Escala')}</span> no dia{' '}
-                  <span className="font-bold text-coop-800">{formatDataCurta(proxima.data)}</span> no horário{' '}
-                  <span className="font-bold text-coop-800">{faixaPorPlantao(proxima)}</span>.
+                <p className="text-xs font-semibold uppercase tracking-wider text-viva-600 mb-0.5">Próxima escala</p>
+                <p className="text-viva-900 font-medium text-sm">
+                  Você tem escala para <span className="font-bold text-viva-800">{fixMojibake(proxima.escalaNome || 'Escala')}</span> no dia{' '}
+                  <span className="font-bold text-viva-800">{formatDataCurta(proxima.data)}</span> no horário{' '}
+                  <span className="font-bold text-viva-800">{faixaPorPlantao(proxima)}</span>.
                 </p>
               </div>
               <div className="flex flex-wrap items-center gap-2 shrink-0">
@@ -529,14 +529,14 @@ const Dashboard = () => {
                         </button>
                       )
                     : (
-                        <span className="text-xs text-coop-600 max-w-[14rem]">
+                        <span className="text-xs text-viva-600 max-w-[14rem]">
                           {isPlantaoAindaFuturoAgenda(proxima.data, proxima)
                             ? 'Período de troca encerrado'
                             : 'Plantão já passou'}
                         </span>
                       )}
                 {proxima.usaPonto === false ? (
-                  <span className="text-xs text-coop-600 max-w-[14rem] text-right">
+                  <span className="text-xs text-viva-600 max-w-[14rem] text-right">
                     Ponto eletrônico não está habilitado para esta escala.
                   </span>
                 ) : proxima.usaEscala === false ? (
@@ -548,7 +548,7 @@ const Dashboard = () => {
                     Bater ponto
                   </Link>
                 ) : antesDaAberturaCheckinPonto(proxima.data, proxima, relogioUi) ? (
-                  <span className="text-xs text-coop-600 max-w-[14rem] text-right leading-snug">
+                  <span className="text-xs text-viva-600 max-w-[14rem] text-right leading-snug">
                     {mensagemLinkBaterPontoAntesDaJanela(proxima.data, proxima)}
                   </span>
                 ) : null}
@@ -557,13 +557,13 @@ const Dashboard = () => {
           )}
           {/* Segunda próxima escala */}
           {segundaProxima && (
-            <div className="card flex flex-wrap items-center justify-between gap-4 border-l-4 border-l-coop-400/80 bg-gradient-to-r from-coop-50/40 to-transparent">
+            <div className="card flex flex-wrap items-center justify-between gap-4 border-l-4 border-l-viva-400/80 bg-gradient-to-r from-viva-50/40 to-transparent">
               <div className="min-w-0">
-                <p className="text-xs font-semibold uppercase tracking-wider text-coop-600 mb-0.5">Segunda próxima</p>
-                <p className="text-coop-900 font-medium text-sm">
-                  Você tem escala para <span className="font-bold text-coop-800">{fixMojibake(segundaProxima.escalaNome || 'Escala')}</span> no dia{' '}
-                  <span className="font-bold text-coop-800">{formatDataCurta(segundaProxima.data)}</span> no horário{' '}
-                  <span className="font-bold text-coop-800">{faixaPorPlantao(segundaProxima)}</span>.
+                <p className="text-xs font-semibold uppercase tracking-wider text-viva-600 mb-0.5">Segunda próxima</p>
+                <p className="text-viva-900 font-medium text-sm">
+                  Você tem escala para <span className="font-bold text-viva-800">{fixMojibake(segundaProxima.escalaNome || 'Escala')}</span> no dia{' '}
+                  <span className="font-bold text-viva-800">{formatDataCurta(segundaProxima.data)}</span> no horário{' '}
+                  <span className="font-bold text-viva-800">{faixaPorPlantao(segundaProxima)}</span>.
                 </p>
               </div>
               <div className="flex flex-wrap items-center gap-2 shrink-0">
@@ -580,14 +580,14 @@ const Dashboard = () => {
                         </button>
                       )
                     : (
-                        <span className="text-xs text-coop-600 max-w-[14rem]">
+                        <span className="text-xs text-viva-600 max-w-[14rem]">
                           {isPlantaoAindaFuturoAgenda(segundaProxima.data, segundaProxima)
                             ? 'Período de troca encerrado'
                             : 'Plantão já passou'}
                         </span>
                       )}
                 {segundaProxima.usaPonto === false ? (
-                  <span className="text-xs text-coop-600 max-w-[14rem] text-right">
+                  <span className="text-xs text-viva-600 max-w-[14rem] text-right">
                     Ponto eletrônico não está habilitado para esta escala.
                   </span>
                 ) : segundaProxima.usaEscala === false ? (
@@ -599,7 +599,7 @@ const Dashboard = () => {
                     Bater ponto
                   </Link>
                 ) : antesDaAberturaCheckinPonto(segundaProxima.data, segundaProxima, relogioUi) ? (
-                  <span className="text-xs text-coop-600 max-w-[14rem] text-right leading-snug">
+                  <span className="text-xs text-viva-600 max-w-[14rem] text-right leading-snug">
                     {mensagemLinkBaterPontoAntesDaJanela(segundaProxima.data, segundaProxima)}
                   </span>
                 ) : null}
@@ -688,8 +688,8 @@ const Dashboard = () => {
               </div>
             ))}
             {trocasEnviadasVisiveis.map((t) => (
-              <div key={t.id} className="rounded-xl border border-coop-200/70 bg-coop-50/40 p-3">
-                <p className="text-sm text-coop-800">
+              <div key={t.id} className="rounded-xl border border-viva-200/70 bg-viva-50/40 p-3">
+                <p className="text-sm text-viva-800">
                   {t.paraEquipeInteira ? (
                     (t.tipoSolicitacao ?? 'PERMUTA') === 'CEDER' ? (
                       <>
@@ -743,10 +743,10 @@ const Dashboard = () => {
         temContratoComEscala &&
         escalasEmVigor.some((e: EscalaItem) => e?.id && e.id !== PONTO_SEM_ESCALA_ESCALA_ID) &&
         !temProximosPlantoes && (
-        <div className="card col-span-full stagger-2 flex flex-wrap items-center justify-between gap-4 border-l-4 border-l-coop-500 bg-gradient-to-r from-coop-50/60 to-transparent">
-          <p className="text-coop-900 font-medium text-sm">
+        <div className="card col-span-full stagger-2 flex flex-wrap items-center justify-between gap-4 border-l-4 border-l-viva-500 bg-gradient-to-r from-viva-50/60 to-transparent">
+          <p className="text-viva-900 font-medium text-sm">
             Escala cadastrada:{' '}
-            <span className="font-bold text-coop-800">{fixMojibake(escalaNome || '—')}</span>
+            <span className="font-bold text-viva-800">{fixMojibake(escalaNome || '—')}</span>
           </p>
         </div>
       )}
@@ -758,7 +758,7 @@ const Dashboard = () => {
             className="bg-white rounded-2xl shadow-xl max-w-md w-full p-5 flex flex-col gap-4 max-h-[90vh] overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
           >
-            <h3 className="text-lg font-semibold text-coop-900 font-display">
+            <h3 className="text-lg font-semibold text-viva-900 font-display">
               {trocaStep === 1
                 ? trocaAcaoTipo === null
                   ? 'Trocar ou ceder plantão'
@@ -771,14 +771,14 @@ const Dashboard = () => {
             </h3>
             {trocaStep === 1 ? (
               <>
-                <p className="text-sm text-coop-700">O que você deseja fazer?</p>
-                <div className="flex rounded-xl border border-coop-200 p-1 gap-1 bg-coop-50/50">
+                <p className="text-sm text-viva-700">O que você deseja fazer?</p>
+                <div className="flex rounded-xl border border-viva-200 p-1 gap-1 bg-viva-50/50">
                   <button
                     type="button"
                     className={`flex-1 text-sm py-2.5 rounded-lg font-medium transition-colors ${
                       trocaAcaoTipo === 'PERMUTA'
-                        ? 'bg-coop-600 text-white shadow-sm'
-                        : 'text-coop-800 hover:bg-white/80'
+                        ? 'bg-viva-600 text-white shadow-sm'
+                        : 'text-viva-800 hover:bg-white/80'
                     }`}
                     onClick={() => {
                       setTrocaAcaoTipo('PERMUTA');
@@ -791,8 +791,8 @@ const Dashboard = () => {
                     type="button"
                     className={`flex-1 text-sm py-2.5 rounded-lg font-medium transition-colors ${
                       trocaAcaoTipo === 'CEDER'
-                        ? 'bg-coop-600 text-white shadow-sm'
-                        : 'text-coop-800 hover:bg-white/80'
+                        ? 'bg-viva-600 text-white shadow-sm'
+                        : 'text-viva-800 hover:bg-white/80'
                     }`}
                     onClick={() => {
                       setTrocaAcaoTipo('CEDER');
@@ -804,19 +804,19 @@ const Dashboard = () => {
                 </div>
                 {trocaAcaoTipo != null ? (
                   <>
-                    <p className="text-xs text-coop-600 font-serif leading-relaxed">
+                    <p className="text-xs text-viva-600 font-serif leading-relaxed">
                       {trocaAcaoTipo === 'CEDER'
                         ? 'Quem aceitar fica com o seu plantão; não precisa ceder um dele.'
                         : 'Troca pelo plantão de um colega. À equipe: quem aceitar escolhe o dele na troca.'}
                     </p>
-                    <p className="text-sm text-coop-700 pt-1">Quem pode receber o pedido?</p>
-                    <div className="flex rounded-xl border border-coop-200 p-1 gap-1 bg-coop-50/50">
+                    <p className="text-sm text-viva-700 pt-1">Quem pode receber o pedido?</p>
+                    <div className="flex rounded-xl border border-viva-200 p-1 gap-1 bg-viva-50/50">
                       <button
                         type="button"
                         className={`flex-1 text-sm py-2.5 rounded-lg font-medium transition-colors ${
                           trocaDestinoModo === 'colega'
-                            ? 'bg-coop-600 text-white shadow-sm'
-                            : 'text-coop-800 hover:bg-white/80'
+                            ? 'bg-viva-600 text-white shadow-sm'
+                            : 'text-viva-800 hover:bg-white/80'
                         }`}
                         onClick={() => {
                           setTrocaDestinoModo('colega');
@@ -830,8 +830,8 @@ const Dashboard = () => {
                         type="button"
                         className={`flex-1 text-sm py-2.5 rounded-lg font-medium transition-colors ${
                           trocaDestinoModo === 'equipe'
-                            ? 'bg-coop-600 text-white shadow-sm'
-                            : 'text-coop-800 hover:bg-white/80'
+                            ? 'bg-viva-600 text-white shadow-sm'
+                            : 'text-viva-800 hover:bg-white/80'
                         }`}
                         onClick={() => {
                           setTrocaDestinoModo('equipe');
@@ -843,7 +843,7 @@ const Dashboard = () => {
                       </button>
                     </div>
                     {trocaDestinoModo === 'equipe' ? (
-                      <p className="text-sm text-coop-700 font-serif leading-relaxed">
+                      <p className="text-sm text-viva-700 font-serif leading-relaxed">
                         {trocaAcaoTipo === 'CEDER' ? (
                           <>
                             Colegas da escala veem o pedido. <strong>O primeiro a aceitar</strong> fica com o plantão, sem
@@ -858,7 +858,7 @@ const Dashboard = () => {
                       </p>
                     ) : (
                       <>
-                        <label className="text-xs font-semibold text-coop-600 uppercase tracking-wide">Profissional</label>
+                        <label className="text-xs font-semibold text-viva-600 uppercase tracking-wide">Profissional</label>
                         <select
                           value={selectedColegaId ?? ''}
                           onChange={(e) => {
@@ -877,16 +877,16 @@ const Dashboard = () => {
                           ))}
                         </select>
                         {selectedColegaId && trocaAcaoTipo === 'PERMUTA' ? (
-                          <div className="flex flex-col gap-2 pt-1 border-t border-coop-100">
-                            <label className="text-xs font-semibold text-coop-600 uppercase tracking-wide">
+                          <div className="flex flex-col gap-2 pt-1 border-t border-viva-100">
+                            <label className="text-xs font-semibold text-viva-600 uppercase tracking-wide">
                               Plantão do colega
                             </label>
-                            <p className="text-xs text-coop-600 font-serif">
+                            <p className="text-xs text-viva-600 font-serif">
                               Plantões de <strong>{selectedColega ? fixMojibake(selectedColega.nomeCompleto) : '—'}</strong> nesta
                               escala.
                             </p>
                             {plantoesColegaFetching ? (
-                              <p className="text-sm text-coop-600 font-serif">Carregando…</p>
+                              <p className="text-sm text-viva-600 font-serif">Carregando…</p>
                             ) : plantoesColegaList.length === 0 ? (
                               <p className="text-sm text-amber-800 font-serif">Nenhum plantão disponível para troca.</p>
                             ) : (
@@ -905,7 +905,7 @@ const Dashboard = () => {
                             )}
                           </div>
                         ) : selectedColegaId && trocaAcaoTipo === 'CEDER' ? (
-                          <p className="text-sm text-coop-700 font-serif pt-1 border-t border-coop-100">
+                          <p className="text-sm text-viva-700 font-serif pt-1 border-t border-viva-100">
                             O plantão será cedido a <strong>{selectedColega ? fixMojibake(selectedColega.nomeCompleto) : '—'}</strong>{' '}
                             se ele(a) aceitar.
                           </p>
@@ -946,10 +946,10 @@ const Dashboard = () => {
               <>
                 {trocaDestinoModo === 'equipe' ? (
                   <>
-                    <p className="text-sm text-coop-700 leading-relaxed">
+                    <p className="text-sm text-viva-700 leading-relaxed">
                       Confirme o envio do seu plantão à <strong>equipe</strong>:
                     </p>
-                    <ul className="text-sm text-coop-800 list-disc pl-5 space-y-1 font-serif">
+                    <ul className="text-sm text-viva-800 list-disc pl-5 space-y-1 font-serif">
                       <li>
                         Seu plantão em{' '}
                         <strong>
@@ -970,11 +970,11 @@ const Dashboard = () => {
                   </>
                 ) : trocaAcaoTipo === 'CEDER' ? (
                   <>
-                    <p className="text-sm text-coop-700 leading-relaxed">
+                    <p className="text-sm text-viva-700 leading-relaxed">
                       Confirme a <strong>cessão</strong> para{' '}
                       <strong>{selectedColega ? fixMojibake(selectedColega.nomeCompleto) : '—'}</strong>:
                     </p>
-                    <ul className="text-sm text-coop-800 list-disc pl-5 space-y-1 font-serif">
+                    <ul className="text-sm text-viva-800 list-disc pl-5 space-y-1 font-serif">
                       <li>
                         Seu plantão em{' '}
                         <strong>
@@ -990,11 +990,11 @@ const Dashboard = () => {
                   </>
                 ) : (
                   <>
-                    <p className="text-sm text-coop-700 leading-relaxed">
+                    <p className="text-sm text-viva-700 leading-relaxed">
                       Confirme a <strong>troca</strong> com{' '}
                       <strong>{selectedColega ? fixMojibake(selectedColega.nomeCompleto) : '—'}</strong>:
                     </p>
-                    <ul className="text-sm text-coop-800 list-disc pl-5 space-y-1 font-serif">
+                    <ul className="text-sm text-viva-800 list-disc pl-5 space-y-1 font-serif">
                       <li>
                         Você fica com o plantão dele em{' '}
                         <strong>
@@ -1057,12 +1057,12 @@ const Dashboard = () => {
             className="bg-white rounded-2xl shadow-xl max-w-md w-full p-5 flex flex-col gap-4"
             onClick={(e) => e.stopPropagation()}
           >
-            <h3 className="text-lg font-semibold text-coop-900 font-display">Aceitar permuta da equipe</h3>
-            <p className="text-sm text-coop-700 font-serif">
+            <h3 className="text-lg font-semibold text-viva-900 font-display">Aceitar permuta da equipe</h3>
+            <p className="text-sm text-viva-700 font-serif">
               Escolha <strong>seu</strong> plantão nesta escala que você oferece em troca.
             </p>
             {meusPlantoesAceiteFetching ? (
-              <p className="text-sm text-coop-600 font-serif">Carregando…</p>
+              <p className="text-sm text-viva-600 font-serif">Carregando…</p>
             ) : meusPlantoesAceiteList.length === 0 ? (
               <p className="text-sm text-amber-800 font-serif">Nenhum plantão seu disponível para troca aqui.</p>
             ) : (
@@ -1115,8 +1115,8 @@ const Dashboard = () => {
 
       {/* Acesso rápido Master */}
       {isMaster && (
-        <div className="card col-span-full stagger-2 flex flex-wrap items-center justify-between gap-4 border-l-4 border-l-coop-500 bg-gradient-to-r from-coop-50/60 to-transparent">
-          <p className="text-coop-900 font-medium text-sm font-display">
+        <div className="card col-span-full stagger-2 flex flex-wrap items-center justify-between gap-4 border-l-4 border-l-viva-500 bg-gradient-to-r from-viva-50/60 to-transparent">
+          <p className="text-viva-900 font-medium text-sm font-display">
             Acesso rápido às áreas de gestão
           </p>
           <div className="flex flex-wrap gap-2">
@@ -1129,89 +1129,89 @@ const Dashboard = () => {
 
       {/* Card de Informações */}
       <div className="card stagger-3">
-        <h3 className="text-xs font-semibold uppercase tracking-wider text-coop-600 mb-4 font-display">
+        <h3 className="text-xs font-semibold uppercase tracking-wider text-viva-600 mb-4 font-display">
           Informações Pessoais
         </h3>
         <div className="space-y-3">
           {!isMaster && (displayUser?.profissao || (displayUser?.especialidades?.length ?? 0) > 0) && (
-            <div className="rounded-xl bg-coop-100/80 border border-coop-200/60 p-4">
-              <p className="text-[10px] font-semibold uppercase tracking-wider text-coop-600">Identificação profissional</p>
+            <div className="rounded-xl bg-viva-100/80 border border-viva-200/60 p-4">
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-viva-600">Identificação profissional</p>
               {displayUser?.profissao && (
-                <p className="text-sm font-semibold text-coop-900 mt-1 font-display">
+                <p className="text-sm font-semibold text-viva-900 mt-1 font-display">
                   {fixMojibake(displayUser.profissao)}
                 </p>
               )}
               {(displayUser?.especialidades?.length ?? 0) > 0 && (
-                <p className="text-xs text-coop-800 mt-0.5 font-serif">
+                <p className="text-xs text-viva-800 mt-0.5 font-serif">
                   {fixMojibake(displayUser!.especialidades!.join(', '))}
                 </p>
               )}
             </div>
           )}
           {!isMaster && displayUser?.crm && (
-            <div className="rounded-xl bg-coop-50/80 border border-coop-200/50 p-4">
-              <p className="text-[10px] font-semibold uppercase tracking-wider text-coop-600">CRM</p>
-              <p className="text-sm font-semibold text-coop-900 mt-0.5 font-display">{formatCRM(displayUser.crm)}</p>
+            <div className="rounded-xl bg-viva-50/80 border border-viva-200/50 p-4">
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-viva-600">CRM</p>
+              <p className="text-sm font-semibold text-viva-900 mt-0.5 font-display">{formatCRM(displayUser.crm)}</p>
             </div>
           )}
           {!isMaster && (
-            <div className="rounded-xl bg-coop-50/80 border border-coop-200/50 p-4">
-              <p className="text-[10px] font-semibold uppercase tracking-wider text-coop-600">Tipo de vínculo</p>
-              <p className="text-sm font-semibold text-coop-900 mt-0.5">
+            <div className="rounded-xl bg-viva-50/80 border border-viva-200/50 p-4">
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-viva-600">Tipo de vínculo</p>
+              <p className="text-sm font-semibold text-viva-900 mt-0.5">
                 {displayUser?.vinculo?.toUpperCase() === 'PJ' ? 'PJ' : 'Associado'}
               </p>
             </div>
           )}
           {!isMaster && (
-            <div className="rounded-xl bg-coop-50/80 border border-coop-200/50 p-4">
-              <p className="text-[10px] font-semibold uppercase tracking-wider text-coop-600">Equipes vinculadas</p>
+            <div className="rounded-xl bg-viva-50/80 border border-viva-200/50 p-4">
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-viva-600">Equipes vinculadas</p>
               {minhasEquipes.length > 0 ? (
                 <div className="mt-2 flex flex-wrap gap-1.5">
                   {minhasEquipes.map((nome) => (
                     <span
                       key={nome}
-                      className="inline-flex items-center rounded-full border border-coop-200 bg-white px-2.5 py-1 text-[11px] font-medium text-coop-800"
+                      className="inline-flex items-center rounded-full border border-viva-200 bg-white px-2.5 py-1 text-[11px] font-medium text-viva-800"
                     >
                       {nome}
                     </span>
                   ))}
                 </div>
               ) : (
-                <p className="text-xs text-coop-700 mt-1 font-serif">Sem equipe vinculada no momento.</p>
+                <p className="text-xs text-viva-700 mt-1 font-serif">Sem equipe vinculada no momento.</p>
               )}
             </div>
           )}
           {isMaster && (
             <>
-              <div className="rounded-xl bg-coop-100/80 border border-coop-200/60 p-4">
-                <p className="text-[10px] font-semibold uppercase tracking-wider text-coop-600 font-display">Perfil</p>
-                <p className="text-sm font-semibold text-coop-900 mt-1 font-display">Administrador Master</p>
+              <div className="rounded-xl bg-viva-100/80 border border-viva-200/60 p-4">
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-viva-600 font-display">Perfil</p>
+                <p className="text-sm font-semibold text-viva-900 mt-1 font-display">Administrador Master</p>
               </div>
               {displayUser?.email && (
-                <div className="rounded-xl bg-coop-50/80 border border-coop-200/50 p-4">
-                  <p className="text-[10px] font-semibold uppercase tracking-wider text-coop-600 font-display">Email de contato</p>
-                  <p className="text-sm font-medium text-coop-900 mt-0.5 break-all font-display">{fixMojibake(displayUser.email)}</p>
+                <div className="rounded-xl bg-viva-50/80 border border-viva-200/50 p-4">
+                  <p className="text-[10px] font-semibold uppercase tracking-wider text-viva-600 font-display">Email de contato</p>
+                  <p className="text-sm font-medium text-viva-900 mt-0.5 break-all font-display">{fixMojibake(displayUser.email)}</p>
                 </div>
               )}
             </>
           )}
           {false && !isMaster && listaEscalas.length > 0 && (
-            <div className="rounded-xl bg-coop-50/80 border border-coop-200/50 p-4">
-              <p className="text-[10px] font-semibold uppercase tracking-wider text-coop-600">Escala(s)</p>
-              <p className="text-xs font-medium text-coop-900 mt-1 leading-snug">
+            <div className="rounded-xl bg-viva-50/80 border border-viva-200/50 p-4">
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-viva-600">Escala(s)</p>
+              <p className="text-xs font-medium text-viva-900 mt-1 leading-snug">
                 <span className="font-semibold">{fixMojibake(escalaNome ?? '—')}</span>
-                <span className="text-coop-600"> · </span>
+                <span className="text-viva-600"> · </span>
                 <span className="font-medium">{new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long' })}</span>
-                <span className="text-coop-600"> · </span>
+                <span className="text-viva-600"> · </span>
                 <span className="font-medium">{faixaHorario}</span>
               </p>
               <div className="mt-3">
                 <Link
                   to="/ponto-eletronico"
-                  className="inline-flex items-center gap-1.5 text-xs font-semibold text-coop-700 hover:text-coop-900 transition"
+                  className="inline-flex items-center gap-1.5 text-xs font-semibold text-viva-700 hover:text-viva-900 transition"
                 >
                   Bater ponto
-                  <span aria-hidden className="text-coop-500">→</span>
+                  <span aria-hidden className="text-viva-500">→</span>
                 </Link>
               </div>
             </div>
@@ -1221,13 +1221,13 @@ const Dashboard = () => {
 
       {/* Documentos disponíveis (profissional) */}
       {!isMaster && (
-        <div className="card col-span-full stagger-5 border-l-4 border-l-coop-500 bg-gradient-to-br from-white to-coop-50/30">
+        <div className="card col-span-full stagger-5 border-l-4 border-l-viva-500 bg-gradient-to-br from-white to-viva-50/30">
           <div className="flex flex-wrap items-start justify-between gap-3 mb-4">
             <div>
-              <h3 className="text-sm font-semibold text-coop-800 font-display">
+              <h3 className="text-sm font-semibold text-viva-800 font-display">
                 Documentos enviados para você
               </h3>
-              <p className="text-xs text-coop-600 mt-1 font-serif max-w-xl">
+              <p className="text-xs text-viva-600 mt-1 font-serif max-w-xl">
                 Acesse Documentos para registar ciência depois de ler (visível para o Master em Envio de Documentos).
               </p>
             </div>
@@ -1254,20 +1254,20 @@ const Dashboard = () => {
                 <li key={doc.id}>
                   <button
                     type="button"
-                    className="w-full flex items-center gap-3 p-3 rounded-xl bg-coop-50/50 hover:bg-coop-100/50 active:bg-coop-100/80 border border-coop-200/40 transition text-left cursor-pointer"
+                    className="w-full flex items-center gap-3 p-3 rounded-xl bg-viva-50/50 hover:bg-viva-100/50 active:bg-viva-100/80 border border-viva-200/40 transition text-left cursor-pointer"
                     onClick={() => medicoService.openDocumentoEnviado(doc.id, doc.nomeArquivo)}
                   >
-                    <span className="flex-shrink-0 w-9 h-9 rounded-lg bg-coop-200/50 flex items-center justify-center text-coop-700">
+                    <span className="flex-shrink-0 w-9 h-9 rounded-lg bg-viva-200/50 flex items-center justify-center text-viva-700">
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                       </svg>
                     </span>
                     <div className="min-w-0 flex-1">
-                      <p className="font-semibold text-coop-900 truncate text-xs font-display">
+                      <p className="font-semibold text-viva-900 truncate text-xs font-display">
                         {doc.titulo || doc.nomeArquivo}
                       </p>
                       {doc.titulo && (
-                        <p className="text-[10px] text-coop-600 truncate mt-0.5">{doc.nomeArquivo}</p>
+                        <p className="text-[10px] text-viva-600 truncate mt-0.5">{doc.nomeArquivo}</p>
                       )}
                     </div>
                     {doc.aceitoEm ? (

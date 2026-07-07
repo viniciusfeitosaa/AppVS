@@ -134,10 +134,10 @@ function ModalAssociarContrato({
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-xl font-bold text-coop-900">
+          <h3 className="text-xl font-bold text-viva-900">
             Associar subgrupos e equipes – {contrato.nome}
           </h3>
-          <button type="button" className="text-gray-500 hover:text-coop-800" onClick={onClose}>
+          <button type="button" className="text-gray-500 hover:text-viva-800" onClick={onClose}>
             ✕
           </button>
         </div>
@@ -149,12 +149,12 @@ function ModalAssociarContrato({
 
         <div className="space-y-6">
           <div>
-            <h4 className="text-sm font-semibold text-coop-800 mb-2">Subgrupos deste contrato</h4>
+            <h4 className="text-sm font-semibold text-viva-800 mb-2">Subgrupos deste contrato</h4>
             {loadSub ? (
               <p className="text-sm text-gray-600">Carregando...</p>
             ) : (
               <>
-                <ul className="list-disc list-inside text-sm text-coop-900 mb-2">
+                <ul className="list-disc list-inside text-sm text-viva-900 mb-2">
                   {linkSubgrupos.length === 0 ? (
                     <li className="text-gray-500">Nenhum subgrupo associado</li>
                   ) : (
@@ -201,12 +201,12 @@ function ModalAssociarContrato({
           </div>
 
           <div>
-            <h4 className="text-sm font-semibold text-coop-800 mb-2">Equipes deste contrato</h4>
+            <h4 className="text-sm font-semibold text-viva-800 mb-2">Equipes deste contrato</h4>
             {loadEqu ? (
               <p className="text-sm text-gray-600">Carregando...</p>
             ) : (
               <>
-                <ul className="list-disc list-inside text-sm text-coop-900 mb-2">
+                <ul className="list-disc list-inside text-sm text-viva-900 mb-2">
                   {linkEquipes.length === 0 ? (
                     <li className="text-gray-500">Nenhuma equipe associada</li>
                   ) : (
@@ -353,13 +353,13 @@ const ContratosAtivos = () => {
 
   return (
     <div className="space-y-6">
-      <div className="card border-l-4 border-coop-500">
-        <h2 className="text-2xl font-bold text-coop-900 mb-1">Contratos Ativos</h2>
+      <div className="card border-l-4 border-viva-500">
+        <h2 className="text-2xl font-bold text-viva-900 mb-1">Contratos Ativos</h2>
         <p className="text-gray-600">Adicione, edite e exclua contratos vinculados ao seu tenant.</p>
       </div>
 
       <div className="card">
-        <h3 className="text-lg font-bold text-coop-900 mb-4">
+        <h3 className="text-lg font-bold text-viva-900 mb-4">
           {editingId ? 'Editar contrato' : 'Novo contrato'}
         </h3>
         <form className="grid grid-cols-1 md:grid-cols-2 gap-4" onSubmit={handleSubmit}>
@@ -381,19 +381,19 @@ const ContratosAtivos = () => {
             value={form.dataFim}
             onChange={(e) => setForm((prev) => ({ ...prev, dataFim: e.target.value }))}
           />
-          <div className="md:col-span-2 rounded-lg border border-coop-100 bg-coop-50/50 px-3 py-2 text-xs text-coop-800">
-            <p className="font-semibold text-coop-900 mb-1">Estilo de produção (escala / ponto)</p>
+          <div className="md:col-span-2 rounded-lg border border-viva-100 bg-viva-50/50 px-3 py-2 text-xs text-viva-800">
+            <p className="font-semibold text-viva-900 mb-1">Estilo de produção (escala / ponto)</p>
             <p>
               Configure por <strong>subgrupo</strong> em <strong>Subgrupos e Equipes</strong> ao selecionar o subgrupo
               (escalas + ponto, só escala ou só ponto). Cada subgrupo do mesmo contrato pode ter uma combinação diferente.
             </p>
           </div>
           <div className="md:col-span-2 space-y-2">
-            <p className="text-sm font-semibold text-coop-800">Troca de plantão</p>
+            <p className="text-sm font-semibold text-viva-800">Troca de plantão</p>
             <p className="text-xs text-gray-600">
               Permite que profissionais da mesma equipe solicitem troca de plantão entre si (quando a escala estiver habilitada no app do médico).
             </p>
-            <label className="flex items-center gap-2 text-sm text-coop-900">
+            <label className="flex items-center gap-2 text-sm text-viva-900">
               <input
                 type="checkbox"
                 checked={form.permiteTrocaPlantao}
@@ -402,7 +402,7 @@ const ContratosAtivos = () => {
               Permitir troca de plantão neste contrato
             </label>
           </div>
-          <label className="flex items-center gap-2 text-sm text-coop-900">
+          <label className="flex items-center gap-2 text-sm text-viva-900">
             <input
               type="checkbox"
               checked={form.ativo}
@@ -434,7 +434,7 @@ const ContratosAtivos = () => {
 
       <div className="card">
         <div className="flex items-center justify-between gap-3 mb-4">
-          <h3 className="text-lg font-bold text-coop-900">Lista de contratos</h3>
+          <h3 className="text-lg font-bold text-viva-900">Lista de contratos</h3>
           <input
             className="input max-w-xs"
             placeholder="Buscar por nome"
@@ -451,7 +451,7 @@ const ContratosAtivos = () => {
           <div className="overflow-x-auto">
             <table className="min-w-full text-sm">
               <thead>
-                <tr className="text-left text-coop-700 border-b">
+                <tr className="text-left text-viva-700 border-b">
                   <th className="py-2 pr-4">Nome</th>
                   <th className="py-2 pr-4">Início</th>
                   <th className="py-2 pr-4">Fim</th>
@@ -464,13 +464,13 @@ const ContratosAtivos = () => {
                 {contratos.map((contrato) => (
                   <tr key={contrato.id} className="border-b last:border-b-0">
                     <td className="py-2 pr-4">
-                      <p className="font-semibold text-coop-900">{contrato.nome}</p>
+                      <p className="font-semibold text-viva-900">{contrato.nome}</p>
                       {contrato.descricao && <p className="text-xs text-gray-600">{contrato.descricao}</p>}
                     </td>
                     <td className="py-2 pr-4 text-gray-700">{toDateInput(contrato.dataInicio)}</td>
                     <td className="py-2 pr-4 text-gray-700">{toDateInput(contrato.dataFim) || '-'}</td>
                     <td className="py-2 pr-4">
-                      <span className="text-xs text-coop-700">Por subgrupo</span>
+                      <span className="text-xs text-viva-700">Por subgrupo</span>
                     </td>
                     <td className="py-2 pr-4">
                       <span

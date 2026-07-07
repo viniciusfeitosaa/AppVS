@@ -19,8 +19,8 @@ import blogRoutes from './routes/blog.routes';
 // Criar aplicação Express
 const app: Express = express();
 
-// Necessário atrás do proxy do Render (evita erro do express-rate-limit com X-Forwarded-For)
-app.set('trust proxy', 1);
+// NPM + nginx do frontend na VPS (2 hops); IP real vem em X-Forwarded-For
+app.set('trust proxy', 2);
 
 // Middleware de segurança
 app.use(buildHelmetMiddleware());

@@ -1,12 +1,10 @@
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { useNavigate } from 'react-router-dom';
-import { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { BrandLogo } from '../components/brand/BrandLogo';
-import '../features/cadastro-coop/cadastro-coop-theme.css';
 
 const loginSchema = z.object({
   email: z.string().email('E-mail inválido'),
@@ -55,13 +53,14 @@ const Login = () => {
   };
 
   return (
-    <div className="cadastro-coop-root min-h-screen flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md w-full space-y-8 bg-white p-10 rounded-2xl shadow-lg border border-[var(--border)]">
+    <div className="min-h-screen flex items-center justify-center bg-viva-950 py-12 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-md w-full space-y-8 bg-white p-10 rounded-2xl shadow-2xl">
         <div className="flex flex-col items-center">
-          <BrandLogo className="h-24 w-auto mb-2" linkToSite />
-          <p className="text-center text-xs text-[var(--text-muted)] max-w-xs">
-            Cooperativa de Trabalho dos Profissionais Assistenciais à Vida e à Saúde
-          </p>
+          <img
+            src={`${import.meta.env.BASE_URL}assets/logo.avif`}
+            alt="Logo Viva Saúde"
+            className="h-24 w-auto mb-6"
+          />
         </div>
         <form className="mt-8 space-y-6" onSubmit={handleSubmit(onSubmit)}>
           {error && (
@@ -72,7 +71,7 @@ const Login = () => {
 
           <div className="space-y-5">
             <div>
-              <label htmlFor="email" className="block text-sm font-semibold text-coop-800 mb-1">
+              <label htmlFor="email" className="block text-sm font-semibold text-viva-800 mb-1">
                 E-mail
               </label>
               <input
@@ -89,7 +88,7 @@ const Login = () => {
             </div>
 
             <div>
-              <label htmlFor="password" className="block text-sm font-semibold text-coop-800 mb-1">
+              <label htmlFor="password" className="block text-sm font-semibold text-viva-800 mb-1">
                 Senha
               </label>
               <div className="relative">
@@ -119,7 +118,7 @@ const Login = () => {
                 <p className="mt-1 text-sm text-red-600">{errors.password.message}</p>
               )}
               <p className="mt-2 text-sm">
-                <Link to="/esqueci-senha" className="text-coop-700 hover:text-coop-900 font-medium">
+                <Link to="/esqueci-senha" className="text-viva-700 hover:text-viva-900 font-medium">
                   Esqueci minha senha
                 </Link>
               </p>
@@ -138,7 +137,7 @@ const Login = () => {
         </form>
         <p className="text-sm text-center text-gray-600">
           Ainda não possui cadastro?{' '}
-          <Link to="/cadastro" className="font-semibold text-coop-800 hover:text-coop-600">
+          <Link to="/cadastro" className="font-semibold text-viva-800 hover:text-viva-600">
             Criar conta
           </Link>
         </p>

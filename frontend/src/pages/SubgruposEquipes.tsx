@@ -370,7 +370,7 @@ const SubgruposEquipes = () => {
   if (!isMaster) {
     return (
       <div className="card border-l-4 border-red-400">
-        <h2 className="text-xl font-bold text-coop-900 mb-2">Acesso restrito</h2>
+        <h2 className="text-xl font-bold text-viva-900 mb-2">Acesso restrito</h2>
         <p className="text-gray-600">Somente o perfil Master pode gerenciar subgrupos e equipes.</p>
       </div>
     );
@@ -378,20 +378,20 @@ const SubgruposEquipes = () => {
 
   return (
     <div className="space-y-6">
-      <div className="card border-l-4 border-coop-500">
-        <h2 className="text-2xl font-bold text-coop-900 mb-1">Subgrupos e Equipes</h2>
+      <div className="card border-l-4 border-viva-500">
+        <h2 className="text-2xl font-bold text-viva-900 mb-1">Subgrupos e Equipes</h2>
         <p className="text-gray-600">
           Crie na ordem: contrato → subgrupo (já associado ao contrato) → equipe (já associada ao subgrupo) → escala (já associada à equipe).{' '}
-          <Link to="/escalas" className="text-coop-600 hover:underline font-medium">Ir para Escalas</Link>
+          <Link to="/escalas" className="text-viva-600 hover:underline font-medium">Ir para Escalas</Link>
         </p>
       </div>
 
       {/* 1. Contrato e subgrupos */}
       <div className="card">
-        <h3 className="text-lg font-bold text-coop-900 mb-2">1. Contrato e subgrupos</h3>
+        <h3 className="text-lg font-bold text-viva-900 mb-2">1. Contrato e subgrupos</h3>
         <p className="text-sm text-gray-600 mb-4">Selecione o contrato e crie subgrupos já vinculados a ele.</p>
         <div className="mb-4">
-          <label className="block text-sm font-medium text-coop-800 mb-1">Contrato</label>
+          <label className="block text-sm font-medium text-viva-800 mb-1">Contrato</label>
           <select
             className="input max-w-md"
             value={selectedContratoId}
@@ -407,7 +407,7 @@ const SubgruposEquipes = () => {
           <>
             <form onSubmit={criarSubgrupo} className="flex flex-wrap items-end gap-2 mb-3">
               <div className="min-w-[200px]">
-                <label className="block text-sm font-medium text-coop-800 mb-1">Novo subgrupo</label>
+                <label className="block text-sm font-medium text-viva-800 mb-1">Novo subgrupo</label>
                 <input className="input w-full" placeholder="Nome do subgrupo" value={subgrupoNome} onChange={(e) => setSubgrupoNome(e.target.value)} />
               </div>
               <button type="submit" className="btn btn-primary" disabled={loadingAction}>Criar subgrupo</button>
@@ -421,11 +421,11 @@ const SubgruposEquipes = () => {
                     key={s.id}
                     role="button"
                     tabIndex={0}
-                    className={`w-full text-left border rounded-lg p-2 flex items-center justify-between gap-2 ${selectedSubgrupoId === s.id ? 'border-coop-900 bg-coop-50' : 'border-coop-200'} cursor-pointer hover:bg-coop-50/50`}
+                    className={`w-full text-left border rounded-lg p-2 flex items-center justify-between gap-2 ${selectedSubgrupoId === s.id ? 'border-viva-900 bg-viva-50' : 'border-viva-200'} cursor-pointer hover:bg-viva-50/50`}
                     onClick={() => { setSelectedSubgrupoId(s.id); setSelectedEquipeId(''); }}
                   >
                     <div className="min-w-0">
-                      <p className="font-semibold text-coop-900">{s.nome}</p>
+                      <p className="font-semibold text-viva-900">{s.nome}</p>
                       <p className="text-xs text-gray-600">
                         Equipes: {s._count?.equipes ?? 0}
                         {s.usaEscala !== false && s.usaPonto !== false
@@ -443,14 +443,14 @@ const SubgruposEquipes = () => {
               )}
             </div>
             {selectedSubgrupoId && selectedSubgrupo && (
-              <div className="mt-4 rounded-lg border border-coop-200 bg-coop-50/40 p-3 space-y-3">
-                <p className="text-sm font-semibold text-coop-900">Estilo de produção — {selectedSubgrupo.nome}</p>
+              <div className="mt-4 rounded-lg border border-viva-200 bg-viva-50/40 p-3 space-y-3">
+                <p className="text-sm font-semibold text-viva-900">Estilo de produção — {selectedSubgrupo.nome}</p>
                 <p className="text-xs text-gray-600">
                   Define se este subgrupo usa grade de plantões na escala e/ou ponto eletrônico (independente de outros
                   subgrupos do mesmo contrato).
                 </p>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
-                  <label className="flex items-start gap-2 text-sm text-coop-900 rounded-lg border border-coop-200 bg-white p-2">
+                  <label className="flex items-start gap-2 text-sm text-viva-900 rounded-lg border border-viva-200 bg-white p-2">
                     <input
                       type="radio"
                       name="estilo-producao-subgrupo"
@@ -460,10 +460,10 @@ const SubgruposEquipes = () => {
                     />
                     <span>
                       <span className="font-semibold">Escala + ponto</span>
-                      <span className="block text-xs text-coop-600">Usa grade de plantões e ponto eletrônico.</span>
+                      <span className="block text-xs text-viva-600">Usa grade de plantões e ponto eletrônico.</span>
                     </span>
                   </label>
-                  <label className="flex items-start gap-2 text-sm text-coop-900 rounded-lg border border-coop-200 bg-white p-2">
+                  <label className="flex items-start gap-2 text-sm text-viva-900 rounded-lg border border-viva-200 bg-white p-2">
                     <input
                       type="radio"
                       name="estilo-producao-subgrupo"
@@ -473,10 +473,10 @@ const SubgruposEquipes = () => {
                     />
                     <span>
                       <span className="font-semibold">Somente escala</span>
-                      <span className="block text-xs text-coop-600">Usa só grade de plantões, sem ponto eletrônico.</span>
+                      <span className="block text-xs text-viva-600">Usa só grade de plantões, sem ponto eletrônico.</span>
                     </span>
                   </label>
-                  <label className="flex items-start gap-2 text-sm text-coop-900 rounded-lg border border-coop-200 bg-white p-2">
+                  <label className="flex items-start gap-2 text-sm text-viva-900 rounded-lg border border-viva-200 bg-white p-2">
                     <input
                       type="radio"
                       name="estilo-producao-subgrupo"
@@ -486,7 +486,7 @@ const SubgruposEquipes = () => {
                     />
                     <span>
                       <span className="font-semibold">Somente ponto</span>
-                      <span className="block text-xs text-coop-600">Usa apenas ponto eletrônico (sem grade).</span>
+                      <span className="block text-xs text-viva-600">Usa apenas ponto eletrônico (sem grade).</span>
                     </span>
                   </label>
                 </div>
@@ -531,7 +531,7 @@ const SubgruposEquipes = () => {
 
       {/* 2. Equipes do subgrupo */}
       <div className="card">
-        <h3 className="text-lg font-bold text-coop-900 mb-2">2. Equipes do subgrupo</h3>
+        <h3 className="text-lg font-bold text-viva-900 mb-2">2. Equipes do subgrupo</h3>
         {!selectedSubgrupoId ? (
           <p className="text-sm text-gray-600">Selecione um contrato e um subgrupo acima para criar equipes já vinculadas a esse subgrupo.</p>
         ) : (
@@ -539,7 +539,7 @@ const SubgruposEquipes = () => {
             <p className="text-sm text-gray-600 mb-3">Subgrupo selecionado: <strong>{selectedSubgrupo?.nome}</strong>. Crie equipes já vinculadas a ele.</p>
             <form onSubmit={criarEquipe} className="flex flex-wrap items-end gap-2 mb-3">
               <div className="min-w-[200px]">
-                <label className="block text-sm font-medium text-coop-800 mb-1">Nova equipe</label>
+                <label className="block text-sm font-medium text-viva-800 mb-1">Nova equipe</label>
                 <input className="input w-full" placeholder="Nome da equipe" value={equipeNome} onChange={(e) => setEquipeNome(e.target.value)} />
               </div>
               <button type="submit" className="btn btn-primary" disabled={loadingAction}>Criar equipe</button>
@@ -553,11 +553,11 @@ const SubgruposEquipes = () => {
                     key={equipe.id}
                     role="button"
                     tabIndex={0}
-                    className={`w-full text-left border rounded-lg p-2 flex items-center justify-between gap-2 ${selectedEquipeId === equipe.id ? 'border-coop-900 bg-coop-50' : 'border-coop-200'} cursor-pointer hover:bg-coop-50/50`}
+                    className={`w-full text-left border rounded-lg p-2 flex items-center justify-between gap-2 ${selectedEquipeId === equipe.id ? 'border-viva-900 bg-viva-50' : 'border-viva-200'} cursor-pointer hover:bg-viva-50/50`}
                     onClick={() => setSelectedEquipeId(equipe.id)}
                   >
                     <div className="min-w-0">
-                      <p className="font-semibold text-coop-900">{equipe.nome}</p>
+                      <p className="font-semibold text-viva-900">{equipe.nome}</p>
                       <p className="text-xs text-gray-600">Médicos: {equipe._count?.equipeMedicos ?? 0} | Escalas: {equipe._count?.escalaEquipes ?? 0}</p>
                     </div>
                     <button type="button" className="btn btn-secondary shrink-0" onClick={(e) => openConfirmExcluirEquipe(e, equipe.id, equipe.nome)} disabled={loadingAction}>Excluir</button>
@@ -566,10 +566,10 @@ const SubgruposEquipes = () => {
               )}
             </div>
             {selectedEquipeId && (
-              <div className="mt-4 pt-4 border-t border-coop-100">
-                <p className="text-sm font-medium text-coop-800 mb-3">Médicos da equipe</p>
-                <div className="mb-4 pb-4 border-b border-coop-100">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-coop-600 mb-2">Adicionar profissionais</p>
+              <div className="mt-4 pt-4 border-t border-viva-100">
+                <p className="text-sm font-medium text-viva-800 mb-3">Médicos da equipe</p>
+                <div className="mb-4 pb-4 border-b border-viva-100">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-viva-600 mb-2">Adicionar profissionais</p>
                   <input
                     type="text"
                     className="input w-full py-2 text-sm mb-2"
@@ -583,7 +583,7 @@ const SubgruposEquipes = () => {
                     <p className="text-xs text-red-600 font-medium mb-2">{membrosEquipeError}</p>
                   )}
                   {loadingMedicosLista && medicos.length === 0 ? (
-                    <p className="text-sm text-coop-600 py-2">Carregando profissionais…</p>
+                    <p className="text-sm text-viva-600 py-2">Carregando profissionais…</p>
                   ) : medicosDisponiveis.length === 0 ? (
                     <p className="text-sm text-gray-500 py-1">
                       {medicos.length === 0 && !loadingMedicosLista
@@ -592,23 +592,23 @@ const SubgruposEquipes = () => {
                     </p>
                   ) : (
                     <>
-                      <ul className="max-h-44 overflow-y-auto space-y-1 rounded-lg border border-coop-200 bg-coop-50/50 p-1.5">
+                      <ul className="max-h-44 overflow-y-auto space-y-1 rounded-lg border border-viva-200 bg-viva-50/50 p-1.5">
                         {medicosDisponiveis.map((m) => (
                           <li
                             key={m.id}
-                            className="flex items-center gap-2 rounded-md px-2 py-1.5 bg-white border border-transparent hover:border-coop-100"
+                            className="flex items-center gap-2 rounded-md px-2 py-1.5 bg-white border border-transparent hover:border-viva-100"
                           >
                             <input
                               type="checkbox"
-                              className="rounded border-coop-300 text-coop-600 focus:ring-coop-500 shrink-0"
+                              className="rounded border-viva-300 text-viva-600 focus:ring-viva-500 shrink-0"
                               checked={membrosEquipePickIds.includes(m.id)}
                               onChange={() => toggleMembrosEquipePick(m.id)}
                               disabled={membrosEquipeActionLoading}
                               aria-label={`Selecionar ${m.nomeCompleto}`}
                             />
                             <div className="flex-1 min-w-0">
-                              <p className="font-medium text-coop-900 text-sm truncate">{m.nomeCompleto}</p>
-                              {m.crm ? <p className="text-xs text-coop-600">CRM: {m.crm}</p> : null}
+                              <p className="font-medium text-viva-900 text-sm truncate">{m.nomeCompleto}</p>
+                              {m.crm ? <p className="text-xs text-viva-600">CRM: {m.crm}</p> : null}
                             </div>
                             <button
                               type="button"
@@ -634,7 +634,7 @@ const SubgruposEquipes = () => {
                     </>
                   )}
                 </div>
-                <p className="text-xs font-semibold uppercase tracking-wide text-coop-600 mb-2">Na equipe</p>
+                <p className="text-xs font-semibold uppercase tracking-wide text-viva-600 mb-2">Na equipe</p>
                 {equipeMedicos.length === 0 ? (
                   <p className="text-sm text-gray-500">Nenhum profissional vinculado a esta equipe.</p>
                 ) : (
@@ -661,11 +661,11 @@ const SubgruposEquipes = () => {
                           (a: { id: string; medicoId: string; medico?: { nomeCompleto: string; crm?: string | null } }) => (
                             <li
                               key={a.id}
-                              className="flex items-center justify-between gap-2 border border-coop-200 rounded-lg px-3 py-2 bg-white"
+                              className="flex items-center justify-between gap-2 border border-viva-200 rounded-lg px-3 py-2 bg-white"
                             >
                               <div className="min-w-0">
-                                <p className="font-medium text-coop-900 text-sm">{a.medico?.nomeCompleto ?? '—'}</p>
-                                {a.medico?.crm ? <p className="text-xs text-coop-600">CRM: {a.medico.crm}</p> : null}
+                                <p className="font-medium text-viva-900 text-sm">{a.medico?.nomeCompleto ?? '—'}</p>
+                                {a.medico?.crm ? <p className="text-xs text-viva-600">CRM: {a.medico.crm}</p> : null}
                               </div>
                               <button
                                 type="button"
@@ -690,7 +690,7 @@ const SubgruposEquipes = () => {
 
       {/* 3. Escala da equipe */}
       <div className="card">
-        <h3 className="text-lg font-bold text-coop-900 mb-2">3. Escala da equipe</h3>
+        <h3 className="text-lg font-bold text-viva-900 mb-2">3. Escala da equipe</h3>
         {!selectedEquipeId || !contratoEscalaDoSubgrupo ? (
           <p className="text-sm text-gray-600">Selecione uma equipe (cujo subgrupo tenha contrato com escala) acima para criar uma escala já vinculada a essa equipe e ao subgrupo.</p>
         ) : (
@@ -699,7 +699,7 @@ const SubgruposEquipes = () => {
             {equipeEscalas.length === 0 && (
               <form onSubmit={criarEscala} className="flex flex-wrap items-end gap-2 mb-4">
                 <div className="min-w-[200px]">
-                  <label className="block text-sm font-medium text-coop-800 mb-1">Nova escala</label>
+                  <label className="block text-sm font-medium text-viva-800 mb-1">Nova escala</label>
                   <input
                     type="text"
                     className="input w-full"
@@ -713,15 +713,15 @@ const SubgruposEquipes = () => {
             )}
             {equipeEscalas.length > 0 && (
               <div>
-                <p className="text-sm font-medium text-coop-800 mb-2">Escalas desta equipe</p>
+                <p className="text-sm font-medium text-viva-800 mb-2">Escalas desta equipe</p>
                 <ul className="space-y-1">
                   {equipeEscalas.map((esc: { id: string; nome: string }) => (
-                    <li key={esc.id} className="flex items-center justify-between border border-coop-200 rounded-lg px-2 py-1.5">
-                      <span className="text-sm text-coop-900">{esc.nome}</span>
+                    <li key={esc.id} className="flex items-center justify-between border border-viva-200 rounded-lg px-2 py-1.5">
+                      <span className="text-sm text-viva-900">{esc.nome}</span>
                       <div className="flex items-center gap-3">
                         <button
                           type="button"
-                          className="text-sm text-coop-700 hover:underline font-medium"
+                          className="text-sm text-viva-700 hover:underline font-medium"
                           onClick={(e) => openEditEscala(e, esc.id, esc.nome)}
                         >
                           Editar
@@ -734,7 +734,7 @@ const SubgruposEquipes = () => {
                         >
                           Excluir
                         </button>
-                        <Link to="/escalas" state={{ escalaId: esc.id }} className="text-sm text-coop-600 hover:underline font-medium">Abrir na página Escalas</Link>
+                        <Link to="/escalas" state={{ escalaId: esc.id }} className="text-sm text-viva-600 hover:underline font-medium">Abrir na página Escalas</Link>
                       </div>
                     </li>
                   ))}
@@ -751,7 +751,7 @@ const SubgruposEquipes = () => {
             className="bg-white rounded-xl shadow-xl max-w-sm w-full p-6"
             onClick={(e) => e.stopPropagation()}
           >
-            <h3 className="text-lg font-bold text-coop-900 mb-2">Confirmar exclusão</h3>
+            <h3 className="text-lg font-bold text-viva-900 mb-2">Confirmar exclusão</h3>
             <p className="text-sm text-gray-600 mb-4">
               {confirmExcluir.tipo === 'subgrupo'
                 ? `Excluir o subgrupo "${confirmExcluir.nome}"? Esta ação não pode ser desfeita.`
@@ -773,7 +773,7 @@ const SubgruposEquipes = () => {
       {editEscala && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" onClick={closeEditEscala}>
           <div className="bg-white rounded-xl shadow-xl max-w-sm w-full p-6" onClick={(e) => e.stopPropagation()}>
-            <h3 className="text-lg font-bold text-coop-900 mb-2">Editar escala</h3>
+            <h3 className="text-lg font-bold text-viva-900 mb-2">Editar escala</h3>
             <p className="text-sm text-gray-600 mb-3">Atualize o nome da escala selecionada.</p>
             <input
               type="text"

@@ -100,7 +100,7 @@ const Avaliacao = () => {
   if (modulosLoading) {
     return (
       <div className="card">
-        <p className="text-sm text-coop-700 font-serif">Carregando permissões…</p>
+        <p className="text-sm text-viva-700 font-serif">Carregando permissões…</p>
       </div>
     );
   }
@@ -108,8 +108,8 @@ const Avaliacao = () => {
   if (moduloDesabilitado) {
     return (
       <div className="card border-l-4 border-amber-500">
-        <h2 className="text-base font-bold text-coop-900 mb-2 font-display">Acesso ao módulo</h2>
-        <p className="text-sm text-coop-700 font-serif">
+        <h2 className="text-base font-bold text-viva-900 mb-2 font-display">Acesso ao módulo</h2>
+        <p className="text-sm text-viva-700 font-serif">
           O módulo Avaliação não está habilitado para o seu perfil neste tenant. Um administrador pode ativá-lo em{' '}
           <strong>Minha Conta</strong> (matriz de acessos).
         </p>
@@ -120,8 +120,8 @@ const Avaliacao = () => {
   if (user?.role !== 'MASTER') {
     return (
       <div className="card border-l-4 border-amber-500">
-        <h2 className="text-base font-bold text-coop-900 mb-2 font-display">Acesso restrito</h2>
-        <p className="text-sm text-coop-700 font-serif">A fila de cadastros públicos é exclusiva do perfil Master.</p>
+        <h2 className="text-base font-bold text-viva-900 mb-2 font-display">Acesso restrito</h2>
+        <p className="text-sm text-viva-700 font-serif">A fila de cadastros públicos é exclusiva do perfil Master.</p>
       </div>
     );
   }
@@ -130,10 +130,10 @@ const Avaliacao = () => {
 
   return (
     <div className="space-y-6">
-      <div className="card dashboard-hero border-l-4 border-l-coop-500 py-8 md:py-10">
-        <p className="text-xs font-semibold uppercase tracking-widest text-coop-600 mb-2 font-display">Cadastros</p>
-        <h1 className="text-2xl md:text-3xl font-bold text-coop-950 font-display tracking-tight mb-2">Avaliação</h1>
-        <p className="text-coop-800 font-serif max-w-2xl">
+      <div className="card dashboard-hero border-l-4 border-l-viva-500 py-8 md:py-10">
+        <p className="text-xs font-semibold uppercase tracking-widest text-viva-600 mb-2 font-display">Cadastros</p>
+        <h1 className="text-2xl md:text-3xl font-bold text-viva-950 font-display tracking-tight mb-2">Avaliação</h1>
+        <p className="text-viva-800 font-serif max-w-2xl">
           Profissionais que se cadastraram pela página pública aparecem aqui até serem aprovados ou rejeitados. Abra um
           registo para ver dados e ficheiros enviados.
         </p>
@@ -145,15 +145,15 @@ const Avaliacao = () => {
 
       <div className="grid grid-cols-1 xl:grid-cols-5 gap-6">
         <div className="xl:col-span-2 card overflow-hidden">
-          <h2 className="text-sm font-bold text-coop-900 font-display mb-3">Pendentes de análise</h2>
-          {listQuery.isLoading && <p className="text-sm text-coop-700 font-serif">A carregar…</p>}
+          <h2 className="text-sm font-bold text-viva-900 font-display mb-3">Pendentes de análise</h2>
+          {listQuery.isLoading && <p className="text-sm text-viva-700 font-serif">A carregar…</p>}
           {listQuery.isError && (
             <p className="text-sm text-red-700 font-serif">Não foi possível carregar a lista. Verifique a sessão e a API.</p>
           )}
           {!listQuery.isLoading && !listQuery.data?.length && (
-            <p className="text-sm text-coop-700 font-serif">Nenhum cadastro aguardando análise.</p>
+            <p className="text-sm text-viva-700 font-serif">Nenhum cadastro aguardando análise.</p>
           )}
-          <ul className="divide-y divide-coop-100 max-h-[520px] overflow-y-auto -mx-4 sm:-mx-6">
+          <ul className="divide-y divide-viva-100 max-h-[520px] overflow-y-auto -mx-4 sm:-mx-6">
             {(listQuery.data || []).map((row) => (
               <li key={row.id}>
                 <button
@@ -162,13 +162,13 @@ const Avaliacao = () => {
                     setActionError(null);
                     setSelectedId(row.id);
                   }}
-                  className={`w-full text-left px-4 py-3 sm:px-6 transition hover:bg-coop-50 ${
-                    selectedId === row.id ? 'bg-coop-50 border-l-4 border-l-coop-600' : ''
+                  className={`w-full text-left px-4 py-3 sm:px-6 transition hover:bg-viva-50 ${
+                    selectedId === row.id ? 'bg-viva-50 border-l-4 border-l-viva-600' : ''
                   }`}
                 >
-                  <p className="font-semibold text-coop-900 text-sm">{row.nomeCompleto}</p>
-                  <p className="text-xs text-coop-700 mt-0.5">{row.email}</p>
-                  <p className="text-xs text-coop-600 mt-1">
+                  <p className="font-semibold text-viva-900 text-sm">{row.nomeCompleto}</p>
+                  <p className="text-xs text-viva-700 mt-0.5">{row.email}</p>
+                  <p className="text-xs text-viva-600 mt-1">
                     {row.profissao}
                     {row.crm ? ` · ${row.crm}` : ''}
                   </p>
@@ -179,8 +179,8 @@ const Avaliacao = () => {
         </div>
 
         <div className="xl:col-span-3 card min-h-[320px]">
-          {!selectedId && <p className="text-sm text-coop-700 font-serif">Selecione um profissional à esquerda.</p>}
-          {selectedId && detailQuery.isLoading && <p className="text-sm text-coop-700 font-serif">A carregar detalhe…</p>}
+          {!selectedId && <p className="text-sm text-viva-700 font-serif">Selecione um profissional à esquerda.</p>}
+          {selectedId && detailQuery.isLoading && <p className="text-sm text-viva-700 font-serif">A carregar detalhe…</p>}
           {selectedId && detailQuery.isError && (
             <p className="text-sm text-red-700 font-serif">Não foi possível carregar este cadastro (pode já ter sido processado).</p>
           )}
@@ -188,8 +188,8 @@ const Avaliacao = () => {
             <div className="space-y-5">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
-                  <h2 className="text-lg font-bold text-coop-950 font-display">{d.nomeCompleto}</h2>
-                  <p className="text-sm text-coop-800 font-serif mt-1">{d.email}</p>
+                  <h2 className="text-lg font-bold text-viva-950 font-display">{d.nomeCompleto}</h2>
+                  <p className="text-sm text-viva-800 font-serif mt-1">{d.email}</p>
                 </div>
                 <div className="flex flex-wrap gap-2">
                   <button
@@ -218,7 +218,7 @@ const Avaliacao = () => {
                   </button>
                   <button
                     type="button"
-                    className="btn btn-secondary text-sm py-2 px-4 rounded-lg shrink-0 border-coop-300 text-coop-900 hover:bg-coop-50"
+                    className="btn btn-secondary text-sm py-2 px-4 rounded-lg shrink-0 border-viva-300 text-viva-900 hover:bg-viva-50"
                     onClick={() => {
                       window.open('https://portal.cfm.org.br/busca-medicos', '_blank');
                     }}
@@ -230,62 +230,62 @@ const Avaliacao = () => {
 
               <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 text-sm">
                 <div>
-                  <dt className="text-coop-600 font-medium">CPF</dt>
-                  <dd className="text-coop-900 font-mono">{d.cpf}</dd>
+                  <dt className="text-viva-600 font-medium">CPF</dt>
+                  <dd className="text-viva-900 font-mono">{d.cpf}</dd>
                 </div>
                 <div>
-                  <dt className="text-coop-600 font-medium">Telefone</dt>
-                  <dd className="text-coop-900">{d.telefone || '—'}</dd>
+                  <dt className="text-viva-600 font-medium">Telefone</dt>
+                  <dd className="text-viva-900">{d.telefone || '—'}</dd>
                 </div>
                 <div>
-                  <dt className="text-coop-600 font-medium">Profissão / CRM</dt>
-                  <dd className="text-coop-900">
+                  <dt className="text-viva-600 font-medium">Profissão / CRM</dt>
+                  <dd className="text-viva-900">
                     {d.profissao}
                     {d.crm ? ` · ${d.crm}` : ''}
                   </dd>
                 </div>
                 <div>
-                  <dt className="text-coop-600 font-medium">Vínculo</dt>
-                  <dd className="text-coop-900">{d.vinculo || '—'}</dd>
+                  <dt className="text-viva-600 font-medium">Vínculo</dt>
+                  <dd className="text-viva-900">{d.vinculo || '—'}</dd>
                 </div>
                 <div className="sm:col-span-2">
-                  <dt className="text-coop-600 font-medium">Especialidades</dt>
-                  <dd className="text-coop-900">{(d.especialidades || []).join(', ') || '—'}</dd>
+                  <dt className="text-viva-600 font-medium">Especialidades</dt>
+                  <dd className="text-viva-900">{(d.especialidades || []).join(', ') || '—'}</dd>
                 </div>
                 <div>
-                  <dt className="text-coop-600 font-medium">Estado civil</dt>
-                  <dd className="text-coop-900">{d.estadoCivil || '—'}</dd>
+                  <dt className="text-viva-600 font-medium">Estado civil</dt>
+                  <dd className="text-viva-900">{d.estadoCivil || '—'}</dd>
                 </div>
                 <div className="sm:col-span-2">
-                  <dt className="text-coop-600 font-medium">Endereço</dt>
-                  <dd className="text-coop-900 whitespace-pre-wrap">{d.enderecoResidencial || '—'}</dd>
+                  <dt className="text-viva-600 font-medium">Endereço</dt>
+                  <dd className="text-viva-900 whitespace-pre-wrap">{d.enderecoResidencial || '—'}</dd>
                 </div>
                 <div className="sm:col-span-2">
-                  <dt className="text-coop-600 font-medium">Dados bancários (texto)</dt>
-                  <dd className="text-coop-900 whitespace-pre-wrap">{d.dadosBancarios || '—'}</dd>
+                  <dt className="text-viva-600 font-medium">Dados bancários (texto)</dt>
+                  <dd className="text-viva-900 whitespace-pre-wrap">{d.dadosBancarios || '—'}</dd>
                 </div>
                 <div className="sm:col-span-2">
-                  <dt className="text-coop-600 font-medium">Chave Pix</dt>
-                  <dd className="text-coop-900">{d.chavePix || '—'}</dd>
+                  <dt className="text-viva-600 font-medium">Chave Pix</dt>
+                  <dd className="text-viva-900">{d.chavePix || '—'}</dd>
                 </div>
               </dl>
 
               <div>
-                <h3 className="text-sm font-bold text-coop-900 font-display mb-2">Documentos enviados</h3>
-                {!d.documentos?.length && <p className="text-sm text-coop-700 font-serif">Nenhum ficheiro anexado no cadastro.</p>}
+                <h3 className="text-sm font-bold text-viva-900 font-display mb-2">Documentos enviados</h3>
+                {!d.documentos?.length && <p className="text-sm text-viva-700 font-serif">Nenhum ficheiro anexado no cadastro.</p>}
                 <ul className="space-y-2">
                   {d.documentos?.map((doc) => (
                     <li
                       key={doc.id}
-                      className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-coop-200/80 bg-coop-50/40 px-3 py-2"
+                      className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-viva-200/80 bg-viva-50/40 px-3 py-2"
                     >
                       <div>
-                        <p className="text-sm font-medium text-coop-900">{labelDocumentoTipo(doc.tipo)}</p>
-                        <p className="text-xs text-coop-700">{doc.nomeArquivo}</p>
+                        <p className="text-sm font-medium text-viva-900">{labelDocumentoTipo(doc.tipo)}</p>
+                        <p className="text-xs text-viva-700">{doc.nomeArquivo}</p>
                       </div>
                       <button
                         type="button"
-                        className="text-sm font-semibold text-coop-700 hover:text-coop-900 underline"
+                        className="text-sm font-semibold text-viva-700 hover:text-viva-900 underline"
                         onClick={() => downloadDoc(d.id, doc.id, doc.nomeArquivo)}
                       >
                         Descarregar

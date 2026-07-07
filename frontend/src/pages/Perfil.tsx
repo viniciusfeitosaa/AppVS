@@ -204,8 +204,8 @@ const Perfil = () => {
     return (
       <div className="flex items-center justify-center py-16">
         <div className="flex items-center gap-3">
-          <div className="animate-spin rounded-full h-10 w-10 border-2 border-coop-200 border-t-coop-600" />
-          <p className="text-sm text-coop-700 font-medium">Carregando perfil...</p>
+          <div className="animate-spin rounded-full h-10 w-10 border-2 border-viva-200 border-t-viva-600" />
+          <p className="text-sm text-viva-700 font-medium">Carregando perfil...</p>
         </div>
       </div>
     );
@@ -215,13 +215,13 @@ const Perfil = () => {
     <div className="space-y-6">
       {/* Hero */}
       <div className="card dashboard-hero col-span-full stagger-1 py-8 md:py-10">
-        <p className="text-xs font-semibold uppercase tracking-widest text-coop-600 mb-2 font-display">
+        <p className="text-xs font-semibold uppercase tracking-widest text-viva-600 mb-2 font-display">
           Configurações
         </p>
-        <h1 className="text-xl md:text-2xl font-bold text-coop-900 font-display leading-tight mb-2">
+        <h1 className="text-xl md:text-2xl font-bold text-viva-900 font-display leading-tight mb-2">
           Minha Conta
         </h1>
-        <p className="text-coop-700 font-serif text-base">
+        <p className="text-viva-700 font-serif text-base">
           Informações do seu perfil de acesso na plataforma.
           {!isMaster && (
             <>
@@ -243,7 +243,7 @@ const Perfil = () => {
         </div>
       )}
 
-      <div className="flex flex-wrap gap-1 p-1 rounded-xl bg-coop-100/50 border border-coop-200/60 w-fit max-w-full">
+      <div className="flex flex-wrap gap-1 p-1 rounded-xl bg-viva-100/50 border border-viva-200/60 w-fit max-w-full">
         {(
           [
             'pessoais',
@@ -258,8 +258,8 @@ const Perfil = () => {
             onClick={() => setActiveTab(tab)}
             className={`px-4 py-2.5 text-sm font-semibold rounded-lg transition ${
               activeTab === tab
-                ? 'bg-white text-coop-900 shadow-sm border border-coop-200/60'
-                : 'text-coop-600 hover:bg-coop-50/80 hover:text-coop-800'
+                ? 'bg-white text-viva-900 shadow-sm border border-viva-200/60'
+                : 'text-viva-600 hover:bg-viva-50/80 hover:text-viva-800'
             }`}
           >
             {tab === 'pessoais' && 'Dados Pessoais'}
@@ -273,31 +273,31 @@ const Perfil = () => {
       {activeTab === 'pessoais' && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="card stagger-2 lg:col-span-2">
-            <h3 className="text-xs font-semibold uppercase tracking-wider text-coop-600 mb-4 font-display">Dados Pessoais</h3>
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-viva-600 mb-4 font-display">Dados Pessoais</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="rounded-xl bg-coop-50/80 border border-coop-200/50 p-4">
-                <p className="text-[10px] font-semibold uppercase tracking-wider text-coop-600">Nome completo</p>
-                <p className="text-sm font-semibold text-coop-900 mt-1 font-display">
+              <div className="rounded-xl bg-viva-50/80 border border-viva-200/50 p-4">
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-viva-600">Nome completo</p>
+                <p className="text-sm font-semibold text-viva-900 mt-1 font-display">
                   {fixMojibake(perfil?.nomeCompleto || '-')}
                 </p>
               </div>
-              <div className="rounded-xl bg-coop-50/80 border border-coop-200/50 p-4">
-                <p className="text-[10px] font-semibold uppercase tracking-wider text-coop-600">E-mail</p>
-                <p className="text-sm font-semibold text-coop-900 mt-1 font-display">
+              <div className="rounded-xl bg-viva-50/80 border border-viva-200/50 p-4">
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-viva-600">E-mail</p>
+                <p className="text-sm font-semibold text-viva-900 mt-1 font-display">
                   {perfil?.email ? fixMojibake(perfil.email) : '-'}
                 </p>
               </div>
               {!isMaster && (
-                <div className="rounded-xl bg-coop-100/80 border border-coop-200/60 p-4 md:col-span-2">
-                  <p className="text-[10px] font-semibold uppercase tracking-wider text-coop-600">
+                <div className="rounded-xl bg-viva-100/80 border border-viva-200/60 p-4 md:col-span-2">
+                  <p className="text-[10px] font-semibold uppercase tracking-wider text-viva-600">
                     Identificação profissional
                   </p>
-                  <p className="text-xs text-coop-800 mt-1 font-serif">
+                  <p className="text-xs text-viva-800 mt-1 font-serif">
                     <span className="font-semibold">Profissão:</span>{' '}
                     {perfil && 'profissao' in perfil ? fixMojibake(perfil.profissao) : 'Médico'}
                   </p>
                   {(perfil && 'especialidades' in perfil && (perfil.especialidades?.length ?? 0) > 0) && (
-                    <p className="text-sm text-coop-800 mt-0.5 font-serif">
+                    <p className="text-sm text-viva-800 mt-0.5 font-serif">
                       <span className="font-semibold">Especialidades:</span>{' '}
                       {fixMojibake((perfil.especialidades ?? []).join(', '))}
                     </p>
@@ -305,16 +305,16 @@ const Perfil = () => {
                 </div>
               )}
               {!isMaster && (
-                <div className="rounded-xl bg-coop-50/80 border border-coop-200/50 p-4">
-                  <p className="text-[10px] font-semibold uppercase tracking-wider text-coop-600">CRM</p>
-                  <p className="text-sm font-semibold text-coop-900 mt-1 font-display">
+                <div className="rounded-xl bg-viva-50/80 border border-viva-200/50 p-4">
+                  <p className="text-[10px] font-semibold uppercase tracking-wider text-viva-600">CRM</p>
+                  <p className="text-sm font-semibold text-viva-900 mt-1 font-display">
                     {formatCRM(perfil?.crm || '') || '-'}
                   </p>
                 </div>
               )}
               {!isMaster && (
-                <div className="rounded-xl bg-coop-50/80 border border-coop-200/50 p-4 md:col-span-2">
-                  <p className="text-[10px] font-semibold uppercase tracking-wider text-coop-600">
+                <div className="rounded-xl bg-viva-50/80 border border-viva-200/50 p-4 md:col-span-2">
+                  <p className="text-[10px] font-semibold uppercase tracking-wider text-viva-600">
                     Atualizar especialidades (várias permitidas)
                   </p>
                   <input
@@ -324,34 +324,34 @@ const Perfil = () => {
                     value={buscaEspecialidade}
                     onChange={(e) => setBuscaEspecialidade(e.target.value)}
                   />
-                  <div className="max-h-40 overflow-y-auto rounded-xl border border-coop-200/60 p-2 mt-2 space-y-1 bg-white/50">
+                  <div className="max-h-40 overflow-y-auto rounded-xl border border-viva-200/60 p-2 mt-2 space-y-1 bg-white/50">
                     {ESPECIALIDADES_MEDICAS.filter((e) =>
                       e.toLowerCase().includes(buscaEspecialidade.toLowerCase())
                     ).map((esp) => (
                       <label
                         key={esp}
-                        className="flex items-center gap-2 cursor-pointer hover:bg-coop-50/80 p-2 rounded-lg transition"
+                        className="flex items-center gap-2 cursor-pointer hover:bg-viva-50/80 p-2 rounded-lg transition"
                       >
                         <input
                           type="checkbox"
                           checked={form.especialidades.includes(esp)}
                           onChange={() => toggleEspecialidade(esp)}
-                          className="rounded border-coop-600 text-coop-600"
+                          className="rounded border-viva-600 text-viva-600"
                         />
-                        <span className="text-xs text-coop-900 font-serif">{esp}</span>
+                        <span className="text-xs text-viva-900 font-serif">{esp}</span>
                       </label>
                     ))}
                   </div>
                   {form.especialidades.length > 0 && (
-                    <p className="mt-2 text-[10px] text-coop-600 font-serif">
+                    <p className="mt-2 text-[10px] text-viva-600 font-serif">
                       Selecionadas: {form.especialidades.join(', ')}
                     </p>
                   )}
                 </div>
               )}
               {!isMaster && (
-                <div className="rounded-xl bg-coop-50/80 border border-coop-200/50 p-4">
-                  <p className="text-[10px] font-semibold uppercase tracking-wider text-coop-600">Telefone</p>
+                <div className="rounded-xl bg-viva-50/80 border border-viva-200/50 p-4">
+                  <p className="text-[10px] font-semibold uppercase tracking-wider text-viva-600">Telefone</p>
                   <input
                     className="input mt-2"
                     value={form.telefone || telefone || ''}
@@ -360,16 +360,16 @@ const Perfil = () => {
                 </div>
               )}
               {!isMaster && (
-                <div className="rounded-xl bg-coop-50/80 border border-coop-200/50 p-4">
-                  <p className="text-[10px] font-semibold uppercase tracking-wider text-coop-600">Vínculo</p>
-                  <p className="text-sm font-semibold text-coop-900 mt-1">
+                <div className="rounded-xl bg-viva-50/80 border border-viva-200/50 p-4">
+                  <p className="text-[10px] font-semibold uppercase tracking-wider text-viva-600">Vínculo</p>
+                  <p className="text-sm font-semibold text-viva-900 mt-1">
                     {perfil?.vinculo ? fixMojibake(perfil.vinculo) : 'Associado'}
                   </p>
                 </div>
               )}
               {!isMaster && (
-                <div className="rounded-xl bg-coop-50/80 border border-coop-200/50 p-4">
-                  <p className="text-[10px] font-semibold uppercase tracking-wider text-coop-600">Estado civil</p>
+                <div className="rounded-xl bg-viva-50/80 border border-viva-200/50 p-4">
+                  <p className="text-[10px] font-semibold uppercase tracking-wider text-viva-600">Estado civil</p>
                   <input
                     className="input mt-2"
                     value={form.estadoCivil || perfilMedicoAtual?.estadoCivil || ''}
@@ -378,8 +378,8 @@ const Perfil = () => {
                 </div>
               )}
               {!isMaster && (
-                <div className="rounded-xl bg-coop-50/80 border border-coop-200/50 p-4 md:col-span-2">
-                  <p className="text-[10px] font-semibold uppercase tracking-wider text-coop-600">Endereço residencial</p>
+                <div className="rounded-xl bg-viva-50/80 border border-viva-200/50 p-4 md:col-span-2">
+                  <p className="text-[10px] font-semibold uppercase tracking-wider text-viva-600">Endereço residencial</p>
                   <textarea
                     className="input mt-2 min-h-[84px]"
                     value={form.enderecoResidencial || perfilMedicoAtual?.enderecoResidencial || ''}
@@ -390,23 +390,23 @@ const Perfil = () => {
             </div>
           </div>
           <div className="card stagger-3">
-            <h3 className="text-xs font-semibold uppercase tracking-wider text-coop-600 mb-4 font-display">Acesso</h3>
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-viva-600 mb-4 font-display">Acesso</h3>
             <div className="space-y-3">
-              <div className="flex items-center justify-between rounded-xl bg-coop-50/60 border border-coop-200/50 px-4 py-3">
-                <span className="text-xs font-medium text-coop-700">Perfil</span>
-                <span className="text-xs font-semibold text-coop-900 font-display">
+              <div className="flex items-center justify-between rounded-xl bg-viva-50/60 border border-viva-200/50 px-4 py-3">
+                <span className="text-xs font-medium text-viva-700">Perfil</span>
+                <span className="text-xs font-semibold text-viva-900 font-display">
                   {isMaster ? 'Master' : 'Profissional'}
                 </span>
               </div>
-              <div className="flex items-center justify-between rounded-xl bg-coop-50/60 border border-coop-200/50 px-4 py-3">
-                <span className="text-xs font-medium text-coop-700">Status</span>
+              <div className="flex items-center justify-between rounded-xl bg-viva-50/60 border border-viva-200/50 px-4 py-3">
+                <span className="text-xs font-medium text-viva-700">Status</span>
                 <span className="inline-flex items-center px-3 py-1 rounded-lg text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-200/80">
                   Ativo
                 </span>
               </div>
             </div>
-            <div className="mt-4 rounded-xl bg-coop-50/80 border border-coop-200/50 p-4">
-              <p className="text-xs text-coop-700 font-serif">
+            <div className="mt-4 rounded-xl bg-viva-50/80 border border-viva-200/50 p-4">
+              <p className="text-xs text-viva-700 font-serif">
                 {isMaster
                   ? 'Como usuário Master, você pode gerenciar médicos, contratos, escalas e relatórios.'
                   : 'Se precisar atualizar dados cadastrais, solicite ao administrador Master.'}
@@ -418,21 +418,21 @@ const Perfil = () => {
 
       {activeTab === 'bancarios' && (
         <div className="card stagger-2">
-          <h3 className="text-xs font-semibold uppercase tracking-wider text-coop-600 mb-4 font-display">Dados Bancários</h3>
+          <h3 className="text-xs font-semibold uppercase tracking-wider text-viva-600 mb-4 font-display">Dados Bancários</h3>
           {isMaster ? (
-            <p className="text-xs text-coop-600 font-serif">Disponível apenas para perfil profissional.</p>
+            <p className="text-xs text-viva-600 font-serif">Disponível apenas para perfil profissional.</p>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-2xl">
-              <div className="rounded-xl bg-coop-50/80 border border-coop-200/50 p-4 md:col-span-2">
-                <p className="text-[10px] font-semibold uppercase tracking-wider text-coop-600">Dados bancários</p>
+              <div className="rounded-xl bg-viva-50/80 border border-viva-200/50 p-4 md:col-span-2">
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-viva-600">Dados bancários</p>
                 <textarea
                   className="input mt-2 min-h-[84px]"
                   value={form.dadosBancarios || perfilMedicoAtual?.dadosBancarios || ''}
                   onChange={(e) => handleChange('dadosBancarios', e.target.value)}
                 />
               </div>
-              <div className="rounded-xl bg-coop-50/80 border border-coop-200/50 p-4 md:col-span-2">
-                <p className="text-[10px] font-semibold uppercase tracking-wider text-coop-600">Chave PIX</p>
+              <div className="rounded-xl bg-viva-50/80 border border-viva-200/50 p-4 md:col-span-2">
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-viva-600">Chave PIX</p>
                 <input
                   className="input mt-2"
                   value={form.chavePix || perfilMedicoAtual?.chavePix || ''}
@@ -446,9 +446,9 @@ const Perfil = () => {
 
       {activeTab === 'documentos' && (
         <div className="card stagger-2">
-          <h3 className="text-xs font-semibold uppercase tracking-wider text-coop-600 mb-4 font-display">Documentos</h3>
+          <h3 className="text-xs font-semibold uppercase tracking-wider text-viva-600 mb-4 font-display">Documentos</h3>
           {isMaster ? (
-            <p className="text-xs text-coop-600 font-serif">Disponível apenas para perfil profissional.</p>
+            <p className="text-xs text-viva-600 font-serif">Disponível apenas para perfil profissional.</p>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {DOCUMENTOS_PERFIL_FIELDS.map((field) => {
@@ -456,9 +456,9 @@ const Perfil = () => {
                   return doc.tipo === DOCUMENTO_TIPO_BY_FIELD[field];
                 });
                 return (
-                  <div key={field} className="rounded-xl bg-coop-50/50 border border-coop-200/50 p-4 hover:bg-coop-50/70 transition">
-                    <p className="text-xs font-semibold text-coop-900 font-display">{DOCUMENTO_LABEL_BY_FIELD[field]}</p>
-                    <p className="text-[10px] text-coop-600 mt-1 mb-2 font-serif">
+                  <div key={field} className="rounded-xl bg-viva-50/50 border border-viva-200/50 p-4 hover:bg-viva-50/70 transition">
+                    <p className="text-xs font-semibold text-viva-900 font-display">{DOCUMENTO_LABEL_BY_FIELD[field]}</p>
+                    <p className="text-[10px] text-viva-600 mt-1 mb-2 font-serif">
                       {existing?.nomeArquivo ? `Atual: ${existing.nomeArquivo}` : 'Ainda não anexado'}
                     </p>
                     {existing?.id && (
@@ -513,11 +513,11 @@ const Perfil = () => {
           <h3 className="text-sm font-semibold uppercase tracking-wider text-red-800 mb-2 font-display">
             Excluir conta permanentemente
           </h3>
-          <p className="text-sm text-coop-800 font-serif leading-relaxed mb-2">
+          <p className="text-sm text-viva-800 font-serif leading-relaxed mb-2">
             Conforme as diretrizes da App Store, você pode remover sua conta e os dados pessoais
             associados (perfil, documentos enviados, registros de ponto, etc.).
           </p>
-          <p className="text-sm text-coop-800 font-serif leading-relaxed mb-4">
+          <p className="text-sm text-viva-800 font-serif leading-relaxed mb-4">
             Esta ação é <strong className="font-semibold">irreversível</strong>. Para voltar a usar o
             app, será necessário um novo cadastro.
           </p>
@@ -532,22 +532,22 @@ const Perfil = () => {
       )}
 
       {isMaster && (
-        <div className="card stagger-2 border-l-4 border-l-coop-500">
-          <h3 className="text-sm font-semibold uppercase tracking-wider text-coop-600 mb-2 font-display">Administração de Acesso por Módulo</h3>
-          <p className="text-sm text-coop-700 mb-4 font-serif">
+        <div className="card stagger-2 border-l-4 border-l-viva-500">
+          <h3 className="text-sm font-semibold uppercase tracking-wider text-viva-600 mb-2 font-display">Administração de Acesso por Módulo</h3>
+          <p className="text-sm text-viva-700 mb-4 font-serif">
             Defina quais perfis têm acesso a cada módulo do sistema.
           </p>
 
           {loadingAcessos ? (
             <div className="flex items-center gap-3 py-6">
-              <div className="animate-spin rounded-full h-8 w-8 border-2 border-coop-200 border-t-coop-600" />
-              <p className="text-xs text-coop-600">Carregando permissões...</p>
+              <div className="animate-spin rounded-full h-8 w-8 border-2 border-viva-200 border-t-viva-600" />
+              <p className="text-xs text-viva-600">Carregando permissões...</p>
             </div>
           ) : (
-            <div className="overflow-x-auto rounded-xl border border-coop-200/60 overflow-hidden">
+            <div className="overflow-x-auto rounded-xl border border-viva-200/60 overflow-hidden">
               <table className="min-w-full text-xs">
                 <thead>
-                  <tr className="text-left text-coop-700 bg-coop-50/80 border-b border-coop-200/60">
+                  <tr className="text-left text-viva-700 bg-viva-50/80 border-b border-viva-200/60">
                     <th className="py-2.5 px-4 font-semibold text-xs">Módulo</th>
                     <th className="py-2.5 px-4 font-semibold text-xs">Master</th>
                     <th className="py-2.5 px-4 font-semibold text-xs">Médico</th>
@@ -561,15 +561,15 @@ const Perfil = () => {
                     const masterLocked =
                       modulo === 'DASHBOARD' || modulo === 'CONFIGURACOES' || modulo === 'PERFIL';
                     return (
-                      <tr key={modulo} className="border-b border-coop-200/40 last:border-b-0 hover:bg-coop-50/40 transition">
-                        <td className="py-2.5 px-4 font-medium text-coop-900 font-serif text-xs">{MODULO_LABEL[modulo]}</td>
+                      <tr key={modulo} className="border-b border-viva-200/40 last:border-b-0 hover:bg-viva-50/40 transition">
+                        <td className="py-2.5 px-4 font-medium text-viva-900 font-serif text-xs">{MODULO_LABEL[modulo]}</td>
                         <td className="py-2.5 px-4">
                           <input
                             type="checkbox"
                             checked={masterChecked}
                             disabled={masterLocked}
                             onChange={(e) => updateAcessoItem('MASTER', modulo, e.target.checked)}
-                            className="rounded border-coop-600 text-coop-600"
+                            className="rounded border-viva-600 text-viva-600"
                           />
                         </td>
                         <td className="py-2.5 px-4">
@@ -577,7 +577,7 @@ const Perfil = () => {
                             type="checkbox"
                             checked={medicoChecked}
                             onChange={(e) => updateAcessoItem('MEDICO', modulo, e.target.checked)}
-                            className="rounded border-coop-600 text-coop-600"
+                            className="rounded border-viva-600 text-viva-600"
                           />
                         </td>
                       </tr>
@@ -598,7 +598,7 @@ const Perfil = () => {
 
       {deleteFlowStep !== 'idle' && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-coop-950/60 backdrop-blur-sm"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-viva-950/60 backdrop-blur-sm"
           role="dialog"
           aria-modal="true"
           aria-labelledby="excluir-conta-titulo"
@@ -609,17 +609,17 @@ const Perfil = () => {
                 <h2 id="excluir-conta-titulo" className="text-base font-bold text-red-900 font-display mb-2">
                   Excluir sua conta?
                 </h2>
-                <p className="text-sm text-coop-800 font-serif leading-relaxed mb-4">
+                <p className="text-sm text-viva-800 font-serif leading-relaxed mb-4">
                   Você está prestes a excluir permanentemente sua conta e todos os dados associados.
                   Esta ação não pode ser desfeita.
                 </p>
-                <p className="text-xs text-coop-600 font-serif mb-6">
+                <p className="text-xs text-viva-600 font-serif mb-6">
                   Se foi um clique acidental, toque em <strong className="font-semibold">Cancelar</strong>.
                 </p>
                 <div className="flex flex-col sm:flex-row gap-2 justify-end">
                   <button
                     type="button"
-                    className="btn text-sm border border-coop-300 bg-white text-coop-800"
+                    className="btn text-sm border border-viva-300 bg-white text-viva-800"
                     onClick={closeDeleteFlow}
                   >
                     Cancelar
@@ -642,23 +642,23 @@ const Perfil = () => {
                 <h2 id="excluir-conta-titulo" className="text-base font-bold text-red-900 font-display mb-2">
                   Confirmar exclusão da conta
                 </h2>
-                <p className="text-xs text-coop-700 font-serif leading-relaxed mb-4">
+                <p className="text-xs text-viva-700 font-serif leading-relaxed mb-4">
                   Para concluir, digite sua senha e <strong className="font-semibold">EXCLUIR</strong>.
                 </p>
-                <label className="block text-xs font-semibold text-coop-800 mb-1">Senha</label>
+                <label className="block text-xs font-semibold text-viva-800 mb-1">Senha</label>
                 <input
                   type="password"
-                  className="w-full rounded-xl border border-coop-200 bg-white px-3 py-2 text-sm mb-3"
+                  className="w-full rounded-xl border border-viva-200 bg-white px-3 py-2 text-sm mb-3"
                   value={deleteSenha}
                   onChange={(e) => setDeleteSenha(e.target.value)}
                   autoComplete="current-password"
                 />
-                <label className="block text-xs font-semibold text-coop-800 mb-1">
+                <label className="block text-xs font-semibold text-viva-800 mb-1">
                   Digite EXCLUIR para confirmar
                 </label>
                 <input
                   type="text"
-                  className="w-full rounded-xl border border-coop-200 bg-white px-3 py-2 text-sm mb-4 uppercase"
+                  className="w-full rounded-xl border border-viva-200 bg-white px-3 py-2 text-sm mb-4 uppercase"
                   value={deleteConfirmacao}
                   onChange={(e) => setDeleteConfirmacao(e.target.value)}
                   placeholder="EXCLUIR"
@@ -667,7 +667,7 @@ const Perfil = () => {
                 <div className="flex flex-col sm:flex-row gap-2 justify-end">
                   <button
                     type="button"
-                    className="btn text-sm border border-coop-300 bg-white text-coop-800"
+                    className="btn text-sm border border-viva-300 bg-white text-viva-800"
                     disabled={deletingAccount}
                     onClick={closeDeleteFlow}
                   >

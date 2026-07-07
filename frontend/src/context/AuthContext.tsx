@@ -63,24 +63,46 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [introPlayed, setIntroPlayed] = useState(false);
 
   useEffect(() => {
-    try {
-      const storedUser = localStorage.getItem('user');
-      if (storedUser) {
-        const parsed = JSON.parse(storedUser);
-        if (parsed && typeof parsed === 'object' && parsed.id) {
-          if (!Array.isArray(parsed.especialidades) && parsed.especialidade != null) {
-            parsed.especialidades = parsed.especialidade ? [parsed.especialidade] : [];
-          }
-          if (!Array.isArray(parsed.especialidades)) parsed.especialidades = [];
-          setUser(mergeRoleFromAccessToken(parsed as User));
-        }
-      }
-    } catch {
+    const clearStoredSession = () => {
       localStorage.removeItem('user');
       localStorage.removeItem('accessToken');
       localStorage.removeItem('refreshToken');
+    };
+
+    try {
+      const token = localStorage.getItem('accessToken');
+      const storedUser = localStorage.getItem('user');
+
+      if (!storedUser) {
+        if (token) clearStoredSession();
+      } else if (!token) {
+        clearStoredSession();
+      } else {
+        const payload = decodeJwtPayloadUnsafe<{ exp?: number; id?: string }>(token);
+        if (!payload?.id || (typeof payload.exp === 'number' && payload.exp * 1000 <= Date.now())) {
+          clearStoredSession();
+        } else {
+          const parsed = JSON.parse(storedUser);
+          if (parsed && typeof parsed === 'object' && parsed.id) {
+            if (!Array.isArray(parsed.especialidades) && parsed.especialidade != null) {
+              parsed.especialidades = parsed.especialidade ? [parsed.especialidade] : [];
+            }
+            if (!Array.isArray(parsed.especialidades)) parsed.especialidades = [];
+            if (parsed.id !== payload.id) {
+              clearStoredSession();
+            } else {
+              setUser(mergeRoleFromAccessToken(parsed as User));
+            }
+          } else {
+            clearStoredSession();
+          }
+        }
+      }
+    } catch {
+      clearStoredSession();
+    } finally {
+      setIsLoading(false);
     }
-    setIsLoading(false);
   }, []);
 
   const login = async (credentials: LoginCredentials) => {
