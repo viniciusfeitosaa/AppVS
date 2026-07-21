@@ -14,6 +14,38 @@ export type CreateEmailMensagemInput = {
   destinatarios: string[];
 };
 
+export type EmailAnexoInput = {
+  filename: string;
+  contentBase64: string;
+  contentType?: string;
+};
+
+const MAX_ANEXO_BYTES = 8 * 1024 * 1024;
+const MAX_ANEXOS = 3;
+
+function parseAnexos(anexos: EmailAnexoInput[] | undefined) {
+  if (!anexos?.length) return [];
+  if (anexos.length > MAX_ANEXOS) {
+    throw new Error(`Máximo de ${MAX_ANEXOS} anexos por e-mail`);
+  }
+  return anexos.map((a) => {
+    const filename = (a.filename || '').trim().slice(0, 200);
+    if (!filename) throw new Error('Nome do anexo é obrigatório');
+    const raw = (a.contentBase64 || '').replace(/^data:[^;]+;base64,/, '').trim();
+    if (!raw) throw new Error(`Anexo vazio: ${filename}`);
+    const content = Buffer.from(raw, 'base64');
+    if (!content.length) throw new Error(`Anexo inválido: ${filename}`);
+    if (content.length > MAX_ANEXO_BYTES) {
+      throw new Error(`Anexo ${filename} excede o limite de 8 MB`);
+    }
+    return {
+      filename,
+      content,
+      contentType: a.contentType?.trim() || undefined,
+    };
+  });
+}
+
 function normalizeDestinatarios(emails: string[]): string[] {
   const unique = new Set<string>();
   for (const raw of emails) {
@@ -203,4 +235,64 @@ export async function deleteEmailMensagemService(tenantId: string, id: string) {
     throw new Error('Não é possível excluir mensagens já enviadas');
   }
   await prisma.emailMensagem.delete({ where: { id } });
+}
+
+/**
+ * Cria a mensagem, envia imediatamente (com anexos opcionais) e marca como ENVIADO.
+ * Anexos não são persistidos no banco — só o registro do e-mail.
+ */
+export async function enviarAgoraEmailMensagemService(
+  tenantId: string,
+  criadoPorMasterId: string | null,
+  input: CreateEmailMensagemInput & { anexos?: EmailAnexoInput[] }
+) {
+  if (!isEmailDeliveryConfigured()) {
+    throw new Error('Serviço de e-mail não configurado (Maddy/SMTP ou Resend)');
+  }
+
+  const anexos = parseAnexos(input.anexos);
+  const created = await createEmailMensagemService(tenantId, criadoPorMasterId, input);
+  const row = await prisma.emailMensagem.findFirst({ where: { id: created.id, tenantId } });
+  if (!row) {
+    throw new Error('Mensagem não encontrada após criação');
+  }
+
+  const destinatarios = Array.isArray(row.destinatarios) ? (row.destinatarios as string[]) : [];
+  const html = row.corpoHtml || `<p>${(row.corpoTexto || '').replace(/\n/g, '<br>')}</p>`;
+  const text = row.corpoTexto || undefined;
+
+  try {
+    await deliverEmail({
+      to: destinatarios,
+      subject: row.assunto,
+      html,
+      text,
+      attachments: anexos,
+    });
+
+    const updated = await prisma.emailMensagem.update({
+      where: { id: row.id },
+      data: {
+        status: EmailMensagemStatus.ENVIADO,
+        enviadoEm: new Date(),
+        erroEnvio: null,
+      },
+      select: mensagemSelect,
+    });
+
+    return {
+      ...mapMensagem(updated),
+      anexosEnviados: anexos.map((a) => ({ filename: a.filename, bytes: a.content.length })),
+    };
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Erro ao enviar e-mail';
+    await prisma.emailMensagem.update({
+      where: { id: row.id },
+      data: {
+        status: EmailMensagemStatus.FALHA,
+        erroEnvio: message,
+      },
+    });
+    throw new Error(message);
+  }
 }

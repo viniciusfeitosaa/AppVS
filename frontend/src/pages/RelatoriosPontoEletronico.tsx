@@ -9,6 +9,7 @@ import { useMasterEscopo } from '../context/MasterEscopoContext';
 import { adminService } from '../services/admin.service';
 import { fixMojibake } from '../utils/validation.util';
 import { notify } from '../lib/notificationEmitter';
+import { addPdfBrandHeader } from '../utils/pdf-branding';
 
 type RegistroPontoLinha = {
   id: string;
@@ -205,14 +206,15 @@ const RelatoriosPontoEletronico = () => {
     notify({ kind: 'success', title: 'Excel gerado', message: 'Relatório de ponto exportado em Excel.', source: 'relatorio-ponto' });
   };
 
-  const exportPdf = () => {
+  const exportPdf = async () => {
     const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+    const y0 = await addPdfBrandHeader(doc, { marginLeft: 14 });
     doc.setFontSize(14);
-    doc.text(textoSeguroPdf('Relatório de ponto eletrônico'), 14, 12);
+    doc.text(textoSeguroPdf('Relatório de ponto eletrônico'), 14, y0);
     doc.setFontSize(10);
-    doc.text(textoSeguroPdf(`Período: ${dataInicio} a ${dataFim}`), 14, 18);
+    doc.text(textoSeguroPdf(`Período: ${dataInicio} a ${dataFim}`), 14, y0 + 6);
     autoTable(doc, {
-      startY: 24,
+      startY: y0 + 12,
       head: [[
         textoSeguroPdf('Profissional'),
         textoSeguroPdf('Entrada'),

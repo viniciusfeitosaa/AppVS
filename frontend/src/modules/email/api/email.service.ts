@@ -3,6 +3,7 @@ import type {
   CreateEmailMensagemPayload,
   EmailMensagem,
   EmailPainelResumo,
+  EnviarAgoraEmailPayload,
   SmtpTesteResultado,
 } from '../types';
 
@@ -26,6 +27,16 @@ export const emailModuleService = {
     payload: CreateEmailMensagemPayload
   ): Promise<{ success: boolean; data: EmailMensagem }> => {
     const response = await api.post('/email/mensagens', payload);
+    return response.data;
+  },
+
+  enviarAgora: async (
+    payload: EnviarAgoraEmailPayload
+  ): Promise<{
+    success: boolean;
+    data: EmailMensagem & { anexosEnviados?: { filename: string; bytes: number }[] };
+  }> => {
+    const response = await api.post('/email/mensagens/enviar-agora', payload);
     return response.data;
   },
 

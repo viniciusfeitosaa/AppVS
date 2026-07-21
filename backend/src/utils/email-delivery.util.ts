@@ -104,12 +104,19 @@ export function getSmtpProviderInfo(): SmtpProviderInfo {
   };
 }
 
+export type EmailAttachment = {
+  filename: string;
+  content: Buffer;
+  contentType?: string;
+};
+
 export type DeliverEmailInput = {
   to: string | string[];
   subject: string;
   html: string;
   text?: string;
   fromName?: string;
+  attachments?: EmailAttachment[];
 };
 
 /** Envio transacional centralizado — Maddy (SMTP) tem prioridade sobre Resend. */
@@ -123,6 +130,7 @@ export async function deliverEmail(input: DeliverEmailInput): Promise<void> {
 
   const text =
     input.text || input.html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+  const attachments = input.attachments?.filter((a) => a.filename && a.content?.length) ?? [];
 
   if (hasSmtpConfig()) {
     const transporter = createSmtpTransporter();
@@ -132,6 +140,11 @@ export async function deliverEmail(input: DeliverEmailInput): Promise<void> {
       subject: input.subject,
       html: input.html,
       text,
+      attachments: attachments.map((a) => ({
+        filename: a.filename,
+        content: a.content,
+        contentType: a.contentType,
+      })),
     });
     return;
   }
@@ -145,6 +158,11 @@ export async function deliverEmail(input: DeliverEmailInput): Promise<void> {
       subject: input.subject,
       html: input.html,
       text,
+      attachments: attachments.map((a) => ({
+        filename: a.filename,
+        content: a.content,
+        contentType: a.contentType,
+      })),
     });
     if (error) {
       throw new Error(error.message || 'Falha ao enviar via Resend');

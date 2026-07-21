@@ -44,4 +44,14 @@ export type CreateEmailMensagemPayload = {
   destinatarios: string[];
 };
 
+export type EmailAnexoPayload = {
+  filename: string;
+  contentBase64: string;
+  contentType?: string;
+};
+
+export type EnviarAgoraEmailPayload = CreateEmailMensagemPayload & {
+  anexos?: EmailAnexoPayload[];
+};
+
 export type EmailPainelTab = 'visao-geral' | 'novo' | 'historico';

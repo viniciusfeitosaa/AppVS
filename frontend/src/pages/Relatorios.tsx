@@ -8,6 +8,7 @@ import { useAuth } from '../context/AuthContext';
 import { useMasterEscopo } from '../context/MasterEscopoContext';
 import { adminService } from '../services/admin.service';
 import { fixMojibake } from '../utils/validation.util';
+import { addPdfBrandHeader } from '../utils/pdf-branding';
 
 type RegistroPontoAdmin = {
   id: string;
@@ -155,22 +156,23 @@ const exportHorasExcel = (
   XLSX.writeFile(wb, `relatorio-horas_${dataInicio}_${dataFim}.xlsx`);
 };
 
-const exportHorasPdf = (
+const exportHorasPdf = async (
   agrupado: AgrupamentoHoras[],
   dataInicio: string,
   dataFim: string,
   mostrarRepasseECobranca: boolean
 ) => {
   const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+  const y0 = await addPdfBrandHeader(doc, { marginLeft: 14 });
   doc.setFontSize(14);
-  doc.text(textoSeguroPdf('Relatório financeiro de horas por médico e escala'), 14, 12);
+  doc.text(textoSeguroPdf('Relatório financeiro de horas por médico e escala'), 14, y0);
   doc.setFontSize(10);
-  doc.text(textoSeguroPdf(`Período: ${dataInicio} a ${dataFim}`), 14, 18);
+  doc.text(textoSeguroPdf(`Período: ${dataInicio} a ${dataFim}`), 14, y0 + 6);
   const cel = (s: string) => textoSeguroPdf(s);
   const celValor = (n: number | null | undefined) =>
     n != null && Number.isFinite(n) ? cel(formatValor(n)) : '-';
   autoTable(doc, {
-    startY: 24,
+    startY: y0 + 12,
     // Uma linha de cabeçalho = [[c1,c2,...]], sem array extra (evita 1 coluna só).
     head: mostrarRepasseECobranca
       ? [

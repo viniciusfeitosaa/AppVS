@@ -4,6 +4,7 @@ import { authenticateToken, requireModuleAccess } from '../middleware/auth.middl
 import {
   createEmailMensagemController,
   deleteEmailMensagemController,
+  enviarAgoraEmailMensagemController,
   enviarEmailMensagemController,
   getEmailMensagemController,
   getEmailPainelResumoController,
@@ -19,6 +20,7 @@ router.use(requireModuleAccess(ModuloSistema.ENVIO_EMAIL));
 router.get('/resumo', getEmailPainelResumoController);
 router.post('/smtp/testar', testarConexaoSmtpController);
 router.get('/mensagens', listEmailMensagensController);
+router.post('/mensagens/enviar-agora', enviarAgoraEmailMensagemController);
 router.get('/mensagens/:id', getEmailMensagemController);
 router.post('/mensagens', createEmailMensagemController);
 router.post('/mensagens/:id/enviar', enviarEmailMensagemController);

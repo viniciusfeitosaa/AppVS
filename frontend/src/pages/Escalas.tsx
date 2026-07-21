@@ -16,6 +16,7 @@ import {
 } from '../services/admin.service';
 import { fixMojibake } from '../utils/validation.util';
 import { notify } from '../lib/notificationEmitter';
+import { addPdfBrandHeader } from '../utils/pdf-branding';
 
 interface EscalaFormState {
   contratoAtivoId: string;
@@ -1165,12 +1166,12 @@ const Escalas = () => {
     return map;
   }, [plantoesMonth]);
 
-  const imprimirRelatorioEscalaPdf = useCallback(() => {
+  const imprimirRelatorioEscalaPdf = useCallback(async () => {
     if (!selectedEscala || !selectedEscalaId) return;
     const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
     const mesTitulo = gradeMonthStart.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
     const slugMes = `${gradeMonthStart.getFullYear()}-${String(gradeMonthStart.getMonth() + 1).padStart(2, '0')}`;
-    let y = 12;
+    let y = await addPdfBrandHeader(doc, { marginLeft: 14 });
     doc.setFontSize(14);
     doc.text(textoSeguroPdf(fixMojibake(selectedEscala.nome)), 14, y);
     y += 7;

@@ -5,7 +5,16 @@ import autoTable from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
 import { useAuth } from '../context/AuthContext';
 import { adminService, type AdminMedico } from '../services/admin.service';
+import { authService } from '../services/auth.service';
 import procedimentosBase from '../data/procedimentosBase.json';
+import { addPdfBrandHeader } from '../utils/pdf-branding';
+import EnviarDemonstrativoProducaoModal from '../modules/email/components/EnviarDemonstrativoProducaoModal';
+import {
+  nomeProfissionalSemCrm,
+  resolverEmailProfissional,
+} from '../modules/email/utils/resolver-email-profissional.util';
+import { notify } from '../lib/notificationEmitter';
+
 
 const BRL = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
 const PCT = new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 3 });
@@ -321,6 +330,57 @@ type DetalheProducaoMedicoLinha = {
   posicao: '1.º médico' | '2.º médico';
   valorReceber: number;
 };
+
+/** PDF da produção filtrada por médico (mesmo layout do export). */
+async function buildProducaoMedicoPdfBase64(opts: {
+  mesChave: string;
+  medicoRotulo: string;
+  linhas: DetalheProducaoMedicoLinha[];
+  total: number;
+}): Promise<{ base64: string; filename: string }> {
+  const cel = (s: string) => textoSeguroPdf(s);
+  const head = [[
+    cel('Data'),
+    cel('Médico'),
+    cel('Procedimento'),
+    cel('Posição'),
+    cel('Valor a receber'),
+  ]];
+  const body = opts.linhas.map((r) => [
+    cel(r.dataFmt),
+    cel(r.medico),
+    cel(r.procedimento),
+    cel(r.posicao),
+    cel(BRL.format(r.valorReceber).replace(/\u00a0/g, ' ')),
+  ]);
+  body.push([
+    cel(''),
+    cel(''),
+    cel(''),
+    cel('Total'),
+    cel(BRL.format(opts.total).replace(/\u00a0/g, ' ')),
+  ]);
+  const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+  const y0 = await addPdfBrandHeader(doc, { marginLeft: 10 });
+  doc.setFontSize(12);
+  doc.text(cel('Produção por médico'), 10, y0);
+  doc.setFontSize(9);
+  doc.text(cel(`Referência: ${opts.mesChave}`), 10, y0 + 6);
+  doc.text(cel(`Médico: ${opts.medicoRotulo}`), 10, y0 + 12);
+  autoTable(doc, {
+    startY: y0 + 18,
+    head,
+    body,
+    styles: { fontSize: 7, cellPadding: 1.5, overflow: 'linebreak' },
+    headStyles: { fillColor: [51, 65, 85] },
+    margin: { left: 10, right: 10 },
+  });
+  const slug = opts.medicoRotulo.replace(/[^\w.-]+/g, '_').slice(0, 40);
+  const filename = `producao-por-medico_${opts.mesChave}_${slug}.pdf`;
+  const dataUri = doc.output('datauristring') as string;
+  const base64 = dataUri.includes(',') ? dataUri.split(',')[1]! : dataUri;
+  return { base64, filename };
+}
 
 const parseNumeroBr = (s: string, fallback: number = 0): number => {
   if (!s || !String(s).trim()) return fallback;
@@ -1967,6 +2027,9 @@ const RelatoriosProcedimentos = () => {
   });
   const [modoVisualLanc, setModoVisualLanc] = useState<'detalhado' | 'resumo' | 'pacientes'>('detalhado');
   const [filtroMedicoResumo, setFiltroMedicoResumo] = useState('');
+  const [demoProducaoOpen, setDemoProducaoOpen] = useState(false);
+  const [demoProducaoPdf, setDemoProducaoPdf] = useState<{ base64: string; filename: string } | null>(null);
+  const [demoProducaoBusy, setDemoProducaoBusy] = useState(false);
   const [modoEntradaLanc, setModoEntradaLanc] = useState<'upload' | 'manual'>('upload');
   const [importMsg, setImportMsg] = useState<{ tipo: 'ok' | 'aviso' | 'erro'; texto: string } | null>(null);
   const [importPreview, setImportPreview] = useState<ImportPreviewLanc | null>(null);
@@ -2008,6 +2071,13 @@ const RelatoriosProcedimentos = () => {
     staleTime: 60_000,
   });
 
+  const { data: modulosResp } = useQuery({
+    queryKey: ['auth', 'modulos-acesso', user?.id],
+    queryFn: () => authService.getModulosAcesso(),
+    enabled: isMaster && !!user,
+    staleTime: 60_000,
+  });
+  const podeUsarPainelEmail = modulosResp?.data?.map?.ENVIO_EMAIL !== false;
   const {
     data: remotoMesResp,
   } = useQuery({
@@ -2833,7 +2903,7 @@ const RelatoriosProcedimentos = () => {
     totalDetalheMedicoFiltrado,
   ]);
 
-  const exportLancamentosPdf = useCallback(() => {
+  const exportLancamentosPdf = useCallback(async () => {
     if (linhasTotais.length === 0) return;
     const cel = (s: string) => textoSeguroPdf(s);
     if (modoVisualLanc === 'pacientes') {
@@ -2852,12 +2922,13 @@ const RelatoriosProcedimentos = () => {
         cel(r.dataCirurgia),
       ]);
       const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+      const y0 = await addPdfBrandHeader(doc, { marginLeft: 10 });
       doc.setFontSize(12);
-      doc.text(cel('Pacientes da cirurgia'), 10, 10);
+      doc.text(cel('Pacientes da cirurgia'), 10, y0);
       doc.setFontSize(9);
-      doc.text(cel(`Referência: ${mesChave}`), 10, 16);
+      doc.text(cel(`Referência: ${mesChave}`), 10, y0 + 6);
       autoTable(doc, {
-        startY: 20,
+        startY: y0 + 10,
         head,
         body,
         styles: { fontSize: 7, cellPadding: 1.4, overflow: 'linebreak' },
@@ -2869,43 +2940,22 @@ const RelatoriosProcedimentos = () => {
     }
     if (modoVisualLanc === 'resumo') {
       if (filtroMedicoResumo && detalheMedicoFiltrado.length > 0) {
-        const head = [[
-          cel('Data'),
-          cel('Médico'),
-          cel('Procedimento'),
-          cel('Posição'),
-          cel('Valor a receber'),
-        ]];
-        const body = detalheMedicoFiltrado.map((r) => [
-          cel(r.dataFmt),
-          cel(r.medico),
-          cel(r.procedimento),
-          cel(r.posicao),
-          cel(BRL.format(r.valorReceber).replace(/\u00a0/g, ' ')),
-        ]);
-        body.push([
-          cel(''),
-          cel(''),
-          cel(''),
-          cel('Total'),
-          cel(BRL.format(totalDetalheMedicoFiltrado).replace(/\u00a0/g, ' ')),
-        ]);
-        const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
-        doc.setFontSize(12);
-        doc.text(cel('Produção por médico'), 10, 10);
-        doc.setFontSize(9);
-        doc.text(cel(`Referência: ${mesChave}`), 10, 16);
-        doc.text(cel(`Médico: ${filtroMedicoResumo}`), 10, 22);
-        autoTable(doc, {
-          startY: 28,
-          head,
-          body,
-          styles: { fontSize: 7, cellPadding: 1.5, overflow: 'linebreak' },
-          headStyles: { fillColor: [51, 65, 85] },
-          margin: { left: 10, right: 10 },
+        const { base64, filename } = await buildProducaoMedicoPdfBase64({
+          mesChave,
+          medicoRotulo: filtroMedicoResumo,
+          linhas: detalheMedicoFiltrado,
+          total: totalDetalheMedicoFiltrado,
         });
-        const slug = filtroMedicoResumo.replace(/[^\w.-]+/g, '_').slice(0, 40);
-        doc.save(`producao-por-medico_${mesChave}_${slug}.pdf`);
+        const binary = atob(base64);
+        const bytes = new Uint8Array(binary.length);
+        for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
+        const blob = new Blob([bytes], { type: 'application/pdf' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        a.click();
+        URL.revokeObjectURL(url);
         return;
       }
       const head: string[][] = [[]];
@@ -2920,12 +2970,13 @@ const RelatoriosProcedimentos = () => {
         return row;
       });
       const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+      const y0 = await addPdfBrandHeader(doc, { marginLeft: 10 });
       doc.setFontSize(12);
-      doc.text(cel('Produção por médico'), 10, 10);
+      doc.text(cel('Produção por médico'), 10, y0);
       doc.setFontSize(9);
-      doc.text(cel(`Referência: ${mesChave}`), 10, 16);
+      doc.text(cel(`Referência: ${mesChave}`), 10, y0 + 6);
       autoTable(doc, {
-        startY: 20,
+        startY: y0 + 10,
         head,
         body,
         styles: { fontSize: 7, cellPadding: 1.5, overflow: 'linebreak' },
@@ -2968,12 +3019,13 @@ const RelatoriosProcedimentos = () => {
       return r;
     });
     const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+    const y0 = await addPdfBrandHeader(doc, { marginLeft: 10 });
     doc.setFontSize(12);
-    doc.text(cel('Lançamentos do mês'), 10, 10);
+    doc.text(cel('Lançamentos do mês'), 10, y0);
     doc.setFontSize(9);
-    doc.text(cel(`Referência: ${mesChave}`), 10, 16);
+    doc.text(cel(`Referência: ${mesChave}`), 10, y0 + 6);
     autoTable(doc, {
-      startY: 20,
+      startY: y0 + 10,
       head,
       body,
       styles: { fontSize: 6.5, cellPadding: 1, overflow: 'linebreak' },
@@ -2993,6 +3045,45 @@ const RelatoriosProcedimentos = () => {
     filtroMedicoResumo,
     detalheMedicoFiltrado,
     totalDetalheMedicoFiltrado,
+  ]);
+
+  const podeEnviarDemonstrativoProducao =
+    modoVisualLanc === 'resumo' &&
+    !!filtroMedicoResumo &&
+    detalheMedicoFiltrado.length > 0;
+
+  const emailProfissionalSelecionado = useMemo(() => {
+    if (!filtroMedicoResumo) return null;
+    return resolverEmailProfissional(filtroMedicoResumo, medicosLista);
+  }, [filtroMedicoResumo, medicosLista]);
+
+  const abrirEnvioDemonstrativoProducao = useCallback(async () => {
+    if (!filtroMedicoResumo || detalheMedicoFiltrado.length === 0) return;
+    setDemoProducaoBusy(true);
+    try {
+      const pdf = await buildProducaoMedicoPdfBase64({
+        mesChave,
+        medicoRotulo: filtroMedicoResumo,
+        linhas: detalheMedicoFiltrado,
+        total: totalDetalheMedicoFiltrado,
+      });
+      setDemoProducaoPdf(pdf);
+      setDemoProducaoOpen(true);
+    } catch (err: unknown) {
+      notify({
+        kind: 'error',
+        title: 'PDF',
+        message: err instanceof Error ? err.message : 'Não foi possível gerar o PDF do demonstrativo.',
+        source: 'relatorio-procedimentos',
+      });
+    } finally {
+      setDemoProducaoBusy(false);
+    }
+  }, [
+    filtroMedicoResumo,
+    detalheMedicoFiltrado,
+    totalDetalheMedicoFiltrado,
+    mesChave,
   ]);
 
   if (!isMaster) {
@@ -4034,11 +4125,28 @@ const RelatoriosProcedimentos = () => {
                   type="button"
                   className="btn btn-secondary btn-sm font-display"
                   disabled={!podeExportarVisualizacaoAtual}
-                  onClick={exportLancamentosPdf}
+                  onClick={() => void exportLancamentosPdf()}
                   title={!podeExportarVisualizacaoAtual ? 'Sem dados para exportar' : 'Exportar PDF'}
                 >
                   PDF
                 </button>
+                {modoVisualLanc === 'resumo' && podeUsarPainelEmail && (
+                  <button
+                    type="button"
+                    className="btn btn-primary btn-sm font-display"
+                    disabled={!podeEnviarDemonstrativoProducao || demoProducaoBusy}
+                    onClick={() => void abrirEnvioDemonstrativoProducao()}
+                    title={
+                      !filtroMedicoResumo
+                        ? 'Selecione um médico para enviar o demonstrativo'
+                        : detalheMedicoFiltrado.length === 0
+                          ? 'Sem produção para este médico'
+                          : 'Prévia e envio do demonstrativo com PDF da produção'
+                    }
+                  >
+                    {demoProducaoBusy ? 'Preparando…' : 'Enviar demonstrativo'}
+                  </button>
+                )}
               </div>
             </div>
             {modoVisualLanc === 'detalhado' && !algumaColLancDado && (
@@ -4771,6 +4879,28 @@ const RelatoriosProcedimentos = () => {
           </div>
         </div>
       )}
+
+      <EnviarDemonstrativoProducaoModal
+        open={demoProducaoOpen && !!demoProducaoPdf}
+        onClose={() => {
+          setDemoProducaoOpen(false);
+          setDemoProducaoPdf(null);
+        }}
+        nomeProfissional={nomeProfissionalSemCrm(filtroMedicoResumo)}
+        emailSugerido={emailProfissionalSelecionado}
+        mes={Number(mesMM)}
+        ano={ano}
+        pdfBase64={demoProducaoPdf?.base64 ?? ''}
+        pdfFilename={demoProducaoPdf?.filename ?? 'producao.pdf'}
+        onEnviado={() => {
+          notify({
+            kind: 'success',
+            title: 'Demonstrativo enviado',
+            message: `E-mail enviado para ${nomeProfissionalSemCrm(filtroMedicoResumo)}.`,
+            source: 'relatorio-procedimentos',
+          });
+        }}
+      />
     </div>
   );
 };

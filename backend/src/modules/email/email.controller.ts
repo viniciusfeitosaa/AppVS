@@ -2,11 +2,13 @@ import { Request, Response } from 'express';
 import {
   createEmailMensagemService,
   deleteEmailMensagemService,
+  enviarAgoraEmailMensagemService,
   enviarEmailMensagemService,
   getEmailMensagemService,
   getEmailPainelResumoService,
   listEmailMensagensService,
   testarConexaoSmtpService,
+  type EmailAnexoInput,
 } from './email.service';
 
 export async function getEmailPainelResumoController(req: Request, res: Response) {
@@ -56,15 +58,45 @@ export async function createEmailMensagemController(req: Request, res: Response)
       req.user!.tenantId,
       req.user!.role === 'MASTER' ? req.user!.id : null,
       {
-      assunto: assunto || '',
-      corpoHtml,
-      corpoTexto,
-      destinatarios: Array.isArray(destinatarios) ? destinatarios : [],
-    });
+        assunto: assunto || '',
+        corpoHtml,
+        corpoTexto,
+        destinatarios: Array.isArray(destinatarios) ? destinatarios : [],
+      }
+    );
 
     return res.status(201).json({ success: true, data });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Erro ao criar mensagem';
+    return res.status(400).json({ success: false, error: message });
+  }
+}
+
+export async function enviarAgoraEmailMensagemController(req: Request, res: Response) {
+  try {
+    const { assunto, corpoHtml, corpoTexto, destinatarios, anexos } = req.body as {
+      assunto?: string;
+      corpoHtml?: string;
+      corpoTexto?: string;
+      destinatarios?: string[];
+      anexos?: EmailAnexoInput[];
+    };
+
+    const data = await enviarAgoraEmailMensagemService(
+      req.user!.tenantId,
+      req.user!.role === 'MASTER' ? req.user!.id : null,
+      {
+        assunto: assunto || '',
+        corpoHtml,
+        corpoTexto,
+        destinatarios: Array.isArray(destinatarios) ? destinatarios : [],
+        anexos: Array.isArray(anexos) ? anexos : undefined,
+      }
+    );
+
+    return res.status(201).json({ success: true, data });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Erro ao enviar mensagem';
     return res.status(400).json({ success: false, error: message });
   }
 }

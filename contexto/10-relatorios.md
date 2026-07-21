@@ -27,7 +27,8 @@
 
 ## Dependências front
 
-- `jspdf`, `jspdf-autotable` — PDF
+- `jspdf`, `jspdf-autotable` — PDF (topo com logo Viva Saúde via `utils/pdf-branding.ts` + `assets/logo-horizontal.png`)
+- Em **Produção por médico** com médico filtrado: botão **Enviar demonstrativo** abre prévia (assunto/corpo do painel de e-mail) e anexa o PDF da produção
 - `xlsx` — Excel
 
 ## Módulo de acesso
