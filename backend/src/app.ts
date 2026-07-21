@@ -15,6 +15,8 @@ import adminRoutes from './routes/admin.routes';
 import pontoRoutes from './routes/ponto.routes';
 import leadsRoutes from './routes/leads.routes';
 import blogRoutes from './routes/blog.routes';
+import evolutionWebhookRoutes from './routes/evolution-webhook.routes';
+import emailRoutes from './routes/email.routes';
 
 // Criar aplicação Express
 const app: Express = express();
@@ -110,6 +112,8 @@ app.get('/health', (_req: Request, res: Response) => {
 });
 
 // Rotas da API
+app.use('/api/webhooks', evolutionWebhookRoutes);
+app.use('/api/email', emailRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/medico', medicoRoutes);
 app.use('/api/admin', adminRoutes);

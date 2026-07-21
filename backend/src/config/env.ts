@@ -66,11 +66,19 @@ const envSchema = z.object({
   SMTP_USER: z.string().optional(),
   SMTP_PASS: z.string().optional(),
   SMTP_FROM: z.string().email().optional(),
+  SMTP_TLS_SERVERNAME: z.string().optional(),
+  MADDY_HOSTNAME: z.string().optional(),
+  ORG_DISPLAY_NAME: z.string().optional(),
 
-  // WhatsApp – esqueci senha: Evolution API (gratuito, open source) ou Twilio (pago)
-  EVOLUTION_API_URL: z.string().url().optional(), // ex: https://sua-evolution.com ou http://localhost:8080
-  EVOLUTION_API_KEY: z.string().optional(),
-  EVOLUTION_INSTANCE: z.string().optional(),
+  // WhatsApp – esqueci senha: Evolution GO (recomendado), Evolution API legada ou Twilio (pago)
+  EVOLUTION_PROVIDER: z.enum(['go', 'legacy']).optional().default('go'),
+  EVOLUTION_API_URL: z.string().url().optional(), // ex: http://evolution-go:8080 na rede Docker
+  EVOLUTION_API_KEY: z.string().optional(), // GLOBAL_API_KEY (GO) ou api key legada
+  EVOLUTION_INSTANCE_ID: z.string().optional(), // UUID da instância (Evolution GO — header instanceId)
+  EVOLUTION_INSTANCE_TOKEN: z.string().optional(), // Token da instância (Evolution GO — header apikey no envio)
+  EVOLUTION_INSTANCE: z.string().optional(), // nome da instância (Evolution API legada)
+  EVOLUTION_WEBHOOK_SECRET: z.string().optional(), // header X-Evolution-Secret (opcional)
+  WHATSAPP_ATENDIMENTO_ENABLED: z.enum(['true', 'false']).optional().default('true'),
   TWILIO_ACCOUNT_SID: z.string().optional(),
   TWILIO_AUTH_TOKEN: z.string().optional(),
   TWILIO_WHATSAPP_FROM: z.string().optional(),

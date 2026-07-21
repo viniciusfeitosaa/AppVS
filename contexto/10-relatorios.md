@@ -11,6 +11,14 @@
 - Frontend: `RelatoriosProcedimentos.tsx`
 - Branch remota histórica: `cursor/relatorio-procedimentos-excel-import-ui`
 
+### Visões em Lançamentos do mês
+
+| Visão | Conteúdo |
+|-------|----------|
+| **Detalhado** | Tabela completa de lançamentos (editar/excluir) |
+| **Produção por médico** | Resumo por médico + filtro opcional; ao filtrar, tabela detalhada (data, procedimento, posição 1.º/2.º, valor a receber, total). Excel/PDF exportam o detalhe filtrado ou o resumo |
+| **Pacientes** | Prontuário, paciente, médico principal/auxiliar, data |
+
 ## Relatórios de ponto
 
 - Listagem admin de registros (`listRegistrosPontoAdminController`)

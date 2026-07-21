@@ -306,6 +306,22 @@ const rotuloQuem = (nome: string, crm: string): string | null => {
   return n || `CRM ${c}`;
 };
 
+const rotuloProcedimentoLinha = (l: Pick<LinhaProcedimento, 'nome1' | 'nome2' | 'instrumento'>): string => {
+  const partes = [l.nome1?.trim(), l.nome2?.trim()].filter(Boolean);
+  if (partes.length > 0) return partes.join(' + ');
+  return l.instrumento?.trim() || '—';
+};
+
+type DetalheProducaoMedicoLinha = {
+  id: string;
+  dataProcedimento: string;
+  dataFmt: string;
+  medico: string;
+  procedimento: string;
+  posicao: '1.º médico' | '2.º médico';
+  valorReceber: number;
+};
+
 const parseNumeroBr = (s: string, fallback: number = 0): number => {
   if (!s || !String(s).trim()) return fallback;
   const raw = String(s)
@@ -1950,6 +1966,7 @@ const RelatoriosProcedimentos = () => {
     recebe: true,
   });
   const [modoVisualLanc, setModoVisualLanc] = useState<'detalhado' | 'resumo' | 'pacientes'>('detalhado');
+  const [filtroMedicoResumo, setFiltroMedicoResumo] = useState('');
   const [modoEntradaLanc, setModoEntradaLanc] = useState<'upload' | 'manual'>('upload');
   const [importMsg, setImportMsg] = useState<{ tipo: 'ok' | 'aviso' | 'erro'; texto: string } | null>(null);
   const [importPreview, setImportPreview] = useState<ImportPreviewLanc | null>(null);
@@ -2041,6 +2058,7 @@ const RelatoriosProcedimentos = () => {
     }
     setBusca('');
     setLinhaPendente(null);
+    setFiltroMedicoResumo('');
     setModoEntradaLanc('upload');
     setImportMsg(null);
     setImportPreview(null);
@@ -2464,13 +2482,68 @@ const RelatoriosProcedimentos = () => {
       .sort((a, b) => a.medico.localeCompare(b.medico, 'pt-BR', { sensitivity: 'base' }));
   }, [linhasTotais, local, r2Pct]);
 
+  const detalheProducaoMedicos = useMemo(() => {
+    const rows: DetalheProducaoMedicoLinha[] = [];
+    for (const l of linhasTotais) {
+      const q = quemRepasseEfetivo(l, local);
+      const r = repassePorLinhaMargemFixa(l.bruto, r2Pct, q);
+      const procedimento = rotuloProcedimentoLinha(l);
+      const dataFmt = formatarDataISO(l.dataProcedimento);
+
+      if (q.incluirProfissional1) {
+        const m1 = rotuloQuem(q.profissional1Nome, q.profissional1Crm);
+        if (m1) {
+          rows.push({
+            id: `${l.id}-1`,
+            dataProcedimento: l.dataProcedimento,
+            dataFmt,
+            medico: m1,
+            procedimento,
+            posicao: '1.º médico',
+            valorReceber: r.r1,
+          });
+        }
+      }
+      if (q.incluirProfissional2) {
+        const m2 = rotuloQuem(q.profissional2Nome, q.profissional2Crm);
+        if (m2) {
+          rows.push({
+            id: `${l.id}-2`,
+            dataProcedimento: l.dataProcedimento,
+            dataFmt,
+            medico: m2,
+            procedimento,
+            posicao: '2.º médico',
+            valorReceber: r.r2,
+          });
+        }
+      }
+    }
+    return rows.sort((a, b) => {
+      const cmpData = a.dataProcedimento.localeCompare(b.dataProcedimento);
+      if (cmpData !== 0) return cmpData;
+      return a.medico.localeCompare(b.medico, 'pt-BR', { sensitivity: 'base' });
+    });
+  }, [linhasTotais, local, r2Pct]);
+
+  const medicosResumoOpcoes = useMemo(() => resumoMedicos.map((r) => r.medico), [resumoMedicos]);
+
+  const resumoMedicosFiltrado = useMemo(() => {
+    if (!filtroMedicoResumo) return resumoMedicos;
+    return resumoMedicos.filter((r) => r.medico === filtroMedicoResumo);
+  }, [resumoMedicos, filtroMedicoResumo]);
+
+  const detalheMedicoFiltrado = useMemo(() => {
+    if (!filtroMedicoResumo) return [];
+    return detalheProducaoMedicos.filter((r) => r.medico === filtroMedicoResumo);
+  }, [detalheProducaoMedicos, filtroMedicoResumo]);
+
+  const totalDetalheMedicoFiltrado = useMemo(
+    () => round2(detalheMedicoFiltrado.reduce((acc, r) => acc + r.valorReceber, 0)),
+    [detalheMedicoFiltrado]
+  );
+
   const tabelaPacientes = useMemo(() => {
-    const fmtData = (iso: string) => {
-      if (!iso) return '—';
-      const [y, m, d] = iso.split('-');
-      if (!y || !m || !d) return iso;
-      return `${d}/${m}/${y}`;
-    };
     return linhasTotais.map((l) => {
       const q = quemRepasseEfetivo(l, local);
       const medicoPrincipal = q.incluirProfissional1
@@ -2484,14 +2557,14 @@ const RelatoriosProcedimentos = () => {
         paciente: l.nomePaciente?.trim() || '—',
         medicoPrincipal,
         medicoAuxiliar,
-        dataCirurgia: fmtData(l.dataProcedimento),
+        dataCirurgia: formatarDataISO(l.dataProcedimento),
       };
     });
   }, [linhasTotais, local]);
 
   const somaResumoMedicos = useMemo(
-    () => round2(resumoMedicos.reduce((acc, r) => acc + r.recebe, 0)),
-    [resumoMedicos]
+    () => round2(resumoMedicosFiltrado.reduce((acc, r) => acc + r.recebe, 0)),
+    [resumoMedicosFiltrado]
   );
   const timelineMeses = useMemo(
     () =>
@@ -2686,7 +2759,29 @@ const RelatoriosProcedimentos = () => {
       return;
     }
     if (modoVisualLanc === 'resumo') {
-      const rows = resumoMedicos.map((r) => {
+      if (filtroMedicoResumo && detalheMedicoFiltrado.length > 0) {
+        const rows: Record<string, string>[] = detalheMedicoFiltrado.map((r) => ({
+          Data: r.dataFmt,
+          Médico: r.medico,
+          Procedimento: r.procedimento,
+          Posição: r.posicao,
+          'Valor a receber': BRL.format(r.valorReceber),
+        }));
+        rows.push({
+          Data: '',
+          Médico: '',
+          Procedimento: '',
+          Posição: 'Total',
+          'Valor a receber': BRL.format(totalDetalheMedicoFiltrado),
+        });
+        const ws = XLSX.utils.json_to_sheet(rows);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, 'Produção por médico');
+        const slug = filtroMedicoResumo.replace(/[^\w.-]+/g, '_').slice(0, 40);
+        XLSX.writeFile(wb, `producao-por-medico_${mesChave}_${slug}.xlsx`);
+        return;
+      }
+      const rows = resumoMedicosFiltrado.map((r) => {
         const o: Record<string, string> = {};
         if (colsResumo.medico) o['Médico'] = r.medico;
         if (colsResumo.repasse) o['Repasse'] = r.repasseTxt;
@@ -2724,7 +2819,19 @@ const RelatoriosProcedimentos = () => {
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Lançamentos');
     XLSX.writeFile(wb, `lancamentos-procedimentos_${mesChave}.xlsx`);
-  }, [linhasTotais, local, mesChave, colsLanc, modoVisualLanc, resumoMedicos, colsResumo, tabelaPacientes]);
+  }, [
+    linhasTotais,
+    local,
+    mesChave,
+    colsLanc,
+    modoVisualLanc,
+    resumoMedicosFiltrado,
+    colsResumo,
+    tabelaPacientes,
+    filtroMedicoResumo,
+    detalheMedicoFiltrado,
+    totalDetalheMedicoFiltrado,
+  ]);
 
   const exportLancamentosPdf = useCallback(() => {
     if (linhasTotais.length === 0) return;
@@ -2761,11 +2868,51 @@ const RelatoriosProcedimentos = () => {
       return;
     }
     if (modoVisualLanc === 'resumo') {
+      if (filtroMedicoResumo && detalheMedicoFiltrado.length > 0) {
+        const head = [[
+          cel('Data'),
+          cel('Médico'),
+          cel('Procedimento'),
+          cel('Posição'),
+          cel('Valor a receber'),
+        ]];
+        const body = detalheMedicoFiltrado.map((r) => [
+          cel(r.dataFmt),
+          cel(r.medico),
+          cel(r.procedimento),
+          cel(r.posicao),
+          cel(BRL.format(r.valorReceber).replace(/\u00a0/g, ' ')),
+        ]);
+        body.push([
+          cel(''),
+          cel(''),
+          cel(''),
+          cel('Total'),
+          cel(BRL.format(totalDetalheMedicoFiltrado).replace(/\u00a0/g, ' ')),
+        ]);
+        const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+        doc.setFontSize(12);
+        doc.text(cel('Produção por médico'), 10, 10);
+        doc.setFontSize(9);
+        doc.text(cel(`Referência: ${mesChave}`), 10, 16);
+        doc.text(cel(`Médico: ${filtroMedicoResumo}`), 10, 22);
+        autoTable(doc, {
+          startY: 28,
+          head,
+          body,
+          styles: { fontSize: 7, cellPadding: 1.5, overflow: 'linebreak' },
+          headStyles: { fillColor: [51, 65, 85] },
+          margin: { left: 10, right: 10 },
+        });
+        const slug = filtroMedicoResumo.replace(/[^\w.-]+/g, '_').slice(0, 40);
+        doc.save(`producao-por-medico_${mesChave}_${slug}.pdf`);
+        return;
+      }
       const head: string[][] = [[]];
       if (colsResumo.medico) head[0].push(cel('Médico'));
       if (colsResumo.repasse) head[0].push(cel('Repasse'));
       if (colsResumo.recebe) head[0].push(cel('Valor exato a receber'));
-      const body = resumoMedicos.map((r) => {
+      const body = resumoMedicosFiltrado.map((r) => {
         const row: string[] = [];
         if (colsResumo.medico) row.push(cel(r.medico));
         if (colsResumo.repasse) row.push(cel(r.repasseTxt));
@@ -2834,7 +2981,19 @@ const RelatoriosProcedimentos = () => {
       margin: { left: 10, right: 10 },
     });
     doc.save(`lancamentos-procedimentos_${mesChave}.pdf`);
-  }, [linhasTotais, local, mesChave, colsLanc, modoVisualLanc, resumoMedicos, colsResumo, tabelaPacientes]);
+  }, [
+    linhasTotais,
+    local,
+    mesChave,
+    colsLanc,
+    modoVisualLanc,
+    resumoMedicosFiltrado,
+    colsResumo,
+    tabelaPacientes,
+    filtroMedicoResumo,
+    detalheMedicoFiltrado,
+    totalDetalheMedicoFiltrado,
+  ]);
 
   if (!isMaster) {
     return (
@@ -3887,11 +4046,6 @@ const RelatoriosProcedimentos = () => {
                 Nenhuma coluna visível. Ative no cabeçalho com o ícone de olho.
               </p>
             )}
-            {modoVisualLanc === 'resumo' && !algumaColResumoDado && (
-              <p className="px-3 sm:px-4 py-2 text-xs text-amber-800 bg-amber-50/80 border-b border-amber-200/80 font-serif">
-                Nenhuma coluna visível. Ative no cabeçalho com o ícone de olho.
-              </p>
-            )}
             {modoVisualLanc === 'detalhado' ? (
             <div className="w-full min-w-0 max-w-full rounded-b-lg overflow-auto max-h-[68vh] px-1 sm:px-2 pb-1">
               <table
@@ -4125,78 +4279,196 @@ const RelatoriosProcedimentos = () => {
               </table>
             </div>
             ) : modoVisualLanc === 'resumo' ? (
-              <div className="px-3 sm:px-4 py-3">
-                <div className="overflow-x-auto rounded-xl border border-viva-200/60">
-                  <table className="min-w-[700px] w-full text-xs sm:text-sm">
-                    <thead>
-                      <tr className="bg-slate-800/95 text-white font-display text-[10px] sm:text-xs">
-                        {RESUMO_TH.map(({ key, label, align }) => {
-                          const vis = colsResumo[key];
-                          return (
-                            <th
-                              key={key}
-                              className={[
-                                'px-3 py-2.5',
-                                vis
-                                  ? align === 'right'
-                                    ? 'text-right'
-                                    : align === 'center'
-                                      ? 'text-center'
-                                      : 'text-left'
-                                  : 'text-center bg-slate-700/55 text-slate-300',
-                              ].join(' ')}
-                              title={vis ? label : 'Mostrar coluna'}
-                            >
-                              <div
-                                className={[
-                                  'flex items-center gap-1',
-                                  vis ? (align === 'right' ? 'justify-end' : align === 'center' ? 'justify-center' : 'justify-between') : 'justify-center',
-                                ].join(' ')}
-                              >
-                                <span className={vis ? 'leading-tight' : 'leading-tight text-slate-300'}>{label}</span>
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    toggleResumoCol(key);
-                                  }}
-                                  className="shrink-0 rounded p-0.5 text-slate-200 transition hover:bg-slate-600/70 hover:text-white"
-                                  title={vis ? 'Ocultar coluna' : 'Mostrar coluna'}
-                                  aria-pressed={vis}
-                                >
-                                  {vis ? <IconEye className="h-3.5 w-3.5" /> : <IconEyeOff className="h-3.5 w-3.5" />}
-                                </button>
-                              </div>
-                            </th>
-                          );
-                        })}
-                      </tr>
-                    </thead>
-                    <tbody className="text-viva-800">
-                      {resumoMedicos.map((r, i) => (
-                        <tr key={r.medico} className={i % 2 ? 'bg-viva-50/25' : 'bg-white border-t border-slate-100/90'}>
-                          {colsResumo.medico ? (
-                            <td className="px-3 py-2 font-serif [overflow-wrap:anywhere]">{r.medico}</td>
-                          ) : (
-                            <td className="px-3 py-2 text-center font-display text-slate-400 bg-slate-100/95">Oculta</td>
-                          )}
-                          {colsResumo.repasse ? (
-                            <td className="px-3 py-2 text-center font-display font-semibold text-viva-700">{r.repasseTxt}</td>
-                          ) : (
-                            <td className="px-3 py-2 text-center font-display text-slate-400 bg-slate-100/95">Oculta</td>
-                          )}
-                          {colsResumo.recebe ? (
-                            <td className="px-3 py-2 text-right font-mono font-bold tabular-nums text-viva-900">
-                              {BRL.format(r.recebe)}
-                            </td>
-                          ) : (
-                            <td className="px-3 py-2 text-center font-display text-slate-400 bg-slate-100/95">Oculta</td>
-                          )}
-                        </tr>
+              <div className="px-3 sm:px-4 py-3 space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-end gap-3">
+                  <label className="flex flex-col gap-1 text-sm text-viva-800 min-w-[280px] flex-1">
+                    <span className="text-xs font-semibold uppercase tracking-wide text-viva-500 font-display">
+                      Filtrar por médico
+                    </span>
+                    <select
+                      className="input w-full"
+                      value={filtroMedicoResumo}
+                      onChange={(e) => setFiltroMedicoResumo(e.target.value)}
+                    >
+                      <option value="">Todos os médicos</option>
+                      {medicosResumoOpcoes.map((m) => (
+                        <option key={m} value={m}>
+                          {m}
+                        </option>
                       ))}
-                    </tbody>
-                  </table>
+                    </select>
+                  </label>
+                  {filtroMedicoResumo && (
+                    <div className="flex flex-wrap items-center gap-2 sm:pb-2">
+                      <p className="text-xs text-viva-600 font-serif">
+                        {detalheMedicoFiltrado.length} procedimento(s) · total{' '}
+                        <span className="font-mono font-semibold text-viva-900 tabular-nums">
+                          {BRL.format(totalDetalheMedicoFiltrado)}
+                        </span>
+                      </p>
+                      <button
+                        type="button"
+                        className="text-xs text-viva-700 underline font-display"
+                        onClick={() => setFiltroMedicoResumo('')}
+                      >
+                        Mostrar todos
+                      </button>
+                    </div>
+                  )}
                 </div>
+
+                {!algumaColResumoDado ? (
+                  <p className="text-xs text-amber-800 bg-amber-50/80 border border-amber-200/80 rounded-lg px-3 py-2 font-serif">
+                    Nenhuma coluna visível. Ative no cabeçalho com o ícone de olho.
+                  </p>
+                ) : (
+                  <div className="overflow-x-auto rounded-xl border border-viva-200/60">
+                    <table className="min-w-[700px] w-full text-xs sm:text-sm">
+                      <thead>
+                        <tr className="bg-slate-800/95 text-white font-display text-[10px] sm:text-xs">
+                          {RESUMO_TH.map(({ key, label, align }) => {
+                            const vis = colsResumo[key];
+                            return (
+                              <th
+                                key={key}
+                                className={[
+                                  'px-3 py-2.5',
+                                  vis
+                                    ? align === 'right'
+                                      ? 'text-right'
+                                      : align === 'center'
+                                        ? 'text-center'
+                                        : 'text-left'
+                                    : 'text-center bg-slate-700/55 text-slate-300',
+                                ].join(' ')}
+                                title={vis ? label : 'Mostrar coluna'}
+                              >
+                                <div
+                                  className={[
+                                    'flex items-center gap-1',
+                                    vis
+                                      ? align === 'right'
+                                        ? 'justify-end'
+                                        : align === 'center'
+                                          ? 'justify-center'
+                                          : 'justify-between'
+                                      : 'justify-center',
+                                  ].join(' ')}
+                                >
+                                  <span className={vis ? 'leading-tight' : 'leading-tight text-slate-300'}>{label}</span>
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      toggleResumoCol(key);
+                                    }}
+                                    className="shrink-0 rounded p-0.5 text-slate-200 transition hover:bg-slate-600/70 hover:text-white"
+                                    title={vis ? 'Ocultar coluna' : 'Mostrar coluna'}
+                                    aria-pressed={vis}
+                                  >
+                                    {vis ? <IconEye className="h-3.5 w-3.5" /> : <IconEyeOff className="h-3.5 w-3.5" />}
+                                  </button>
+                                </div>
+                              </th>
+                            );
+                          })}
+                        </tr>
+                      </thead>
+                      <tbody className="text-viva-800">
+                        {resumoMedicosFiltrado.length === 0 ? (
+                          <tr>
+                            <td colSpan={3} className="px-3 py-6 text-center text-viva-600 font-serif">
+                              Nenhum médico encontrado para este filtro.
+                            </td>
+                          </tr>
+                        ) : (
+                          resumoMedicosFiltrado.map((r, i) => (
+                            <tr
+                              key={r.medico}
+                              className={i % 2 ? 'bg-viva-50/25' : 'bg-white border-t border-slate-100/90'}
+                            >
+                              {colsResumo.medico ? (
+                                <td className="px-3 py-2 font-serif [overflow-wrap:anywhere]">{r.medico}</td>
+                              ) : (
+                                <td className="px-3 py-2 text-center font-display text-slate-400 bg-slate-100/95">Oculta</td>
+                              )}
+                              {colsResumo.repasse ? (
+                                <td className="px-3 py-2 text-center font-display font-semibold text-viva-700">
+                                  {r.repasseTxt}
+                                </td>
+                              ) : (
+                                <td className="px-3 py-2 text-center font-display text-slate-400 bg-slate-100/95">Oculta</td>
+                              )}
+                              {colsResumo.recebe ? (
+                                <td className="px-3 py-2 text-right font-mono font-bold tabular-nums text-viva-900">
+                                  {BRL.format(r.recebe)}
+                                </td>
+                              ) : (
+                                <td className="px-3 py-2 text-center font-display text-slate-400 bg-slate-100/95">Oculta</td>
+                              )}
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+
+                {filtroMedicoResumo && (
+                  <div className="space-y-2">
+                    <h4 className="text-sm font-semibold text-viva-900 font-display">
+                      Procedimentos de {filtroMedicoResumo}
+                    </h4>
+                    {detalheMedicoFiltrado.length === 0 ? (
+                      <p className="text-sm text-viva-600 text-center py-6 font-serif">
+                        Nenhum procedimento encontrado para este médico no mês selecionado.
+                      </p>
+                    ) : (
+                      <div className="overflow-x-auto rounded-xl border border-viva-200/60">
+                        <table className="min-w-[860px] w-full text-xs sm:text-sm">
+                          <thead>
+                            <tr className="bg-slate-800/95 text-white font-display text-[10px] sm:text-xs">
+                              <th className="px-3 py-2.5 text-left">Data do procedimento</th>
+                              <th className="px-3 py-2.5 text-left">Médico</th>
+                              <th className="px-3 py-2.5 text-left">Procedimento</th>
+                              <th className="px-3 py-2.5 text-center">Posição</th>
+                              <th className="px-3 py-2.5 text-right">Valor a receber</th>
+                            </tr>
+                          </thead>
+                          <tbody className="text-viva-800">
+                            {detalheMedicoFiltrado.map((r, i) => (
+                              <tr
+                                key={r.id}
+                                className={i % 2 ? 'bg-viva-50/25' : 'bg-white border-t border-slate-100/90'}
+                              >
+                                <td className="px-3 py-2 font-mono tabular-nums whitespace-nowrap">{r.dataFmt}</td>
+                                <td className="px-3 py-2 font-serif [overflow-wrap:anywhere]">{r.medico}</td>
+                                <td className="px-3 py-2 font-serif [overflow-wrap:anywhere]">{r.procedimento}</td>
+                                <td className="px-3 py-2 text-center font-display text-viva-700">{r.posicao}</td>
+                                <td className="px-3 py-2 text-right font-mono font-bold tabular-nums text-viva-900">
+                                  {BRL.format(r.valorReceber)}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                          <tfoot>
+                            <tr className="bg-viva-50/60 border-t-2 border-viva-200/80">
+                              <td
+                                colSpan={4}
+                                className="px-3 py-2.5 text-right text-sm font-semibold text-viva-800 font-display"
+                              >
+                                Total a receber
+                              </td>
+                              <td className="px-3 py-2.5 text-right text-base font-bold text-viva-900 font-mono tabular-nums">
+                                {BRL.format(totalDetalheMedicoFiltrado)}
+                              </td>
+                            </tr>
+                          </tfoot>
+                        </table>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             ) : (
               <div className="px-3 sm:px-4 py-3">
@@ -4237,11 +4509,20 @@ const RelatoriosProcedimentos = () => {
                   {tabelaPacientes.length}
                 </span>
               </>
+            ) : modoVisualLanc === 'resumo' ? (
+              <>
+                <span className="text-xs text-viva-500 font-serif">
+                  {filtroMedicoResumo ? 'Total do médico selecionado' : 'Soma'}
+                </span>
+                <span className="text-lg font-bold text-viva-900 font-mono tabular-nums">
+                  {BRL.format(filtroMedicoResumo ? totalDetalheMedicoFiltrado : somaResumoMedicos)}
+                </span>
+              </>
             ) : (
               <>
                 <span className="text-xs text-viva-500 font-serif">Soma</span>
                 <span className="text-lg font-bold text-viva-900 font-mono tabular-nums">
-                  {BRL.format(modoVisualLanc === 'resumo' ? somaResumoMedicos : valorBruto)}
+                  {BRL.format(valorBruto)}
                 </span>
               </>
             )}

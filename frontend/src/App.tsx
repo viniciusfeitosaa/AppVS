@@ -31,6 +31,7 @@ import RelatoriosProcedimentos from './pages/RelatoriosProcedimentos';
 import Perfil from './pages/Perfil';
 import EnvioDocumentos from './pages/EnvioDocumentos';
 import MeusDocumentos from './pages/MeusDocumentos';
+import { EmailPainelPage } from './modules/email';
 import EsqueciSenha from './pages/EsqueciSenha';
 import RedefinirSenha from './pages/RedefinirSenha';
 import AcessoNegado from './pages/AcessoNegado';
@@ -166,6 +167,14 @@ function AppRoutes() {
         <Route
           path="/envio-documentos"
           element={<EnvioDocumentos />}
+        />
+        <Route
+          path="/email"
+          element={
+            <MasterOnly>
+              <EmailPainelPage />
+            </MasterOnly>
+          }
         />
         <Route
           path="/documentos"

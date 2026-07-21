@@ -11,6 +11,7 @@ export type ModuloSistema =
   | 'CONFIGURACOES'
   | 'ENVIO_DOCUMENTOS'
   | 'AVALIACAO'
+  | 'ENVIO_EMAIL'
   | 'PERFIL';
 
 export const MODULO_LABEL: Record<ModuloSistema, string> = {
@@ -26,5 +27,6 @@ export const MODULO_LABEL: Record<ModuloSistema, string> = {
   CONFIGURACOES: 'Configurações',
   ENVIO_DOCUMENTOS: 'Envio de Documentos',
   AVALIACAO: 'Avaliação',
+  ENVIO_EMAIL: 'Painel de E-mail',
   PERFIL: 'Minha Conta',
 };

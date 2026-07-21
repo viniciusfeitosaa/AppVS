@@ -1,0 +1,78 @@
+# Evolution GO — stack isolada (Viva Saúde)
+# Uso: docker compose -f docker-compose.evolution-go.yml --env-file .env.evolution-go up -d
+#
+# Após subir, crie a instância e pareie o QR — ver docs/SETUP-EVOLUTION-GO.md
+
+services:
+  evolution-go-postgres:
+    image: postgres:15-alpine
+    container_name: evolution-go-postgres
+    environment:
+      POSTGRES_USER: ${EVOGO_POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${EVOGO_POSTGRES_PASSWORD:?Defina EVOGO_POSTGRES_PASSWORD em .env.evolution-go}
+    volumes:
+      - evolution_go_postgres_data:/var/lib/postgresql/data
+    networks:
+      - evolution-go-internal
+    restart: unless-stopped
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${EVOGO_POSTGRES_USER:-postgres}']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+
+  evolution-go:
+    image: evoapicloud/evolution-go:latest
+    container_name: evolution-go
+    depends_on:
+      evolution-go-postgres:
+        condition: service_healthy
+    environment:
+      SERVER_PORT: 8080
+      CLIENT_NAME: viva-saude
+      GLOBAL_API_KEY: ${EVOGO_GLOBAL_API_KEY:?Defina EVOGO_GLOBAL_API_KEY em .env.evolution-go}
+      POSTGRES_AUTH_DB: postgresql://${EVOGO_POSTGRES_USER:-postgres}:${EVOGO_POSTGRES_PASSWORD}@evolution-go-postgres:5432/evogo_auth?sslmode=disable
+      POSTGRES_USERS_DB: postgresql://${EVOGO_POSTGRES_USER:-postgres}:${EVOGO_POSTGRES_PASSWORD}@evolution-go-postgres:5432/evogo_users?sslmode=disable
+      DATABASE_SAVE_MESSAGES: ${EVOGO_DATABASE_SAVE_MESSAGES:-false}
+      WADEBUG: ${EVOGO_WADEBUG:-INFO}
+      LOGTYPE: console
+      CONNECT_ON_STARTUP: ${EVOGO_CONNECT_ON_STARTUP:-true}
+    ports:
+      # Apenas localhost na VPS — backend acessa pela rede Docker
+      - '127.0.0.1:${EVOGO_HTTP_PORT:-8085}:8080'
+    networks:
+      - evolution-go-internal
+      - app-network
+      - proxy-network
+    restart: unless-stopped
+    healthcheck:
+      test: ['CMD-SHELL', 'wget -q --spider http://127.0.0.1:8080/swagger/index.html || curl -sf http://127.0.0.1:8080/swagger/index.html']
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+        reservations:
+          memory: 128M
+
+networks:
+  evolution-go-internal:
+    driver: bridge
+    name: evolution-go-internal
+  app-network:
+    external: true
+    name: app-medico-network
+  proxy-network:
+    external: true
+    name: proxy-network
+
+volumes:
+  evolution_go_postgres_data:
+    name: evolution_go_postgres_data

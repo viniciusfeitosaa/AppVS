@@ -39,6 +39,12 @@ enum StatusCadastroMedico {
   REJEITADO
 }
 
+enum EmailMensagemStatus {
+  RASCUNHO
+  ENVIADO
+  FALHA
+}
+
 enum ModuloSistema {
   DASHBOARD
   MEDICOS
@@ -53,6 +59,7 @@ enum ModuloSistema {
   CONFIGURACOES
   ENVIO_DOCUMENTOS
   AVALIACAO
+  ENVIO_EMAIL
   PERFIL
 }
 
@@ -100,6 +107,7 @@ model Tenant {
   blogCategories          BlogCategory[]
   blogPosts               BlogPost[]
   blogComments            BlogComment[]
+  emailMensagens          EmailMensagem[]
 
   @@map("tenants")
   @@index([slug])
@@ -166,6 +174,7 @@ model UsuarioMaster {
   auditoriaLog Auditoria[]   @relation("auditoria_master")
   blogPosts    BlogPost[]
   blogCommentRespostas BlogComment[] @relation("blog_comment_respostas")
+  emailMensagensCriadas EmailMensagem[] @relation("email_mensagem_criador")
 
   @@map("usuarios_master")
   @@unique([tenantId, email])
@@ -912,4 +921,26 @@ model BlogComment {
   @@index([tenantId, status, createdAt])
   @@index([postId, status])
   @@map("blog_comments")
+}
+
+model EmailMensagem {
+  id                String              @id @default(uuid())
+  tenantId          String              @map("tenant_id")
+  assunto           String              @db.VarChar(500)
+  corpoHtml         String?             @map("corpo_html") @db.Text
+  corpoTexto        String?             @map("corpo_texto") @db.Text
+  destinatarios     Json
+  status            EmailMensagemStatus @default(RASCUNHO)
+  criadoPorMasterId String?             @map("criado_por_master_id")
+  erroEnvio         String?             @map("erro_envio") @db.Text
+  enviadoEm         DateTime?           @map("enviado_em")
+  createdAt         DateTime            @default(now()) @map("created_at")
+  updatedAt         DateTime            @updatedAt @map("updated_at")
+
+  tenant          Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  criadoPorMaster UsuarioMaster?  @relation("email_mensagem_criador", fields: [criadoPorMasterId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, createdAt(sort: Desc)])
+  @@index([tenantId, status])
+  @@map("email_mensagens")
 }

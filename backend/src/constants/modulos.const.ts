@@ -13,6 +13,7 @@ export const MODULOS_SISTEMA: ModuloSistema[] = [
   ModuloSistema.CONFIGURACOES,
   ModuloSistema.ENVIO_DOCUMENTOS,
   ModuloSistema.AVALIACAO,
+  ModuloSistema.ENVIO_EMAIL,
   ModuloSistema.PERFIL,
 ];
 
@@ -41,6 +42,7 @@ export const MODULOS_DEFAULT_POR_PERFIL: Record<UserRole, Record<ModuloSistema, 
     [ModuloSistema.CONFIGURACOES]: false,
     [ModuloSistema.ENVIO_DOCUMENTOS]: false,
     [ModuloSistema.AVALIACAO]: true,
+    [ModuloSistema.ENVIO_EMAIL]: false,
     [ModuloSistema.PERFIL]: true,
   },
 };
