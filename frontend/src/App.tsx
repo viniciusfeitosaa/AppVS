@@ -7,6 +7,12 @@ function MasterOnly({ children }: { children: ReactNode }) {
   if (user?.role !== 'MASTER') return <Navigate to="/acesso-negado" replace />;
   return <>{children}</>;
 }
+
+function ConteudosEntry() {
+  const { user } = useAuth();
+  if (user?.role === 'MASTER') return <ConteudosAdminPage />;
+  return <ConteudosMedicoPage />;
+}
 import { MasterEscopoProvider } from './context/MasterEscopoContext';
 import { NotificationProvider } from './context/NotificationContext';
 import ProtectedRoute from './components/Layout/ProtectedRoute';
@@ -38,6 +44,13 @@ import AcessoNegado from './pages/AcessoNegado';
 import Vagas from './pages/Vagas';
 import Avaliacao from './pages/Avaliacao';
 import ModuloEscalaMaster from './pages/ModuloEscalaMaster';
+import {
+  ConteudosAdminPage,
+  ConteudosMedicoPage,
+  ConteudoMedicoDetalhePage,
+  ConteudoPalestrantePublicPage,
+  ConteudoInscricaoPublicPage,
+} from './modules/conteudos';
 
 const PageLoadingScreen = () => (
   <div className="min-h-screen flex items-center justify-center bg-viva-50">
@@ -87,6 +100,8 @@ function AppRoutes() {
         }
       />
       <Route path="/ativar-conta/:token" element={<AcceptInvite />} />
+      <Route path="/conteudos/palestrante/:token" element={<ConteudoPalestrantePublicPage />} />
+      <Route path="/conteudos/inscricao/:token" element={<ConteudoInscricaoPublicPage />} />
       <Route path="/esqueci-senha" element={<LoginGuard><EsqueciSenha /></LoginGuard>} />
       <Route path="/redefinir-senha" element={<AuthOnlyRedirect><RedefinirSenha /></AuthOnlyRedirect>} />
       <Route
@@ -124,6 +139,8 @@ function AppRoutes() {
           }
         />
         <Route path="/vagas" element={<Vagas />} />
+        <Route path="/conteudos" element={<ConteudosEntry />} />
+        <Route path="/conteudos/:id" element={<ConteudoMedicoDetalhePage />} />
         <Route
           path="/avaliacao"
           element={

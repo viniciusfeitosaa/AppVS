@@ -12,7 +12,8 @@ export type ModuloSistema =
   | 'ENVIO_DOCUMENTOS'
   | 'AVALIACAO'
   | 'ENVIO_EMAIL'
-  | 'PERFIL';
+  | 'PERFIL'
+  | 'CONTEUDOS';
 
 export const MODULO_LABEL: Record<ModuloSistema, string> = {
   DASHBOARD: 'Dashboard',
@@ -29,4 +30,5 @@ export const MODULO_LABEL: Record<ModuloSistema, string> = {
   AVALIACAO: 'Avaliação',
   ENVIO_EMAIL: 'Painel de E-mail',
   PERFIL: 'Minha Conta',
+  CONTEUDOS: 'Conteúdos',
 };

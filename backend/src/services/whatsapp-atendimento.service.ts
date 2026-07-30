@@ -13,12 +13,15 @@ import {
 import { sendWhatsAppText, deleteWhatsAppMessage } from './evolution-whatsapp.service';
 
 
-export type AtendimentoDepartment = 'administrativo' | 'financeiro' | 'duvidas';
+export type AtendimentoDepartment = 'administrativo' | 'financeiro' | 'duvidas' | 'viva_atualiza';
 
 export type AtendimentoContactInfo = {
   nome?: string;
   crm?: string;
   local?: string;
+  email?: string;
+  faculdade?: string;
+  duvida?: string;
   raw: string;
 };
 
@@ -38,10 +41,13 @@ const SESSION_TTL_SEC = 4 * 60 * 60; // 4h — depois disso, novo contato recebe
 const PAUSED_TTL_SEC = 24 * 60 * 60; // 24h — pausa humana na conversa
 const LID_MAP_TTL_SEC = 30 * 24 * 60 * 60;
 
-const DEPARTMENTS: Record<'1' | '2' | '3', { key: AtendimentoDepartment; label: string }> = {
+type DepartmentChoice = '1' | '2' | '3' | '4';
+
+const DEPARTMENTS: Record<DepartmentChoice, { key: AtendimentoDepartment; label: string }> = {
   '1': { key: 'administrativo', label: 'Administrativo' },
   '2': { key: 'financeiro', label: 'Financeiro' },
   '3': { key: 'duvidas', label: 'Dúvidas' },
+  '4': { key: 'viva_atualiza', label: 'Viva Atualiza' },
 };
 
 const COMMANDS_HINT = '_Digite *menu* para ver as opções • *sair* para encerrar_';
@@ -57,8 +63,9 @@ function welcomeMessage(): string {
     '1️⃣ Administrativo',
     '2️⃣ Financeiro',
     '3️⃣ Dúvidas',
+    '4️⃣ Viva Atualiza',
     '',
-    '_Responda com 1, 2 ou 3._',
+    '_Responda com 1, 2, 3 ou 4._',
     COMMANDS_HINT,
   ].join('\n');
 }
@@ -87,13 +94,42 @@ function goodbyeMessage(): string {
 
 function invalidOptionMessage(): string {
   return [
-    'Opção inválida. Por favor, responda apenas com *1*, *2* ou *3*.',
+    'Opção inválida. Por favor, responda apenas com *1*, *2*, *3* ou *4*.',
     '',
     COMMANDS_HINT,
   ].join('\n');
 }
 
-function askContactInfoMessage(label: string): string {
+function askContactInfoMessage(dept: AtendimentoDepartment, label: string): string {
+  if (dept === 'viva_atualiza') {
+    return [
+      `Você selecionou *${label}*.`,
+      '',
+      'Para continuar, informe em uma mensagem:',
+      '• *Nome completo*',
+      '• *Faculdade* ou *CRM*',
+      '• *E-mail*',
+      '',
+      '_Envie tudo em uma única mensagem._',
+      COMMANDS_HINT,
+    ].join('\n');
+  }
+
+  if (dept === 'duvidas') {
+    return [
+      `Você selecionou *${label}*.`,
+      '',
+      'Para facilitar o atendimento, informe:',
+      '• *Nome completo*',
+      '• *CRM*',
+      '• *Local onde trabalha*',
+      '• *Qual a sua dúvida?*',
+      '',
+      '_Envie tudo em uma única mensagem._',
+      COMMANDS_HINT,
+    ].join('\n');
+  }
+
   return [
     `Você selecionou *${label}*.`,
     '',
@@ -107,7 +143,30 @@ function askContactInfoMessage(label: string): string {
   ].join('\n');
 }
 
-function invalidContactInfoMessage(): string {
+function invalidContactInfoMessage(dept?: AtendimentoDepartment): string {
+  if (dept === 'viva_atualiza') {
+    return [
+      'Não consegui identificar seus dados. Por favor, envie em uma mensagem:',
+      '• Nome completo',
+      '• Faculdade ou CRM',
+      '• E-mail',
+      '',
+      COMMANDS_HINT,
+    ].join('\n');
+  }
+
+  if (dept === 'duvidas') {
+    return [
+      'Não consegui identificar seus dados. Por favor, envie em uma mensagem:',
+      '• Nome completo',
+      '• CRM',
+      '• Local onde trabalha',
+      '• Qual a sua dúvida',
+      '',
+      COMMANDS_HINT,
+    ].join('\n');
+  }
+
   return [
     'Não consegui identificar seus dados. Por favor, envie em uma mensagem:',
     '• Nome completo',
@@ -136,11 +195,12 @@ function alreadyQueuedMessage(label: string): string {
   ].join('\n');
 }
 
-function normalizeChoice(text: string): '1' | '2' | '3' | null {
+function normalizeChoice(text: string): DepartmentChoice | null {
   const t = text.trim().toLowerCase();
   if (t === '1' || t.includes('administr')) return '1';
   if (t === '2' || t.includes('financeir')) return '2';
   if (t === '3' || t.includes('duvida') || t.includes('dúvida')) return '3';
+  if (t === '4' || t.includes('viva atualiza')) return '4';
   return null;
 }
 
@@ -170,37 +230,97 @@ export function isResumeCommand(text: string): boolean {
   );
 }
 
-/** Interpreta resposta livre com nome, CRM e local (rótulos ou linhas). */
-export function parseContactInfo(text: string): AtendimentoContactInfo {
+/** Interpreta resposta livre conforme o setor. */
+export function parseContactInfo(
+  text: string,
+  department: AtendimentoDepartment = 'administrativo'
+): AtendimentoContactInfo {
   const raw = text.trim();
   const lines = raw.split('\n').map((l) => l.trim()).filter(Boolean);
 
   let nome: string | undefined;
   let crm: string | undefined;
   let local: string | undefined;
+  let email: string | undefined;
+  let faculdade: string | undefined;
+  let duvida: string | undefined;
 
   for (const line of lines) {
-    const match = line.match(/^(nome|crm|local)\s*[:=\-]\s*(.+)$/i);
+    const match = line.match(
+      /^(nome|crm|local|email|e-mail|faculdade|duvida|dúvida)\s*[:=\-]\s*(.+)$/i
+    );
     if (!match) continue;
     const value = match[2].trim();
     const key = match[1].toLowerCase();
     if (key === 'nome') nome = value;
     else if (key === 'crm') crm = value;
     else if (key === 'local') local = value;
+    else if (key === 'email' || key === 'e-mail') email = value;
+    else if (key === 'faculdade') faculdade = value;
+    else if (key === 'duvida' || key === 'dúvida') duvida = value;
   }
 
-  if (!nome && !crm && !local && lines.length >= 3) {
+  if (!email) {
+    const emailMatch = raw.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i);
+    if (emailMatch) email = emailMatch[0];
+  }
+
+  if (department === 'viva_atualiza') {
+    if (!nome && !crm && !faculdade && lines.length >= 3) {
+      nome = lines[0];
+      const mid = lines[1];
+      email = email || lines.find((l) => l.includes('@')) || lines[2];
+      if (/crm|\d{4,}/i.test(mid)) crm = mid;
+      else faculdade = mid;
+    } else if (!nome && lines.length >= 2) {
+      nome = lines[0];
+      const mid = lines[1];
+      if (/@/.test(mid)) email = email || mid;
+      else if (/crm|\d{4,}/i.test(mid)) crm = mid;
+      else faculdade = mid;
+    }
+  } else if (department === 'duvidas') {
+    if (!nome && !crm && !local && !duvida && lines.length >= 4) {
+      nome = lines[0];
+      crm = lines[1];
+      local = lines[2];
+      duvida = lines.slice(3).join(' ');
+    } else if (!nome && !crm && !local && lines.length >= 3) {
+      nome = lines[0];
+      crm = lines[1];
+      local = lines[2];
+      if (lines.length > 3) duvida = lines.slice(3).join(' ');
+    }
+  } else if (!nome && !crm && !local && lines.length >= 3) {
     [nome, crm, local] = lines;
   } else if (!nome && !crm && lines.length === 2) {
     [nome, crm] = lines;
   }
 
-  return { nome, crm, local, raw };
+  return { nome, crm, local, email, faculdade, duvida, raw };
 }
 
-function isValidContactInfo(text: string): boolean {
-  const parsed = parseContactInfo(text);
-  if (parsed.raw.length < 12) return false;
+function looksLikeEmail(value?: string): boolean {
+  return !!value && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
+}
+
+function isValidContactInfo(text: string, department: AtendimentoDepartment): boolean {
+  const parsed = parseContactInfo(text, department);
+  if (parsed.raw.length < 8) return false;
+
+  if (department === 'viva_atualiza') {
+    const identidade = !!(parsed.faculdade || parsed.crm);
+    return !!(parsed.nome && identidade && looksLikeEmail(parsed.email));
+  }
+
+  if (department === 'duvidas') {
+    const base = [parsed.nome, parsed.crm, parsed.local].filter(Boolean).length >= 2;
+    const hasDuvida =
+      !!(parsed.duvida && parsed.duvida.trim().length >= 5) ||
+      (base && parsed.raw.split(/\s+/).length >= 8);
+    return base && hasDuvida;
+  }
+
   const parts = [parsed.nome, parsed.crm, parsed.local].filter(Boolean);
   if (parts.length >= 2) return true;
   return parsed.raw.split(/\s+/).length >= 4;
@@ -208,10 +328,10 @@ function isValidContactInfo(text: string): boolean {
 
 async function startDepartmentFlow(
   phone: string,
-  dept: (typeof DEPARTMENTS)['1' | '2' | '3'],
+  dept: (typeof DEPARTMENTS)[DepartmentChoice],
   pushName?: string
 ): Promise<void> {
-  await sendWhatsAppText(phone, askContactInfoMessage(dept.label));
+  await sendWhatsAppText(phone, askContactInfoMessage(dept.key, dept.label));
   await saveSession(phone, {
     state: 'collecting_info',
     department: dept.key,
@@ -230,7 +350,9 @@ function logQueuedContact(
 ): void {
   console.log(
     `[whatsapp-atendimento] ${phone}${pushName ? ` (${pushName})` : ''} → fila ${department} | ` +
-      `nome=${info.nome ?? '-'} | crm=${info.crm ?? '-'} | local=${info.local ?? '-'} | raw=${JSON.stringify(info.raw)}`
+      `nome=${info.nome ?? '-'} | crm=${info.crm ?? '-'} | faculdade=${info.faculdade ?? '-'} | ` +
+      `local=${info.local ?? '-'} | email=${info.email ?? '-'} | duvida=${info.duvida ?? '-'} | ` +
+      `raw=${JSON.stringify(info.raw)}`
   );
 }
 
@@ -319,6 +441,7 @@ async function resumeConversation(phone: string, chatJid?: string | null): Promi
 function departmentLabel(key?: AtendimentoDepartment): string {
   if (key === 'financeiro') return 'Financeiro';
   if (key === 'duvidas') return 'Dúvidas';
+  if (key === 'viva_atualiza') return 'Viva Atualiza';
   return 'Administrativo';
 }
 
@@ -496,12 +619,12 @@ export async function handleIncomingWhatsAppMessage(payload: EvolutionWebhookPay
       return true;
     }
 
-    if (!isValidContactInfo(text)) {
-      await sendWhatsAppText(phone, invalidContactInfoMessage());
+    if (!isValidContactInfo(text, session.department || 'administrativo')) {
+      await sendWhatsAppText(phone, invalidContactInfoMessage(session.department));
       return true;
     }
 
-    const contactInfo = parseContactInfo(text);
+    const contactInfo = parseContactInfo(text, session.department || 'administrativo');
     const label = departmentLabel(session.department);
     await sendWhatsAppText(phone, queuedMessage(label));
     await saveSession(phone, {

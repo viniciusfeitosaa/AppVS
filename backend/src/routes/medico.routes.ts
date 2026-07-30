@@ -21,6 +21,12 @@ import {
   deleteInteresseVagaController,
   deleteVagaMedicoController,
 } from '../controllers/medico.controller';
+import {
+  downloadCapaMedicoController,
+  getEventoMedicoController,
+  inscreverMedicoController,
+  listEventosMedicoController,
+} from '../controllers/conteudo.controller';
 import { UserRole } from '@prisma/client';
 import { authenticateToken, requireModuleAccess, requireRole } from '../middleware/auth.middleware';
 import {
@@ -188,6 +194,34 @@ router.delete(
   requireModuleAccess(ModuloSistema.PERFIL),
   validateDeleteSelfAccount,
   deleteSelfAccountController
+);
+
+router.get(
+  '/conteudos',
+  requireRole([UserRole.MEDICO]),
+  requireModuleAccess(ModuloSistema.CONTEUDOS),
+  listEventosMedicoController
+);
+router.get(
+  '/conteudos/:id',
+  requireRole([UserRole.MEDICO]),
+  requireModuleAccess(ModuloSistema.CONTEUDOS),
+  validateUUIDParam('id'),
+  getEventoMedicoController
+);
+router.get(
+  '/conteudos/:id/capa',
+  requireRole([UserRole.MEDICO]),
+  requireModuleAccess(ModuloSistema.CONTEUDOS),
+  validateUUIDParam('id'),
+  downloadCapaMedicoController
+);
+router.post(
+  '/conteudos/:id/inscrever',
+  requireRole([UserRole.MEDICO]),
+  requireModuleAccess(ModuloSistema.CONTEUDOS),
+  validateUUIDParam('id'),
+  inscreverMedicoController
 );
 
 export default router;

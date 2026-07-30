@@ -17,6 +17,7 @@ import leadsRoutes from './routes/leads.routes';
 import blogRoutes from './routes/blog.routes';
 import evolutionWebhookRoutes from './routes/evolution-webhook.routes';
 import emailRoutes from './routes/email.routes';
+import conteudoPublicRoutes from './routes/conteudo-public.routes';
 
 // Criar aplicação Express
 const app: Express = express();
@@ -120,6 +121,7 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/ponto', pontoRoutes);
 app.use('/api/leads', leadsRoutes);
 app.use('/api/blog', blogRoutes);
+app.use('/api/conteudos/public', conteudoPublicRoutes);
 
 // Rota raiz
 app.get('/', (_req: Request, res: Response) => {

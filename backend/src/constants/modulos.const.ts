@@ -15,6 +15,7 @@ export const MODULOS_SISTEMA: ModuloSistema[] = [
   ModuloSistema.AVALIACAO,
   ModuloSistema.ENVIO_EMAIL,
   ModuloSistema.PERFIL,
+  ModuloSistema.CONTEUDOS,
 ];
 
 export const CORE_MASTER_SEMPRE_ATIVOS = new Set<ModuloSistema>([
@@ -44,5 +45,6 @@ export const MODULOS_DEFAULT_POR_PERFIL: Record<UserRole, Record<ModuloSistema, 
     [ModuloSistema.AVALIACAO]: true,
     [ModuloSistema.ENVIO_EMAIL]: false,
     [ModuloSistema.PERFIL]: true,
+    [ModuloSistema.CONTEUDOS]: true,
   },
 };

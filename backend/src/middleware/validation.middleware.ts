@@ -956,3 +956,70 @@ export const validateCreateBlogCategory = [
   body('ordem').optional().isInt({ min: 0 }),
   handleValidationErrors,
 ];
+
+export const validateCreateConteudoEvento = [
+  body('titulo').trim().isLength({ min: 3, max: 255 }).withMessage('Título inválido'),
+  body('youtubeUrl')
+    .optional({ values: 'falsy' })
+    .trim()
+    .isLength({ max: 500 })
+    .withMessage('Link do YouTube inválido'),
+  body('iniciaEm').isISO8601().withMessage('Data/hora inválida'),
+  body('descricao').optional({ values: 'null' }).trim().isLength({ max: 5000 }),
+  body('capaUrl').optional({ values: 'null' }).trim().isLength({ max: 500 }),
+  body('palestranteId').optional({ values: 'null' }).isUUID().withMessage('Palestrante inválido'),
+  body('status').optional().isIn(['RASCUNHO', 'PUBLICADO', 'ENCERRADO']),
+  handleValidationErrors,
+];
+
+export const validateUpdateConteudoEvento = [
+  body('titulo').optional().trim().isLength({ min: 3, max: 255 }),
+  body('youtubeUrl').optional({ values: 'falsy' }).trim().isLength({ max: 500 }),
+  body('iniciaEm').optional().isISO8601(),
+  body('descricao').optional({ values: 'null' }).trim().isLength({ max: 5000 }),
+  body('capaUrl').optional({ values: 'null' }).trim().isLength({ max: 500 }),
+  body('palestranteId').optional({ values: 'null' }).isUUID(),
+  body('status').optional().isIn(['RASCUNHO', 'PUBLICADO', 'ENCERRADO']),
+  handleValidationErrors,
+];
+
+export const validateConvidarPalestrante = [
+  body('nome').optional().trim().isLength({ max: 255 }),
+  body('email').optional().trim().isEmail().withMessage('E-mail inválido'),
+  body('medicoId').optional().isUUID(),
+  handleValidationErrors,
+];
+
+export const validatePublicPalestranteForm = [
+  body('nome').trim().isLength({ min: 2, max: 255 }).withMessage('Nome inválido'),
+  body('email').trim().isEmail().withMessage('E-mail inválido'),
+  body('telefone').optional({ values: 'null' }).trim().isLength({ max: 30 }),
+  body('bio').optional({ values: 'null' }).trim().isLength({ max: 5000 }),
+  body('fotoUrl').optional({ values: 'null' }).trim().isLength({ max: 500 }),
+  body('crm').optional({ values: 'null' }).trim().isLength({ max: 60 }),
+  body('especialidade').optional({ values: 'null' }).trim().isLength({ max: 120 }),
+  handleValidationErrors,
+];
+
+export const validatePublicInscricaoForm = [
+  body('nome').trim().isLength({ min: 2, max: 255 }).withMessage('Nome inválido'),
+  body('email').trim().isEmail().withMessage('E-mail inválido'),
+  body('telefone').trim().isLength({ min: 8, max: 30 }).withMessage('Telefone/WhatsApp inválido'),
+  body('crm').optional({ values: 'falsy' }).trim().isLength({ max: 60 }),
+  body('especialidade').optional({ values: 'falsy' }).trim().isLength({ max: 120 }),
+  body('cidade').optional({ values: 'falsy' }).trim().isLength({ max: 120 }),
+  body('interesseCorpoClinico').optional().isBoolean(),
+  body('consentimentoLgpd')
+    .custom((v) => v === true)
+    .withMessage('É necessário aceitar o consentimento LGPD'),
+  handleValidationErrors,
+];
+
+export const validateConteudoTokenParam = [
+  param('token')
+    .trim()
+    .isLength({ min: 16, max: 64 })
+    .matches(/^[a-f0-9]+$/i)
+    .withMessage('Token inválido'),
+  handleValidationErrors,
+];

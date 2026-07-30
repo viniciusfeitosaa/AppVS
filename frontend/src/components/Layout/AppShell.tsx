@@ -189,6 +189,7 @@ const AppShell = () => {
             { to: '/modulo-escala-master', label: 'Somente escala' },
             { to: '/envio-documentos', label: 'Envio de Documentos' },
             { to: '/email', label: 'Painel de E-mail' },
+            { to: '/conteudos', label: 'Conteúdos' },
             { to: '/perfil', label: 'Minha Conta' },
           ],
         },
@@ -200,7 +201,10 @@ const AppShell = () => {
         },
         {
           title: 'Produtividade',
-          items: [{ to: '/atendimentos', label: 'Atendimentos' }],
+          items: [
+            { to: '/atendimentos', label: 'Atendimentos' },
+            { to: '/conteudos', label: 'Conteúdos' },
+          ],
         },
         {
           title: 'Conta',
@@ -230,6 +234,7 @@ const AppShell = () => {
     '/historico-pontos': 'PONTO_ELETRONICO',
     '/meu-calendario-plantoes': 'PONTO_ELETRONICO',
     '/atendimentos': 'ATENDIMENTOS',
+    '/conteudos': 'CONTEUDOS',
     '/vagas': 'VAGAS',
     '/avaliacao': 'AVALIACAO',
     '/modulo-escala-master': 'CONFIGURACOES',
