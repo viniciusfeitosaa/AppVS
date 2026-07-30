@@ -58,6 +58,8 @@ Substituir a **Evolution API (Node.js)** pela **Evolution GO** (Go + whatsmeow) 
 ### Fase 2 — Operação
 
 - [x] Endpoint webhook `POST /api/webhooks/evolution-go` (menu de atendimento automático)
+- [x] Comandos *pausar* / *retomar* por conversa (somente equipe; silencioso + apaga o comando do chat)
+- [x] `readMessages=false` na instância (não marcar como lido ao receber)
 - [ ] Health no `/health` do backend (ping Evolution GO)
 - [ ] Painel master: status instância + link QR (opcional)
 

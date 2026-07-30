@@ -1,13 +1,14 @@
 # 15 — Estado atual e pendências
 
-**Snapshot:** 2026-05-28  
-**Branch:** `main` (sync com `origin/main`)
+**Snapshot:** 2026-07-30  
+**Branch:** `main` (sync com `origin/main` após push desta entrega)
 
-> Este arquivo deve ser o **primeiro** atualizado após entregas relevantes.
+> Este arquivo deve ser o **primeiro** atualizado após entregas relevantes.  
+> É o **mapa de bordo** do projeto (o que está pronto, o que falta, histórico recente).
 
 ## Resumo executivo
 
-O **Viva Saúde** é um sistema **maduro em produção/desenvolvimento avançado**, não um MVP em fase de setup. Auth, escalas, ponto, vagas, documentos, relatórios, mobile e deploy estão implementados.
+O **Viva Saúde** está em produção na VPS (`sejavivasaude.com.br`). Auth, escalas, ponto, vagas, documentos, relatórios, painel de e-mail, robô WhatsApp (Evolution GO), mobile e deploy estão implementados.
 
 ## Módulos — status
 
@@ -22,7 +23,9 @@ O **Viva Saúde** é um sistema **maduro em produção/desenvolvimento avançado
 | Ponto eletrônico | ✅ | ✅ | Geo, foto, histórico |
 | Vagas | ✅ | ✅ | Wizard de anúncio |
 | Documentos | ✅ | ✅ | DocuSeal opcional |
-| Relatórios | ✅ | ✅ | Procedimentos + ponto |
+| Relatórios | ✅ | ✅ | Procedimentos + ponto; PDF com logo VS |
+| Painel de E-mail | ✅ | ✅ | NF / demonstrativos; anexo PDF |
+| WhatsApp (Evolution GO) | ✅ | — | Menu atendimento; pausar/retomar (equipe) |
 | Configurações / módulos | ✅ | ✅ | Matriz de acesso |
 | Avaliação (master) | ✅ | ✅ | `MasterOnly` |
 | Atendimentos | — | ⏳ Placeholder | `FeaturePlaceholder` |
@@ -32,22 +35,18 @@ O **Viva Saúde** é um sistema **maduro em produção/desenvolvimento avançado
 
 | Item | Status |
 |------|--------|
-| Testes backend Jest | ✅ 12 testes passando |
-| Migrations Prisma | ✅ 39 pastas |
+| Testes backend Jest | ✅ |
+| Migrations Prisma | ✅ |
 | CI GitHub Actions | ✅ `ci.yml`, `deploy-vps.yml` |
 | Docs raiz README/CHECKLIST | ⚠️ Desatualizados |
-| Obsidian COFRE - MEMORIA (vinic) | ✅ Junction `memoria total\Viva-Saude` |
-
-## Git local (agente/cloud)
-
-- Alteração não commitada observada: `backend/package-lock.json`
-- Último commit: remoção animação vídeo login
+| Ícone PWA | ✅ Viva Saúde (VS), não CoopVitta |
 
 ## Pendências prioritárias
 
 1. **Atendimentos** — definir escopo e implementar (hoje só placeholder)
 2. **Sincronizar README/CHECKLIST** ou marcar como arquivados apontando para `contexto/`
 3. **Harness** — manter esta pasta após cada feature (ver `16-como-atualizar.md`)
+4. **WhatsApp** — health no `/health` do backend (ping Evolution GO); painel master opcional (QR/status)
 
 ## Pendências menores
 
@@ -55,13 +54,28 @@ O **Viva Saúde** é um sistema **maduro em produção/desenvolvimento avançado
 - Processo de publicação App Store / Play Store em `12-mobile-capacitor.md`
 - Tabela de endpoints de vagas em `08-vagas.md`
 
-## Histórico de entregas recentes (referência)
+## Histórico de entregas recentes
 
-| Data (aprox.) | Entrega |
-|---------------|---------|
-| 2026-04 | Trocas de plantão (várias migrations) |
-| 2026-03 | Módulo vagas, valores plantão, perf indexes ponto |
-| 2026 | Relatório procedimentos + import Excel |
-| 2026 | Remoção vídeo animado na login |
+| Data | Entrega |
+|------|---------|
+| 2026-07-30 | Robô WhatsApp: `pausar`/`retomar` **só pela equipe** (silencioso + apaga comando); fix retomar com JID `@lid` ↔ telefone; `readMessages=false` |
+| 2026-07-21 | Logo VS nos PDFs; enviar demonstrativo da produção (prévia + PDF anexo); contatos/e-mails médicos; ícone PWA VS |
+| 2026-07 | Painel de e-mail (NF/demonstrativos), Evolution GO, filtro produção por médico |
+| 2026-04 | Trocas de plantão |
+| 2026-03 | Módulo vagas, valores plantão |
 
-*Adicione linhas aqui ao fechar tarefas.*
+### Detalhe — WhatsApp pausar/retomar (2026-07-30)
+
+- **Quem controla:** apenas mensagens `IsFromMe` no WhatsApp da Viva Saúde (`pausar`, `retomar` / `despausar` / `ativar`)
+- **Cliente:** não pausa/retoma; com conversa pausada o robô não responde
+- **UX:** sem confirmação no chat; tenta apagar o comando (`/message/delete`)
+- **Bug corrigido:** pause/resume usavam `@lid` como “telefone”; agora resolve PN + mapeia LID↔telefone no Redis
+- **Arquivos:** `whatsapp-atendimento.service.ts`, `whatsapp-jid.util.ts`, `evolution-whatsapp.service.ts`, `evolution-webhook.routes.ts`, `docs/SETUP-EVOLUTION-GO.md`
+
+### Detalhe — Relatórios / e-mail (2026-07-21)
+
+- PDF com logo horizontal Viva Saúde (`utils/pdf-branding.ts`)
+- Produção por médico → **Enviar demonstrativo** (prévia + anexo)
+- Remetente operacional: `noreply@vivasaude.cloud`
+
+*Adicione linhas na tabela ao fechar tarefas.*

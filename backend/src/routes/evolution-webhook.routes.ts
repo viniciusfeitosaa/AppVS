@@ -4,6 +4,7 @@ import {
   handleIncomingWhatsAppMessage,
   type EvolutionWebhookPayload,
 } from '../services/whatsapp-atendimento.service';
+import { ensureEvolutionGoUnreadSettings } from '../services/evolution-whatsapp.service';
 import { safeLogger } from '../utils/safe-logger';
 
 const router = Router();
@@ -42,6 +43,7 @@ router.post('/evolution-go', async (req: Request, res: Response) => {
   }
 
   setImmediate(() => {
+    void ensureEvolutionGoUnreadSettings().catch(() => undefined);
     handleIncomingWhatsAppMessage(body).catch((err) => {
       safeLogger.error('[evolution-webhook] falha ao processar mensagem:', err);
     });

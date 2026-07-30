@@ -60,9 +60,9 @@ pages → components → services (api.ts + *.service.ts)
 
 ## Integrações externas (via env)
 
-- E-mail (reset, convites, cadastro)
+- E-mail / SMTP Maddy (`noreply@vivasaude.cloud`) — painel NF/demonstrativos + reset/convites
 - DocuSeal (`docuseal.service.ts`) — assinatura/documentos quando configurado
-- WhatsApp util (`whatsapp.util.ts`) — notificações opcionais
+- WhatsApp Evolution GO (`evolution-whatsapp.service.ts` + `whatsapp-atendimento.service.ts`) — menu automático; `pausar`/`retomar` só pela equipe
 
 Ver `.env.example` para variáveis completas.
 
