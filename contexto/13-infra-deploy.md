@@ -1,12 +1,14 @@
 # 13 — Infraestrutura e deploy
 
 **Status:** ✅ Configurado  
-**Última atualização:** 2026-05-28
+**Última atualização:** 2026-07-30
 
 ## Docker
 
 - `docker-compose.yml` — app (frontend + backend + nginx)
 - `docker-compose.postgres.yml` — Postgres na mesma VPS (rede interna)
+- `docker-compose.vps.yml` — overrides VPS (rede `coopvitta-network` / aliases NPM)
+- `docker-compose.evolution-go.yml` — Evolution GO (WhatsApp); ver `docs/SETUP-EVOLUTION-GO.md`
 - `DOCKER.md` — guia detalhado
 - `Dockerfile` — build da aplicação
 
