@@ -26,6 +26,7 @@ O **Viva Saúde** está em produção na VPS (`sejavivasaude.com.br`). Auth, esc
 | Relatórios | ✅ | ✅ | Procedimentos + ponto; PDF com logo VS |
 | Painel de E-mail | ✅ | ✅ | NF / demonstrativos; anexo PDF |
 | WhatsApp (Evolution GO) | ✅ | — | Menu atendimento; pausar/retomar (equipe) |
+| Conteúdos / eventos | ✅ | ✅ | Anúncio + inscrições; frequência v1 (admin + app + e-mail) |
 | Configurações / módulos | ✅ | ✅ | Matriz de acesso |
 | Avaliação (master) | ✅ | ✅ | `MasterOnly` |
 | Atendimentos | — | ⏳ Placeholder | `FeaturePlaceholder` |
@@ -58,6 +59,8 @@ O **Viva Saúde** está em produção na VPS (`sejavivasaude.com.br`). Auth, esc
 
 | Data | Entrega |
 |------|---------|
+| 2026-07-31 | Conteúdos: **frequência** na aula (admin abre/fecha; médico no app; externo por e-mail) — `17-conteudos-eventos.md` |
+| 2026-07-30 | Conteúdos: modelo **anúncio** — abrir inscrições sem YouTube; copy admin/médico (ver `17-conteudos-eventos.md`) |
 | 2026-07-30 | Robô WhatsApp: `pausar`/`retomar` **só pela equipe** (silencioso + apaga comando); fix retomar com JID `@lid` ↔ telefone; `readMessages=false` |
 | 2026-07-21 | Logo VS nos PDFs; enviar demonstrativo da produção (prévia + PDF anexo); contatos/e-mails médicos; ícone PWA VS |
 | 2026-07 | Painel de e-mail (NF/demonstrativos), Evolution GO, filtro produção por médico |

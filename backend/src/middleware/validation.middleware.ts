@@ -1005,13 +1005,27 @@ export const validatePublicInscricaoForm = [
   body('nome').trim().isLength({ min: 2, max: 255 }).withMessage('Nome inválido'),
   body('email').trim().isEmail().withMessage('E-mail inválido'),
   body('telefone').trim().isLength({ min: 8, max: 30 }).withMessage('Telefone/WhatsApp inválido'),
+  body('cpf').trim().notEmpty().withMessage('Informe o CPF').isLength({ min: 11, max: 14 }),
+  body('perfil')
+    .optional()
+    .isIn(['MEDICO', 'ESTUDANTE'])
+    .withMessage('Perfil inválido'),
   body('crm').optional({ values: 'falsy' }).trim().isLength({ max: 60 }),
   body('especialidade').optional({ values: 'falsy' }).trim().isLength({ max: 120 }),
   body('cidade').optional({ values: 'falsy' }).trim().isLength({ max: 120 }),
+  body('faculdade').optional({ values: 'falsy' }).trim().isLength({ max: 255 }),
+  body('semestre').optional({ values: 'falsy' }).trim().isLength({ max: 40 }),
+  body('participaLiga').optional().isBoolean(),
+  body('ligaNome').optional({ values: 'falsy' }).trim().isLength({ max: 255 }),
   body('interesseCorpoClinico').optional().isBoolean(),
   body('consentimentoLgpd')
     .custom((v) => v === true)
     .withMessage('É necessário aceitar o consentimento LGPD'),
+  handleValidationErrors,
+];
+
+export const validatePublicFrequenciaForm = [
+  body('email').trim().isEmail().withMessage('Informe um e-mail válido').isLength({ max: 255 }),
   handleValidationErrors,
 ];
 

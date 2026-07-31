@@ -36,6 +36,7 @@
 | 14 | [14-convencoes-codigo.md](./14-convencoes-codigo.md) | Convenções |
 | 15 | [15-estado-atual-e-pendencias.md](./15-estado-atual-e-pendencias.md) | Estado atual |
 | 16 | [16-como-atualizar.md](./16-como-atualizar.md) | Manutenção do harness |
+| 17 | [17-conteudos-eventos.md](./17-conteudos-eventos.md) | Conteúdos / aulas ao vivo |
 
 ## Outros docs úteis (fora de `contexto/`)
 

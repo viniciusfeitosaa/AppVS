@@ -2,6 +2,9 @@ import { FormEvent, useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { BrandLogo } from '../../../components/brand/BrandLogo';
 import { conteudoPublicService, type ConteudoEvento } from '../api/conteudo.service';
+import { maskCpf } from '../../../features/cadastro-coop/utils/masks';
+
+type PerfilInscricao = 'MEDICO' | 'ESTUDANTE';
 
 const ConteudoInscricaoPublicPage = () => {
   const { token } = useParams<{ token: string }>();
@@ -10,12 +13,18 @@ const ConteudoInscricaoPublicPage = () => {
   const [success, setSuccess] = useState(false);
   const [evento, setEvento] = useState<ConteudoEvento | null>(null);
   const [form, setForm] = useState({
+    perfil: '' as '' | PerfilInscricao,
     nome: '',
     email: '',
     telefone: '',
+    cpf: '',
     crm: '',
     especialidade: '',
     cidade: '',
+    faculdade: '',
+    semestre: '',
+    participaLiga: false,
+    ligaNome: '',
     interesseCorpoClinico: true,
     consentimentoLgpd: false,
   });
@@ -38,17 +47,32 @@ const ConteudoInscricaoPublicPage = () => {
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (!token) return;
+    if (!form.perfil) {
+      setError('Selecione se você é médico(a) ou estudante.');
+      return;
+    }
     setError(null);
     try {
       await conteudoPublicService.submitInscricao(token, {
+        perfil: form.perfil,
         nome: form.nome,
         email: form.email,
         telefone: form.telefone,
-        crm: form.crm || undefined,
-        especialidade: form.especialidade || undefined,
+        cpf: form.cpf,
         cidade: form.cidade || undefined,
         interesseCorpoClinico: form.interesseCorpoClinico,
         consentimentoLgpd: form.consentimentoLgpd,
+        ...(form.perfil === 'MEDICO'
+          ? {
+              crm: form.crm || undefined,
+              especialidade: form.especialidade || undefined,
+            }
+          : {
+              faculdade: form.faculdade,
+              semestre: form.semestre,
+              participaLiga: form.participaLiga,
+              ligaNome: form.participaLiga ? form.ligaNome : undefined,
+            }),
       });
       setSuccess(true);
     } catch (err: unknown) {
@@ -58,6 +82,8 @@ const ConteudoInscricaoPublicPage = () => {
   };
 
   const capaSrc = token ? conteudoPublicService.capaUrl(token) : null;
+  const isMedico = form.perfil === 'MEDICO';
+  const isEstudante = form.perfil === 'ESTUDANTE';
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-viva-950 py-12 px-4">
@@ -85,6 +111,10 @@ const ConteudoInscricaoPublicPage = () => {
           <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 px-4 py-3 rounded text-sm">
             Precadastro e inscrição confirmados. Em breve nossa equipe poderá entrar em contato.
           </div>
+        ) : !evento ? (
+          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded text-sm">
+            {error || 'Link de inscrição inválido'}
+          </div>
         ) : (
           <form className="space-y-3" onSubmit={onSubmit}>
             {error && (
@@ -92,6 +122,45 @@ const ConteudoInscricaoPublicPage = () => {
                 {error}
               </div>
             )}
+
+            <fieldset className="space-y-2">
+              <legend className="text-sm font-medium text-viva-800">Você é *</legend>
+              <div className="grid grid-cols-2 gap-2">
+                <label
+                  className={`flex cursor-pointer items-center justify-center rounded-lg border px-3 py-2.5 text-sm font-medium transition ${
+                    isMedico
+                      ? 'border-viva-700 bg-viva-50 text-viva-950 ring-2 ring-viva-600/30'
+                      : 'border-viva-200 text-viva-700 hover:bg-viva-50'
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="perfil"
+                    className="sr-only"
+                    checked={isMedico}
+                    onChange={() => setForm((f) => ({ ...f, perfil: 'MEDICO' }))}
+                  />
+                  Médico(a)
+                </label>
+                <label
+                  className={`flex cursor-pointer items-center justify-center rounded-lg border px-3 py-2.5 text-sm font-medium transition ${
+                    isEstudante
+                      ? 'border-viva-700 bg-viva-50 text-viva-950 ring-2 ring-viva-600/30'
+                      : 'border-viva-200 text-viva-700 hover:bg-viva-50'
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="perfil"
+                    className="sr-only"
+                    checked={isEstudante}
+                    onChange={() => setForm((f) => ({ ...f, perfil: 'ESTUDANTE' }))}
+                  />
+                  Estudante
+                </label>
+              </div>
+            </fieldset>
+
             <label className="block text-sm space-y-1">
               <span className="text-viva-700">Nome completo *</span>
               <input
@@ -120,24 +189,91 @@ const ConteudoInscricaoPublicPage = () => {
                 onChange={(e) => setForm((f) => ({ ...f, telefone: e.target.value }))}
               />
             </label>
-            <div className="grid sm:grid-cols-2 gap-3">
-              <label className="block text-sm space-y-1">
-                <span className="text-viva-700">CRM / registro</span>
-                <input
-                  className="w-full rounded-lg border border-viva-200 px-3 py-2"
-                  value={form.crm}
-                  onChange={(e) => setForm((f) => ({ ...f, crm: e.target.value }))}
-                />
-              </label>
-              <label className="block text-sm space-y-1">
-                <span className="text-viva-700">Especialidade</span>
-                <input
-                  className="w-full rounded-lg border border-viva-200 px-3 py-2"
-                  value={form.especialidade}
-                  onChange={(e) => setForm((f) => ({ ...f, especialidade: e.target.value }))}
-                />
-              </label>
-            </div>
+            <label className="block text-sm space-y-1">
+              <span className="text-viva-700">CPF *</span>
+              <input
+                required
+                inputMode="numeric"
+                autoComplete="off"
+                className="w-full rounded-lg border border-viva-200 px-3 py-2"
+                value={form.cpf}
+                onChange={(e) => setForm((f) => ({ ...f, cpf: maskCpf(e.target.value) }))}
+                placeholder="000.000.000-00"
+              />
+            </label>
+
+            {isMedico && (
+              <div className="grid sm:grid-cols-2 gap-3">
+                <label className="block text-sm space-y-1">
+                  <span className="text-viva-700">CRM / registro</span>
+                  <input
+                    className="w-full rounded-lg border border-viva-200 px-3 py-2"
+                    value={form.crm}
+                    onChange={(e) => setForm((f) => ({ ...f, crm: e.target.value }))}
+                  />
+                </label>
+                <label className="block text-sm space-y-1">
+                  <span className="text-viva-700">Especialidade</span>
+                  <input
+                    className="w-full rounded-lg border border-viva-200 px-3 py-2"
+                    value={form.especialidade}
+                    onChange={(e) => setForm((f) => ({ ...f, especialidade: e.target.value }))}
+                  />
+                </label>
+              </div>
+            )}
+
+            {isEstudante && (
+              <>
+                <label className="block text-sm space-y-1">
+                  <span className="text-viva-700">Faculdade *</span>
+                  <input
+                    required
+                    className="w-full rounded-lg border border-viva-200 px-3 py-2"
+                    value={form.faculdade}
+                    onChange={(e) => setForm((f) => ({ ...f, faculdade: e.target.value }))}
+                    placeholder="Nome da instituição"
+                  />
+                </label>
+                <label className="block text-sm space-y-1">
+                  <span className="text-viva-700">Semestre *</span>
+                  <input
+                    required
+                    className="w-full rounded-lg border border-viva-200 px-3 py-2"
+                    value={form.semestre}
+                    onChange={(e) => setForm((f) => ({ ...f, semestre: e.target.value }))}
+                    placeholder="Ex.: 6º"
+                  />
+                </label>
+                <label className="flex items-start gap-2 text-sm text-viva-800">
+                  <input
+                    type="checkbox"
+                    className="mt-1"
+                    checked={form.participaLiga}
+                    onChange={(e) =>
+                      setForm((f) => ({
+                        ...f,
+                        participaLiga: e.target.checked,
+                        ligaNome: e.target.checked ? f.ligaNome : '',
+                      }))
+                    }
+                  />
+                  <span>Participo de alguma liga acadêmica</span>
+                </label>
+                {form.participaLiga && (
+                  <label className="block text-sm space-y-1">
+                    <span className="text-viva-700">Qual liga? *</span>
+                    <input
+                      required
+                      className="w-full rounded-lg border border-viva-200 px-3 py-2"
+                      value={form.ligaNome}
+                      onChange={(e) => setForm((f) => ({ ...f, ligaNome: e.target.value }))}
+                    />
+                  </label>
+                )}
+              </>
+            )}
+
             <label className="block text-sm space-y-1">
               <span className="text-viva-700">Cidade</span>
               <input
@@ -168,7 +304,8 @@ const ConteudoInscricaoPublicPage = () => {
             </label>
             <button
               type="submit"
-              className="w-full rounded-lg bg-viva-800 text-white py-2.5 text-sm font-medium"
+              disabled={!form.perfil}
+              className="w-full rounded-lg bg-viva-800 text-white py-2.5 text-sm font-medium disabled:opacity-50"
             >
               Confirmar inscrição
             </button>

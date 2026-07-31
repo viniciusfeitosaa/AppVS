@@ -10,10 +10,13 @@ import {
   type ConteudoParticipante,
   type ConteudoPrecadastro,
 } from '../api/conteudo.service';
-import { AuthImage } from '../components/AuthImage';
+import { CapaUploadField } from '../components/CapaUploadField';
+import { DateTimeField } from '../components/DateTimeField';
+import { LocalQrCode } from '../components/LocalQrCode';
+import { ShareLinkCard } from '../components/ShareLinkCard';
 
 function statusLabel(s: ConteudoEventoStatus) {
-  if (s === 'PUBLICADO') return 'Publicado';
+  if (s === 'PUBLICADO') return 'Inscrições abertas';
   if (s === 'ENCERRADO') return 'Encerrado';
   return 'Rascunho';
 }
@@ -59,6 +62,7 @@ const ConteudosAdminPage = () => {
   const [palEmail, setPalEmail] = useState('');
   const [palSearch, setPalSearch] = useState('');
   const [selectedPalId, setSelectedPalId] = useState('');
+  const [palMode, setPalMode] = useState<'existente' | 'novo'>('existente');
 
   const { data: modulosResp } = useQuery({
     queryKey: ['auth', 'modulos-acesso', user?.id],
@@ -115,6 +119,7 @@ const ConteudosAdminPage = () => {
       descricao: evento.descricao || '',
     });
     setSelectedPalId(evento.palestranteId || '');
+    setPalMode(evento.palestranteId ? 'existente' : 'novo');
   }, [evento?.id, evento?.updatedAt]);
 
   const invalidate = async () => {
@@ -168,17 +173,34 @@ const ConteudosAdminPage = () => {
   const actionMutation = useMutation({
     mutationFn: async (action: 'publicar' | 'encerrar' | 'rascunho') => {
       if (!selectedId) throw new Error('Sem id');
-      if (action === 'publicar') return conteudoAdminService.publicar(selectedId);
+      if (action === 'publicar') {
+        // Salva campos pendentes e abre inscrições (YouTube opcional — pode vir perto do horário)
+        await conteudoAdminService.updateEvento(selectedId, {
+          titulo: form.titulo,
+          youtubeUrl: form.youtubeUrl.trim() || null,
+          iniciaEm: fromLocalInputValue(form.iniciaEm),
+          descricao: form.descricao || null,
+          palestranteId: selectedPalId || null,
+        });
+        return conteudoAdminService.publicar(selectedId);
+      }
       if (action === 'encerrar') return conteudoAdminService.encerrar(selectedId);
       return conteudoAdminService.rascunho(selectedId);
     },
-    onSuccess: async () => {
-      setOkMsg('Status atualizado');
+    onSuccess: async (_data, action) => {
+      setError(null);
+      setOkMsg(
+        action === 'publicar'
+          ? 'Inscrições abertas — anúncio liberado'
+          : action === 'encerrar'
+            ? 'Inscrições encerradas'
+            : 'Voltado a rascunho'
+      );
       await invalidate();
     },
     onError: (e: unknown) => {
-      const err = e as { response?: { data?: { error?: string } } };
-      setError(err.response?.data?.error || 'Falha na ação');
+      const err = e as { response?: { data?: { error?: string } }; message?: string };
+      setError(err.response?.data?.error || err.message || 'Falha na ação');
     },
   });
 
@@ -217,6 +239,23 @@ const ConteudosAdminPage = () => {
     },
   });
 
+  const frequenciaMutation = useMutation({
+    mutationFn: async (action: 'abrir' | 'fechar') => {
+      if (!selectedId) throw new Error('Sem id');
+      if (action === 'abrir') return conteudoAdminService.abrirFrequencia(selectedId);
+      return conteudoAdminService.fecharFrequencia(selectedId);
+    },
+    onSuccess: async (_data, action) => {
+      setError(null);
+      setOkMsg(action === 'abrir' ? 'Frequência aberta — compartilhe o link' : 'Frequência encerrada');
+      await invalidate();
+    },
+    onError: (e: unknown) => {
+      const err = e as { response?: { data?: { error?: string } } };
+      setError(err.response?.data?.error || 'Falha na frequência');
+    },
+  });
+
   const onCreate = (e: FormEvent) => {
     e.preventDefault();
     setOkMsg(null);
@@ -244,7 +283,8 @@ const ConteudosAdminPage = () => {
         <div className="space-y-1">
           <h1 className="text-2xl font-display font-semibold text-viva-950">Conteúdos</h1>
           <p className="text-sm text-viva-700">
-            Cadastre eventos e capture participantes como precadastro do corpo clínico.
+            Anuncie aulas ao vivo, abra inscrições cedo e capture participantes — o link do YouTube pode
+            entrar depois, perto do horário.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -313,32 +353,40 @@ const ConteudosAdminPage = () => {
       <div className="grid lg:grid-cols-5 gap-6">
         <section className="lg:col-span-2 space-y-4">
           <form onSubmit={onCreate} className="rounded-2xl border border-viva-200 bg-white p-4 space-y-3">
-            <h2 className="font-semibold text-viva-900">Novo conteúdo</h2>
-            <input
-              className="w-full rounded-lg border border-viva-200 px-3 py-2 text-sm"
-              placeholder="Nome do conteúdo"
-              value={form.titulo}
-              onChange={(e) => setForm((f) => ({ ...f, titulo: e.target.value }))}
-              disabled={!!selectedId}
-            />
+            <h2 className="font-semibold text-viva-900">Novo anúncio</h2>
+            <label className="block space-y-1.5">
+              <span className="text-sm font-medium text-viva-800">Nome do conteúdo</span>
+              <input
+                className="w-full rounded-lg border border-viva-200 bg-white px-3 py-2.5 text-sm text-viva-900 shadow-sm outline-none transition focus:border-viva-500 focus:ring-2 focus:ring-viva-500/20"
+                placeholder="Ex.: Aula ao vivo — escalas"
+                value={form.titulo}
+                onChange={(e) => setForm((f) => ({ ...f, titulo: e.target.value }))}
+                disabled={!!selectedId}
+                required={!selectedId}
+              />
+            </label>
             {!selectedId && (
               <>
-                <input
-                  className="w-full rounded-lg border border-viva-200 px-3 py-2 text-sm"
-                  placeholder="Link do YouTube (opcional no rascunho)"
-                  value={form.youtubeUrl}
-                  onChange={(e) => setForm((f) => ({ ...f, youtubeUrl: e.target.value }))}
-                />
-                <input
-                  type="datetime-local"
-                  className="w-full rounded-lg border border-viva-200 px-3 py-2 text-sm"
+                <label className="block space-y-1.5">
+                  <span className="text-sm font-medium text-viva-800">YouTube (opcional)</span>
+                  <input
+                    className="w-full rounded-lg border border-viva-200 bg-white px-3 py-2.5 text-sm text-viva-900 shadow-sm outline-none transition focus:border-viva-500 focus:ring-2 focus:ring-viva-500/20"
+                    placeholder="Pode ficar em branco — adicione perto do horário"
+                    value={form.youtubeUrl}
+                    onChange={(e) => setForm((f) => ({ ...f, youtubeUrl: e.target.value }))}
+                  />
+                </label>
+                <DateTimeField
+                  id="novo-conteudo-inicia"
+                  required
                   value={form.iniciaEm}
-                  onChange={(e) => setForm((f) => ({ ...f, iniciaEm: e.target.value }))}
+                  onChange={(iniciaEm) => setForm((f) => ({ ...f, iniciaEm }))}
+                  hint="obrigatório"
                 />
                 <button
                   type="submit"
                   disabled={createMutation.isPending}
-                  className="w-full rounded-lg bg-viva-800 text-white py-2 text-sm font-medium hover:bg-viva-900 disabled:opacity-60"
+                  className="w-full rounded-lg bg-viva-800 text-white py-2.5 text-sm font-medium hover:bg-viva-900 disabled:opacity-60"
                 >
                   {createMutation.isPending ? 'Criando…' : 'Criar rascunho'}
                 </button>
@@ -398,270 +446,500 @@ const ConteudosAdminPage = () => {
           </div>
         </section>
 
-        <section className="lg:col-span-3 space-y-4">
+        <section className="lg:col-span-3 space-y-4" aria-label="Detalhe do conteúdo">
           {!selectedId || !evento ? (
-            <div className="rounded-2xl border border-dashed border-viva-300 bg-viva-50/50 p-10 text-center text-viva-700 text-sm">
-              Selecione um conteúdo na lista ou crie um novo.
+            <div className="flex min-h-[22rem] flex-col items-center justify-center rounded-2xl border border-dashed border-viva-300 bg-[radial-gradient(circle_at_top,_rgba(82,163,58,0.08),_transparent_55%),linear-gradient(180deg,#f8faf7,#fff)] p-10 text-center">
+              <span className="mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-white text-viva-700 shadow-sm ring-1 ring-viva-200">
+                <svg className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="1.7" viewBox="0 0 24 24" aria-hidden>
+                  <path d="M4 19.5V6.75A2.25 2.25 0 0 1 6.25 4.5h11.5A2.25 2.25 0 0 1 20 6.75v12.75" strokeLinecap="round" />
+                  <path d="M8 8h8M8 12h5" strokeLinecap="round" />
+                </svg>
+              </span>
+              <p className="font-display text-lg font-semibold text-viva-950">Nenhum anúncio selecionado</p>
+              <p className="mt-1 max-w-sm text-sm text-viva-600 leading-relaxed">
+                Crie um rascunho à esquerda ou escolha um item da lista para editar capa, palestrante e abrir
+                inscrições.
+              </p>
             </div>
           ) : (
             <>
-              <div className="rounded-2xl border border-viva-200 bg-white p-4 space-y-4">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <h2 className="font-semibold text-viva-900">Editar</h2>
-                  <span className={`text-xs px-2 py-1 rounded-full ${statusClass(evento.status)}`}>
-                    {statusLabel(evento.status)}
-                  </span>
-                </div>
-                <p className="text-xs text-viva-600 leading-relaxed">
-                  {evento.status === 'RASCUNHO' &&
-                    'Rascunho: só a equipe vê. Médicos e links públicos de inscrição ficam fechados até publicar.'}
-                  {evento.status === 'PUBLICADO' &&
-                    'Publicado: médicos veem na lista e podem participar. Link externo de inscrição ativo.'}
-                  {evento.status === 'ENCERRADO' &&
-                    'Encerrado: ainda aparece para consulta, mas novas inscrições (app e link) ficam bloqueadas.'}
-                </p>
+              <article className="overflow-hidden rounded-2xl border border-viva-200 bg-white shadow-[0_10px_30px_rgba(26,64,17,0.04)]">
+                <header className="border-b border-viva-100 bg-gradient-to-r from-viva-50 via-white to-white px-4 py-4 sm:px-5">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="min-w-0 space-y-1">
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-viva-500">
+                        Anúncio da aula
+                      </p>
+                      <h2 className="font-display text-xl font-semibold text-viva-950 truncate">
+                        {evento.titulo || 'Sem título'}
+                      </h2>
+                    </div>
+                    <span className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold ${statusClass(evento.status)}`}>
+                      {statusLabel(evento.status)}
+                    </span>
+                  </div>
+                  <div
+                    className={`mt-3 rounded-xl px-3 py-2.5 text-xs leading-relaxed ${
+                      evento.status === 'PUBLICADO'
+                        ? 'bg-emerald-50 text-emerald-900 ring-1 ring-emerald-100'
+                        : evento.status === 'ENCERRADO'
+                          ? 'bg-slate-100 text-slate-700 ring-1 ring-slate-200'
+                          : 'bg-amber-50 text-amber-950 ring-1 ring-amber-100'
+                    }`}
+                    role="status"
+                  >
+                    {evento.status === 'RASCUNHO' &&
+                      'Rascunho: só a equipe vê. Abra as inscrições quando o anúncio estiver pronto — YouTube não é obrigatório.'}
+                    {evento.status === 'PUBLICADO' &&
+                      'Inscrições abertas: médicos veem na lista e o link externo já captura participantes. O vídeo pode ser adicionado depois.'}
+                    {evento.status === 'ENCERRADO' &&
+                      'Encerrado: ainda consultável, mas novas inscrições (app e link) estão bloqueadas.'}
+                  </div>
+                </header>
 
-                <label className="block text-sm space-y-1">
-                  <span className="text-viva-700">Título</span>
-                  <input
-                    className="w-full rounded-lg border border-viva-200 px-3 py-2"
-                    value={form.titulo}
-                    onChange={(e) => setForm((f) => ({ ...f, titulo: e.target.value }))}
-                  />
-                </label>
-                <label className="block text-sm space-y-1">
-                  <span className="text-viva-700">YouTube (opcional no rascunho; obrigatório para publicar)</span>
-                  <input
-                    className="w-full rounded-lg border border-viva-200 px-3 py-2"
-                    value={form.youtubeUrl}
-                    onChange={(e) => setForm((f) => ({ ...f, youtubeUrl: e.target.value }))}
-                  />
-                </label>
-                {evento.youtubeEmbedUrl && (
-                  <div className="aspect-video w-full overflow-hidden rounded-xl border border-viva-200 bg-black">
-                    <iframe
-                      title="Prévia YouTube"
-                      src={evento.youtubeEmbedUrl}
-                      className="h-full w-full"
-                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                      allowFullScreen
+                <div className="space-y-5 p-4 sm:p-5">
+                  <section className="space-y-3" aria-labelledby="conteudo-dados-title">
+                    <h3 id="conteudo-dados-title" className="text-sm font-semibold text-viva-900">
+                      Dados principais
+                    </h3>
+                    <label className="block space-y-1.5">
+                      <span className="text-sm font-medium text-viva-800">Título</span>
+                      <input
+                        className="w-full rounded-lg border border-viva-200 bg-white px-3 py-2.5 text-sm text-viva-900 shadow-sm outline-none transition focus:border-viva-500 focus:ring-2 focus:ring-viva-500/20"
+                        value={form.titulo}
+                        onChange={(e) => setForm((f) => ({ ...f, titulo: e.target.value }))}
+                      />
+                    </label>
+                    <DateTimeField
+                      id="editar-conteudo-inicia"
+                      required
+                      value={form.iniciaEm}
+                      onChange={(iniciaEm) => setForm((f) => ({ ...f, iniciaEm }))}
                     />
+                    <label className="block space-y-1.5">
+                      <span className="text-sm font-medium text-viva-800">Descrição</span>
+                      <textarea
+                        className="min-h-[96px] w-full rounded-lg border border-viva-200 bg-white px-3 py-2.5 text-sm text-viva-900 shadow-sm outline-none transition focus:border-viva-500 focus:ring-2 focus:ring-viva-500/20"
+                        value={form.descricao}
+                        onChange={(e) => setForm((f) => ({ ...f, descricao: e.target.value }))}
+                        placeholder="Resumo curto para a lista e a página do conteúdo"
+                      />
+                    </label>
+                  </section>
+
+                  <section className="space-y-3 border-t border-viva-100 pt-5" aria-labelledby="conteudo-midia-title">
+                    <h3 id="conteudo-midia-title" className="text-sm font-semibold text-viva-900">
+                      Mídia
+                    </h3>
+                    <label className="block space-y-1.5">
+                      <span className="text-sm font-medium text-viva-800">YouTube (opcional)</span>
+                      <input
+                        className="w-full rounded-lg border border-viva-200 bg-white px-3 py-2.5 text-sm text-viva-900 shadow-sm outline-none transition focus:border-viva-500 focus:ring-2 focus:ring-viva-500/20"
+                        value={form.youtubeUrl}
+                        onChange={(e) => setForm((f) => ({ ...f, youtubeUrl: e.target.value }))}
+                        placeholder="Adicione perto do horário da aula ao vivo"
+                      />
+                      <span className="text-[11px] text-viva-500">
+                        Não precisa para anunciar. Quando tiver o link, cole aqui e salve — a prévia aparece abaixo.
+                      </span>
+                    </label>
+                    {evento.youtubeEmbedUrl && (
+                      <div className="aspect-video w-full overflow-hidden rounded-xl border border-viva-200 bg-black shadow-sm">
+                        <iframe
+                          title="Prévia YouTube"
+                          src={evento.youtubeEmbedUrl}
+                          className="h-full w-full"
+                          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                          allowFullScreen
+                        />
+                      </div>
+                    )}
+                    <CapaUploadField
+                      eventoId={evento.id}
+                      capaUrl={evento.capaUrl}
+                      updatedAt={evento.updatedAt}
+                      uploading={capaMutation.isPending}
+                      onUpload={(file) => capaMutation.mutate(file)}
+                    />
+                  </section>
+
+                  <footer className="sticky bottom-0 z-[1] -mx-4 border-t border-viva-100 bg-white/95 px-4 py-3 backdrop-blur sm:-mx-5 sm:px-5">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => saveMutation.mutate()}
+                        disabled={saveMutation.isPending}
+                        className="rounded-lg border border-viva-300 bg-white px-4 py-2.5 text-sm font-semibold text-viva-900 shadow-sm transition hover:bg-viva-50 disabled:opacity-60"
+                      >
+                        {saveMutation.isPending ? 'Salvando…' : 'Salvar alterações'}
+                      </button>
+                      {evento.status !== 'PUBLICADO' && (
+                        <button
+                          type="button"
+                          onClick={() => actionMutation.mutate('publicar')}
+                          disabled={actionMutation.isPending}
+                          title="Salva os campos e abre as inscrições (YouTube opcional)"
+                          className="rounded-lg bg-emerald-700 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-800 disabled:opacity-60"
+                        >
+                          {actionMutation.isPending && actionMutation.variables === 'publicar'
+                            ? 'Abrindo…'
+                            : 'Abrir inscrições'}
+                        </button>
+                      )}
+                      {evento.status === 'PUBLICADO' && (
+                        <button
+                          type="button"
+                          onClick={() => actionMutation.mutate('encerrar')}
+                          disabled={actionMutation.isPending}
+                          className="rounded-lg bg-slate-700 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800 disabled:opacity-60"
+                        >
+                          Encerrar inscrições
+                        </button>
+                      )}
+                      {evento.status !== 'RASCUNHO' && (
+                        <button
+                          type="button"
+                          onClick={() => actionMutation.mutate('rascunho')}
+                          disabled={actionMutation.isPending}
+                          className="rounded-lg px-3 py-2.5 text-sm font-medium text-viva-700 underline-offset-2 hover:underline disabled:opacity-60"
+                        >
+                          Voltar a rascunho
+                        </button>
+                      )}
+                    </div>
+                    <p className="mt-2 text-[11px] text-viva-500">
+                      Salvar guarda os campos. Abrir inscrições anuncia a aula para médicos e ativa o link
+                      público — o YouTube pode ser preenchido depois.
+                    </p>
+                  </footer>
+                </div>
+              </article>
+
+              <article className="rounded-2xl border border-viva-200 bg-white p-4 shadow-[0_8px_24px_rgba(26,64,17,0.03)] sm:p-5 space-y-4">
+                <header className="space-y-1">
+                  <h3 className="font-display text-lg font-semibold text-viva-950">Palestrante</h3>
+                  <p className="text-xs text-viva-600 leading-relaxed">
+                    Vincule alguém já cadastrado ou convide uma pessoa nova — ela completa o perfil no link.
+                  </p>
+                </header>
+
+                {evento.palestrante && (
+                  <div className="flex flex-wrap items-center gap-2 rounded-xl bg-viva-50 px-3 py-2.5 ring-1 ring-viva-100">
+                    <span className="flex h-8 w-8 items-center justify-center rounded-full bg-viva-800 text-xs font-bold text-white">
+                      {evento.palestrante.nome.slice(0, 1).toUpperCase()}
+                    </span>
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-semibold text-viva-950">{evento.palestrante.nome}</p>
+                      <p className="truncate text-xs text-viva-600">{evento.palestrante.email}</p>
+                    </div>
+                    <span
+                      className={`ml-auto rounded-full px-2 py-0.5 text-[11px] font-semibold ${
+                        evento.palestrante.status === 'COMPLETO'
+                          ? 'bg-emerald-100 text-emerald-800'
+                          : 'bg-amber-100 text-amber-900'
+                      }`}
+                    >
+                      {evento.palestrante.status === 'COMPLETO' ? 'Cadastro completo' : 'Aguardando formulário'}
+                    </span>
                   </div>
                 )}
-                <label className="block text-sm space-y-1">
-                  <span className="text-viva-700">Data e hora</span>
-                  <input
-                    type="datetime-local"
-                    className="w-full rounded-lg border border-viva-200 px-3 py-2"
-                    value={form.iniciaEm}
-                    onChange={(e) => setForm((f) => ({ ...f, iniciaEm: e.target.value }))}
-                  />
-                </label>
-                <label className="block text-sm space-y-1">
-                  <span className="text-viva-700">Descrição</span>
-                  <textarea
-                    className="w-full rounded-lg border border-viva-200 px-3 py-2 min-h-[80px]"
-                    value={form.descricao}
-                    onChange={(e) => setForm((f) => ({ ...f, descricao: e.target.value }))}
-                  />
-                </label>
 
-                <div className="space-y-2">
-                  <span className="text-sm text-viva-700">Capa</span>
-                  {evento.capaUrl && (
-                    <AuthImage
-                      key={evento.updatedAt || evento.capaUrl}
-                      apiPath={`/admin/conteudos/eventos/${evento.id}/capa`}
-                      alt="Capa"
-                      className="w-full max-h-48 object-cover rounded-xl border border-viva-100"
-                    />
-                  )}
-                  <input
-                    type="file"
-                    accept="image/jpeg,image/png,image/webp"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      if (file) capaMutation.mutate(file);
-                    }}
-                  />
-                </div>
-
-                <div className="flex flex-wrap gap-2">
+                <div className="inline-flex rounded-xl bg-viva-50 p-1 ring-1 ring-viva-100" role="tablist" aria-label="Modo do palestrante">
                   <button
                     type="button"
-                    onClick={() => saveMutation.mutate()}
-                    disabled={saveMutation.isPending}
-                    className="rounded-lg bg-viva-800 text-white px-4 py-2 text-sm"
+                    role="tab"
+                    aria-selected={palMode === 'existente'}
+                    onClick={() => setPalMode('existente')}
+                    className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
+                      palMode === 'existente' ? 'bg-white text-viva-950 shadow-sm' : 'text-viva-600 hover:text-viva-900'
+                    }`}
                   >
-                    Salvar
+                    Já cadastrado
                   </button>
-                  {evento.status !== 'PUBLICADO' && (
-                    <button
-                      type="button"
-                      onClick={() => actionMutation.mutate('publicar')}
-                      className="rounded-lg bg-emerald-700 text-white px-4 py-2 text-sm"
-                    >
-                      Publicar
-                    </button>
-                  )}
-                  {evento.status === 'PUBLICADO' && (
-                    <button
-                      type="button"
-                      onClick={() => actionMutation.mutate('encerrar')}
-                      className="rounded-lg bg-slate-700 text-white px-4 py-2 text-sm"
-                    >
-                      Encerrar
-                    </button>
-                  )}
-                  {evento.status !== 'RASCUNHO' && (
-                    <button
-                      type="button"
-                      onClick={() => actionMutation.mutate('rascunho')}
-                      className="rounded-lg border border-viva-300 px-4 py-2 text-sm"
-                    >
-                      Voltar a rascunho
-                    </button>
-                  )}
-                </div>
-              </div>
-
-              <div className="rounded-2xl border border-viva-200 bg-white p-4 space-y-3">
-                <h3 className="font-semibold text-viva-900">Palestrante</h3>
-                <p className="text-xs text-viva-600">
-                  Escolha um já cadastrado e salve, ou convide um novo pelo e-mail — ele preenche o formulário no
-                  link abaixo.
-                </p>
-                {evento.palestrante && (
-                  <p className="text-sm text-viva-800">
-                    {evento.palestrante.nome} · {evento.palestrante.email}{' '}
-                    <span className="text-xs text-viva-500">
-                      (
-                      {evento.palestrante.status === 'COMPLETO'
-                        ? 'cadastro completo'
-                        : 'aguardando formulário'}
-                      )
-                    </span>
-                  </p>
-                )}
-                <div className="grid sm:grid-cols-2 gap-2">
-                  <input
-                    className="rounded-lg border border-viva-200 px-3 py-2 text-sm"
-                    placeholder="Buscar palestrante existente"
-                    value={palSearch}
-                    onChange={(e) => setPalSearch(e.target.value)}
-                  />
-                  <select
-                    className="rounded-lg border border-viva-200 px-3 py-2 text-sm"
-                    value={selectedPalId}
-                    onChange={(e) => setSelectedPalId(e.target.value)}
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={palMode === 'novo'}
+                    onClick={() => setPalMode('novo')}
+                    className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
+                      palMode === 'novo' ? 'bg-white text-viva-950 shadow-sm' : 'text-viva-600 hover:text-viva-900'
+                    }`}
                   >
-                    <option value="">Sem palestrante / novo convite</option>
-                    {palestrantes.map((p: ConteudoPalestrante) => (
-                      <option key={p.id} value={p.id}>
-                        {p.nome} ({p.email})
-                      </option>
-                    ))}
-                  </select>
+                    Convidar novo
+                  </button>
                 </div>
-                <div className="grid sm:grid-cols-2 gap-2">
-                  <input
-                    className="rounded-lg border border-viva-200 px-3 py-2 text-sm"
-                    placeholder="Nome (novo)"
-                    value={palNome}
-                    onChange={(e) => setPalNome(e.target.value)}
-                  />
-                  <input
-                    className="rounded-lg border border-viva-200 px-3 py-2 text-sm"
-                    placeholder="E-mail (novo)"
-                    value={palEmail}
-                    onChange={(e) => setPalEmail(e.target.value)}
-                  />
-                </div>
-                <button
-                  type="button"
-                  onClick={() => conviteMutation.mutate()}
-                  disabled={conviteMutation.isPending}
-                  className="rounded-lg border border-viva-300 px-3 py-2 text-sm"
-                >
-                  {conviteMutation.isPending ? 'Gerando…' : 'Convidar novo palestrante'}
-                </button>
-                {evento.linkPalestrante && (
-                  <div className="space-y-1">
-                    <p className="text-xs font-medium text-viva-800">
-                      Link do formulário do palestrante (envie por WhatsApp/e-mail)
-                    </p>
-                    <div className="flex flex-wrap gap-2 items-center text-sm">
-                      <code className="text-xs bg-viva-50 px-2 py-1 rounded break-all flex-1">
-                        {evento.linkPalestrante}
-                      </code>
-                      <button
-                        type="button"
-                        className="text-viva-800 underline"
-                        onClick={async () => {
-                          await copyText(evento.linkPalestrante!);
-                          setOkMsg('Link do palestrante copiado');
-                        }}
-                      >
-                        Copiar
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
 
-              <div className="rounded-2xl border border-viva-200 bg-white p-4 space-y-3">
-                <h3 className="font-semibold text-viva-900">Participantes</h3>
-                <p className="text-xs text-viva-600">
-                  Médicos se inscrevem pelo app. Externos usam o link abaixo (precadastro com dados
-                  mínimos; só funciona com status Publicado).
-                </p>
-                {evento.linkInscricao && (
+                {palMode === 'existente' ? (
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    <label className="block space-y-1 sm:col-span-1">
+                      <span className="text-xs font-medium text-viva-700">Buscar</span>
+                      <input
+                        className="w-full rounded-lg border border-viva-200 px-3 py-2.5 text-sm outline-none focus:border-viva-500 focus:ring-2 focus:ring-viva-500/20"
+                        placeholder="Nome ou e-mail"
+                        value={palSearch}
+                        onChange={(e) => setPalSearch(e.target.value)}
+                      />
+                    </label>
+                    <label className="block space-y-1">
+                      <span className="text-xs font-medium text-viva-700">Selecionar</span>
+                      <select
+                        className="w-full rounded-lg border border-viva-200 px-3 py-2.5 text-sm outline-none focus:border-viva-500 focus:ring-2 focus:ring-viva-500/20"
+                        value={selectedPalId}
+                        onChange={(e) => setSelectedPalId(e.target.value)}
+                      >
+                        <option value="">Sem palestrante</option>
+                        {palestrantes.map((p: ConteudoPalestrante) => (
+                          <option key={p.id} value={p.id}>
+                            {p.nome} ({p.email})
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <p className="sm:col-span-2 text-[11px] text-viva-500">
+                      Depois de escolher, clique em <strong>Salvar alterações</strong> no bloco acima para vincular.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    <div className="grid gap-2 sm:grid-cols-2">
+                      <label className="block space-y-1">
+                        <span className="text-xs font-medium text-viva-700">Nome</span>
+                        <input
+                          className="w-full rounded-lg border border-viva-200 px-3 py-2.5 text-sm outline-none focus:border-viva-500 focus:ring-2 focus:ring-viva-500/20"
+                          placeholder="Nome completo"
+                          value={palNome}
+                          onChange={(e) => setPalNome(e.target.value)}
+                        />
+                      </label>
+                      <label className="block space-y-1">
+                        <span className="text-xs font-medium text-viva-700">E-mail</span>
+                        <input
+                          type="email"
+                          className="w-full rounded-lg border border-viva-200 px-3 py-2.5 text-sm outline-none focus:border-viva-500 focus:ring-2 focus:ring-viva-500/20"
+                          placeholder="email@exemplo.com"
+                          value={palEmail}
+                          onChange={(e) => setPalEmail(e.target.value)}
+                        />
+                      </label>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => conviteMutation.mutate()}
+                      disabled={conviteMutation.isPending}
+                      className="inline-flex items-center justify-center rounded-lg bg-viva-800 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-viva-900 disabled:opacity-60"
+                    >
+                      {conviteMutation.isPending ? 'Gerando convite…' : 'Gerar convite e link'}
+                    </button>
+                  </div>
+                )}
+
+                {evento.linkPalestrante && (
+                  <ShareLinkCard
+                    label="Link do formulário do palestrante"
+                    description="Envie por WhatsApp ou e-mail para a pessoa completar o cadastro."
+                    url={evento.linkPalestrante}
+                    onCopy={async () => {
+                      await copyText(evento.linkPalestrante!);
+                      setOkMsg('Link do palestrante copiado');
+                    }}
+                  />
+                )}
+              </article>
+
+              <article className="rounded-2xl border border-viva-200 bg-white p-4 shadow-[0_8px_24px_rgba(26,64,17,0.03)] sm:p-5 space-y-4">
+                <header className="flex flex-wrap items-end justify-between gap-2">
                   <div className="space-y-1">
-                    <p className="text-xs font-medium text-viva-800">Link público de inscrição</p>
-                    <div className="flex flex-wrap gap-2 items-center text-sm">
-                      <code className="text-xs bg-viva-50 px-2 py-1 rounded break-all flex-1">
-                        {evento.linkInscricao}
-                      </code>
+                    <h3 className="font-display text-lg font-semibold text-viva-950">Frequência</h3>
+                    <p className="text-xs text-viva-600 leading-relaxed">
+                      Durante a aula, abra a frequência e compartilhe o link/QR. Médicos confirmam no app;
+                      externos usam o e-mail da inscrição.
+                    </p>
+                  </div>
+                  <span
+                    className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
+                      evento.frequenciaAberta
+                        ? 'bg-emerald-100 text-emerald-800 ring-1 ring-emerald-200'
+                        : 'bg-slate-100 text-slate-700 ring-1 ring-slate-200'
+                    }`}
+                  >
+                    {evento.frequenciaAberta ? 'Aberta agora' : 'Fechada'}
+                  </span>
+                </header>
+
+                <div className="flex flex-wrap gap-2">
+                  {!evento.frequenciaAberta ? (
+                    <button
+                      type="button"
+                      onClick={() => frequenciaMutation.mutate('abrir')}
+                      disabled={frequenciaMutation.isPending || evento.status === 'RASCUNHO'}
+                      title={
+                        evento.status === 'RASCUNHO'
+                          ? 'Abra as inscrições antes de liberar a frequência'
+                          : undefined
+                      }
+                      className="rounded-lg bg-emerald-700 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-800 disabled:opacity-60"
+                    >
+                      {frequenciaMutation.isPending && frequenciaMutation.variables === 'abrir'
+                        ? 'Abrindo…'
+                        : 'Abrir frequência'}
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => frequenciaMutation.mutate('fechar')}
+                      disabled={frequenciaMutation.isPending}
+                      className="rounded-lg bg-slate-700 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800 disabled:opacity-60"
+                    >
+                      {frequenciaMutation.isPending && frequenciaMutation.variables === 'fechar'
+                        ? 'Encerrando…'
+                        : 'Encerrar frequência'}
+                    </button>
+                  )}
+                </div>
+
+                {evento.linkFrequencia && (
+                  <ShareLinkCard
+                    label="Link público de frequência"
+                    description="Mostre na aula ou envie no chat — o inscrito confirma com o e-mail do cadastro."
+                    url={evento.linkFrequencia}
+                    disabledHint={!evento.frequenciaAberta ? 'Abra a frequência para ativar este link.' : null}
+                    onCopy={async () => {
+                      await copyText(evento.linkFrequencia!);
+                      setOkMsg('Link de frequência copiado');
+                    }}
+                  />
+                )}
+
+                {evento.frequenciaAberta && evento.linkFrequencia && (
+                  <div className="flex flex-col items-start gap-2 sm:flex-row sm:items-center">
+                    <LocalQrCode
+                      value={evento.linkFrequencia}
+                      size={160}
+                      alt="QR Code da frequência"
+                      className="h-40 w-40 rounded-xl border border-viva-200 bg-white p-2"
+                    />
+                    <div className="space-y-2 max-w-xs">
+                      <p className="text-xs text-viva-600 leading-relaxed">
+                        QR gerado neste aparelho (sem enviar o link a serviços externos). Presentes:{' '}
+                        {evento.presentesCount ?? 0} · Ausentes:{' '}
+                        {evento.ausentesCount ??
+                          Math.max(0, (evento.participantesCount ?? 0) - (evento.presentesCount ?? 0))}
+                      </p>
                       <button
                         type="button"
-                        className="text-viva-800 underline"
+                        className="text-xs font-medium text-viva-700 underline"
                         onClick={async () => {
-                          await copyText(evento.linkInscricao!);
-                          setOkMsg('Link de inscrição copiado');
+                          if (!selectedId) return;
+                          try {
+                            await conteudoAdminService.regenerarToken(selectedId, 'frequencia');
+                            setOkMsg('Link de frequência regenerado — use o novo QR');
+                            await invalidate();
+                          } catch (e: unknown) {
+                            const err = e as { response?: { data?: { error?: string } } };
+                            setError(err.response?.data?.error || 'Falha ao regenerar link');
+                          }
                         }}
                       >
-                        Copiar link
+                        Regenerar link de frequência
                       </button>
                     </div>
                   </div>
                 )}
-                <ul className="divide-y divide-viva-100 max-h-56 overflow-auto text-sm">
-                  {(participantesQuery.data || []).map((p: ConteudoParticipante) => (
-                    <li key={p.id} className="py-2 space-y-0.5">
-                      <div className="flex justify-between gap-2">
-                        <span className="font-medium text-viva-900">
-                          {[
-                            p.nome,
-                            p.email,
-                            p.telefone,
-                            p.crm ? `CRM ${p.crm}` : null,
-                            p.especialidade,
-                            p.cidade,
-                          ]
-                            .filter(Boolean)
-                            .join(' · ')}
-                        </span>
-                        <span className="text-xs text-viva-500 shrink-0">
-                          {p.origem === 'MEDICO' ? 'App' : 'Precadastro'}
-                        </span>
-                      </div>
-                    </li>
-                  ))}
-                  {(participantesQuery.data || []).length === 0 && (
-                    <li className="py-2 text-viva-600">Nenhum participante ainda.</li>
-                  )}
-                </ul>
-              </div>
+              </article>
+
+              <article className="rounded-2xl border border-viva-200 bg-white p-4 shadow-[0_8px_24px_rgba(26,64,17,0.03)] sm:p-5 space-y-4">
+                <header className="flex flex-wrap items-end justify-between gap-2">
+                  <div className="space-y-1">
+                    <h3 className="font-display text-lg font-semibold text-viva-950">Participantes</h3>
+                    <p className="text-xs text-viva-600 leading-relaxed">
+                      Médicos pelo app · externos pelo link público (com inscrições abertas).
+                    </p>
+                  </div>
+                  <span className="rounded-full bg-viva-50 px-2.5 py-1 text-xs font-semibold text-viva-800 ring-1 ring-viva-100">
+                    {(participantesQuery.data || []).length} inscrito
+                    {(participantesQuery.data || []).length === 1 ? '' : 's'}
+                    {evento.presentesCount != null ? ` · ${evento.presentesCount} presente(s)` : ''}
+                  </span>
+                </header>
+
+                {evento.linkInscricao && (
+                  <ShareLinkCard
+                    label="Link público de inscrição"
+                    description="Para quem não está no app — gera precadastro com dados mínimos."
+                    url={evento.linkInscricao}
+                    disabledHint={
+                      evento.status !== 'PUBLICADO'
+                        ? 'Abra as inscrições para ativar este link.'
+                        : null
+                    }
+                    onCopy={async () => {
+                      await copyText(evento.linkInscricao!);
+                      setOkMsg('Link de inscrição copiado');
+                    }}
+                  />
+                )}
+
+                {(participantesQuery.data || []).length === 0 ? (
+                  <div className="rounded-xl border border-dashed border-viva-300 bg-viva-50/50 px-4 py-8 text-center">
+                    <p className="text-sm font-medium text-viva-900">Nenhum participante ainda</p>
+                    <p className="mt-1 text-xs text-viva-600">
+                      {evento.status === 'PUBLICADO'
+                        ? 'Assim que alguém se inscrever pelo app ou pelo link, a lista aparece aqui.'
+                        : 'Abra as inscrições para começar a captar participantes.'}
+                    </p>
+                  </div>
+                ) : (
+                  <ul className="max-h-64 divide-y divide-viva-100 overflow-auto rounded-xl border border-viva-100">
+                    {(participantesQuery.data || []).map((p: ConteudoParticipante) => (
+                      <li key={p.id} className="flex items-start justify-between gap-3 px-3 py-2.5 text-sm">
+                        <div className="min-w-0 space-y-0.5">
+                          <p className="font-medium text-viva-950 truncate">{p.nome}</p>
+                          <p className="truncate text-xs text-viva-600">
+                            {[
+                              p.perfil === 'ESTUDANTE' ? 'Estudante' : p.perfil === 'MEDICO' ? 'Médico' : null,
+                              p.email,
+                              p.telefone,
+                              p.cpf ? `CPF ${p.cpf}` : null,
+                              p.crm ? `CRM ${p.crm}` : null,
+                              p.especialidade,
+                              p.faculdade,
+                              p.semestre ? `Semestre: ${p.semestre}` : null,
+                              p.participaLiga && p.ligaNome ? `Liga: ${p.ligaNome}` : null,
+                              p.cidade,
+                            ]
+                              .filter(Boolean)
+                              .join(' · ')}
+                          </p>
+                          {p.presenteEm && (
+                            <p className="text-[11px] text-emerald-700">
+                              Presente às {new Date(p.presenteEm).toLocaleString('pt-BR')}
+                              {p.presencaOrigem === 'APP'
+                                ? ' · app'
+                                : p.presencaOrigem === 'LINK_PUBLICO'
+                                  ? ' · link'
+                                  : ''}
+                            </p>
+                          )}
+                        </div>
+                        <div className="shrink-0 flex flex-col items-end gap-1">
+                          <span className="rounded-full bg-viva-50 px-2 py-0.5 text-[11px] font-semibold text-viva-700">
+                            {p.origem === 'MEDICO' ? 'App' : 'Precadastro'}
+                          </span>
+                          <span
+                            className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${
+                              p.presenteEm
+                                ? 'bg-emerald-100 text-emerald-800'
+                                : 'bg-slate-100 text-slate-600'
+                            }`}
+                          >
+                            {p.presenteEm ? 'Presente' : 'Ausente'}
+                          </span>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </article>
             </>
           )}
         </section>

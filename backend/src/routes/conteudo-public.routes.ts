@@ -1,14 +1,17 @@
 import { Router } from 'express';
 import {
   downloadCapaPublicInscricaoController,
+  getPublicFrequenciaController,
   getPublicInscricaoController,
   getPublicPalestranteController,
+  submitPublicFrequenciaController,
   submitPublicInscricaoController,
   submitPublicPalestranteController,
 } from '../controllers/conteudo.controller';
 import { publicFormLimiter } from '../middleware/rate-limit.middleware';
 import {
   validateConteudoTokenParam,
+  validatePublicFrequenciaForm,
   validatePublicInscricaoForm,
   validatePublicPalestranteForm,
 } from '../middleware/validation.middleware';
@@ -44,6 +47,19 @@ router.get(
   '/inscricao/:token/capa',
   validateConteudoTokenParam,
   downloadCapaPublicInscricaoController
+);
+
+router.get(
+  '/frequencia/:token',
+  validateConteudoTokenParam,
+  getPublicFrequenciaController
+);
+router.post(
+  '/frequencia/:token',
+  publicFormLimiter,
+  validateConteudoTokenParam,
+  validatePublicFrequenciaForm,
+  submitPublicFrequenciaController
 );
 
 export default router;

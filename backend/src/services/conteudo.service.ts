@@ -2,11 +2,14 @@ import {
   ConteudoEventoStatus,
   ConteudoPalestranteStatus,
   ConteudoParticipanteOrigem,
+  ConteudoParticipantePerfil,
+  ConteudoPresencaOrigem,
   Prisma,
 } from '@prisma/client';
 import { prisma } from '../config/database';
 import { getFrontendAppBaseUrl } from '../utils/email-branding.util';
 import { newConteudoToken, parseYoutubeUrl, youtubeEmbedUrl } from '../utils/conteudo.util';
+import { validateCPF } from '../utils/validation.util';
 
 const palestranteSelect = {
   id: true,
@@ -42,14 +45,20 @@ function formatEventoAdmin(
     palestranteId: string | null;
     tokenPalestrante: string;
     tokenInscricao: string;
+    tokenFrequencia: string;
+    frequenciaAberta: boolean;
+    frequenciaAbertaEm: Date | null;
+    frequenciaFechadaEm: Date | null;
     createdAt: Date;
     updatedAt: Date;
     palestrante: Prisma.ConteudoPalestranteGetPayload<{ select: typeof palestranteSelect }> | null;
     _count?: { participantes: number };
   },
-  opts?: { includeTokens?: boolean }
+  opts?: { includeTokens?: boolean; presentesCount?: number }
 ) {
   const base = getFrontendAppBaseUrl();
+  const participantesCount = evento._count?.participantes ?? undefined;
+  const presentesCount = opts?.presentesCount;
   return {
     id: evento.id,
     titulo: evento.titulo,
@@ -62,15 +71,25 @@ function formatEventoAdmin(
     status: evento.status,
     palestranteId: evento.palestranteId,
     palestrante: evento.palestrante,
-    participantesCount: evento._count?.participantes ?? undefined,
+    participantesCount,
+    presentesCount,
+    ausentesCount:
+      participantesCount !== undefined && presentesCount !== undefined
+        ? Math.max(0, participantesCount - presentesCount)
+        : undefined,
+    frequenciaAberta: evento.frequenciaAberta,
+    frequenciaAbertaEm: evento.frequenciaAbertaEm?.toISOString() ?? null,
+    frequenciaFechadaEm: evento.frequenciaFechadaEm?.toISOString() ?? null,
     createdAt: evento.createdAt.toISOString(),
     updatedAt: evento.updatedAt.toISOString(),
     ...(opts?.includeTokens
       ? {
           tokenPalestrante: evento.tokenPalestrante,
           tokenInscricao: evento.tokenInscricao,
+          tokenFrequencia: evento.tokenFrequencia,
           linkPalestrante: `${base}/conteudos/palestrante/${evento.tokenPalestrante}`,
           linkInscricao: `${base}/conteudos/inscricao/${evento.tokenInscricao}`,
+          linkFrequencia: `${base}/conteudos/frequencia/${evento.tokenFrequencia}`,
         }
       : {}),
   };
@@ -85,8 +104,10 @@ function formatEventoPublico(evento: {
   descricao: string | null;
   iniciaEm: Date;
   status: ConteudoEventoStatus;
+  frequenciaAberta?: boolean;
   palestrante: { id: string; nome: string; bio: string | null; fotoUrl: string | null; especialidade: string | null } | null;
   jaInscrito?: boolean;
+  presenteEm?: Date | null;
 }) {
   return {
     id: evento.id,
@@ -98,6 +119,7 @@ function formatEventoPublico(evento: {
     descricao: evento.descricao,
     iniciaEm: evento.iniciaEm.toISOString(),
     status: evento.status,
+    frequenciaAberta: evento.frequenciaAberta ?? false,
     palestrante: evento.palestrante
       ? {
           id: evento.palestrante.id,
@@ -108,6 +130,7 @@ function formatEventoPublico(evento: {
         }
       : null,
     jaInscrito: evento.jaInscrito ?? false,
+    presenteEm: evento.presenteEm ? evento.presenteEm.toISOString() : null,
   };
 }
 
@@ -148,7 +171,10 @@ export async function getEventoAdminService(tenantId: string, id: string) {
     },
   });
   if (!evento) notFound();
-  return formatEventoAdmin(evento, { includeTokens: true });
+  const presentesCount = await prisma.conteudoParticipante.count({
+    where: { tenantId, eventoId: id, presenteEm: { not: null } },
+  });
+  return formatEventoAdmin(evento, { includeTokens: true, presentesCount });
 }
 
 type CreateEventoInput = {
@@ -192,9 +218,6 @@ export async function createEventoAdminService(
   }
 
   const status = input.status || ConteudoEventoStatus.RASCUNHO;
-  if (status === ConteudoEventoStatus.PUBLICADO && !yt.youtubeVideoId) {
-    throw { statusCode: 400, message: 'Informe o link do YouTube antes de publicar.' };
-  }
 
   const evento = await prisma.conteudoEvento.create({
     data: {
@@ -209,6 +232,7 @@ export async function createEventoAdminService(
       status,
       tokenPalestrante: newConteudoToken(),
       tokenInscricao: newConteudoToken(),
+      tokenFrequencia: newConteudoToken(),
       criadoPorMasterId: masterId,
     },
     include: {
@@ -259,15 +283,6 @@ export async function updateEventoAdminService(
     data.youtubeVideoId = yt.youtubeVideoId;
   }
 
-  const nextStatus = input.status ?? existing.status;
-  const nextYoutubeId =
-    input.youtubeUrl !== undefined
-      ? resolveYoutubeFields(input.youtubeUrl).youtubeVideoId
-      : existing.youtubeVideoId;
-  if (nextStatus === ConteudoEventoStatus.PUBLICADO && !nextYoutubeId) {
-    throw { statusCode: 400, message: 'Informe o link do YouTube antes de publicar.' };
-  }
-
   if (input.palestranteId !== undefined) {
     if (input.palestranteId === null) {
       data.palestrante = { disconnect: true };
@@ -297,20 +312,63 @@ export async function setEventoStatusAdminService(
   id: string,
   status: ConteudoEventoStatus
 ) {
-  if (status === ConteudoEventoStatus.PUBLICADO) {
-    const existing = await prisma.conteudoEvento.findFirst({ where: { id, tenantId } });
-    if (!existing) notFound();
-    if (!existing.youtubeVideoId) {
-      throw { statusCode: 400, message: 'Informe o link do YouTube antes de publicar.' };
-    }
-  }
   return updateEventoAdminService(tenantId, id, { status });
+}
+
+export async function abrirFrequenciaAdminService(tenantId: string, id: string) {
+  const existing = await prisma.conteudoEvento.findFirst({ where: { id, tenantId } });
+  if (!existing) notFound();
+  if (existing.status === ConteudoEventoStatus.RASCUNHO) {
+    throw { statusCode: 400, message: 'Abra as inscrições antes de liberar a frequência.' };
+  }
+
+  const evento = await prisma.conteudoEvento.update({
+    where: { id },
+    data: {
+      frequenciaAberta: true,
+      frequenciaAbertaEm: new Date(),
+      frequenciaFechadaEm: null,
+      // Novo link a cada abertura — invalida QR/link vazado de sessões anteriores
+      tokenFrequencia: newConteudoToken(),
+    },
+    include: {
+      palestrante: { select: palestranteSelect },
+      _count: { select: { participantes: true } },
+    },
+  });
+
+  const presentesCount = await prisma.conteudoParticipante.count({
+    where: { tenantId, eventoId: id, presenteEm: { not: null } },
+  });
+  return formatEventoAdmin(evento, { includeTokens: true, presentesCount });
+}
+
+export async function fecharFrequenciaAdminService(tenantId: string, id: string) {
+  const existing = await prisma.conteudoEvento.findFirst({ where: { id, tenantId } });
+  if (!existing) notFound();
+
+  const evento = await prisma.conteudoEvento.update({
+    where: { id },
+    data: {
+      frequenciaAberta: false,
+      frequenciaFechadaEm: new Date(),
+    },
+    include: {
+      palestrante: { select: palestranteSelect },
+      _count: { select: { participantes: true } },
+    },
+  });
+
+  const presentesCount = await prisma.conteudoParticipante.count({
+    where: { tenantId, eventoId: id, presenteEm: { not: null } },
+  });
+  return formatEventoAdmin(evento, { includeTokens: true, presentesCount });
 }
 
 export async function regenerarTokenAdminService(
   tenantId: string,
   id: string,
-  tipo: 'palestrante' | 'inscricao'
+  tipo: 'palestrante' | 'inscricao' | 'frequencia'
 ) {
   const existing = await prisma.conteudoEvento.findFirst({ where: { id, tenantId } });
   if (!existing) notFound();
@@ -318,9 +376,11 @@ export async function regenerarTokenAdminService(
   const data =
     tipo === 'palestrante'
       ? { tokenPalestrante: newConteudoToken() }
-      : { tokenInscricao: newConteudoToken() };
+      : tipo === 'inscricao'
+        ? { tokenInscricao: newConteudoToken() }
+        : { tokenFrequencia: newConteudoToken() };
 
-  const evento = await prisma.conteudoEvento.update({
+  const updated = await prisma.conteudoEvento.update({
     where: { id },
     data,
     include: {
@@ -329,7 +389,7 @@ export async function regenerarTokenAdminService(
     },
   });
 
-  return formatEventoAdmin(evento, { includeTokens: true });
+  return formatEventoAdmin(updated, { includeTokens: true });
 }
 
 export async function convidarPalestranteAdminService(
@@ -401,18 +461,32 @@ export async function listParticipantesAdminService(tenantId: string, eventoId: 
     select: {
       id: true,
       origem: true,
+      perfil: true,
       nome: true,
       email: true,
       telefone: true,
+      cpf: true,
       crm: true,
       especialidade: true,
       cidade: true,
+      faculdade: true,
+      semestre: true,
+      participaLiga: true,
+      ligaNome: true,
       interesseCorpoClinico: true,
       medicoId: true,
       consentimentoLgpd: true,
+      presenteEm: true,
+      presencaOrigem: true,
       createdAt: true,
     },
-  });
+  }).then((rows) =>
+    rows.map((r) => ({
+      ...r,
+      presenteEm: r.presenteEm?.toISOString() ?? null,
+      createdAt: r.createdAt.toISOString(),
+    }))
+  );
 }
 
 /** Lista unificada de precadastros (inscritos externos) de todos os conteúdos. */
@@ -497,7 +571,7 @@ export async function listEventosMedicoService(tenantId: string, medicoId: strin
       },
       participantes: {
         where: { medicoId },
-        select: { id: true },
+        select: { id: true, presenteEm: true },
         take: 1,
       },
     },
@@ -508,6 +582,7 @@ export async function listEventosMedicoService(tenantId: string, medicoId: strin
     formatEventoPublico({
       ...e,
       jaInscrito: e.participantes.length > 0,
+      presenteEm: e.participantes[0]?.presenteEm ?? null,
     })
   );
 }
@@ -525,7 +600,7 @@ export async function getEventoMedicoService(tenantId: string, medicoId: string,
       },
       participantes: {
         where: { medicoId },
-        select: { id: true },
+        select: { id: true, presenteEm: true },
         take: 1,
       },
     },
@@ -534,6 +609,7 @@ export async function getEventoMedicoService(tenantId: string, medicoId: string,
   return formatEventoPublico({
     ...evento,
     jaInscrito: evento.participantes.length > 0,
+    presenteEm: evento.participantes[0]?.presenteEm ?? null,
   });
 }
 
@@ -567,6 +643,7 @@ export async function inscreverMedicoService(tenantId: string, medicoId: string,
         tenantId,
         eventoId,
         origem: ConteudoParticipanteOrigem.MEDICO,
+        perfil: ConteudoParticipantePerfil.MEDICO,
         medicoId,
         nome: medico.nomeCompleto,
         email,
@@ -581,6 +658,51 @@ export async function inscreverMedicoService(tenantId: string, medicoId: string,
     }
     throw e;
   }
+}
+
+export async function confirmarPresencaMedicoService(
+  tenantId: string,
+  medicoId: string,
+  eventoId: string
+) {
+  const evento = await prisma.conteudoEvento.findFirst({
+    where: {
+      id: eventoId,
+      tenantId,
+      status: { in: [ConteudoEventoStatus.PUBLICADO, ConteudoEventoStatus.ENCERRADO] },
+    },
+  });
+  if (!evento) notFound();
+  if (!evento.frequenciaAberta) {
+    throw { statusCode: 400, message: 'A frequência ainda não está aberta para este conteúdo.' };
+  }
+
+  const participante = await prisma.conteudoParticipante.findFirst({
+    where: { eventoId, tenantId, medicoId },
+  });
+  if (!participante) {
+    throw { statusCode: 400, message: 'Você precisa estar inscrito para confirmar presença.' };
+  }
+
+  if (participante.presenteEm) {
+    return {
+      presenteEm: participante.presenteEm.toISOString(),
+      jaRegistrado: true,
+    };
+  }
+
+  const updated = await prisma.conteudoParticipante.update({
+    where: { id: participante.id },
+    data: {
+      presenteEm: new Date(),
+      presencaOrigem: ConteudoPresencaOrigem.APP,
+    },
+  });
+
+  return {
+    presenteEm: updated.presenteEm!.toISOString(),
+    jaRegistrado: false,
+  };
 }
 
 /* ——— Públicos (token) ——— */
@@ -690,9 +812,15 @@ export async function submitPublicInscricaoService(
     nome: string;
     email: string;
     telefone?: string | null;
+    perfil?: 'MEDICO' | 'ESTUDANTE';
     crm?: string | null;
     especialidade?: string | null;
     cidade?: string | null;
+    cpf?: string | null;
+    faculdade?: string | null;
+    semestre?: string | null;
+    participaLiga?: boolean | null;
+    ligaNome?: string | null;
     interesseCorpoClinico?: boolean;
     consentimentoLgpd: boolean;
   }
@@ -708,13 +836,48 @@ export async function submitPublicInscricaoService(
   const nome = input.nome.trim();
   const email = input.email.trim().toLowerCase();
   const telefone = input.telefone?.trim() || '';
+  const perfil =
+    input.perfil === 'ESTUDANTE'
+      ? ConteudoParticipantePerfil.ESTUDANTE
+      : ConteudoParticipantePerfil.MEDICO;
+
   if (nome.length < 2) throw { statusCode: 400, message: 'Informe o nome completo.' };
   if (!email.includes('@')) throw { statusCode: 400, message: 'E-mail inválido.' };
   if (telefone.length < 8) {
     throw { statusCode: 400, message: 'Informe um telefone/WhatsApp válido.' };
   }
+  const cpf = (input.cpf || '').replace(/\D/g, '');
+  if (!validateCPF(cpf)) {
+    throw { statusCode: 400, message: 'CPF inválido.' };
+  }
   if (!input.consentimentoLgpd) {
     throw { statusCode: 400, message: 'É necessário aceitar o consentimento LGPD.' };
+  }
+
+  let crm: string | null = null;
+  let especialidade: string | null = null;
+  let faculdade: string | null = null;
+  let semestre: string | null = null;
+  let participaLiga: boolean | null = null;
+  let ligaNome: string | null = null;
+
+  if (perfil === ConteudoParticipantePerfil.ESTUDANTE) {
+    faculdade = input.faculdade?.trim() || null;
+    semestre = input.semestre?.trim() || null;
+    if (!faculdade || faculdade.length < 2) {
+      throw { statusCode: 400, message: 'Informe a faculdade.' };
+    }
+    if (!semestre) {
+      throw { statusCode: 400, message: 'Informe o semestre.' };
+    }
+    participaLiga = input.participaLiga === true;
+    ligaNome = participaLiga ? input.ligaNome?.trim() || null : null;
+    if (participaLiga && (!ligaNome || ligaNome.length < 2)) {
+      throw { statusCode: 400, message: 'Informe qual liga você participa.' };
+    }
+  } else {
+    crm = input.crm?.trim() || null;
+    especialidade = input.especialidade?.trim() || null;
   }
 
   const existente = await prisma.conteudoParticipante.findFirst({
@@ -728,12 +891,18 @@ export async function submitPublicInscricaoService(
         tenantId: evento.tenantId,
         eventoId: evento.id,
         origem: ConteudoParticipanteOrigem.EXTERNO,
+        perfil,
         nome,
         email,
         telefone,
-        crm: input.crm?.trim() || null,
-        especialidade: input.especialidade?.trim() || null,
+        cpf,
+        crm,
+        especialidade,
         cidade: input.cidade?.trim() || null,
+        faculdade,
+        semestre,
+        participaLiga,
+        ligaNome,
         interesseCorpoClinico: input.interesseCorpoClinico !== false,
         consentimentoLgpd: true,
       },
@@ -744,6 +913,81 @@ export async function submitPublicInscricaoService(
     }
     throw e;
   }
+}
+
+export async function getPublicFrequenciaService(token: string) {
+  const evento = await prisma.conteudoEvento.findFirst({
+    where: { tokenFrequencia: token },
+    select: {
+      id: true,
+      titulo: true,
+      iniciaEm: true,
+      frequenciaAberta: true,
+      status: true,
+    },
+  });
+  if (!evento) notFound('Link de frequência inválido.');
+
+  return {
+    evento: {
+      id: evento.id,
+      titulo: evento.titulo,
+      iniciaEm: evento.iniciaEm.toISOString(),
+      status: evento.status,
+      frequenciaAberta: evento.frequenciaAberta,
+    },
+  };
+}
+
+export async function submitPublicFrequenciaService(token: string, emailRaw: string) {
+  const evento = await prisma.conteudoEvento.findFirst({
+    where: { tokenFrequencia: token },
+  });
+  if (!evento) notFound('Link de frequência inválido.');
+  if (!evento.frequenciaAberta) {
+    throw { statusCode: 400, message: 'A frequência não está aberta no momento.' };
+  }
+
+  const email = (emailRaw || '').trim().toLowerCase();
+  // Resposta uniforme (anti-enumeração): não revelar se o e-mail está na lista
+  const ack = {
+    presenteEm: null as string | null,
+    jaRegistrado: false,
+    registrado: false,
+  };
+
+  if (!email.includes('@')) {
+    return ack;
+  }
+
+  const participante = await prisma.conteudoParticipante.findFirst({
+    where: { eventoId: evento.id, email },
+  });
+  if (!participante) {
+    return ack;
+  }
+
+  if (participante.presenteEm) {
+    return {
+      presenteEm: participante.presenteEm.toISOString(),
+      jaRegistrado: true,
+      registrado: true,
+    };
+  }
+
+  const updated = await prisma.conteudoParticipante.update({
+    where: { id: participante.id },
+    data: {
+      presenteEm: new Date(),
+      presencaOrigem: ConteudoPresencaOrigem.LINK_PUBLICO,
+    },
+  });
+
+  return {
+    presenteEm: updated.presenteEm!.toISOString(),
+    jaRegistrado: false,
+    registrado: true,
+  };
 }
 
 export async function getCapaByInscricaoTokenService(token: string) {

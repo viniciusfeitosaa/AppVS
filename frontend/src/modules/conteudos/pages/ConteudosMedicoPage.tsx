@@ -34,7 +34,7 @@ const ConteudosMedicoPage = () => {
     <div className="p-4 md:p-6 max-w-screen-xl mx-auto space-y-6">
       <header>
         <h1 className="text-2xl font-display font-semibold text-viva-950">Conteúdos</h1>
-        <p className="text-sm text-viva-700 mt-1">Eventos e materiais publicados pela equipe.</p>
+        <p className="text-sm text-viva-700 mt-1">Aulas anunciadas pela equipe — inscreva-se antes do ao vivo.</p>
       </header>
 
       {listQuery.isLoading ? (

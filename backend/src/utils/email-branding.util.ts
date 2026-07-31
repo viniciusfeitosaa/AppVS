@@ -21,7 +21,13 @@ export function getEmailTagline(): string {
 export function getFrontendAppBaseUrl(): string {
   const appUrl = process.env.FRONTEND_APP_URL?.trim();
   if (appUrl) return appUrl.replace(/\/$/, '');
-  return (process.env.FRONTEND_URL || 'http://localhost:5173').trim().replace(/\/$/, '');
+  const frontendUrl = process.env.FRONTEND_URL?.trim();
+  if (frontendUrl) return frontendUrl.replace(/\/$/, '');
+  // Dev local com landing + Vite: app em :3000/app (não o default antigo :5173)
+  if (process.env.NODE_ENV !== 'production') {
+    return 'http://localhost:3000/app';
+  }
+  return 'http://localhost:5173';
 }
 
 /** Logo: EMAIL_LOGO_URL ou frontend + /assets/logo-coopvitta.png */

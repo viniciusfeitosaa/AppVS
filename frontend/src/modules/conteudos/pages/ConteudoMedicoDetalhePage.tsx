@@ -40,6 +40,26 @@ const ConteudoMedicoDetalhePage = () => {
     },
   });
 
+  const presencaMutation = useMutation({
+    mutationFn: () => {
+      if (!id) throw new Error('id');
+      return conteudoMedicoService.confirmarPresenca(id);
+    },
+    onSuccess: async (res) => {
+      setMsg(
+        res.data.data.jaRegistrado
+          ? 'Presença já estava registrada'
+          : 'Presença confirmada'
+      );
+      setErr(null);
+      await queryClient.invalidateQueries({ queryKey: ['medico', 'conteudos'] });
+    },
+    onError: (e: unknown) => {
+      const error = e as { response?: { data?: { error?: string } } };
+      setErr(error.response?.data?.error || 'Não foi possível confirmar presença');
+    },
+  });
+
   const ev = detailQuery.data;
 
   if (detailQuery.isLoading) {
@@ -92,7 +112,7 @@ const ConteudoMedicoDetalhePage = () => {
         </div>
       ) : (
         <p className="text-sm text-viva-600 rounded-xl border border-dashed border-viva-200 p-4">
-          Vídeo ainda não disponível para este conteúdo.
+          Aula ao vivo ainda sem link — você já pode se inscrever; o vídeo entra perto do horário.
         </p>
       )}
 
@@ -106,15 +126,40 @@ const ConteudoMedicoDetalhePage = () => {
         </div>
       )}
 
-      {ev.status === 'PUBLICADO' && (
-        <button
-          type="button"
-          disabled={ev.jaInscrito || inscMutation.isPending}
-          onClick={() => inscMutation.mutate()}
-          className="rounded-lg bg-viva-800 text-white px-5 py-2.5 text-sm font-medium disabled:opacity-50"
-        >
-          {ev.jaInscrito ? 'Você já está inscrito' : inscMutation.isPending ? 'Inscrevendo…' : 'Participar'}
-        </button>
+      <div className="flex flex-wrap gap-2">
+        {ev.status === 'PUBLICADO' && (
+          <button
+            type="button"
+            disabled={ev.jaInscrito || inscMutation.isPending}
+            onClick={() => inscMutation.mutate()}
+            className="rounded-lg bg-viva-800 text-white px-5 py-2.5 text-sm font-medium disabled:opacity-50"
+          >
+            {ev.jaInscrito ? 'Você já está inscrito' : inscMutation.isPending ? 'Inscrevendo…' : 'Participar'}
+          </button>
+        )}
+
+        {ev.jaInscrito && ev.frequenciaAberta && !ev.presenteEm && (
+          <button
+            type="button"
+            disabled={presencaMutation.isPending}
+            onClick={() => presencaMutation.mutate()}
+            className="rounded-lg bg-emerald-700 text-white px-5 py-2.5 text-sm font-semibold disabled:opacity-50"
+          >
+            {presencaMutation.isPending ? 'Confirmando…' : 'Confirmar presença'}
+          </button>
+        )}
+      </div>
+
+      {ev.jaInscrito && ev.presenteEm && (
+        <p className="text-sm text-emerald-800 rounded-xl bg-emerald-50 border border-emerald-100 px-4 py-3">
+          Presença registrada às {new Date(ev.presenteEm).toLocaleString('pt-BR')}
+        </p>
+      )}
+
+      {ev.jaInscrito && !ev.frequenciaAberta && !ev.presenteEm && (
+        <p className="text-xs text-viva-600">
+          A frequência será liberada pela equipe durante a aula.
+        </p>
       )}
     </div>
   );

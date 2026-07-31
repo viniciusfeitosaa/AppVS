@@ -29,11 +29,19 @@ export type ConteudoEvento = {
   palestranteId?: string | null;
   palestrante?: ConteudoPalestrante | null;
   participantesCount?: number;
+  presentesCount?: number;
+  ausentesCount?: number;
   jaInscrito?: boolean;
+  presenteEm?: string | null;
+  frequenciaAberta?: boolean;
+  frequenciaAbertaEm?: string | null;
+  frequenciaFechadaEm?: string | null;
   tokenPalestrante?: string;
   tokenInscricao?: string;
+  tokenFrequencia?: string;
   linkPalestrante?: string;
   linkInscricao?: string;
+  linkFrequencia?: string;
   createdAt?: string;
   updatedAt?: string;
 };
@@ -41,15 +49,23 @@ export type ConteudoEvento = {
 export type ConteudoParticipante = {
   id: string;
   origem: 'MEDICO' | 'EXTERNO';
+  perfil?: 'MEDICO' | 'ESTUDANTE';
   nome: string;
   email: string;
   telefone?: string | null;
+  cpf?: string | null;
   crm?: string | null;
   especialidade?: string | null;
   cidade?: string | null;
+  faculdade?: string | null;
+  semestre?: string | null;
+  participaLiga?: boolean | null;
+  ligaNome?: string | null;
   interesseCorpoClinico?: boolean;
   medicoId?: string | null;
   consentimentoLgpd: boolean;
+  presenteEm?: string | null;
+  presencaOrigem?: 'APP' | 'LINK_PUBLICO' | null;
   createdAt: string;
 };
 
@@ -96,7 +112,7 @@ export const conteudoAdminService = {
     api.patch<{ success: boolean; data: ConteudoEvento }>(`/admin/conteudos/eventos/${id}/encerrar`),
   rascunho: (id: string) =>
     api.patch<{ success: boolean; data: ConteudoEvento }>(`/admin/conteudos/eventos/${id}/rascunho`),
-  regenerarToken: (id: string, tipo: 'palestrante' | 'inscricao') =>
+  regenerarToken: (id: string, tipo: 'palestrante' | 'inscricao' | 'frequencia') =>
     api.patch<{ success: boolean; data: ConteudoEvento }>(
       `/admin/conteudos/eventos/${id}/tokens/${tipo}`
     ),
@@ -115,6 +131,14 @@ export const conteudoAdminService = {
   listParticipantes: (id: string) =>
     api.get<{ success: boolean; data: ConteudoParticipante[] }>(
       `/admin/conteudos/eventos/${id}/participantes`
+    ),
+  abrirFrequencia: (id: string) =>
+    api.post<{ success: boolean; data: ConteudoEvento }>(
+      `/admin/conteudos/eventos/${id}/frequencia/abrir`
+    ),
+  fecharFrequencia: (id: string) =>
+    api.post<{ success: boolean; data: ConteudoEvento }>(
+      `/admin/conteudos/eventos/${id}/frequencia/fechar`
     ),
   listPrecadastros: () =>
     api.get<{ success: boolean; data: ConteudoPrecadastro[] }>('/admin/conteudos/precadastros'),
@@ -139,6 +163,10 @@ export const conteudoMedicoService = {
     api.get<{ success: boolean; data: ConteudoEvento }>(`/medico/conteudos/${id}`),
   inscrever: (id: string) =>
     api.post<{ success: boolean; data: unknown }>(`/medico/conteudos/${id}/inscrever`),
+  confirmarPresenca: (id: string) =>
+    api.post<{ success: boolean; data: { presenteEm: string; jaRegistrado: boolean } }>(
+      `/medico/conteudos/${id}/presenca`
+    ),
   capaUrl: (id: string) => {
     const base = api.defaults.baseURL || '/api';
     return `${base}/medico/conteudos/${id}/capa`;
@@ -173,12 +201,18 @@ export const conteudoPublicService = {
   submitInscricao: (
     token: string,
     payload: {
+      perfil?: 'MEDICO' | 'ESTUDANTE';
       nome: string;
       email: string;
       telefone: string;
+      cpf: string;
       crm?: string;
       especialidade?: string;
       cidade?: string;
+      faculdade?: string;
+      semestre?: string;
+      participaLiga?: boolean;
+      ligaNome?: string;
       interesseCorpoClinico?: boolean;
       consentimentoLgpd: boolean;
     }
@@ -187,4 +221,23 @@ export const conteudoPublicService = {
     const base = api.defaults.baseURL || '/api';
     return `${base}/conteudos/public/inscricao/${token}/capa`;
   },
+  getFrequencia: (token: string) =>
+    api.get<{
+      success: boolean;
+      data: {
+        evento: {
+          id: string;
+          titulo: string;
+          iniciaEm: string;
+          status: ConteudoEventoStatus;
+          frequenciaAberta: boolean;
+        };
+      };
+    }>(`/conteudos/public/frequencia/${token}`),
+  submitFrequencia: (token: string, email: string) =>
+    api.post<{
+      success: boolean;
+      data: { presenteEm: string; jaRegistrado: boolean };
+      message?: string;
+    }>(`/conteudos/public/frequencia/${token}`, { email }),
 };

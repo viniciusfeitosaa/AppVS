@@ -22,6 +22,7 @@ import {
   deleteVagaMedicoController,
 } from '../controllers/medico.controller';
 import {
+  confirmarPresencaMedicoController,
   downloadCapaMedicoController,
   getEventoMedicoController,
   inscreverMedicoController,
@@ -222,6 +223,13 @@ router.post(
   requireModuleAccess(ModuloSistema.CONTEUDOS),
   validateUUIDParam('id'),
   inscreverMedicoController
+);
+router.post(
+  '/conteudos/:id/presenca',
+  requireRole([UserRole.MEDICO]),
+  requireModuleAccess(ModuloSistema.CONTEUDOS),
+  validateUUIDParam('id'),
+  confirmarPresencaMedicoController
 );
 
 export default router;

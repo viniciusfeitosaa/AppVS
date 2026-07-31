@@ -2,13 +2,17 @@ import { Request, Response } from 'express';
 import path from 'path';
 import { ConteudoEventoStatus } from '@prisma/client';
 import {
+  abrirFrequenciaAdminService,
+  confirmarPresencaMedicoService,
   convidarPalestranteAdminService,
   createEventoAdminService,
+  fecharFrequenciaAdminService,
   getCapaByEventoPublicadoService,
   getCapaByInscricaoTokenService,
   getEventoAdminService,
   getEventoCapaPathAdminService,
   getEventoMedicoService,
+  getPublicFrequenciaService,
   getPublicInscricaoFormService,
   getPublicPalestranteFormService,
   inscreverMedicoService,
@@ -20,6 +24,7 @@ import {
   regenerarTokenAdminService,
   setCapaEventoAdminService,
   setEventoStatusAdminService,
+  submitPublicFrequenciaService,
   submitPublicInscricaoService,
   submitPublicPalestranteFormService,
   updateEventoAdminService,
@@ -138,11 +143,31 @@ export const rascunhoEventoAdminController = async (req: Request, res: Response)
   }
 };
 
+export const abrirFrequenciaAdminController = async (req: Request, res: Response) => {
+  try {
+    const data = await abrirFrequenciaAdminService(req.user!.tenantId, req.params.id);
+    return res.json({ success: true, data, message: 'Frequência aberta' });
+  } catch (error) {
+    return handleServiceError(res, error);
+  }
+};
+
+export const fecharFrequenciaAdminController = async (req: Request, res: Response) => {
+  try {
+    const data = await fecharFrequenciaAdminService(req.user!.tenantId, req.params.id);
+    return res.json({ success: true, data, message: 'Frequência encerrada' });
+  } catch (error) {
+    return handleServiceError(res, error);
+  }
+};
+
 export const regenerarTokenAdminController = async (req: Request, res: Response) => {
   try {
-    const tipo = req.params.tipo === 'palestrante' ? 'palestrante' : 'inscricao';
+    const raw = req.params.tipo;
+    const tipo =
+      raw === 'palestrante' ? 'palestrante' : raw === 'frequencia' ? 'frequencia' : 'inscricao';
     const data = await regenerarTokenAdminService(req.user!.tenantId, req.params.id, tipo);
-    return res.json({ success: true, data, message: 'Link regenerado' });
+    return res.json({ success: true, data, message: 'Token regenerado' });
   } catch (error) {
     return handleServiceError(res, error);
   }
@@ -230,6 +255,19 @@ export const inscreverMedicoController = async (req: Request, res: Response) => 
   }
 };
 
+export const confirmarPresencaMedicoController = async (req: Request, res: Response) => {
+  try {
+    const data = await confirmarPresencaMedicoService(req.user!.tenantId, req.user!.id, req.params.id);
+    return res.json({
+      success: true,
+      data,
+      message: data.jaRegistrado ? 'Presença já registrada' : 'Presença confirmada',
+    });
+  } catch (error) {
+    return handleServiceError(res, error);
+  }
+};
+
 export const downloadCapaMedicoController = async (req: Request, res: Response) => {
   try {
     const capaUrl = await getCapaByEventoPublicadoService(req.user!.tenantId, req.params.id);
@@ -287,6 +325,29 @@ export const downloadCapaPublicInscricaoController = async (req: Request, res: R
       return res.redirect(capaUrl);
     }
     return sendStoredImage(res, capaUrl);
+  } catch (error) {
+    return handleServiceError(res, error);
+  }
+};
+
+export const getPublicFrequenciaController = async (req: Request, res: Response) => {
+  try {
+    const data = await getPublicFrequenciaService(req.params.token);
+    return res.json({ success: true, data });
+  } catch (error) {
+    return handleServiceError(res, error);
+  }
+};
+
+export const submitPublicFrequenciaController = async (req: Request, res: Response) => {
+  try {
+    const data = await submitPublicFrequenciaService(req.params.token, req.body.email);
+    return res.json({
+      success: true,
+      data,
+      message:
+        'Se o e-mail estiver na lista de inscritos, a presença foi registrada.',
+    });
   } catch (error) {
     return handleServiceError(res, error);
   }

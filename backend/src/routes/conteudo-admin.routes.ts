@@ -1,9 +1,11 @@
 import { Router } from 'express';
 import {
+  abrirFrequenciaAdminController,
   convidarPalestranteAdminController,
   createEventoAdminController,
   downloadCapaAdminController,
   encerrarEventoAdminController,
+  fecharFrequenciaAdminController,
   getEventoAdminController,
   listEventosAdminController,
   listPalestrantesAdminController,
@@ -34,6 +36,8 @@ router.patch('/eventos/:id', validateUUIDParam('id'), validateUpdateConteudoEven
 router.patch('/eventos/:id/publicar', validateUUIDParam('id'), publicarEventoAdminController);
 router.patch('/eventos/:id/encerrar', validateUUIDParam('id'), encerrarEventoAdminController);
 router.patch('/eventos/:id/rascunho', validateUUIDParam('id'), rascunhoEventoAdminController);
+router.post('/eventos/:id/frequencia/abrir', validateUUIDParam('id'), abrirFrequenciaAdminController);
+router.post('/eventos/:id/frequencia/fechar', validateUUIDParam('id'), fecharFrequenciaAdminController);
 router.patch(
   '/eventos/:id/tokens/:tipo',
   validateUUIDParam('id'),

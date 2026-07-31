@@ -50,6 +50,7 @@ import {
   ConteudoMedicoDetalhePage,
   ConteudoPalestrantePublicPage,
   ConteudoInscricaoPublicPage,
+  ConteudoFrequenciaPublicPage,
 } from './modules/conteudos';
 
 const PageLoadingScreen = () => (
@@ -102,6 +103,7 @@ function AppRoutes() {
       <Route path="/ativar-conta/:token" element={<AcceptInvite />} />
       <Route path="/conteudos/palestrante/:token" element={<ConteudoPalestrantePublicPage />} />
       <Route path="/conteudos/inscricao/:token" element={<ConteudoInscricaoPublicPage />} />
+      <Route path="/conteudos/frequencia/:token" element={<ConteudoFrequenciaPublicPage />} />
       <Route path="/esqueci-senha" element={<LoginGuard><EsqueciSenha /></LoginGuard>} />
       <Route path="/redefinir-senha" element={<AuthOnlyRedirect><RedefinirSenha /></AuthOnlyRedirect>} />
       <Route
