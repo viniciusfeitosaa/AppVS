@@ -25,6 +25,10 @@ Status interno continua `RASCUNHO | PUBLICADO | ENCERRADO` (UI: “Inscrições 
 
 ## Changelog
 
+### 2026-07-31 — CPF no cadastro do palestrante
+- Formulário público do palestrante exige CPF (validação + máscara)
+- Coluna `cpf` em `conteudo_palestrantes`; admin exibe quando preenchido
+
 ### 2026-07-31 — Hardening segurança frequência (loop #1)
 - Anti-enumeração: POST público sempre ACK genérico (não revela se e-mail está inscrito)
 - QR gerado no cliente (`LocalQrCode` + `qrcode`) — sem api.qrserver.com

@@ -631,6 +631,9 @@ const ConteudosAdminPage = () => {
                     <div className="min-w-0">
                       <p className="truncate text-sm font-semibold text-viva-950">{evento.palestrante.nome}</p>
                       <p className="truncate text-xs text-viva-600">{evento.palestrante.email}</p>
+                      {evento.palestrante.cpf && (
+                        <p className="truncate text-xs text-viva-600">CPF {evento.palestrante.cpf}</p>
+                      )}
                     </div>
                     <span
                       className={`ml-auto rounded-full px-2 py-0.5 text-[11px] font-semibold ${

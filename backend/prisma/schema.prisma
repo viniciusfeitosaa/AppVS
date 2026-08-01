@@ -984,6 +984,7 @@ model ConteudoPalestrante {
   nome          String                    @db.VarChar(255)
   email         String                    @db.VarChar(255)
   telefone      String?                   @db.VarChar(30)
+  cpf           String?                   @db.VarChar(14)
   bio           String?                   @db.Text
   fotoUrl       String?                   @map("foto_url") @db.VarChar(500)
   crm           String?                   @db.VarChar(60)

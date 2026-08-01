@@ -1,6 +1,7 @@
 import { FormEvent, useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { BrandLogo } from '../../../components/brand/BrandLogo';
+import { maskCpf } from '../../../features/cadastro-coop/utils/masks';
 import { conteudoPublicService } from '../api/conteudo.service';
 
 const ConteudoPalestrantePublicPage = () => {
@@ -13,10 +14,10 @@ const ConteudoPalestrantePublicPage = () => {
     nome: '',
     email: '',
     telefone: '',
+    cpf: '',
     bio: '',
     crm: '',
     especialidade: '',
-    fotoUrl: '',
   });
 
   useEffect(() => {
@@ -31,10 +32,10 @@ const ConteudoPalestrantePublicPage = () => {
             nome: palestrante.nome || '',
             email: palestrante.email || '',
             telefone: palestrante.telefone || '',
+            cpf: palestrante.cpf ? maskCpf(palestrante.cpf) : '',
             bio: palestrante.bio || '',
             crm: palestrante.crm || '',
             especialidade: palestrante.especialidade || '',
-            fotoUrl: palestrante.fotoUrl || '',
           });
         }
       } catch (e: unknown) {
@@ -55,10 +56,10 @@ const ConteudoPalestrantePublicPage = () => {
         nome: form.nome,
         email: form.email,
         telefone: form.telefone || undefined,
+        cpf: form.cpf,
         bio: form.bio || undefined,
         crm: form.crm || undefined,
         especialidade: form.especialidade || undefined,
-        fotoUrl: form.fotoUrl || undefined,
       });
       setSuccess(true);
     } catch (err: unknown) {
@@ -94,9 +95,6 @@ const ConteudoPalestrantePublicPage = () => {
                 ['nome', 'Nome completo', true],
                 ['email', 'E-mail', true],
                 ['telefone', 'Telefone', false],
-                ['crm', 'CRM / registro', false],
-                ['especialidade', 'Especialidade', false],
-                ['fotoUrl', 'URL da foto', false],
               ] as const
             ).map(([key, label, required]) => (
               <label key={key} className="block text-sm space-y-1">
@@ -104,6 +102,35 @@ const ConteudoPalestrantePublicPage = () => {
                 <input
                   required={required}
                   type={key === 'email' ? 'email' : 'text'}
+                  className="w-full rounded-lg border border-viva-200 px-3 py-2"
+                  value={form[key]}
+                  onChange={(e) => setForm((f) => ({ ...f, [key]: e.target.value }))}
+                />
+              </label>
+            ))}
+            <label className="block text-sm space-y-1">
+              <span className="text-viva-700">CPF</span>
+              <input
+                required
+                inputMode="numeric"
+                autoComplete="off"
+                placeholder="000.000.000-00"
+                className="w-full rounded-lg border border-viva-200 px-3 py-2"
+                value={form.cpf}
+                onChange={(e) => setForm((f) => ({ ...f, cpf: maskCpf(e.target.value) }))}
+              />
+            </label>
+            {(
+              [
+                ['crm', 'CRM / registro', false],
+                ['especialidade', 'Especialidade', false],
+              ] as const
+            ).map(([key, label, required]) => (
+              <label key={key} className="block text-sm space-y-1">
+                <span className="text-viva-700">{label}</span>
+                <input
+                  required={required}
+                  type="text"
                   className="w-full rounded-lg border border-viva-200 px-3 py-2"
                   value={form[key]}
                   onChange={(e) => setForm((f) => ({ ...f, [key]: e.target.value }))}

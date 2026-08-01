@@ -8,6 +8,7 @@ export type ConteudoPalestrante = {
   nome: string;
   email: string;
   telefone?: string | null;
+  cpf?: string | null;
   bio?: string | null;
   fotoUrl?: string | null;
   crm?: string | null;
@@ -188,8 +189,8 @@ export const conteudoPublicService = {
       nome: string;
       email: string;
       telefone?: string;
+      cpf: string;
       bio?: string;
-      fotoUrl?: string;
       crm?: string;
       especialidade?: string;
     }

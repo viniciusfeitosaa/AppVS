@@ -16,6 +16,7 @@ const palestranteSelect = {
   nome: true,
   email: true,
   telefone: true,
+  cpf: true,
   bio: true,
   fotoUrl: true,
   crm: true,
@@ -732,8 +733,8 @@ export async function submitPublicPalestranteFormService(
     nome: string;
     email: string;
     telefone?: string | null;
+    cpf?: string | null;
     bio?: string | null;
-    fotoUrl?: string | null;
     crm?: string | null;
     especialidade?: string | null;
   }
@@ -748,12 +749,17 @@ export async function submitPublicPalestranteFormService(
   if (nome.length < 2) throw { statusCode: 400, message: 'Informe o nome completo.' };
   if (!email.includes('@')) throw { statusCode: 400, message: 'E-mail inválido.' };
 
+  const cpf = (input.cpf || '').replace(/\D/g, '');
+  if (!validateCPF(cpf)) {
+    throw { statusCode: 400, message: 'CPF inválido.' };
+  }
+
   const data = {
     nome,
     email,
     telefone: input.telefone?.trim() || null,
+    cpf,
     bio: input.bio?.trim() || null,
-    fotoUrl: input.fotoUrl?.trim() || null,
     crm: input.crm?.trim() || null,
     especialidade: input.especialidade?.trim() || null,
     status: ConteudoPalestranteStatus.COMPLETO,
