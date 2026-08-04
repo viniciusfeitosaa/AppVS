@@ -1,15 +1,32 @@
 import type { EmailNfPersonalizado } from '../utils/email-nf-template.util';
+import type { EmailDemonstrativoPersonalizado } from '../utils/email-demonstrativo-template.util';
 import { formatValorBRL, parseValorBRL } from '../utils/parse-nf-tabela.util';
+
+type BatchItem = EmailNfPersonalizado | EmailDemonstrativoPersonalizado;
 
 type Props = {
   assunto: string;
-  emails: EmailNfPersonalizado[];
+  emails: BatchItem[];
   onCancel: () => void;
   onSaveDrafts: () => void;
   onSendAll: () => void;
   busy?: boolean;
   variante?: 'nf' | 'demonstrativo';
+  /** Demonstrativo com tabela de produção → PDF será anexado no envio. */
+  comPdfAnexo?: boolean;
 };
+
+function totalFromDados(e: BatchItem): number | null {
+  const d = (e as EmailDemonstrativoPersonalizado).dados;
+  if (d) return d.total;
+  return null;
+}
+
+function locaisFromDados(e: BatchItem): number | null {
+  const d = (e as EmailDemonstrativoPersonalizado).dados;
+  if (d) return d.linhas.length;
+  return null;
+}
 
 const EmailNfBatchPreview = ({
   assunto,
@@ -19,8 +36,11 @@ const EmailNfBatchPreview = ({
   onSendAll,
   busy,
   variante = 'nf',
+  comPdfAnexo = false,
 }: Props) => {
   const isNf = variante === 'nf';
+  const isDemo = variante === 'demonstrativo';
+  const showValores = isNf || comPdfAnexo;
 
   return (
     <div className={`card space-y-4 border-l-4 ${isNf ? 'border-sky-500' : 'border-emerald-500'}`}>
@@ -31,9 +51,14 @@ const EmailNfBatchPreview = ({
           </h3>
           <p className="text-sm text-gray-600 mt-1">
             {emails.length} e-mail(s) individual(is)
-            {isNf ? ' com valores por UPA' : ' personalizados'}. Assunto:{' '}
-            <span className="font-medium text-viva-800">{assunto}</span>
+            {isNf ? ' com valores por UPA' : comPdfAnexo ? ' com PDF (nome, locais, valor e total)' : ' personalizados'}
+            . Assunto: <span className="font-medium text-viva-800">{assunto}</span>
           </p>
+          {isDemo && comPdfAnexo && (
+            <p className="text-xs text-emerald-800 mt-1">
+              No envio, cada e-mail levará o PDF do demonstrativo em anexo.
+            </p>
+          )}
         </div>
         <button type="button" className="btn btn-secondary text-sm" onClick={onCancel} disabled={busy}>
           Cancelar
@@ -46,31 +71,42 @@ const EmailNfBatchPreview = ({
             <tr className="text-left text-viva-800">
               <th className="py-2 px-3 font-medium">Profissional</th>
               <th className="py-2 px-3 font-medium">E-mail</th>
-              {isNf && (
+              {showValores && (
                 <>
-                  <th className="py-2 px-3 font-medium">UPAs</th>
-                  <th className="py-2 px-3 font-medium text-right">Total bruto</th>
+                  <th className="py-2 px-3 font-medium">{isNf ? 'UPAs' : 'Locais'}</th>
+                  <th className="py-2 px-3 font-medium text-right">
+                    {isNf ? 'Total bruto' : 'Total'}
+                  </th>
                 </>
               )}
             </tr>
           </thead>
           <tbody>
             {emails.map((e) => {
-              const total = e.corpoTexto
-                .split('\n')
-                .filter((l) => l.startsWith('•'))
-                .reduce((acc, linha) => {
-                  const m = linha.match(/R\$\s*[\d.,]+/);
-                  return acc + (m ? parseValorBRL(m[0]) : 0);
-                }, 0);
-              const upas = (e.corpoTexto.match(/^• .+$/gm) ?? []).length;
+              const totalDados = totalFromDados(e);
+              const locaisDados = locaisFromDados(e);
+
+              let total = totalDados ?? 0;
+              let count = locaisDados ?? 0;
+
+              if (totalDados == null) {
+                total = e.corpoTexto
+                  .split('\n')
+                  .filter((l) => l.startsWith('•'))
+                  .reduce((acc, linha) => {
+                    const m = linha.match(/R\$\s*[\d.,]+/);
+                    return acc + (m ? parseValorBRL(m[0]) : 0);
+                  }, 0);
+                count = (e.corpoTexto.match(/^• .+$/gm) ?? []).length;
+              }
+
               return (
                 <tr key={e.email} className="border-t border-viva-50 align-top">
                   <td className="py-2 px-3 font-medium text-viva-900">{e.nome}</td>
                   <td className="py-2 px-3 text-gray-600">{e.email}</td>
-                  {isNf && (
+                  {showValores && (
                     <>
-                      <td className="py-2 px-3 text-gray-600">{upas}</td>
+                      <td className="py-2 px-3 text-gray-600">{count}</td>
                       <td className="py-2 px-3 text-right font-medium">{formatValorBRL(total)}</td>
                     </>
                   )}
@@ -95,7 +131,11 @@ const EmailNfBatchPreview = ({
           Salvar {emails.length} rascunho(s)
         </button>
         <button type="button" className="btn btn-primary" onClick={onSendAll} disabled={busy}>
-          Enviar {emails.length} e-mail(s) agora
+          {busy
+            ? 'Processando…'
+            : comPdfAnexo
+              ? `Enviar ${emails.length} e-mail(s) com PDF`
+              : `Enviar ${emails.length} e-mail(s) agora`}
         </button>
       </div>
     </div>

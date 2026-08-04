@@ -8,7 +8,11 @@ import EmailStatsCards from '../components/EmailStatsCards';
 import EmailMaddyStatus from '../components/EmailMaddyStatus';
 import EmailComposeForm from '../components/EmailComposeForm';
 import EmailHistoryTable from '../components/EmailHistoryTable';
-import type { CreateEmailMensagemPayload, EmailPainelTab } from '../types';
+import type {
+  CreateEmailMensagemPayload,
+  EmailPainelTab,
+  EnviarAgoraEmailPayload,
+} from '../types';
 
 const tabs: { id: EmailPainelTab; label: string }[] = [
   { id: 'visao-geral', label: 'Visão geral' },
@@ -87,9 +91,10 @@ const EmailPainelPage = () => {
     }
   };
 
-  const handleSendNow = async (payload: CreateEmailMensagemPayload) => {
-    const created = await createMutation.mutateAsync(payload);
-    await enviarMutation.mutateAsync(created.data.id);
+  const handleSendNow = async (payload: EnviarAgoraEmailPayload) => {
+    // enviar-agora aceita anexos (PDF de demonstrativo); create + enviar não.
+    await emailModuleService.enviarAgora(payload);
+    invalidate();
     setTab('historico');
   };
 
@@ -149,11 +154,11 @@ const EmailPainelPage = () => {
             }
             setTab('historico');
           }}
-          onSendMany={async (payloads) => {
+          onSendMany={async (payloads: EnviarAgoraEmailPayload[]) => {
             for (const payload of payloads) {
-              const created = await createMutation.mutateAsync(payload);
-              await enviarMutation.mutateAsync(created.data.id);
+              await emailModuleService.enviarAgora(payload);
             }
+            invalidate();
             setTab('historico');
           }}
           disabled={createMutation.isPending || enviarMutation.isPending}

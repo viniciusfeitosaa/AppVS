@@ -4,18 +4,24 @@ import EmitirNFModal, { type EmitirNFResultado } from './EmitirNFModal';
 import DemonstrativosModal, { type DemonstrativosResultado } from './DemonstrativosModal';
 import EmailNfBatchPreview from './EmailNfBatchPreview';
 import type { EmailNfPersonalizado } from '../utils/email-nf-template.util';
-import type { CreateEmailMensagemPayload } from '../types';
+import type { EmailDemonstrativoPersonalizado, CompetenciaDemonstrativo } from '../utils/email-demonstrativo-template.util';
+import { buildDemonstrativoPainelPdfBase64 } from '../utils/build-demonstrativo-pdf.util';
+import type {
+  CreateEmailMensagemPayload,
+  EnviarAgoraEmailPayload,
+} from '../types';
 
 type Props = {
   onSubmit: (payload: CreateEmailMensagemPayload) => Promise<void>;
-  onSendNow?: (payload: CreateEmailMensagemPayload) => Promise<void>;
+  onSendNow?: (payload: EnviarAgoraEmailPayload) => Promise<void>;
   onSubmitMany?: (payloads: CreateEmailMensagemPayload[]) => Promise<void>;
-  onSendMany?: (payloads: CreateEmailMensagemPayload[]) => Promise<void>;
+  onSendMany?: (payloads: EnviarAgoraEmailPayload[]) => Promise<void>;
   disabled?: boolean;
   smtpConfigurado?: boolean;
 };
 
 type BatchVariante = 'nf' | 'demonstrativo';
+type BatchEmailItem = EmailNfPersonalizado | EmailDemonstrativoPersonalizado;
 
 const EmailComposeForm = ({ onSubmit, onSendNow, onSubmitMany, onSendMany, disabled, smtpConfigurado }: Props) => {
   const [assunto, setAssunto] = useState('');
@@ -27,9 +33,12 @@ const EmailComposeForm = ({ onSubmit, onSendNow, onSubmitMany, onSendMany, disab
   const [error, setError] = useState<string | null>(null);
   const [nfModalOpen, setNfModalOpen] = useState(false);
   const [demoModalOpen, setDemoModalOpen] = useState(false);
-  const [batchEmails, setBatchEmails] = useState<EmailNfPersonalizado[] | null>(null);
+  const [batchEmails, setBatchEmails] = useState<BatchEmailItem[] | null>(null);
   const [batchAssunto, setBatchAssunto] = useState('');
   const [batchVariante, setBatchVariante] = useState<BatchVariante>('nf');
+  /** Demonstrativo colado com locais/valores → gera PDF no envio. */
+  const [batchComPdf, setBatchComPdf] = useState(false);
+  const [batchCompetencia, setBatchCompetencia] = useState<CompetenciaDemonstrativo | null>(null);
 
   const contatosPorEmail = useMemo(
     () => new Map(EMAIL_CONTATOS.map((c) => [c.email.toLowerCase(), c.nome])),
@@ -79,6 +88,13 @@ const EmailComposeForm = ({ onSubmit, onSendNow, onSubmitMany, onSendMany, disab
       setBatchEmails(resultado.emails);
       setBatchAssunto(resultado.assunto);
       setBatchVariante(variante);
+      if (variante === 'demonstrativo' && 'comTabelaProducao' in resultado) {
+        setBatchComPdf(resultado.comTabelaProducao);
+        setBatchCompetencia(resultado.competencia);
+      } else {
+        setBatchComPdf(false);
+        setBatchCompetencia(null);
+      }
       setAssunto('');
       setCorpoTexto('');
       setDestinatariosSelecionados([]);
@@ -87,6 +103,8 @@ const EmailComposeForm = ({ onSubmit, onSendNow, onSubmitMany, onSendMany, disab
     }
 
     setBatchEmails(null);
+    setBatchComPdf(false);
+    setBatchCompetencia(null);
     setAssunto(resultado.assunto);
     setCorpoTexto(resultado.corpoTexto);
     if (!destinatariosSelecionados.length) {
@@ -97,30 +115,75 @@ const EmailComposeForm = ({ onSubmit, onSendNow, onSubmitMany, onSendMany, disab
   const cancelarBatch = () => {
     setBatchEmails(null);
     setBatchAssunto('');
+    setBatchComPdf(false);
+    setBatchCompetencia(null);
   };
 
-  const payloadsFromBatch = (): CreateEmailMensagemPayload[] =>
+  const payloadsFromBatchDraft = (): CreateEmailMensagemPayload[] =>
     (batchEmails ?? []).map((e) => ({
       assunto: e.assunto,
       corpoTexto: e.corpoTexto,
       destinatarios: [e.email],
     }));
 
+  const payloadsFromBatchSend = async (): Promise<EnviarAgoraEmailPayload[]> => {
+    const list = batchEmails ?? [];
+    const out: EnviarAgoraEmailPayload[] = [];
+
+    for (const e of list) {
+      const item: EnviarAgoraEmailPayload = {
+        assunto: e.assunto,
+        corpoTexto: e.corpoTexto,
+        destinatarios: [e.email],
+      };
+
+      if (batchComPdf && batchCompetencia) {
+        const demo = e as EmailDemonstrativoPersonalizado;
+        if (demo.dados) {
+          const pdf = await buildDemonstrativoPainelPdfBase64({
+            competencia: batchCompetencia,
+            nome: demo.nome,
+            linhas: demo.dados.linhas,
+            total: demo.dados.total,
+          });
+          item.anexos = [
+            {
+              filename: pdf.filename,
+              contentBase64: pdf.base64,
+              contentType: 'application/pdf',
+            },
+          ];
+        }
+      }
+
+      out.push(item);
+    }
+
+    return out;
+  };
+
   const handleBatch = async (mode: 'draft' | 'send') => {
     if (!batchEmails?.length) return;
     setError(null);
     setBusy(true);
     try {
-      const payloads = payloadsFromBatch();
-      if (mode === 'send' && onSendMany) {
-        await onSendMany(payloads);
-      } else if (onSubmitMany) {
-        await onSubmitMany(payloads);
-      } else {
-        for (const p of payloads) {
-          if (mode === 'send' && onSendNow) {
+      if (mode === 'send') {
+        const payloads = await payloadsFromBatchSend();
+        if (onSendMany) {
+          await onSendMany(payloads);
+        } else if (onSendNow) {
+          for (const p of payloads) {
             await onSendNow(p);
-          } else {
+          }
+        } else {
+          throw new Error('Envio imediato não configurado');
+        }
+      } else {
+        const payloads = payloadsFromBatchDraft();
+        if (onSubmitMany) {
+          await onSubmitMany(payloads);
+        } else {
+          for (const p of payloads) {
             await onSubmit(p);
           }
         }
@@ -145,6 +208,8 @@ const EmailComposeForm = ({ onSubmit, onSendNow, onSubmitMany, onSendMany, disab
     setCorpoTexto('');
     setBatchEmails(null);
     setBatchAssunto('');
+    setBatchComPdf(false);
+    setBatchCompetencia(null);
   };
 
   const handle = async (mode: 'draft' | 'send') => {
@@ -181,6 +246,7 @@ const EmailComposeForm = ({ onSubmit, onSendNow, onSubmitMany, onSendMany, disab
           assunto={batchAssunto}
           emails={batchEmails}
           variante={batchVariante}
+          comPdfAnexo={batchComPdf}
           onCancel={cancelarBatch}
           onSaveDrafts={() => void handleBatch('draft')}
           onSendAll={() => void handleBatch('send')}
