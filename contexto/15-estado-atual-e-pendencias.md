@@ -77,6 +77,7 @@ Arquivos de referência: `schema.prisma` (`Escala`, `EscalaMedico`, `EscalaPlant
 
 | Data | Entrega |
 |------|---------|
+| 2026-08-04 | WhatsApp: **pausar** sem expirar em 24h — só volta com `retomar` |
 | 2026-08-04 | Painel de E-mail → **Demonstrativos** com PDF (tabela colada); 2 competências; corpo sem valores |
 | 2026-08-04 | Confirmação **multi-escala/multi-contrato no mesmo mês** + cálculo de repasse (mapa de bordo) |
 | 2026-07-31 | Conteúdos: CPF também no **cadastro do palestrante** (link público) |
@@ -134,6 +135,7 @@ Assunto, corpo e linha “Competência” do PDF usam o estilo escolhido.
 ### Detalhe — WhatsApp pausar/retomar (2026-07-30)
 
 - **Quem controla:** apenas mensagens `IsFromMe` no WhatsApp da Viva Saúde (`pausar`, `retomar` / `despausar` / `ativar`)
+- **Pausa permanente** até a equipe digitar `retomar` / `despausar` / `ativar` (sem TTL de 24h no Redis)
 - **Cliente:** não pausa/retoma; com conversa pausada o robô não responde
 - **UX:** sem confirmação no chat; tenta apagar o comando (`/message/delete`)
 - **Bug corrigido:** pause/resume usavam `@lid` como “telefone”; agora resolve PN + mapeia LID↔telefone no Redis

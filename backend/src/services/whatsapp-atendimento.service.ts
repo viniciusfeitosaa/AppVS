@@ -38,7 +38,7 @@ const SESSION_PREFIX = 'wa:atendimento:';
 const PAUSED_PREFIX = 'wa:atendimento:paused:';
 const LID_PHONE_PREFIX = 'wa:lid2phone:';
 const SESSION_TTL_SEC = 4 * 60 * 60; // 4h — depois disso, novo contato recebe menu de novo
-const PAUSED_TTL_SEC = 24 * 60 * 60; // 24h — pausa humana na conversa
+/** Pausado pela equipe: sem TTL — só retoma com comando explícito (retomar/despausar). */
 const LID_MAP_TTL_SEC = 30 * 24 * 60 * 60;
 
 type DepartmentChoice = '1' | '2' | '3' | '4';
@@ -412,10 +412,11 @@ async function pauseConversation(phone: string, chatJid?: string | null): Promis
   const redis = getRedisClient();
   if (!redis) return;
   const pipeline = redis.multi();
-  pipeline.set(`${PAUSED_PREFIX}${phone}`, '1', 'EX', PAUSED_TTL_SEC);
+  // Sem EX: permanece pausado até a equipe digitar retomar / despausar.
+  pipeline.set(`${PAUSED_PREFIX}${phone}`, '1');
   if (chatJid) {
     // guarda o telefone no valor para o retomar via @lid achar a chave certa
-    pipeline.set(`${PAUSED_PREFIX}jid:${chatJid}`, phone, 'EX', PAUSED_TTL_SEC);
+    pipeline.set(`${PAUSED_PREFIX}jid:${chatJid}`, phone);
   }
   await pipeline.exec();
   await rememberLidPhoneMapping(phone, chatJid);
