@@ -978,6 +978,13 @@ enum ConteudoPresencaOrigem {
   LINK_PUBLICO
 }
 
+/// Pipeline de convite ao corpo clínico a partir do precadastro de conteúdo (opção A: sem Avaliação).
+enum ConteudoPrecadastroStatus {
+  AGUARDANDO
+  ACEITO
+  CONVERTIDO
+}
+
 model ConteudoPalestrante {
   id            String                    @id @default(uuid())
   tenantId      String                    @map("tenant_id")
@@ -1057,6 +1064,11 @@ model ConteudoParticipante {
   /// Precadastro para possível ingresso no corpo clínico.
   interesseCorpoClinico  Boolean                    @default(true) @map("interesse_corpo_clinico")
   consentimentoLgpd      Boolean                    @default(false) @map("consentimento_lgpd")
+  /// Fluxo aceite → e-mail → cadastro ATIVO (não passa por Avaliação).
+  precadastroStatus      ConteudoPrecadastroStatus  @default(AGUARDANDO) @map("precadastro_status")
+  tokenCadastroCorpo     String?                    @unique @map("token_cadastro_corpo") @db.VarChar(64)
+  precadastroAceitoEm    DateTime?                  @map("precadastro_aceito_em")
+  precadastroAceitoPorMasterId String?              @map("precadastro_aceito_por_master_id")
   presenteEm             DateTime?                  @map("presente_em")
   presencaOrigem         ConteudoPresencaOrigem?    @map("presenca_origem")
   createdAt              DateTime                   @default(now()) @map("created_at")
@@ -1069,6 +1081,7 @@ model ConteudoParticipante {
   @@unique([eventoId, medicoId])
   @@index([tenantId, eventoId])
   @@index([tenantId, origem, createdAt])
+  @@index([tenantId, precadastroStatus])
   @@index([medicoId])
   @@map("conteudo_participantes")
 }

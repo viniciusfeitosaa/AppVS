@@ -1,9 +1,11 @@
 import { Router } from 'express';
 import {
   downloadCapaPublicInscricaoController,
+  getPublicCadastroCorpoController,
   getPublicFrequenciaController,
   getPublicInscricaoController,
   getPublicPalestranteController,
+  submitPublicCadastroCorpoController,
   submitPublicFrequenciaController,
   submitPublicInscricaoController,
   submitPublicPalestranteController,
@@ -11,6 +13,7 @@ import {
 import { publicFormLimiter } from '../middleware/rate-limit.middleware';
 import {
   validateConteudoTokenParam,
+  validatePublicCadastroCorpoForm,
   validatePublicFrequenciaForm,
   validatePublicInscricaoForm,
   validatePublicPalestranteForm,
@@ -60,6 +63,19 @@ router.post(
   validateConteudoTokenParam,
   validatePublicFrequenciaForm,
   submitPublicFrequenciaController
+);
+
+router.get(
+  '/cadastro-corpo/:token',
+  validateConteudoTokenParam,
+  getPublicCadastroCorpoController
+);
+router.post(
+  '/cadastro-corpo/:token',
+  publicFormLimiter,
+  validateConteudoTokenParam,
+  validatePublicCadastroCorpoForm,
+  submitPublicCadastroCorpoController
 );
 
 export default router;

@@ -1,8 +1,10 @@
 import { Router } from 'express';
 import {
+  aceitarPrecadastrosAdminController,
   abrirFrequenciaAdminController,
   convidarPalestranteAdminController,
   createEventoAdminController,
+  deleteParticipanteAdminController,
   downloadCapaAdminController,
   encerrarEventoAdminController,
   fecharFrequenciaAdminController,
@@ -18,6 +20,7 @@ import {
   uploadCapaAdminController,
 } from '../controllers/conteudo.controller';
 import {
+  validateAceitarPrecadastros,
   validateConvidarPalestrante,
   validateCreateConteudoEvento,
   validateUpdateConteudoEvento,
@@ -29,6 +32,7 @@ const router = Router();
 
 router.get('/palestrantes', listPalestrantesAdminController);
 router.get('/precadastros', listPrecadastrosAdminController);
+router.post('/precadastros/aceitar', validateAceitarPrecadastros, aceitarPrecadastrosAdminController);
 router.get('/eventos', listEventosAdminController);
 router.get('/eventos/:id', validateUUIDParam('id'), getEventoAdminController);
 router.post('/eventos', validateCreateConteudoEvento, createEventoAdminController);
@@ -50,6 +54,12 @@ router.post(
   convidarPalestranteAdminController
 );
 router.get('/eventos/:id/participantes', validateUUIDParam('id'), listParticipantesAdminController);
+router.delete(
+  '/eventos/:id/participantes/:participanteId',
+  validateUUIDParam('id'),
+  validateUUIDParam('participanteId'),
+  deleteParticipanteAdminController
+);
 router.post(
   '/eventos/:id/capa',
   validateUUIDParam('id'),

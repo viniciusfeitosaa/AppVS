@@ -2,16 +2,19 @@ import { Request, Response } from 'express';
 import path from 'path';
 import { ConteudoEventoStatus } from '@prisma/client';
 import {
+  aceitarPrecadastrosAdminService,
   abrirFrequenciaAdminService,
   confirmarPresencaMedicoService,
   convidarPalestranteAdminService,
   createEventoAdminService,
+  deleteParticipanteAdminService,
   fecharFrequenciaAdminService,
   getCapaByEventoPublicadoService,
   getCapaByInscricaoTokenService,
   getEventoAdminService,
   getEventoCapaPathAdminService,
   getEventoMedicoService,
+  getPublicCadastroCorpoFormService,
   getPublicFrequenciaService,
   getPublicInscricaoFormService,
   getPublicPalestranteFormService,
@@ -24,6 +27,7 @@ import {
   regenerarTokenAdminService,
   setCapaEventoAdminService,
   setEventoStatusAdminService,
+  submitPublicCadastroCorpoService,
   submitPublicFrequenciaService,
   submitPublicInscricaoService,
   submitPublicPalestranteFormService,
@@ -191,10 +195,37 @@ export const listParticipantesAdminController = async (req: Request, res: Respon
   }
 };
 
+export const deleteParticipanteAdminController = async (req: Request, res: Response) => {
+  try {
+    const data = await deleteParticipanteAdminService(
+      req.user!.tenantId,
+      req.params.id,
+      req.params.participanteId
+    );
+    return res.json({ success: true, data, message: 'Participante excluído' });
+  } catch (error) {
+    return handleServiceError(res, error);
+  }
+};
+
 export const listPrecadastrosAdminController = async (req: Request, res: Response) => {
   try {
     const data = await listPrecadastrosAdminService(req.user!.tenantId);
     return res.json({ success: true, data });
+  } catch (error) {
+    return handleServiceError(res, error);
+  }
+};
+
+export const aceitarPrecadastrosAdminController = async (req: Request, res: Response) => {
+  try {
+    const ids = Array.isArray(req.body?.ids) ? req.body.ids.map(String) : [];
+    const data = await aceitarPrecadastrosAdminService(req.user!.tenantId, req.user!.id, ids);
+    return res.json({
+      success: true,
+      data,
+      message: `${data.aceitos} de ${data.total} precadastro(s) aceito(s)`,
+    });
   } catch (error) {
     return handleServiceError(res, error);
   }
@@ -347,6 +378,28 @@ export const submitPublicFrequenciaController = async (req: Request, res: Respon
       data,
       message:
         'Se o e-mail estiver na lista de inscritos, a presença foi registrada.',
+    });
+  } catch (error) {
+    return handleServiceError(res, error);
+  }
+};
+
+export const getPublicCadastroCorpoController = async (req: Request, res: Response) => {
+  try {
+    const data = await getPublicCadastroCorpoFormService(req.params.token);
+    return res.json({ success: true, data });
+  } catch (error) {
+    return handleServiceError(res, error);
+  }
+};
+
+export const submitPublicCadastroCorpoController = async (req: Request, res: Response) => {
+  try {
+    const data = await submitPublicCadastroCorpoService(req.params.token, req.body);
+    return res.status(201).json({
+      success: true,
+      data,
+      message: data.message,
     });
   } catch (error) {
     return handleServiceError(res, error);

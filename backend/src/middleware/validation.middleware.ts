@@ -1029,6 +1029,28 @@ export const validatePublicFrequenciaForm = [
   handleValidationErrors,
 ];
 
+export const validateAceitarPrecadastros = [
+  body('ids').isArray({ min: 1 }).withMessage('Informe ao menos um precadastro'),
+  body('ids.*').isUUID().withMessage('ID de precadastro inválido'),
+  handleValidationErrors,
+];
+
+export const validatePublicCadastroCorpoForm = [
+  body('password').isLength({ min: 8 }).withMessage('Senha deve ter no mínimo 8 caracteres'),
+  body('confirmPassword').optional().isString(),
+  body('profissao').trim().isLength({ min: 2, max: 80 }).withMessage('Informe a profissão'),
+  body('nomeCompleto').optional().trim().isLength({ max: 255 }),
+  body('email').optional().trim().isEmail().withMessage('E-mail inválido'),
+  body('telefone').optional({ values: 'falsy' }).trim().isLength({ max: 30 }),
+  body('cpf').optional({ values: 'falsy' }).trim().isLength({ min: 11, max: 14 }),
+  body('crm').optional({ values: 'falsy' }).trim().isLength({ max: 60 }),
+  body('especialidades').optional(),
+  body('aceitouTermos')
+    .custom((v) => v === true || v === 'true' || v === '1' || v === 'on')
+    .withMessage('É necessário aceitar os termos de cadastro'),
+  handleValidationErrors,
+];
+
 export const validateConteudoTokenParam = [
   param('token')
     .trim()

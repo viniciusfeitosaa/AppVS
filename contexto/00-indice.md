@@ -1,6 +1,6 @@
 # Índice — Contexto Viva Saúde
 
-**Última revisão geral:** 2026-05-28  
+**Última revisão geral:** 2026-08-05  
 **Branch de referência:** `main`
 
 ## Obsidian

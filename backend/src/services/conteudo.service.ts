@@ -3,13 +3,19 @@ import {
   ConteudoPalestranteStatus,
   ConteudoParticipanteOrigem,
   ConteudoParticipantePerfil,
+  ConteudoPrecadastroStatus,
   ConteudoPresencaOrigem,
   Prisma,
+  StatusCadastroMedico,
 } from '@prisma/client';
 import { prisma } from '../config/database';
 import { getFrontendAppBaseUrl } from '../utils/email-branding.util';
 import { newConteudoToken, parseYoutubeUrl, youtubeEmbedUrl } from '../utils/conteudo.util';
 import { validateCPF } from '../utils/validation.util';
+import { TERMOS_CADASTRO_VERSAO } from '../constants/termos-cadastro.const';
+import { enviarEmailPrecadastroAceito } from './cadastro-publico-email.service';
+import { hashPassword } from '../utils/password.util';
+import { resolveRegistroConselhoParaCadastro } from '../utils/profissao-registro.util';
 
 const palestranteSelect = {
   id: true,
@@ -490,6 +496,22 @@ export async function listParticipantesAdminService(tenantId: string, eventoId: 
   );
 }
 
+/** Remove inscrição do conteúdo (= some da lista de participantes e de precadastros se for externo). */
+export async function deleteParticipanteAdminService(
+  tenantId: string,
+  eventoId: string,
+  participanteId: string
+) {
+  const row = await prisma.conteudoParticipante.findFirst({
+    where: { id: participanteId, tenantId, eventoId },
+    select: { id: true, nome: true, email: true },
+  });
+  if (!row) notFound('Participante não encontrado.');
+
+  await prisma.conteudoParticipante.delete({ where: { id: row.id } });
+  return { id: row.id, nome: row.nome, email: row.email };
+}
+
 /** Lista unificada de precadastros (inscritos externos) de todos os conteúdos. */
 export async function listPrecadastrosAdminService(tenantId: string) {
   const rows = await prisma.conteudoParticipante.findMany({
@@ -498,14 +520,24 @@ export async function listPrecadastrosAdminService(tenantId: string) {
     take: 500,
     select: {
       id: true,
+      perfil: true,
       nome: true,
       email: true,
       telefone: true,
+      cpf: true,
       crm: true,
       especialidade: true,
       cidade: true,
+      faculdade: true,
+      semestre: true,
+      participaLiga: true,
+      ligaNome: true,
       interesseCorpoClinico: true,
       consentimentoLgpd: true,
+      precadastroStatus: true,
+      precadastroAceitoEm: true,
+      presenteEm: true,
+      presencaOrigem: true,
       createdAt: true,
       evento: {
         select: { id: true, titulo: true, iniciaEm: true, status: true },
@@ -513,36 +545,430 @@ export async function listPrecadastrosAdminService(tenantId: string) {
     },
   });
 
-  return rows.map((r) => ({
-    id: r.id,
-    nome: r.nome,
-    email: r.email,
-    telefone: r.telefone,
-    crm: r.crm,
-    especialidade: r.especialidade,
-    cidade: r.cidade,
-    interesseCorpoClinico: r.interesseCorpoClinico,
-    consentimentoLgpd: r.consentimentoLgpd,
-    createdAt: r.createdAt.toISOString(),
-    evento: {
-      id: r.evento.id,
-      titulo: r.evento.titulo,
-      iniciaEm: r.evento.iniciaEm.toISOString(),
-      status: r.evento.status,
+  return rows.map((r) => {
+    const camposFaltantes = computeCamposFaltantesCadastroCorpo({
+      nome: r.nome,
+      email: r.email,
+      telefone: r.telefone,
+      cpf: r.cpf,
+      crm: r.crm,
+      perfil: r.perfil,
+    });
+    return {
+      id: r.id,
+      perfil: r.perfil,
+      nome: r.nome,
+      email: r.email,
+      telefone: r.telefone,
+      cpf: r.cpf,
+      crm: r.crm,
+      especialidade: r.especialidade,
+      cidade: r.cidade,
+      faculdade: r.faculdade,
+      semestre: r.semestre,
+      participaLiga: r.participaLiga,
+      ligaNome: r.ligaNome,
+      interesseCorpoClinico: r.interesseCorpoClinico,
+      consentimentoLgpd: r.consentimentoLgpd,
+      precadastroStatus: r.precadastroStatus,
+      precadastroAceitoEm: r.precadastroAceitoEm?.toISOString() ?? null,
+      presenteEm: r.presenteEm?.toISOString() ?? null,
+      presencaOrigem: r.presencaOrigem,
+      createdAt: r.createdAt.toISOString(),
+      camposFaltantes,
+      evento: {
+        id: r.evento.id,
+        titulo: r.evento.titulo,
+        iniciaEm: r.evento.iniciaEm.toISOString(),
+        status: r.evento.status,
+      },
+      resumo: [
+        r.nome,
+        r.email,
+        r.telefone,
+        r.crm ? `CRM ${r.crm}` : null,
+        r.especialidade,
+        r.cidade,
+        r.interesseCorpoClinico ? 'interesse corpo clínico' : null,
+      ]
+        .filter(Boolean)
+        .join(' · '),
+    };
+  });
+}
+
+function computeCamposFaltantesCadastroCorpo(p: {
+  nome: string;
+  email: string;
+  telefone: string | null;
+  cpf: string | null;
+  crm: string | null;
+  perfil: ConteudoParticipantePerfil;
+}): string[] {
+  const faltam: string[] = [];
+  if (!p.nome || p.nome.trim().length < 3) faltam.push('Nome completo');
+  if (!p.email || !p.email.includes('@')) faltam.push('E-mail');
+  const cpf = (p.cpf || '').replace(/\D/g, '');
+  if (!validateCPF(cpf)) faltam.push('CPF');
+  if (!p.telefone || p.telefone.trim().length < 8) faltam.push('Telefone');
+  if (p.perfil === ConteudoParticipantePerfil.MEDICO && !p.crm?.trim()) {
+    faltam.push('CRM / registro profissional');
+  }
+  // Sempre pedidos no formulário de conclusão
+  faltam.push('Senha de acesso');
+  faltam.push('Profissão');
+  faltam.push('Aceite dos termos de cadastro');
+  return faltam;
+}
+
+/**
+ * Aceita precadastros (opção A): gera link de conclusão e e-mail.
+ * Ao completar o cadastro pelo link, entra como ATIVO — não passa por Avaliação.
+ */
+export async function aceitarPrecadastrosAdminService(
+  tenantId: string,
+  masterId: string,
+  ids: string[]
+) {
+  const uniqueIds = [...new Set((ids || []).filter(Boolean))];
+  if (uniqueIds.length === 0) {
+    throw { statusCode: 400, message: 'Selecione ao menos um precadastro.' };
+  }
+  if (uniqueIds.length > 100) {
+    throw { statusCode: 400, message: 'Selecione no máximo 100 precadastros por vez.' };
+  }
+
+  const rows = await prisma.conteudoParticipante.findMany({
+    where: {
+      tenantId,
+      id: { in: uniqueIds },
+      origem: ConteudoParticipanteOrigem.EXTERNO,
     },
-    /** Linha única para leitura rápida no Master. */
-    resumo: [
-      r.nome,
-      r.email,
-      r.telefone,
-      r.crm ? `CRM ${r.crm}` : null,
-      r.especialidade,
-      r.cidade,
-      r.interesseCorpoClinico ? 'interesse corpo clínico' : null,
-    ]
-      .filter(Boolean)
-      .join(' · '),
-  }));
+  });
+
+  const byId = new Map(rows.map((r) => [r.id, r]));
+  const results: Array<{
+    id: string;
+    nome: string;
+    email: string;
+    ok: boolean;
+    message: string;
+    camposFaltantes?: string[];
+    cadastroUrl?: string;
+  }> = [];
+
+  for (const id of uniqueIds) {
+    const row = byId.get(id);
+    if (!row) {
+      results.push({ id, nome: '', email: '', ok: false, message: 'Precadastro não encontrado.' });
+      continue;
+    }
+    if (row.precadastroStatus === ConteudoPrecadastroStatus.CONVERTIDO) {
+      results.push({
+        id,
+        nome: row.nome,
+        email: row.email,
+        ok: false,
+        message: 'Já convertido em corpo clínico.',
+      });
+      continue;
+    }
+
+    const email = row.email.trim().toLowerCase();
+    const cpf = (row.cpf || '').replace(/\D/g, '');
+    const existing = await prisma.medico.findFirst({
+      where: {
+        tenantId,
+        OR: [
+          { email },
+          ...(cpf.length === 11 ? [{ cpf }] : []),
+        ],
+      },
+      select: { id: true, statusCadastro: true },
+    });
+    if (existing) {
+      results.push({
+        id,
+        nome: row.nome,
+        email: row.email,
+        ok: false,
+        message:
+          existing.statusCadastro === StatusCadastroMedico.PENDENTE_ANALISE
+            ? 'Já existe cadastro em Avaliação com este e-mail/CPF.'
+            : 'Já existe profissional no corpo clínico com este e-mail/CPF.',
+      });
+      continue;
+    }
+
+    const token = newConteudoToken();
+    const camposFaltantes = computeCamposFaltantesCadastroCorpo({
+      nome: row.nome,
+      email: row.email,
+      telefone: row.telefone,
+      cpf: row.cpf,
+      crm: row.crm,
+      perfil: row.perfil,
+    });
+    const cadastroUrl = `${getFrontendAppBaseUrl()}/conteudos/cadastro-corpo/${token}`;
+
+    await prisma.conteudoParticipante.update({
+      where: { id: row.id },
+      data: {
+        precadastroStatus: ConteudoPrecadastroStatus.ACEITO,
+        tokenCadastroCorpo: token,
+        precadastroAceitoEm: new Date(),
+        precadastroAceitoPorMasterId: masterId,
+      },
+    });
+
+    try {
+      await enviarEmailPrecadastroAceito({
+        to: email,
+        nomeCompleto: row.nome,
+        cadastroUrl,
+        camposFaltantes,
+      });
+    } catch (err) {
+      console.error('[precadastro-aceite] e-mail falhou para', email, err);
+    }
+
+    results.push({
+      id,
+      nome: row.nome,
+      email: row.email,
+      ok: true,
+      message: 'Aceito — e-mail com link de cadastro enviado (se SMTP/Resend estiver ativo).',
+      camposFaltantes,
+      cadastroUrl,
+    });
+  }
+
+  const aceitos = results.filter((r) => r.ok).length;
+  return {
+    aceitos,
+    total: uniqueIds.length,
+    results,
+  };
+}
+
+export async function getPublicCadastroCorpoFormService(token: string) {
+  const row = await prisma.conteudoParticipante.findFirst({
+    where: {
+      tokenCadastroCorpo: token,
+      origem: ConteudoParticipanteOrigem.EXTERNO,
+    },
+    include: {
+      evento: { select: { id: true, titulo: true, iniciaEm: true } },
+    },
+  });
+  if (!row) notFound('Link de cadastro inválido ou expirado.');
+  if (row.precadastroStatus === ConteudoPrecadastroStatus.CONVERTIDO) {
+    throw { statusCode: 400, message: 'Este cadastro já foi concluído. Faça login com seu e-mail e senha.' };
+  }
+  if (row.precadastroStatus !== ConteudoPrecadastroStatus.ACEITO) {
+    throw { statusCode: 400, message: 'Este convite ainda não foi liberado pela equipe.' };
+  }
+
+  const camposFaltantes = computeCamposFaltantesCadastroCorpo({
+    nome: row.nome,
+    email: row.email,
+    telefone: row.telefone,
+    cpf: row.cpf,
+    crm: row.crm,
+    perfil: row.perfil,
+  });
+
+  return {
+    nome: row.nome,
+    email: row.email,
+    telefone: row.telefone,
+    cpf: row.cpf,
+    crm: row.crm,
+    especialidade: row.especialidade,
+    perfil: row.perfil,
+    cidade: row.cidade,
+    camposFaltantes,
+    evento: {
+      id: row.evento.id,
+      titulo: row.evento.titulo,
+      iniciaEm: row.evento.iniciaEm.toISOString(),
+    },
+  };
+}
+
+/**
+ * Completa o cadastro a partir do precadastro aceito → Medico ATIVO (não vai para Avaliação).
+ */
+export async function submitPublicCadastroCorpoService(
+  token: string,
+  input: {
+    nomeCompleto?: string;
+    email?: string;
+    telefone?: string | null;
+    cpf?: string | null;
+    password: string;
+    confirmPassword?: string;
+    profissao: string;
+    crm?: string | null;
+    especialidades?: string[] | string | null;
+    aceitouTermos?: boolean | string;
+  }
+) {
+  const row = await prisma.conteudoParticipante.findFirst({
+    where: {
+      tokenCadastroCorpo: token,
+      origem: ConteudoParticipanteOrigem.EXTERNO,
+    },
+  });
+  if (!row) notFound('Link de cadastro inválido ou expirado.');
+  if (row.precadastroStatus === ConteudoPrecadastroStatus.CONVERTIDO) {
+    throw { statusCode: 400, message: 'Este cadastro já foi concluído.' };
+  }
+  if (row.precadastroStatus !== ConteudoPrecadastroStatus.ACEITO) {
+    throw { statusCode: 400, message: 'Este convite ainda não foi liberado pela equipe.' };
+  }
+
+  const aceitou =
+    input.aceitouTermos === true ||
+    input.aceitouTermos === 'true' ||
+    input.aceitouTermos === '1' ||
+    input.aceitouTermos === 'on';
+  if (!aceitou) {
+    throw { statusCode: 400, message: 'É necessário aceitar a declaração e os termos de cadastro.' };
+  }
+
+  const password = (input.password || '').trim();
+  if (password.length < 8) {
+    throw { statusCode: 400, message: 'A senha deve ter no mínimo 8 caracteres.' };
+  }
+  if (input.confirmPassword != null && input.confirmPassword !== password) {
+    throw { statusCode: 400, message: 'As senhas não coincidem.' };
+  }
+
+  const profissao = (input.profissao || '').trim();
+  if (!profissao) {
+    throw { statusCode: 400, message: 'Informe a profissão.' };
+  }
+
+  const nomeCompleto = (input.nomeCompleto || row.nome || '').trim();
+  if (nomeCompleto.length < 3) {
+    throw { statusCode: 400, message: 'Informe o nome completo.' };
+  }
+
+  const email = (input.email || row.email || '').trim().toLowerCase();
+  if (!email.includes('@')) {
+    throw { statusCode: 400, message: 'E-mail inválido.' };
+  }
+
+  const telefone = (input.telefone || row.telefone || '').trim();
+  if (telefone.length < 8) {
+    throw { statusCode: 400, message: 'Informe um telefone válido.' };
+  }
+
+  const cpf = (input.cpf || row.cpf || '').replace(/\D/g, '');
+  if (!validateCPF(cpf)) {
+    throw { statusCode: 400, message: 'CPF inválido.' };
+  }
+
+  const crmRaw = input.crm ?? row.crm;
+  const crm = resolveRegistroConselhoParaCadastro(profissao, crmRaw);
+
+  let especialidadesArr: string[] = [];
+  const rawEsp = input.especialidades;
+  if (Array.isArray(rawEsp)) {
+    especialidadesArr = rawEsp.map((e) => String(e ?? '').trim()).filter(Boolean);
+  } else if (typeof rawEsp === 'string' && rawEsp.trim()) {
+    especialidadesArr = [rawEsp.trim()];
+  } else if (row.especialidade?.trim()) {
+    especialidadesArr = [row.especialidade.trim()];
+  }
+  const isMedico = profissao === 'Médico';
+  const especialidadesFinal = isMedico
+    ? especialidadesArr.length > 0
+      ? especialidadesArr
+      : ['Clínica Médica']
+    : especialidadesArr;
+
+  const existing = await prisma.medico.findFirst({
+    where: {
+      tenantId: row.tenantId,
+      OR: [{ email }, { cpf }, ...(crm ? [{ crm }] : [])],
+    },
+    select: { id: true, statusCadastro: true },
+  });
+  if (existing) {
+    throw {
+      statusCode: 409,
+      message:
+        existing.statusCadastro === StatusCadastroMedico.PENDENTE_ANALISE
+          ? 'Já existe cadastro em análise com estes dados. Use a área de Avaliação ou o login quando aprovado.'
+          : 'Já existe profissional cadastrado com estes dados. Faça login ou use "Esqueci a senha".',
+    };
+  }
+
+  const senhaHash = await hashPassword(password);
+
+  const medico = await prisma.$transaction(async (tx) => {
+    const created = await tx.medico.create({
+      data: {
+        tenantId: row.tenantId,
+        nomeCompleto,
+        email,
+        cpf,
+        profissao,
+        crm,
+        senhaHash,
+        especialidades: especialidadesFinal,
+        vinculo: 'Associado',
+        telefone,
+        ativo: true,
+        statusCadastro: StatusCadastroMedico.ATIVO,
+        termosCadastroAceitosEm: new Date(),
+        termosCadastroVersao: TERMOS_CADASTRO_VERSAO,
+        inviteTokenHash: null,
+        inviteExpiresAt: null,
+        inviteAcceptedAt: new Date(),
+      },
+      select: {
+        id: true,
+        nomeCompleto: true,
+        email: true,
+      },
+    });
+
+    await tx.conteudoParticipante.update({
+      where: { id: row.id },
+      data: {
+        precadastroStatus: ConteudoPrecadastroStatus.CONVERTIDO,
+        tokenCadastroCorpo: null,
+        medicoId: created.id,
+        nome: nomeCompleto,
+        email,
+        telefone,
+        cpf,
+        crm,
+      },
+    });
+
+    return created;
+  });
+
+  try {
+    const { notificarBoasVindasMedico } = await import('./notificacao-medico.service');
+    await notificarBoasVindasMedico(row.tenantId, medico.id, medico.nomeCompleto);
+  } catch (err) {
+    console.error('[precadastro-cadastro] boas-vindas:', err);
+  }
+
+  return {
+    medico: {
+      id: medico.id,
+      nomeCompleto: medico.nomeCompleto,
+      email: medico.email,
+    },
+    message:
+      'Cadastro concluído. Você já faz parte do corpo clínico e pode entrar com o e-mail e a senha definidos.',
+  };
 }
 
 export async function setCapaEventoAdminService(tenantId: string, id: string, capaUrl: string) {

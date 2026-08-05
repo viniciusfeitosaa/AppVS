@@ -12,3 +12,4 @@ export { default as ConteudoMedicoDetalhePage } from './pages/ConteudoMedicoDeta
 export { default as ConteudoPalestrantePublicPage } from './pages/ConteudoPalestrantePublicPage';
 export { default as ConteudoInscricaoPublicPage } from './pages/ConteudoInscricaoPublicPage';
 export { default as ConteudoFrequenciaPublicPage } from './pages/ConteudoFrequenciaPublicPage';
+export { default as ConteudoCadastroCorpoPublicPage } from './pages/ConteudoCadastroCorpoPublicPage';

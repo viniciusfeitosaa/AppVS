@@ -63,6 +63,15 @@ const ConteudosAdminPage = () => {
   const [palSearch, setPalSearch] = useState('');
   const [selectedPalId, setSelectedPalId] = useState('');
   const [palMode, setPalMode] = useState<'existente' | 'novo'>('existente');
+  const [excluirParticipante, setExcluirParticipante] = useState<{
+    id: string;
+    eventoId: string;
+    nome: string;
+    email: string;
+  } | null>(null);
+  const [detalhePrecadastro, setDetalhePrecadastro] = useState<ConteudoPrecadastro | null>(null);
+  const [selectedPrecadastroIds, setSelectedPrecadastroIds] = useState<string[]>([]);
+  const [confirmAceitar, setConfirmAceitar] = useState(false);
 
   const { data: modulosResp } = useQuery({
     queryKey: ['auth', 'modulos-acesso', user?.id],
@@ -256,6 +265,42 @@ const ConteudosAdminPage = () => {
     },
   });
 
+  const deleteParticipanteMutation = useMutation({
+    mutationFn: (target: { eventoId: string; id: string }) =>
+      conteudoAdminService.deleteParticipante(target.eventoId, target.id),
+    onSuccess: async () => {
+      setError(null);
+      setOkMsg('Participante excluído da lista e dos precadastros');
+      setExcluirParticipante(null);
+      await invalidate();
+    },
+    onError: (e: unknown) => {
+      const err = e as { response?: { data?: { error?: string } } };
+      setError(err.response?.data?.error || 'Não foi possível excluir o participante');
+    },
+  });
+
+  const aceitarPrecadastrosMutation = useMutation({
+    mutationFn: (ids: string[]) => conteudoAdminService.aceitarPrecadastros(ids),
+    onSuccess: async (res) => {
+      setError(null);
+      const d = res.data.data;
+      const falhas = d.results.filter((r) => !r.ok);
+      setOkMsg(
+        falhas.length
+          ? `${d.aceitos}/${d.total} aceitos. ${falhas.length} com erro (veja lista).`
+          : `${d.aceitos} precadastro(s) aceito(s) — e-mail com link de cadastro enviado.`
+      );
+      setSelectedPrecadastroIds([]);
+      setConfirmAceitar(false);
+      await invalidate();
+    },
+    onError: (e: unknown) => {
+      const err = e as { response?: { data?: { error?: string } } };
+      setError(err.response?.data?.error || 'Falha ao aceitar precadastros');
+    },
+  });
+
   const onCreate = (e: FormEvent) => {
     e.preventDefault();
     setOkMsg(null);
@@ -321,11 +366,39 @@ const ConteudosAdminPage = () => {
 
       {viewMode === 'precadastros' ? (
         <section className="rounded-2xl border border-viva-200 bg-white overflow-hidden">
-          <div className="px-4 py-3 border-b border-viva-100">
-            <h2 className="font-semibold text-viva-900">Precadastros (corpo clínico)</h2>
-            <p className="text-xs text-viva-600 mt-1">
-              Todos os inscritos externos dos conteúdos, com dados mínimos em um só lugar.
-            </p>
+          <div className="px-4 py-3 border-b border-viva-100 flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h2 className="font-semibold text-viva-900">Precadastros (candidatos ao corpo clínico)</h2>
+              <p className="text-xs text-viva-600 mt-1">
+                Ainda não estão no corpo clínico. Aceite um ou vários: enviamos e-mail com link para completar o
+                cadastro; ao concluir, o acesso é liberado na hora (sem Avaliação).
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                className="rounded-lg border border-viva-200 px-3 py-1.5 text-xs font-semibold text-viva-800 hover:bg-viva-50"
+                onClick={() => {
+                  const list = (precadastrosQuery.data || []).filter(
+                    (p) => p.precadastroStatus !== 'CONVERTIDO'
+                  );
+                  const allIds = list.map((p) => p.id);
+                  const allSelected =
+                    allIds.length > 0 && allIds.every((id) => selectedPrecadastroIds.includes(id));
+                  setSelectedPrecadastroIds(allSelected ? [] : allIds);
+                }}
+              >
+                {selectedPrecadastroIds.length > 0 ? 'Limpar seleção' : 'Selecionar todos'}
+              </button>
+              <button
+                type="button"
+                disabled={selectedPrecadastroIds.length === 0 || aceitarPrecadastrosMutation.isPending}
+                onClick={() => setConfirmAceitar(true)}
+                className="rounded-lg bg-viva-800 px-3 py-1.5 text-xs font-semibold text-white hover:bg-viva-900 disabled:opacity-50"
+              >
+                Aceitar selecionados ({selectedPrecadastroIds.length})
+              </button>
+            </div>
           </div>
           {precadastrosQuery.isLoading ? (
             <p className="p-4 text-sm text-viva-600">Carregando…</p>
@@ -333,19 +406,80 @@ const ConteudosAdminPage = () => {
             <p className="p-4 text-sm text-viva-600">Nenhum precadastro ainda.</p>
           ) : (
             <ul className="divide-y divide-viva-100">
-              {(precadastrosQuery.data || []).map((p: ConteudoPrecadastro) => (
-                <li key={p.id} className="px-4 py-3 space-y-1">
-                  <div className="flex flex-wrap items-start justify-between gap-2">
-                    <p className="text-sm font-medium text-viva-950">{p.resumo}</p>
-                    <span className="text-[11px] text-viva-500 whitespace-nowrap">
-                      {new Date(p.createdAt).toLocaleString('pt-BR')}
-                    </span>
-                  </div>
-                  <p className="text-xs text-viva-600">
-                    Conteúdo: {p.evento.titulo} · {new Date(p.evento.iniciaEm).toLocaleString('pt-BR')}
-                  </p>
-                </li>
-              ))}
+              {(precadastrosQuery.data || []).map((p: ConteudoPrecadastro) => {
+                const status = p.precadastroStatus || 'AGUARDANDO';
+                const isConvertido = status === 'CONVERTIDO';
+                const checked = selectedPrecadastroIds.includes(p.id);
+                return (
+                  <li key={p.id} className="px-4 py-3 space-y-1">
+                    <div className="flex flex-wrap items-start gap-3">
+                      <input
+                        type="checkbox"
+                        className="mt-1"
+                        disabled={isConvertido}
+                        checked={checked}
+                        onChange={() => {
+                          setSelectedPrecadastroIds((prev) =>
+                            prev.includes(p.id) ? prev.filter((x) => x !== p.id) : [...prev, p.id]
+                          );
+                        }}
+                        aria-label={`Selecionar ${p.nome}`}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setDetalhePrecadastro(p)}
+                        className="min-w-0 flex-1 text-left rounded-lg -mx-1 px-1 py-0.5 hover:bg-viva-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-viva-500/30"
+                      >
+                        <p className="text-sm font-medium text-viva-950">{p.resumo}</p>
+                        <p className="text-xs text-viva-600 mt-1">
+                          Conteúdo: {p.evento.titulo} · {new Date(p.evento.iniciaEm).toLocaleString('pt-BR')}
+                        </p>
+                        {p.camposFaltantes && p.camposFaltantes.length > 0 && status !== 'CONVERTIDO' && (
+                          <p className="text-[11px] text-amber-800 mt-1">
+                            Faltam: {p.camposFaltantes.slice(0, 4).join(', ')}
+                            {p.camposFaltantes.length > 4 ? '…' : ''}
+                          </p>
+                        )}
+                      </button>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <span
+                          className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${
+                            status === 'CONVERTIDO'
+                              ? 'bg-emerald-100 text-emerald-800'
+                              : status === 'ACEITO'
+                                ? 'bg-sky-100 text-sky-800'
+                                : 'bg-amber-100 text-amber-900'
+                          }`}
+                        >
+                          {status === 'CONVERTIDO'
+                            ? 'No corpo clínico'
+                            : status === 'ACEITO'
+                              ? 'Aceito · aguarda cadastro'
+                              : 'Aguardando'}
+                        </span>
+                        <span className="text-[11px] text-viva-500 whitespace-nowrap">
+                          {new Date(p.createdAt).toLocaleString('pt-BR')}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setExcluirParticipante({
+                              id: p.id,
+                              eventoId: p.evento.id,
+                              nome: p.nome,
+                              email: p.email,
+                            });
+                          }}
+                          className="rounded-lg border border-red-200 px-2 py-1 text-[11px] font-semibold text-red-700 hover:bg-red-50"
+                        >
+                          Excluir
+                        </button>
+                      </div>
+                    </div>
+                  </li>
+                );
+              })}
             </ul>
           )}
         </section>
@@ -937,6 +1071,20 @@ const ConteudosAdminPage = () => {
                           >
                             {p.presenteEm ? 'Presente' : 'Ausente'}
                           </span>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setExcluirParticipante({
+                                id: p.id,
+                                eventoId: selectedId!,
+                                nome: p.nome,
+                                email: p.email,
+                              })
+                            }
+                            className="mt-0.5 rounded-lg border border-red-200 px-2 py-0.5 text-[11px] font-semibold text-red-700 hover:bg-red-50"
+                          >
+                            Excluir
+                          </button>
                         </div>
                       </li>
                     ))}
@@ -947,6 +1095,243 @@ const ConteudosAdminPage = () => {
           )}
         </section>
       </div>
+      )}
+
+      {detalhePrecadastro && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50"
+          onClick={() => setDetalhePrecadastro(null)}
+          role="presentation"
+        >
+          <div
+            className="bg-white rounded-2xl shadow-xl max-w-lg w-full p-6 border border-viva-100 max-h-[90vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="detalhe-precadastro-titulo"
+          >
+            <header className="mb-4 space-y-1">
+              <h3 id="detalhe-precadastro-titulo" className="text-lg font-semibold text-viva-950">
+                Dados do precadastro
+              </h3>
+              <p className="text-sm text-viva-800 font-medium">{detalhePrecadastro.nome}</p>
+            </header>
+
+            <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-3 text-sm">
+              {(
+                [
+                  [
+                    'Perfil',
+                    detalhePrecadastro.perfil === 'ESTUDANTE'
+                      ? 'Estudante'
+                      : detalhePrecadastro.perfil === 'MEDICO'
+                        ? 'Médico'
+                        : '—',
+                  ],
+                  ['E-mail', detalhePrecadastro.email],
+                  ['Telefone', detalhePrecadastro.telefone || '—'],
+                  ['CPF', detalhePrecadastro.cpf || '—'],
+                  ['CRM', detalhePrecadastro.crm || '—'],
+                  ['Especialidade', detalhePrecadastro.especialidade || '—'],
+                  ['Cidade', detalhePrecadastro.cidade || '—'],
+                  ['Faculdade', detalhePrecadastro.faculdade || '—'],
+                  ['Semestre', detalhePrecadastro.semestre || '—'],
+                  [
+                    'Liga acadêmica',
+                    detalhePrecadastro.participaLiga
+                      ? detalhePrecadastro.ligaNome || 'Sim'
+                      : detalhePrecadastro.participaLiga === false
+                        ? 'Não'
+                        : '—',
+                  ],
+                  [
+                    'Interesse corpo clínico',
+                    detalhePrecadastro.interesseCorpoClinico ? 'Sim' : 'Não',
+                  ],
+                  [
+                    'Consentimento LGPD',
+                    detalhePrecadastro.consentimentoLgpd ? 'Sim' : 'Não',
+                  ],
+                  [
+                    'Status no pipeline',
+                    detalhePrecadastro.precadastroStatus === 'CONVERTIDO'
+                      ? 'Já no corpo clínico'
+                      : detalhePrecadastro.precadastroStatus === 'ACEITO'
+                        ? 'Aceito — aguardando completar cadastro'
+                        : 'Aguardando aceite da equipe',
+                  ],
+                  [
+                    'Campos a completar',
+                    (detalhePrecadastro.camposFaltantes || []).join(', ') || '—',
+                  ],
+                  [
+                    'Presença',
+                    detalhePrecadastro.presenteEm
+                      ? `${new Date(detalhePrecadastro.presenteEm).toLocaleString('pt-BR')}${
+                          detalhePrecadastro.presencaOrigem === 'APP'
+                            ? ' · app'
+                            : detalhePrecadastro.presencaOrigem === 'LINK_PUBLICO'
+                              ? ' · link'
+                              : ''
+                        }`
+                      : 'Não registrada',
+                  ],
+                  [
+                    'Inscrito em',
+                    new Date(detalhePrecadastro.createdAt).toLocaleString('pt-BR'),
+                  ],
+                  ['Conteúdo', detalhePrecadastro.evento.titulo],
+                  [
+                    'Data do conteúdo',
+                    new Date(detalhePrecadastro.evento.iniciaEm).toLocaleString('pt-BR'),
+                  ],
+                ] as const
+              ).map(([label, value]) => (
+                <div key={label} className={label === 'Conteúdo' || label === 'E-mail' ? 'sm:col-span-2' : ''}>
+                  <dt className="text-[11px] font-semibold uppercase tracking-wide text-viva-500">
+                    {label}
+                  </dt>
+                  <dd className="mt-0.5 text-viva-900 break-words">{value}</dd>
+                </div>
+              ))}
+            </dl>
+
+            <div className="mt-6 flex flex-wrap gap-2 justify-end">
+              {detalhePrecadastro.precadastroStatus !== 'CONVERTIDO' && (
+                <button
+                  type="button"
+                  className="rounded-lg bg-emerald-700 px-3 py-2 text-sm font-medium text-white hover:bg-emerald-800"
+                  onClick={() => {
+                    setSelectedPrecadastroIds([detalhePrecadastro.id]);
+                    setDetalhePrecadastro(null);
+                    setConfirmAceitar(true);
+                  }}
+                >
+                  Aceitar e enviar e-mail
+                </button>
+              )}
+              <button
+                type="button"
+                className="rounded-lg border border-red-200 px-3 py-2 text-sm font-medium text-red-700 hover:bg-red-50"
+                onClick={() => {
+                  setExcluirParticipante({
+                    id: detalhePrecadastro.id,
+                    eventoId: detalhePrecadastro.evento.id,
+                    nome: detalhePrecadastro.nome,
+                    email: detalhePrecadastro.email,
+                  });
+                  setDetalhePrecadastro(null);
+                }}
+              >
+                Excluir
+              </button>
+              <button
+                type="button"
+                className="rounded-lg bg-viva-800 px-3 py-2 text-sm font-medium text-white hover:bg-viva-900"
+                onClick={() => setDetalhePrecadastro(null)}
+              >
+                Fechar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {confirmAceitar && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50"
+          onClick={() => !aceitarPrecadastrosMutation.isPending && setConfirmAceitar(false)}
+          role="presentation"
+        >
+          <div
+            className="bg-white rounded-2xl shadow-xl max-w-md w-full p-6 border border-viva-100"
+            onClick={(e) => e.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="aceitar-precadastro-titulo"
+          >
+            <h3 id="aceitar-precadastro-titulo" className="text-lg font-semibold text-viva-950 mb-2">
+              Aceitar precadastro{selectedPrecadastroIds.length > 1 ? 's' : ''}?
+            </h3>
+            <p className="text-sm text-viva-700 mb-3">
+              {selectedPrecadastroIds.length} pessoa(s) receberão e-mail com link para completar o cadastro.
+              Ao finalizarem, entram no corpo clínico como <strong>ativos</strong> — sem passar pela área de
+              Avaliação.
+            </p>
+            <p className="text-xs text-viva-600 mb-5">
+              Se já existir médico com o mesmo e-mail/CPF, o aceite deste item será recusado.
+            </p>
+            <div className="flex flex-wrap gap-2 justify-end">
+              <button
+                type="button"
+                className="rounded-lg border border-viva-200 px-3 py-2 text-sm font-medium text-viva-800 hover:bg-viva-50"
+                onClick={() => setConfirmAceitar(false)}
+                disabled={aceitarPrecadastrosMutation.isPending}
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                className="rounded-lg bg-viva-800 px-3 py-2 text-sm font-medium text-white hover:bg-viva-900 disabled:opacity-60"
+                disabled={aceitarPrecadastrosMutation.isPending || selectedPrecadastroIds.length === 0}
+                onClick={() => aceitarPrecadastrosMutation.mutate(selectedPrecadastroIds)}
+              >
+                {aceitarPrecadastrosMutation.isPending ? 'Enviando…' : 'Confirmar aceite'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {excluirParticipante && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50"
+          onClick={() => !deleteParticipanteMutation.isPending && setExcluirParticipante(null)}
+          role="presentation"
+        >
+          <div
+            className="bg-white rounded-2xl shadow-xl max-w-md w-full p-6 border border-viva-100"
+            onClick={(e) => e.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="excluir-participante-titulo"
+          >
+            <h3 id="excluir-participante-titulo" className="text-lg font-semibold text-viva-950 mb-2">
+              Excluir participante?
+            </h3>
+            <p className="text-sm text-viva-800 mb-1">
+              <span className="font-semibold">{excluirParticipante.nome}</span>
+            </p>
+            <p className="text-xs text-viva-600 mb-1">{excluirParticipante.email}</p>
+            <p className="text-sm text-viva-600 mb-5">
+              A pessoa será removida da lista de participantes deste conteúdo e, se for precadastro,
+              também da lista unificada de precadastros. Esta ação não pode ser desfeita.
+            </p>
+            <div className="flex flex-wrap gap-2 justify-end">
+              <button
+                type="button"
+                className="rounded-lg border border-viva-200 px-3 py-2 text-sm font-medium text-viva-800 hover:bg-viva-50"
+                onClick={() => setExcluirParticipante(null)}
+                disabled={deleteParticipanteMutation.isPending}
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                className="rounded-lg bg-red-600 px-3 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-60"
+                disabled={deleteParticipanteMutation.isPending}
+                onClick={() =>
+                  deleteParticipanteMutation.mutate({
+                    eventoId: excluirParticipante.eventoId,
+                    id: excluirParticipante.id,
+                  })
+                }
+              >
+                {deleteParticipanteMutation.isPending ? 'Excluindo…' : 'Excluir'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

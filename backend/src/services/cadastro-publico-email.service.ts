@@ -338,3 +338,64 @@ export async function enviarEmailCadastroAprovado(params: {
     buildCadastroAprovadoText(primeiro, nomeInstituicao)
   );
 }
+
+export async function enviarEmailPrecadastroAceito(params: {
+  to: string;
+  nomeCompleto: string;
+  cadastroUrl: string;
+  camposFaltantes: string[];
+}): Promise<void> {
+  const to = params.to.trim().toLowerCase();
+  if (!to) return;
+  const primeiro = params.nomeCompleto.trim().split(/\s+/)[0] || 'Profissional';
+  const orgName = org();
+  const href = escapeHtmlAttr(params.cadastroUrl);
+  const lista = params.camposFaltantes.length
+    ? `<ul style="margin:0 0 14px;padding-left:20px;font-size:15px;line-height:1.6;color:#4b5563;">${params.camposFaltantes
+        .map((c) => `<li>${escapeHtmlText(c)}</li>`)
+        .join('')}</ul>`
+    : '';
+  const listaText = params.camposFaltantes.map((c) => `- ${c}`).join('\n');
+
+  const html = buildEmailShell({
+    preheader: 'Você foi convidado a completar o cadastro no corpo clínico',
+    headline: 'Convite aceito — complete seu cadastro',
+    bodyParagraphsHtml: [
+      p(`Olá, <strong style="color:#0f172a;">${escapeHtmlText(primeiro)}</strong>.`),
+      p(
+        `A equipe da ${escapeHtmlText(orgName)} aceitou o seu precadastro e convida você a integrar o <strong>corpo clínico</strong>.`
+      ),
+      p('Complete o cadastro pelo link abaixo. Ainda precisamos destes dados:'),
+      lista,
+      `<p style="margin:0 0 18px;text-align:center;"><a href="${href}" style="display:inline-block;padding:12px 22px;background-color:#0d9488;color:#ffffff;text-decoration:none;border-radius:10px;font-weight:600;font-size:15px;">Completar cadastro</a></p>`,
+      p(
+        `Se o botão não funcionar, copie e cole este endereço no navegador:<br><span style="word-break:break-all;color:#0d9488;">${escapeHtmlText(
+          params.cadastroUrl
+        )}</span>`
+      ),
+      p(
+        'Após preencher, o seu acesso será liberado <strong>imediatamente</strong> — sem nova etapa de análise. Você poderá entrar com o e-mail e a senha definidos no formulário.'
+      ),
+    ],
+  });
+
+  const text = [
+    `Olá, ${primeiro}.`,
+    '',
+    `A equipe da ${orgName} aceitou o seu precadastro para o corpo clínico.`,
+    '',
+    'Dados ainda necessários:',
+    listaText || '(complete o formulário no link)',
+    '',
+    `Complete o cadastro: ${params.cadastroUrl}`,
+    '',
+    'Após o envio, o acesso fica ativo na hora (sem passar por avaliação).',
+  ].join('\n');
+
+  await sendEmailHtml(
+    to,
+    `Convite aceito — complete seu cadastro | ${orgName}`,
+    html,
+    text
+  );
+}

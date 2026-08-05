@@ -70,16 +70,29 @@ export type ConteudoParticipante = {
   createdAt: string;
 };
 
+export type ConteudoPrecadastroStatus = 'AGUARDANDO' | 'ACEITO' | 'CONVERTIDO';
+
 export type ConteudoPrecadastro = {
   id: string;
+  perfil?: 'MEDICO' | 'ESTUDANTE';
   nome: string;
   email: string;
   telefone?: string | null;
+  cpf?: string | null;
   crm?: string | null;
   especialidade?: string | null;
   cidade?: string | null;
+  faculdade?: string | null;
+  semestre?: string | null;
+  participaLiga?: boolean | null;
+  ligaNome?: string | null;
   interesseCorpoClinico: boolean;
   consentimentoLgpd: boolean;
+  precadastroStatus?: ConteudoPrecadastroStatus;
+  precadastroAceitoEm?: string | null;
+  camposFaltantes?: string[];
+  presenteEm?: string | null;
+  presencaOrigem?: 'APP' | 'LINK_PUBLICO' | null;
   createdAt: string;
   resumo: string;
   evento: {
@@ -133,6 +146,10 @@ export const conteudoAdminService = {
     api.get<{ success: boolean; data: ConteudoParticipante[] }>(
       `/admin/conteudos/eventos/${id}/participantes`
     ),
+  deleteParticipante: (eventoId: string, participanteId: string) =>
+    api.delete<{ success: boolean; data: { id: string; nome: string; email: string } }>(
+      `/admin/conteudos/eventos/${eventoId}/participantes/${participanteId}`
+    ),
   abrirFrequencia: (id: string) =>
     api.post<{ success: boolean; data: ConteudoEvento }>(
       `/admin/conteudos/eventos/${id}/frequencia/abrir`
@@ -143,6 +160,23 @@ export const conteudoAdminService = {
     ),
   listPrecadastros: () =>
     api.get<{ success: boolean; data: ConteudoPrecadastro[] }>('/admin/conteudos/precadastros'),
+  aceitarPrecadastros: (ids: string[]) =>
+    api.post<{
+      success: boolean;
+      data: {
+        aceitos: number;
+        total: number;
+        results: Array<{
+          id: string;
+          nome: string;
+          email: string;
+          ok: boolean;
+          message: string;
+          camposFaltantes?: string[];
+          cadastroUrl?: string;
+        }>;
+      };
+    }>('/admin/conteudos/precadastros/aceitar', { ids }),
   uploadCapa: (id: string, file: File) => {
     const form = new FormData();
     form.append('capa', file);
@@ -241,4 +275,40 @@ export const conteudoPublicService = {
       data: { presenteEm: string; jaRegistrado: boolean };
       message?: string;
     }>(`/conteudos/public/frequencia/${token}`, { email }),
+  getCadastroCorpo: (token: string) =>
+    api.get<{
+      success: boolean;
+      data: {
+        nome: string;
+        email: string;
+        telefone?: string | null;
+        cpf?: string | null;
+        crm?: string | null;
+        especialidade?: string | null;
+        perfil?: 'MEDICO' | 'ESTUDANTE';
+        cidade?: string | null;
+        camposFaltantes: string[];
+        evento: { id: string; titulo: string; iniciaEm: string };
+      };
+    }>(`/conteudos/public/cadastro-corpo/${token}`),
+  submitCadastroCorpo: (
+    token: string,
+    payload: {
+      nomeCompleto?: string;
+      email?: string;
+      telefone?: string;
+      cpf?: string;
+      password: string;
+      confirmPassword: string;
+      profissao: string;
+      crm?: string;
+      especialidades?: string[];
+      aceitouTermos: boolean;
+    }
+  ) =>
+    api.post<{
+      success: boolean;
+      data: { medico: { id: string; nomeCompleto: string; email: string | null }; message: string };
+      message?: string;
+    }>(`/conteudos/public/cadastro-corpo/${token}`, payload),
 };
