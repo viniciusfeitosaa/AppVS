@@ -90,7 +90,7 @@ const ConteudoInscricaoPublicPage = () => {
       <div className="max-w-lg w-full space-y-6 bg-white p-8 rounded-2xl shadow-2xl">
         <div className="flex flex-col items-center">
           <BrandLogo className="h-20 w-auto mb-4" linkToSite />
-          <h1 className="text-xl font-semibold text-viva-900">Inscrição e precadastro</h1>
+          <h1 className="text-xl font-semibold text-viva-900">Inscrição</h1>
           {evento && <p className="text-sm text-viva-600 mt-1 text-center">{evento.titulo}</p>}
         </div>
 
