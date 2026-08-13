@@ -18,6 +18,13 @@ enum UserRole {
 
 enum OrigemRegistroPonto {
   APP_MEDICO
+  JUSTIFICADO_SEM_PONTO
+}
+
+enum StatusJustificativaAusenciaPonto {
+  PENDENTE
+  ACEITA
+  RECUSADA
 }
 
 enum DocumentoPerfilTipo {
@@ -113,6 +120,7 @@ model Tenant {
   conteudoPalestrantes    ConteudoPalestrante[]
   conteudoEventos         ConteudoEvento[]
   conteudoParticipantes   ConteudoParticipante[]
+  justificativasAusenciaPonto JustificativaAusenciaPonto[]
 
   @@map("tenants")
   @@index([slug])
@@ -181,6 +189,7 @@ model UsuarioMaster {
   blogCommentRespostas BlogComment[] @relation("blog_comment_respostas")
   emailMensagensCriadas EmailMensagem[] @relation("email_mensagem_criador")
   conteudoEventosCriados ConteudoEvento[] @relation("conteudo_evento_criador")
+  justificativasAusenciaDecididas JustificativaAusenciaPonto[] @relation("justificativa_ausencia_decidido_por")
 
   @@map("usuarios_master")
   @@unique([tenantId, email])
@@ -237,6 +246,7 @@ model Medico {
   vagaInteressesComoCandidato    VagaInteresse[] @relation("VagaInteresseCandidato")
   conteudoPalestrantes           ConteudoPalestrante[]
   conteudoParticipacoes          ConteudoParticipante[]
+  justificativasAusenciaPonto    JustificativaAusenciaPonto[]
 
   @@map("medicos")
   @@unique([tenantId, cpf])
@@ -382,6 +392,7 @@ model Escala {
   registrosPonto RegistroPonto[]
   escalaSubgrupos EscalaSubgrupo[]
   escalaEquipes   EscalaEquipe[]
+  justificativasAusenciaPonto JustificativaAusenciaPonto[]
 
   @@map("escalas")
   @@index([tenantId])
@@ -592,6 +603,7 @@ model EscalaPlantao {
   medico Medico @relation(fields: [medicoId], references: [id], onDelete: Cascade)
   solicitacoesTrocaPrincipal     SolicitacaoTrocaPlantao[] @relation("TrocaPlantaoPrincipal")
   solicitacoesTrocaContrapartida SolicitacaoTrocaPlantao[] @relation("TrocaPlantaoContrapartida")
+  justificativasAusenciaPonto    JustificativaAusenciaPonto[]
 
   @@map("escala_plantoes")
   /// Vários médicos podem compartilhar o mesmo dia/turno (cada um com seu registro).
@@ -602,6 +614,39 @@ model EscalaPlantao {
   @@index([data])
   @@index([tenantId, medicoId, data])
   @@index([escalaId, data])
+}
+
+model JustificativaAusenciaPonto {
+  id                     String                           @id @default(uuid())
+  tenantId               String                           @map("tenant_id")
+  medicoId               String                           @map("medico_id")
+  escalaId               String                           @map("escala_id")
+  escalaPlantaoId        String                           @map("escala_plantao_id")
+  horarioOficialInicio   DateTime                         @map("horario_oficial_inicio")
+  horarioOficialFim      DateTime                         @map("horario_oficial_fim")
+  horarioAlegadoEntrada  DateTime                         @map("horario_alegado_entrada")
+  horarioAlegadoSaida    DateTime                         @map("horario_alegado_saida")
+  motivo                 String                           @db.Text
+  status                 StatusJustificativaAusenciaPonto @default(PENDENTE)
+  comentarioMaster       String?                          @map("comentario_master") @db.Text
+  decididoPorMasterId    String?                          @map("decidido_por_master_id")
+  decididoEm             DateTime?                        @map("decidido_em")
+  registroPontoId        String?                          @map("registro_ponto_id")
+  createdAt              DateTime                         @default(now()) @map("created_at")
+  updatedAt              DateTime                         @updatedAt @map("updated_at")
+
+  tenant        Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  medico        Medico          @relation(fields: [medicoId], references: [id], onDelete: Cascade)
+  escala        Escala          @relation(fields: [escalaId], references: [id], onDelete: Cascade)
+  escalaPlantao EscalaPlantao   @relation(fields: [escalaPlantaoId], references: [id], onDelete: Cascade)
+  decididoPor   UsuarioMaster?  @relation("justificativa_ausencia_decidido_por", fields: [decididoPorMasterId], references: [id], onDelete: SetNull)
+  registroPonto RegistroPonto?  @relation(fields: [registroPontoId], references: [id], onDelete: SetNull)
+
+  @@map("justificativas_ausencia_ponto")
+  @@index([tenantId, status])
+  @@index([tenantId, medicoId])
+  @@index([escalaPlantaoId])
+  @@unique([registroPontoId])
 }
 
 // Registro de pedido: PERMUTA (troca bilateral) ou CEDER (cede o plantão ao aceitante, sem contrapartida).
@@ -765,6 +810,7 @@ model RegistroPonto {
   tenant Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   escala Escala? @relation(fields: [escalaId], references: [id], onDelete: SetNull)
   medico Medico  @relation(fields: [medicoId], references: [id], onDelete: Cascade)
+  justificativaAusencia JustificativaAusenciaPonto?
 
   @@map("registros_ponto")
   @@index([tenantId])
