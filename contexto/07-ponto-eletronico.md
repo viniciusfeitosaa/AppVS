@@ -43,6 +43,8 @@ Exemplos:
 | `HistoricoPontos.tsx` | Histórico |
 | `ValoresPonto.tsx` | Valores admin |
 | `RelatoriosPontoEletronico.tsx` | Relatórios |
+| `JustificarAusenciaPonto.tsx` | Médico: pedir justificativa de ausência |
+| `JustificativasPontoAdmin.tsx` | Master: fila aceitar/recusar justificativas |
 | `PontoLocationMap.tsx` | Mapa Leaflet |
 | `PontoEnderecoMapaBlock.tsx` | Endereço no mapa |
 
@@ -50,6 +52,9 @@ Exemplos:
 
 - `GET/PUT /api/admin/config-ponto`
 - `GET /api/admin/registros-ponto` (módulo `RELATORIOS`)
+- `GET /api/admin/justificativas-ausencia?status=`
+- `POST /api/admin/justificativas-ausencia/:id/aceitar` (horários alegados opcionais)
+- `POST /api/admin/justificativas-ausencia/:id/recusar` (comentário)
 
 ## Pendências
 

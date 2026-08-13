@@ -1,6 +1,37 @@
 import api from './api';
 import { ModuloSistema } from '../constants/modulos';
 
+export type StatusJustificativaAusenciaAdmin = 'PENDENTE' | 'ACEITA' | 'RECUSADA';
+
+export interface JustificativaAusenciaAdminItem {
+  id: string;
+  medicoId: string;
+  escalaId: string;
+  escalaPlantaoId: string;
+  horarioOficialInicio: string;
+  horarioOficialFim: string;
+  horarioAlegadoEntrada: string;
+  horarioAlegadoSaida: string;
+  motivo: string;
+  status: StatusJustificativaAusenciaAdmin;
+  comentarioMaster: string | null;
+  decididoEm: string | null;
+  createdAt: string;
+  medico?: {
+    id: string;
+    nomeCompleto: string;
+    crm: string | null;
+    profissao: string | null;
+  } | null;
+  escala?: { id: string; nome: string } | null;
+  escalaPlantao?: {
+    id: string;
+    data: string;
+    gradeId: string;
+    escalaId: string;
+  } | null;
+}
+
 export interface CadastroPendenteListItem {
   id: string;
   nomeCompleto: string;
@@ -993,6 +1024,38 @@ export const adminService = {
       message?: string;
       data?: { enviados: number };
     }>('/admin/push/broadcast', payload);
+    return response.data;
+  },
+
+  listJustificativasAusencia: async (params?: { status?: StatusJustificativaAusenciaAdmin }) => {
+    const response = await api.get<{
+      success: boolean;
+      data: JustificativaAusenciaAdminItem[];
+    }>('/admin/justificativas-ausencia', { params });
+    return response.data;
+  },
+
+  aceitarJustificativaAusencia: async (
+    id: string,
+    payload?: {
+      horarioAlegadoEntrada?: string;
+      horarioAlegadoSaida?: string;
+    }
+  ) => {
+    const response = await api.post<{
+      success: boolean;
+      message?: string;
+      data: JustificativaAusenciaAdminItem;
+    }>(`/admin/justificativas-ausencia/${id}/aceitar`, payload ?? {});
+    return response.data;
+  },
+
+  recusarJustificativaAusencia: async (id: string, payload?: { comentario?: string }) => {
+    const response = await api.post<{
+      success: boolean;
+      message?: string;
+      data: JustificativaAusenciaAdminItem;
+    }>(`/admin/justificativas-ausencia/${id}/recusar`, payload ?? {});
     return response.data;
   },
 };

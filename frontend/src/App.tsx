@@ -47,6 +47,7 @@ import Vagas from './pages/Vagas';
 import Avaliacao from './pages/Avaliacao';
 import ModuloEscalaMaster from './pages/ModuloEscalaMaster';
 import EnviarAvisoPush from './pages/EnviarAvisoPush';
+import JustificativasPontoAdmin from './pages/JustificativasPontoAdmin';
 import {
   ConteudosAdminPage,
   ConteudosMedicoPage,
@@ -198,6 +199,14 @@ function AppRoutes() {
           element={
             <MasterOnly>
               <EnviarAvisoPush />
+            </MasterOnly>
+          }
+        />
+        <Route
+          path="/justificativas-ponto"
+          element={
+            <MasterOnly>
+              <JustificativasPontoAdmin />
             </MasterOnly>
           }
         />
