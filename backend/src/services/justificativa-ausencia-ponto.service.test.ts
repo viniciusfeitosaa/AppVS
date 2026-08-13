@@ -20,12 +20,14 @@ jest.mock('../config/database', () => ({
       findMany: jest.fn(),
       deleteMany: jest.fn(),
       create: jest.fn(),
+      delete: jest.fn(),
     },
     justificativaAusenciaPonto: {
       findFirst: jest.fn(),
       findMany: jest.fn(),
       create: jest.fn(),
       update: jest.fn(),
+      updateMany: jest.fn(),
     },
     tipoPlantao: { findMany: jest.fn() },
     $transaction: jest.fn(),
@@ -54,10 +56,12 @@ const mockPlantaoFindMany = prisma.escalaPlantao.findMany as jest.Mock;
 const mockRegistroFindFirst = prisma.registroPonto.findFirst as jest.Mock;
 const mockRegistroDeleteMany = prisma.registroPonto.deleteMany as jest.Mock;
 const mockRegistroCreate = prisma.registroPonto.create as jest.Mock;
+const mockRegistroDelete = prisma.registroPonto.delete as jest.Mock;
 const mockJustificativaFindFirst = prisma.justificativaAusenciaPonto.findFirst as jest.Mock;
 const mockJustificativaFindMany = prisma.justificativaAusenciaPonto.findMany as jest.Mock;
 const mockJustificativaCreate = prisma.justificativaAusenciaPonto.create as jest.Mock;
 const mockJustificativaUpdate = prisma.justificativaAusenciaPonto.update as jest.Mock;
+const mockJustificativaUpdateMany = prisma.justificativaAusenciaPonto.updateMany as jest.Mock;
 const mockTipoFindMany = prisma.tipoPlantao.findMany as jest.Mock;
 const mockTransaction = prisma.$transaction as jest.Mock;
 const mockResolveProducao = resolveProducaoMedicoNaEscala as jest.Mock;
@@ -293,6 +297,7 @@ describe('aceitarJustificativa', () => {
       origem: 'JUSTIFICADO_SEM_PONTO',
       repasseValorCongelado: 1200,
     });
+    mockJustificativaUpdateMany.mockResolvedValue({ count: 1 });
     mockJustificativaUpdate.mockImplementation(async ({ data }: { data: Record<string, unknown> }) => ({
       ...justificativaPendente(),
       ...data,
@@ -302,20 +307,21 @@ describe('aceitarJustificativa', () => {
     mockRegistroFindFirst.mockResolvedValue(null);
   });
 
-  it('cancela ponto aberto da mesma escala/dia e cria JUSTIFICADO_SEM_PONTO com valor cheio', async () => {
+  it('cancela ponto aberto da mesma escala (qualquer dia) e cria JUSTIFICADO_SEM_PONTO com valor cheio', async () => {
     const updated = await aceitarJustificativa(tenantId, masterId, justId);
 
     expect(mockRegistroDeleteMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: expect.objectContaining({
+        where: {
           tenantId,
           medicoId,
           escalaId,
           checkOutAt: null,
-          checkInAt: expect.objectContaining({ gte: expect.any(Date), lte: expect.any(Date) }),
-        }),
+        },
       })
     );
+    const deleteWhere = mockRegistroDeleteMany.mock.calls[0][0].where;
+    expect(deleteWhere.checkInAt).toBeUndefined();
     expect(mockRegistroCreate).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
@@ -327,6 +333,16 @@ describe('aceitarJustificativa', () => {
         }),
       })
     );
+    expect(mockJustificativaUpdateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: justId, tenantId, status: 'PENDENTE' },
+        data: expect.objectContaining({
+          status: 'ACEITA',
+          registroPontoId: 'reg-just',
+          decididoPorMasterId: masterId,
+        }),
+      })
+    );
     expect(updated.status).toBe('ACEITA');
     expect(mockCriarNotif).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -335,6 +351,42 @@ describe('aceitarJustificativa', () => {
       })
     );
     expect(pathForNotificacaoTipo(TIPO_NOTIFICACAO.JUSTIFICATIVA_PONTO_ACEITA)).toBe('/historico-pontos');
+  });
+
+  it('rejeita com 409 quando já existe ponto fechado no dia', async () => {
+    mockRegistroFindFirst.mockResolvedValue({ id: 'reg-fechado' });
+
+    await expect(aceitarJustificativa(tenantId, masterId, justId)).rejects.toMatchObject({
+      statusCode: 409,
+      message: expect.stringMatching(/ponto fechado/i),
+    });
+    expect(mockRegistroCreate).not.toHaveBeenCalled();
+    expect(mockJustificativaUpdateMany).not.toHaveBeenCalled();
+  });
+
+  it('cancela ponto aberto de outro dia civil na mesma escala', async () => {
+    await aceitarJustificativa(tenantId, masterId, justId);
+
+    const where = mockRegistroDeleteMany.mock.calls[0][0].where;
+    expect(where).toEqual({
+      tenantId,
+      medicoId,
+      escalaId,
+      checkOutAt: null,
+    });
+    expect(where).not.toHaveProperty('checkInAt');
+  });
+
+  it('rejeita com 409 sob race (updateMany count 0) e limpa registro criado', async () => {
+    mockJustificativaUpdateMany.mockResolvedValue({ count: 0 });
+    mockRegistroDelete.mockResolvedValue({ id: 'reg-just' });
+
+    await expect(aceitarJustificativa(tenantId, masterId, justId)).rejects.toMatchObject({
+      statusCode: 409,
+      message: expect.stringMatching(/pendente/i),
+    });
+    expect(mockRegistroDelete).toHaveBeenCalledWith({ where: { id: 'reg-just' } });
+    expect(mockCriarNotif).not.toHaveBeenCalled();
   });
 
   it('rejeita com 400 quando não há valor de plantão', async () => {

@@ -1,4 +1,4 @@
-import { OrigemRegistroPonto } from '@prisma/client';
+import { OrigemRegistroPonto, type Prisma } from '@prisma/client';
 import { prisma } from '../config/database';
 import {
   fimPlantaoAsDate,
@@ -13,6 +13,8 @@ import {
 import { intervaloDiaCivil } from './justificativa-ausencia-ponto.dia';
 import { resolverValorCheioPlantao } from './justificativa-ausencia-ponto.valor';
 import { criarNotificacaoComPush, TIPO_NOTIFICACAO } from './notificacao-medico.service';
+
+type DbClient = Prisma.TransactionClient | typeof prisma;
 
 export type CriarJustificativaAusenciaPontoInput = {
   escalaPlantaoId: string;
@@ -341,8 +343,34 @@ function truncMotivo(motivo: string, max = 200): string {
 }
 
 /**
- * Aceita justificativa pendente: cancela ponto aberto do dia/escala, cria RegistroPonto JUSTIFICADO_SEM_PONTO
- * com valor cheio e notifica o médico.
+ * Ao transferir plantão (troca/cessão), invalida pedidos PENDENTE do slot.
+ * `comentarioMaster = 'Plantão transferido'`.
+ */
+export async function recusarJustificativasPendentesPorTransferenciaPlantao(
+  db: DbClient,
+  escalaPlantaoIds: string[],
+  comentarioMaster = 'Plantão transferido'
+): Promise<number> {
+  const ids = [...new Set(escalaPlantaoIds.filter(Boolean))];
+  if (ids.length === 0) return 0;
+  const result = await db.justificativaAusenciaPonto.updateMany({
+    where: {
+      escalaPlantaoId: { in: ids },
+      status: 'PENDENTE',
+    },
+    data: {
+      status: 'RECUSADA',
+      comentarioMaster,
+      decididoEm: new Date(),
+    },
+  });
+  return result.count;
+}
+
+/**
+ * Aceita justificativa pendente: cancela qualquer ponto aberto da escala (sem filtro de dia civil),
+ * cria RegistroPonto JUSTIFICADO_SEM_PONTO com valor cheio e notifica o médico.
+ * Claim condicional (updateMany status PENDENTE) evita double JUSTIFICADO sob race.
  */
 export async function aceitarJustificativa(
   tenantId: string,
@@ -396,6 +424,7 @@ export async function aceitarJustificativa(
   const dia = intervaloDiaCivilPlantao(justificativa.escalaPlantao.data);
   const duracaoMinutos = Math.max(1, Math.floor((saida.getTime() - entrada.getTime()) / 60000));
   const observacao = `Justificativa ${justificativa.id}: ${truncMotivo(justificativa.motivo)}`;
+  const decididoEm = new Date();
 
   const updated = await prisma.$transaction(async (tx) => {
     const locked = await tx.justificativaAusenciaPonto.findFirst({
@@ -425,13 +454,13 @@ export async function aceitarJustificativa(
       throwHttp(409, 'Já existe ponto fechado para esta escala no dia do plantão');
     }
 
+    // Qualquer ponto aberto da escala bloqueia checkout real; cancela sem filtro de dia civil.
     await tx.registroPonto.deleteMany({
       where: {
         tenantId,
         medicoId: locked.medicoId,
         escalaId: locked.escalaId,
         checkOutAt: null,
-        checkInAt: { gte: dia.gte, lte: dia.lte },
       },
     });
 
@@ -449,17 +478,31 @@ export async function aceitarJustificativa(
       },
     });
 
-    return tx.justificativaAusenciaPonto.update({
-      where: { id: locked.id },
+    const claimed = await tx.justificativaAusenciaPonto.updateMany({
+      where: { id: locked.id, tenantId, status: 'PENDENTE' },
       data: {
         status: 'ACEITA',
         registroPontoId: registro.id,
         decididoPorMasterId: masterId,
-        decididoEm: new Date(),
+        decididoEm,
         horarioAlegadoEntrada: entrada,
         horarioAlegadoSaida: saida,
       },
     });
+    if (claimed.count === 0) {
+      await tx.registroPonto.delete({ where: { id: registro.id } });
+      throwHttp(409, 'Justificativa não está pendente');
+    }
+
+    return {
+      ...locked,
+      status: 'ACEITA' as const,
+      registroPontoId: registro.id,
+      decididoPorMasterId: masterId,
+      decididoEm,
+      horarioAlegadoEntrada: entrada,
+      horarioAlegadoSaida: saida,
+    };
   });
 
   await criarNotificacaoComPush({

@@ -19,7 +19,10 @@ import {
   type MedicoEquipeGeoLinha,
 } from '../utils/ponto-geo-config.util';
 import { batchResolveProducaoMedicoNasEscalas, resolveProducaoMedicoNaEscala } from '../utils/producao-subgrupo.util';
-import { temJustificativaAceitaNoDiaEscala } from './justificativa-ausencia-ponto.service';
+import {
+  recusarJustificativasPendentesPorTransferenciaPlantao,
+  temJustificativaAceitaNoDiaEscala,
+} from './justificativa-ausencia-ponto.service';
 
 function isPontoSemEscalaEscalaId(escalaId: string) {
   return escalaId === PONTO_SEM_ESCALA_ESCALA_ID;
@@ -2213,6 +2216,7 @@ export async function aceitarTrocaPlantaoService(
       if (upCeder.count === 0) {
         throw { statusCode: 409, message: 'Plantão já não pertence mais ao solicitante' };
       }
+      await recusarJustificativasPendentesPorTransferenciaPlantao(tx, [solic.escalaPlantaoId]);
       await tx.solicitacaoTrocaPlantao.update({
         where: { id: solic.id },
         data: {
@@ -2285,6 +2289,7 @@ export async function aceitarTrocaPlantaoService(
       if (updatedPlantao.count === 0) {
         throw { statusCode: 409, message: 'Plantão já não pertence mais ao solicitante' };
       }
+      await recusarJustificativasPendentesPorTransferenciaPlantao(tx, [solic.escalaPlantaoId]);
       const idsLegado = [solic.escalaPlantaoId];
       await tx.solicitacaoTrocaPlantao.update({
         where: { id: solic.id },
@@ -2351,6 +2356,7 @@ export async function aceitarTrocaPlantaoService(
     }
 
     const idsEnvolvidos = [solic.escalaPlantaoId, contrapartidaId];
+    await recusarJustificativasPendentesPorTransferenciaPlantao(tx, idsEnvolvidos);
 
     await tx.solicitacaoTrocaPlantao.update({
       where: { id: solic.id },
