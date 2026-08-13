@@ -164,6 +164,7 @@ export const pontoService = {
           duracaoMinutos: number | null;
           checkInAtrasado: boolean;
           minutosAtrasoCheckin: number | null;
+          origem?: string | null;
           valor: number | null;
           escalaId: string | null;
           escala?: { id: string; nome: string } | null;

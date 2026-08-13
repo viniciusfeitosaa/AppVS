@@ -1325,6 +1325,7 @@ export async function getHistoricoPontosMedicoService(
       duracaoMinutos: r.duracaoMinutos,
       checkInAtrasado: !!r.checkInAtrasado,
       minutosAtrasoCheckin: r.minutosAtrasoCheckin ?? null,
+      origem: r.origem,
       valor: r.valorCalculado,
       escalaId: r.escalaId,
       escala: r.escala,

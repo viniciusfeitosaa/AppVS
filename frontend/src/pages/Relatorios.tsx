@@ -9,12 +9,14 @@ import { useMasterEscopo } from '../context/MasterEscopoContext';
 import { adminService } from '../services/admin.service';
 import { fixMojibake } from '../utils/validation.util';
 import { addPdfBrandHeader } from '../utils/pdf-branding';
+import { BadgeJustificadoSemPonto, isJustificadoSemPonto } from '../components/ponto/SituacaoRegistroPonto';
 
 type RegistroPontoAdmin = {
   id: string;
   checkInAt: string;
   checkOutAt: string | null;
   duracaoMinutos: number | null;
+  origem?: string | null;
   /** Preenchido no checkout (escala+ponto): valor fixo no histórico */
   repasseValorCongelado?: number | string | null;
   medico: {
@@ -36,6 +38,7 @@ type DetalheCalculoRegistroPonto = {
   registroId: string;
   checkInAt: string;
   duracaoMinutos: number;
+  origem?: string | null;
   valorRepasseAplicado: number | null;
   valorCobrancaAplicado: number | null;
   metodo:
@@ -582,6 +585,7 @@ const Relatorios = () => {
         registroId: item.id,
         checkInAt: item.checkInAt,
         duracaoMinutos: minutos,
+        origem: item.origem ?? null,
         valorRepasseAplicado: repasseComAdicional,
         valorCobrancaAplicado: cobrancaComAdicional,
         metodo: metodoCalculo,
@@ -986,6 +990,11 @@ const Relatorios = () => {
                               <ul className="list-inside list-disc space-y-1 pl-1">
                                 {item.calculoPorRegistro.map((d, i) => (
                                   <li key={`${d.registroId}-${i}`}>
+                                    {isJustificadoSemPonto(d.origem) ? (
+                                      <span className="mr-2 inline-flex align-middle">
+                                        <BadgeJustificadoSemPonto />
+                                      </span>
+                                    ) : null}
                                     <span className="font-mono text-[11px] text-gray-500">
                                       {d.registroId !== '_agrupado' ? d.registroId.slice(0, 8) : '—'}…
                                     </span>{' '}

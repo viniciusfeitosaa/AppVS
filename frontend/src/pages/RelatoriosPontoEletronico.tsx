@@ -10,12 +10,14 @@ import { adminService } from '../services/admin.service';
 import { fixMojibake } from '../utils/validation.util';
 import { notify } from '../lib/notificationEmitter';
 import { addPdfBrandHeader } from '../utils/pdf-branding';
+import { SituacaoRegistroPonto, situacaoRegistroPontoTexto } from '../components/ponto/SituacaoRegistroPonto';
 
 type RegistroPontoLinha = {
   id: string;
   checkInAt: string;
   checkOutAt: string | null;
   duracaoMinutos: number | null;
+  origem?: string | null;
   checkInAtrasado?: boolean;
   minutosAtrasoCheckin?: number | null;
   medico?: { nomeCompleto?: string | null } | null;
@@ -174,6 +176,7 @@ const RelatoriosPontoEletronico = () => {
       entrada: formatDateTimePtBr(r.checkInAt),
       saida: formatDateTimePtBr(r.checkOutAt),
       minutos: Math.max(0, Number(r.duracaoMinutos ?? 0)),
+      origem: r.origem ?? null,
       atrasado: !!r.checkInAtrasado,
       minutosAtraso: Math.max(0, Number(r.minutosAtrasoCheckin ?? 0)),
     }));
@@ -189,7 +192,11 @@ const RelatoriosPontoEletronico = () => {
       Profissional: row.profissional,
       Entrada: row.entrada,
       Saida: row.saida,
-      Situação: row.atrasado ? `Atrasado (${row.minutosAtraso} min)` : 'No horário',
+      Situação: situacaoRegistroPontoTexto({
+        origem: row.origem,
+        atrasado: row.atrasado,
+        minutosAtraso: row.minutosAtraso,
+      }),
       'Total do dia': formatDuration(row.minutos),
     }));
     rows.push({
@@ -226,7 +233,13 @@ const RelatoriosPontoEletronico = () => {
         textoSeguroPdf(row.profissional),
         textoSeguroPdf(row.entrada),
         textoSeguroPdf(row.saida),
-        textoSeguroPdf(row.atrasado ? `Atrasado (${row.minutosAtraso} min)` : 'No horário'),
+        textoSeguroPdf(
+          situacaoRegistroPontoTexto({
+            origem: row.origem,
+            atrasado: row.atrasado,
+            minutosAtraso: row.minutosAtraso,
+          })
+        ),
         textoSeguroPdf(formatDuration(row.minutos)),
       ]),
       foot: [[
@@ -410,15 +423,11 @@ const RelatoriosPontoEletronico = () => {
                       <td className="py-2 pr-4 text-viva-900">{row.entrada}</td>
                       <td className="py-2 pr-4 text-viva-900">{row.saida}</td>
                       <td className="py-2 pr-4 text-viva-900">
-                        {row.atrasado ? (
-                          <span className="inline-flex items-center rounded-full bg-amber-100 text-amber-800 px-2 py-0.5 text-xs font-medium">
-                            Atrasado ({row.minutosAtraso} min)
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center rounded-full bg-emerald-100 text-emerald-800 px-2 py-0.5 text-xs font-medium">
-                            No horário
-                          </span>
-                        )}
+                        <SituacaoRegistroPonto
+                          origem={row.origem}
+                          atrasado={row.atrasado}
+                          minutosAtraso={row.minutosAtraso}
+                        />
                       </td>
                       <td className="py-2 pr-4 text-viva-900">{formatDuration(row.minutos)}</td>
                     </tr>
