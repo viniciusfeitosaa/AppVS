@@ -1,6 +1,7 @@
 import fs from 'fs';
 import { Request, Response, NextFunction } from 'express';
 import { body, param, query, validationResult } from 'express-validator';
+import { z } from 'zod';
 import { PONTO_SEM_ESCALA_ESCALA_ID } from '../constants/ponto.const';
 import { validateCPF, validateCRM } from '../utils/validation.util';
 import {
@@ -1060,3 +1061,111 @@ export const validateConteudoTokenParam = [
     .withMessage('Token inválido'),
   handleValidationErrors,
 ];
+
+const isoDateTimeString = z
+  .string({ required_error: 'Data/hora obrigatória' })
+  .trim()
+  .min(1, 'Data/hora obrigatória')
+  .refine((v) => !Number.isNaN(Date.parse(v)), { message: 'Data/hora inválida (use ISO)' });
+
+const optionalIsoDateTimeString = z.preprocess(
+  (v) => (v == null || (typeof v === 'string' && v.trim() === '') ? undefined : v),
+  isoDateTimeString.optional()
+);
+
+const criarJustificativaAusenciaPontoSchema = z
+  .object({
+    escalaPlantaoId: z.string().uuid('escalaPlantaoId inválido'),
+    horarioAlegadoEntrada: isoDateTimeString,
+    horarioAlegadoSaida: isoDateTimeString,
+    motivo: z
+      .string({ required_error: 'Motivo é obrigatório' })
+      .trim()
+      .min(10, 'O motivo deve ter no mínimo 10 caracteres'),
+  })
+  .strict();
+
+const aceitarJustificativaAusenciaPontoSchema = z
+  .object({
+    horarioAlegadoEntrada: optionalIsoDateTimeString,
+    horarioAlegadoSaida: optionalIsoDateTimeString,
+  })
+  .strict();
+
+const recusarJustificativaAusenciaPontoSchema = z
+  .object({
+    comentario: z.preprocess(
+      (v) => (v == null || (typeof v === 'string' && v.trim() === '') ? undefined : v),
+      z.string().trim().max(2000, 'Comentário muito longo').optional()
+    ),
+  })
+  .strict();
+
+const listJustificativasAdminQuerySchema = z.object({
+  status: z
+    .enum(['PENDENTE', 'ACEITA', 'RECUSADA'], {
+      errorMap: () => ({ message: 'status inválido (PENDENTE, ACEITA ou RECUSADA)' }),
+    })
+    .optional(),
+});
+
+function validateZodBody(schema: z.ZodTypeAny) {
+  return (req: Request, res: Response, next: NextFunction) => {
+    const parsed = schema.safeParse(req.body ?? {});
+    if (!parsed.success) {
+      const list = parsed.error.issues;
+      const error =
+        list.map((i) => i.message).filter(Boolean).join(' · ') || 'Dados inválidos';
+      return res.status(400).json({
+        success: false,
+        error,
+        errors: list,
+      });
+    }
+    req.body = parsed.data;
+    return next();
+  };
+}
+
+function validateZodQuery(schema: z.ZodTypeAny) {
+  return (req: Request, res: Response, next: NextFunction) => {
+    const raw = { ...(req.query as Record<string, unknown>) };
+    if (typeof raw.status === 'string' && raw.status.trim() !== '') {
+      raw.status = raw.status.trim().toUpperCase();
+    } else {
+      delete raw.status;
+    }
+    const parsed = schema.safeParse(raw);
+    if (!parsed.success) {
+      const list = parsed.error.issues;
+      const error =
+        list.map((i) => i.message).filter(Boolean).join(' · ') || 'Dados inválidos';
+      return res.status(400).json({
+        success: false,
+        error,
+        errors: list,
+      });
+    }
+    return next();
+  };
+}
+
+/** POST /ponto/justificativas-ausencia */
+export const validateCriarJustificativaAusenciaPonto = validateZodBody(
+  criarJustificativaAusenciaPontoSchema
+);
+
+/** POST /admin/justificativas-ausencia/:id/aceitar */
+export const validateAceitarJustificativaAusenciaPonto = validateZodBody(
+  aceitarJustificativaAusenciaPontoSchema
+);
+
+/** POST /admin/justificativas-ausencia/:id/recusar */
+export const validateRecusarJustificativaAusenciaPonto = validateZodBody(
+  recusarJustificativaAusenciaPontoSchema
+);
+
+/** GET /admin/justificativas-ausencia?status= */
+export const validateListJustificativasAdminQuery = validateZodQuery(
+  listJustificativasAdminQuerySchema
+);

@@ -88,7 +88,12 @@ import {
 import { authenticateToken, requireAnyModuleAccess, requireModuleAccess, requireRole } from '../middleware/auth.middleware';
 import { uploadDocumentoEnviado } from '../middleware/upload.middleware';
 import { ModuloSistema, UserRole } from '@prisma/client';
-import { validateUUIDParam, validateCreateEscala, validateUpdateEscala, validateCreateEscalaPlantao, validateReplicarPlantoesMes, validateAlocarMedicoEscala, validateUpsertAdicionalPlantao, validateListAdicionaisPlantao, validateRemoverAdicionalPlantao, validateCreateTipoPlantao, validateUpdateTipoPlantao, validateSetConfigPonto } from '../middleware/validation.middleware';
+import { validateUUIDParam, validateCreateEscala, validateUpdateEscala, validateCreateEscalaPlantao, validateReplicarPlantoesMes, validateAlocarMedicoEscala, validateUpsertAdicionalPlantao, validateListAdicionaisPlantao, validateRemoverAdicionalPlantao, validateCreateTipoPlantao, validateUpdateTipoPlantao, validateSetConfigPonto, validateListJustificativasAdminQuery, validateAceitarJustificativaAusenciaPonto, validateRecusarJustificativaAusenciaPonto } from '../middleware/validation.middleware';
+import {
+  listJustificativasAdminController,
+  aceitarJustificativaController,
+  recusarJustificativaController,
+} from '../controllers/justificativa-ausencia-ponto.controller';
 import blogAdminRoutes from './blog-admin.routes';
 import conteudoAdminRoutes from './conteudo-admin.routes';
 
@@ -217,6 +222,27 @@ router.delete('/adicionais-plantao', requireModuleAccess(ModuloSistema.VALORES_P
 router.get('/config-ponto/opcoes', requireModuleAccess(ModuloSistema.PONTO_ELETRONICO), getConfigPontoOpcoesController);
 router.get('/config-ponto', requireModuleAccess(ModuloSistema.PONTO_ELETRONICO), getConfigPontoController);
 router.put('/config-ponto', requireModuleAccess(ModuloSistema.PONTO_ELETRONICO), validateSetConfigPonto, setConfigPontoController);
+
+router.get(
+  '/justificativas-ausencia',
+  requireModuleAccess(ModuloSistema.PONTO_ELETRONICO),
+  validateListJustificativasAdminQuery,
+  listJustificativasAdminController
+);
+router.post(
+  '/justificativas-ausencia/:id/aceitar',
+  requireModuleAccess(ModuloSistema.PONTO_ELETRONICO),
+  validateUUIDParam('id'),
+  validateAceitarJustificativaAusenciaPonto,
+  aceitarJustificativaController
+);
+router.post(
+  '/justificativas-ausencia/:id/recusar',
+  requireModuleAccess(ModuloSistema.PONTO_ELETRONICO),
+  validateUUIDParam('id'),
+  validateRecusarJustificativaAusenciaPonto,
+  recusarJustificativaController
+);
 
 router.get('/registros-ponto', requireModuleAccess(ModuloSistema.RELATORIOS), listRegistrosPontoAdminController);
 router.get(

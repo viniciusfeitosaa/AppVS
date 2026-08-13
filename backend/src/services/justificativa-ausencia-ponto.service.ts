@@ -307,6 +307,28 @@ export async function listMinhasJustificativas(tenantId: string, medicoId: strin
   });
 }
 
+export async function listJustificativasAdmin(
+  tenantId: string,
+  status?: 'PENDENTE' | 'ACEITA' | 'RECUSADA'
+) {
+  return prisma.justificativaAusenciaPonto.findMany({
+    where: {
+      tenantId,
+      ...(status ? { status } : {}),
+    },
+    orderBy: { createdAt: 'desc' },
+    include: {
+      medico: {
+        select: { id: true, nomeCompleto: true, crm: true, profissao: true },
+      },
+      escalaPlantao: {
+        select: { id: true, data: true, gradeId: true, escalaId: true },
+      },
+      escala: { select: { id: true, nome: true } },
+    },
+  });
+}
+
 export type AceitarJustificativaInput = {
   horarioAlegadoEntrada?: Date;
   horarioAlegadoSaida?: Date;

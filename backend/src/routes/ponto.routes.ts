@@ -14,6 +14,7 @@ import {
   validateAceitarTrocaPlantao,
   validatePlantoesColegaTrocaQuery,
   validateMeusPlantoesCalendarioQuery,
+  validateCriarJustificativaAusenciaPonto,
 } from '../middleware/validation.middleware';
 import {
   checkInController,
@@ -36,6 +37,11 @@ import {
   canCheckInController,
   getHistoricoPontosMedicoController,
 } from '../controllers/ponto.controller';
+import {
+  listPlantoesElegiveisJustificativaController,
+  criarJustificativaAusenciaPontoController,
+  listMinhasJustificativasController,
+} from '../controllers/justificativa-ausencia-ponto.controller';
 
 const router = Router();
 
@@ -82,5 +88,13 @@ router.post('/trocas-plantao/:id/recusar', validateUUIDParam('id'), recusarTroca
 router.get('/can-checkin', validateEscalaIdQueryPonto, canCheckInController);
 router.get('/historico', getHistoricoPontosMedicoController);
 router.get('/registros/:id/foto-checkin', validateUUIDParam('id'), downloadFotoCheckinMedicoController);
+
+router.get('/justificativas-ausencia/eligiveis', listPlantoesElegiveisJustificativaController);
+router.post(
+  '/justificativas-ausencia',
+  validateCriarJustificativaAusenciaPonto,
+  criarJustificativaAusenciaPontoController
+);
+router.get('/justificativas-ausencia/minhas', listMinhasJustificativasController);
 
 export default router;
