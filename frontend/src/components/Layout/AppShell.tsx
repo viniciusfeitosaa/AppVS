@@ -160,6 +160,7 @@ const AppShell = () => {
   const pontoMenuItemsMedico: MenuItem[] = [
     { to: '/ponto-eletronico', label: 'Ponto Eletrônico' },
     { to: '/historico-pontos', label: 'Histórico de pontos' },
+    { to: '/justificar-ausencia-ponto', label: 'Justificar ausência de ponto' },
     ...(mostrarCalendarioEscalasNoMenu ? [{ to: '/meu-calendario-plantoes', label: 'Calendário de escalas' } as MenuItem] : []),
   ];
   const menuGroupsBase: MenuGroup[] = isMaster
@@ -234,6 +235,7 @@ const AppShell = () => {
     '/documentos': 'PERFIL',
     '/ponto-eletronico': 'PONTO_ELETRONICO',
     '/historico-pontos': 'PONTO_ELETRONICO',
+    '/justificar-ausencia-ponto': 'PONTO_ELETRONICO',
     '/meu-calendario-plantoes': 'PONTO_ELETRONICO',
     '/atendimentos': 'ATENDIMENTOS',
     '/conteudos': 'CONTEUDOS',

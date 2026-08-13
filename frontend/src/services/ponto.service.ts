@@ -208,4 +208,69 @@ export const pontoService = {
     const response = await api.post(`/ponto/trocas-plantao/${solicitacaoId}/recusar`);
     return response.data as { success: boolean; message?: string };
   },
+
+  listPlantoesElegiveisJustificativa: async () => {
+    const response = await api.get('/ponto/justificativas-ausencia/eligiveis');
+    return response.data as {
+      success: boolean;
+      data: PlantaoElegivelJustificativa[];
+    };
+  },
+
+  criarJustificativaAusencia: async (payload: CriarJustificativaAusenciaPayload) => {
+    const response = await api.post('/ponto/justificativas-ausencia', payload);
+    return response.data as {
+      success: boolean;
+      message?: string;
+      data: JustificativaAusenciaPontoItem;
+    };
+  },
+
+  listMinhasJustificativas: async () => {
+    const response = await api.get('/ponto/justificativas-ausencia/minhas');
+    return response.data as {
+      success: boolean;
+      data: JustificativaAusenciaPontoItem[];
+    };
+  },
 };
+
+export type StatusJustificativaAusencia = 'PENDENTE' | 'ACEITA' | 'RECUSADA';
+
+export interface PlantaoElegivelJustificativa {
+  id: string;
+  escalaId: string;
+  data: string;
+  gradeId: string;
+  horarioOficialInicio: string;
+  horarioOficialFim: string;
+}
+
+export interface CriarJustificativaAusenciaPayload {
+  escalaPlantaoId: string;
+  horarioAlegadoEntrada: string;
+  horarioAlegadoSaida: string;
+  motivo: string;
+}
+
+export interface JustificativaAusenciaPontoItem {
+  id: string;
+  escalaId: string;
+  escalaPlantaoId: string;
+  horarioOficialInicio: string;
+  horarioOficialFim: string;
+  horarioAlegadoEntrada: string;
+  horarioAlegadoSaida: string;
+  motivo: string;
+  status: StatusJustificativaAusencia;
+  comentarioMaster: string | null;
+  decididoEm: string | null;
+  createdAt: string;
+  escala?: { id: string; nome: string } | null;
+  escalaPlantao?: {
+    id: string;
+    data: string;
+    gradeId: string;
+    escalaId: string;
+  } | null;
+}

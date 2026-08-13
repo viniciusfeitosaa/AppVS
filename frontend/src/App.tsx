@@ -31,6 +31,7 @@ import ValoresPlantao from './pages/ValoresPlantao';
 import ValoresPonto from './pages/ValoresPonto';
 import PontoEletronico from './pages/PontoEletronico';
 import HistoricoPontos from './pages/HistoricoPontos';
+import JustificarAusenciaPonto from './pages/JustificarAusenciaPonto';
 import MeuCalendarioPlantoes from './pages/MeuCalendarioPlantoes';
 import Relatorios from './pages/Relatorios';
 import RelatoriosPontoEletronico from './pages/RelatoriosPontoEletronico';
@@ -134,6 +135,7 @@ function AppRoutes() {
           element={<PontoEletronico />}
         />
         <Route path="/historico-pontos" element={<HistoricoPontos />} />
+        <Route path="/justificar-ausencia-ponto" element={<JustificarAusenciaPonto />} />
         <Route path="/meu-calendario-plantoes" element={<MeuCalendarioPlantoes />} />
         <Route
           path="/atendimentos"
