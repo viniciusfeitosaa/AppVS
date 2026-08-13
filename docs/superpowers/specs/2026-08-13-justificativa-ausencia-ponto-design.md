@@ -28,12 +28,27 @@ Em contratos com **escala + ponto**, o repasse depende do check-out. Se o médic
 
 | Tema | Escolha |
 |------|---------|
-| Elegibilidade | Só plantão **sem** ponto (aberto ou fechado) naquele dia/escala |
+| Elegibilidade | Plantão **sem ponto completo** (ver matriz abaixo) |
 | Pagamento no aceite | **Plantão cheio** |
 | Horários | Médico informa alegados; Master pode editar antes de aceitar |
 | Prazo | Sem limite (v1) |
 | Visibilidade | Selo claro de ausência de ponto em relatório/histórico |
 | Arquitetura | Pedido separado + ponto gerado na aprovação |
+
+### Matriz de elegibilidade (ponto incompleto / ausente)
+
+A justificativa existe para dizer: **o profissional não concluiu o ponto corretamente** naquele plantão.
+
+| Situação no plantão (médico + escala + dia do `EscalaPlantao`) | Elegível? |
+|---------------------------------------------------------------|-----------|
+| Nenhum check-in e nenhum check-out | **Sim** |
+| Check-in feito, **sem** check-out (ponto aberto / esquecido) | **Sim** |
+| Check-in e check-out concluídos (`checkOutAt` preenchido) | **Não** — já há ponto fechado; pagamento segue a regra normal do ponto |
+| Já existe justificativa `ACEITA` / ponto `JUSTIFICADO_SEM_PONTO` para o plantão | **Não** |
+| Já existe justificativa `PENDENTE` | **Não** (até decidir ou recusar) |
+
+“Demais” na v1 = qualquer variante **sem ponto fechado** para aquele plantão (ex.: check-in aberto deixado de um dia anterior ainda sem checkout, desde que o plantão alvo continue sem ponto fechado).  
+**Não** cobre na v1: ponto fechado na escala errada, pedido de “refazer” valor de um ponto já completo.
 
 ## Confirmação técnica prévia
 
@@ -93,9 +108,10 @@ Todas devem ser verdadeiras:
 
 1. Médico autenticado é o `medicoId` do `EscalaPlantao`.
 2. Escala/contrato com produção **usa escala + usa ponto**.
-3. Não existe `RegistroPonto` do médico naquela `escalaId` cujo intervalo (check-in/out) cubra / pertença ao plantão do dia (regra prática v1: **nenhum ponto do médico naquela escala no dia civil do plantão**, aberto ou fechado — simples e conservadora).
-4. Não existe justificativa `PENDENTE` para o `escalaPlantaoId`.
-5. Não existe justificativa `ACEITA` já ligada a esse plantão / ponto justificado para o mesmo plantão.
+3. **Não** existe `RegistroPonto` **fechado** (`checkOutAt` não nulo) do médico naquela `escalaId` no **dia civil** do plantão (origem `APP_MEDICO` ou `JUSTIFICADO_SEM_PONTO`).
+4. Pode existir ponto **aberto** (`checkOutAt` null) naquela escala/dia — isso **não** impede o pedido (é exatamente o caso “bateu entrada e esqueceu a saída”).
+5. Não existe justificativa `PENDENTE` para o `escalaPlantaoId`.
+6. Não existe justificativa `ACEITA` já ligada a esse plantão.
 
 ## Pagamento (aceite)
 
@@ -121,13 +137,19 @@ Ordem para obter o **total do plantão** (não ratear):
 
 1. Fila de pendentes (módulo `PONTO_ELETRONICO` e/ou `ESCALAS`).
 2. Pode editar `horarioAlegadoEntrada/Saida`.
-3. **Aceitar** → transação: valida elegibilidade de novo → cria `RegistroPonto` → congela valor → marca justificativa `ACEITA` + `registroPontoId` → notifica médico.
-4. **Recusar** → `RECUSADA` + comentário opcional → notifica médico.
+3. **Aceitar** → transação:
+   - Revalida elegibilidade (ainda sem ponto **fechado**).
+   - Se houver `RegistroPonto` **aberto** do médico naquela escala (e, se aplicável, no contexto do plantão/dia): **cancela/encerra sem repasse** (não paga o incompleto).
+   - Cria `RegistroPonto` `JUSTIFICADO_SEM_PONTO` com valor cheio.
+   - Marca justificativa `ACEITA` + `registroPontoId`.
+   - Notifica médico.
+4. **Recusar** → `RECUSADA` + comentário opcional → notifica médico.  
+   - Ponto aberto (se houver) **permanece** como está; Master/médico ainda podem tratar checkout à parte.
 
 ### Pós-aceite / anti-duplicidade
 
 - Bloquear check-in “normal” que geraria **segundo** pagamento para o mesmo plantão/dia/escala já coberto por `JUSTIFICADO_SEM_PONTO`.
-- Relatórios: preferir `repasseValorCongelado`; exibir badge **“Sem ponto — justificado”** quando `origem = JUSTIFICADO_SEM_PONTO`.
+- Relatórios: **ignorar** registros abertos cancelados no aceite; preferir `repasseValorCongelado` do justificado; badge **“Sem ponto — justificado”**.
 
 ### Troca de plantão
 
@@ -168,13 +190,15 @@ Autorização Master: módulo `PONTO_ELETRONICO` (primário); se o menu viver so
 
 ## Testes mínimos
 
-- Elegível sem ponto → cria `PENDENTE`.
-- Com ponto no dia/escala → 400/409.
+- Sem check-in/out → elegível → cria `PENDENTE`.
+- Só check-in aberto (sem checkout) → elegível → cria `PENDENTE`.
+- Com ponto **fechado** no dia/escala → 400/409.
+- Aceite com ponto aberto → cancela aberto sem repasse + cria `JUSTIFICADO_SEM_PONTO` com valor cheio.
 - Segundo `PENDENTE` no mesmo plantão → 409.
 - Aceite → `RegistroPonto` `JUSTIFICADO_SEM_PONTO` + valor cheio + status `ACEITA`.
-- Recusa → sem registro; médico pode reabrir.
+- Recusa → sem justificado; ponto aberto (se houver) intacto; médico pode reabrir pedido.
 - Check-in após aceite do mesmo plantão → bloqueado.
-- Relatório mostra badge e soma o congelado uma vez.
+- Relatório mostra badge e soma o congelado uma vez (não soma o aberto cancelado).
 
 ## Arquivos-chave previstos
 
@@ -188,4 +212,5 @@ Autorização Master: módulo `PONTO_ELETRONICO` (primário); se o menu viver so
 
 ## Changelog da spec
 
+- 2026-08-13: Elegibilidade ampliada — cobre **sem check-in/out** e **check-in sem check-out**; ponto fechado continua inelegível; aceite cancela aberto sem repasse.
 - 2026-08-13: Versão inicial aprovada no brainstorming (opções A elegibilidade, B pagamento cheio + horários alegados, Master edita horários, prazo A).
