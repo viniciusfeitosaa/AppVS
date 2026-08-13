@@ -19,6 +19,7 @@ import {
   type MedicoEquipeGeoLinha,
 } from '../utils/ponto-geo-config.util';
 import { batchResolveProducaoMedicoNasEscalas, resolveProducaoMedicoNaEscala } from '../utils/producao-subgrupo.util';
+import { temJustificativaAceitaNoDiaEscala } from './justificativa-ausencia-ponto.service';
 
 function isPontoSemEscalaEscalaId(escalaId: string) {
   return escalaId === PONTO_SEM_ESCALA_ESCALA_ID;
@@ -556,6 +557,15 @@ export async function checkInService(
     if (dist > configGeo.raioMetros) {
       throw { statusCode: 400, message: `Você está fora do raio permitido para bater ponto (distância: ${Math.round(dist)} m, raio: ${configGeo.raioMetros} m).` };
     }
+  }
+
+  if (
+    await temJustificativaAceitaNoDiaEscala(tenantId, medicoId, escalaId, instanteCheckIn)
+  ) {
+    throw {
+      statusCode: 409,
+      message: 'Este plantão já foi justificado e aprovado. Não é possível bater ponto novamente.',
+    };
   }
 
   return prisma.$transaction(async (tx: any) => {
