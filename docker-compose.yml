@@ -29,6 +29,11 @@ services:
       - FRONTEND_APP_URL=${FRONTEND_APP_URL:-}
       - ALLOWED_ORIGINS=${ALLOWED_ORIGINS}
       - REDIS_URL=${REDIS_URL:-redis://redis:6379}
+      - FIREBASE_SERVICE_ACCOUNT_PATH=${FIREBASE_SERVICE_ACCOUNT_PATH:-}
+      - FIREBASE_SERVICE_ACCOUNT_JSON=${FIREBASE_SERVICE_ACCOUNT_JSON:-}
+      - PUSH_QUEUE_CONCURRENCY=${PUSH_QUEUE_CONCURRENCY:-4}
+    volumes:
+      - ./backend/secrets:/app/secrets:ro
     networks:
       - app-network
       - proxy-network

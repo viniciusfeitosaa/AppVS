@@ -1,6 +1,6 @@
 # 12 — Mobile (Capacitor)
 
-**Status:** ✅ Código push FCM pronto; ⏳ VPS + builds store  
+**Status:** ✅ Código + VPS (migration/worker/Firebase JSON) ok; ⏳ builds store + teste no aparelho  
 **Última atualização:** 2026-08-13
 
 ## O que existe
@@ -36,35 +36,22 @@
 | Service account local | `backend/secrets/firebase-adminsdk.json` (gitignored) + `FIREBASE_SERVICE_ACCOUNT_PATH` no `.env` local |
 | Arquivos nativos locais | `google-services.json` e `GoogleService-Info.plist` no app (gitignored; ver `.example` Android) |
 
-### Checklist VPS (humano — falta fazer)
+### Checklist VPS (humano)
 
-1. **Copiar o JSON** da service account para a VPS (não commitado), ex.:
-   - `/opt/appvs/secrets/firebase-adminsdk.json` (ou path real do deploy)
-2. **Env do backend** na VPS (Docker/compose/.env):
-   ```bash
-   FIREBASE_SERVICE_ACCOUNT_PATH=/caminho/absoluto/firebase-adminsdk.json
-   # OU (uma linha JSON):
-   # FIREBASE_SERVICE_ACCOUNT_JSON={"type":"service_account",...}
-   # Redis já usado pelo e-mail:
-   # REDIS_URL=redis://...
-   # opcional: PUSH_QUEUE_CONCURRENCY=4
-   ```
-3. **Migration** (no container/host do backend, contra o Postgres da VPS):
-   ```bash
-   cd backend && npx prisma migrate deploy
-   ```
-   Migration: `20260813160000_device_push_tokens` → tabela `device_push_tokens`
-4. **Deploy** do código desta entrega (`main`) e **reiniciar** o backend (worker BullMQ `viva-push` sobe com Redis).
-5. **Verificar logs** no start: fila push ativa / Firebase inicializa sem erro.
-6. **Builds store** (depois do deploy web/API):
+1. [x] **JSON** da service account na VPS: `backend/secrets/firebase-adminsdk.json` (gitignored; mount `/app/secrets`)
+2. [x] **Env** `FIREBASE_SERVICE_ACCOUNT_PATH=/app/secrets/firebase-adminsdk.json` + recreate backend (2026-08-13) — Firebase init ok (`viva-saude-d4644`)
+3. [x] **Migration** `20260813160000_device_push_tokens` → tabela `device_push_tokens` (aplicada na VPS em 2026-08-13)
+4. [x] **Deploy** `main` + restart backend — worker BullMQ `[push-queue] worker ativo` (confirmado na VPS)
+5. [x] **Verificar**: JSON montado e `firebase-admin` inicializa no projeto `viva-saude-d4644`
+6. [ ] **Builds store**:
    ```bash
    cd frontend && npm run build && npx cap sync
    ```
    - Android Studio → AAB (bump `versionCode` se necessário)
    - Xcode → Push Notifications capability + IPA (`aps-environment` production no archive)
-7. **Teste**: login associado no app nativo → permissão notificação → Master `/enviar-aviso` → push + sino in-app.
+7. [ ] **Teste**: login associado no app nativo → permissão notificação → Master `/enviar-aviso` → push + sino in-app.
 
-### Teste rápido (após VPS + app nativo)
+### Teste rápido (após Firebase na VPS + app nativo)
 
 1. Login associado no app nativo → aceitar permissão de notificação.
 2. Master → Administração → **Enviar aviso push**.
@@ -96,9 +83,8 @@ Registros marcados com `OrigemRegistroPonto.APP_MEDICO` no schema.
 - [x] Firebase projeto + apps Android/iOS
 - [x] APNs no Firebase (dev + produção)
 - [x] Service account local (gitignored)
-- [ ] Service account + env na **VPS**
-- [ ] `prisma migrate deploy` na VPS (`device_push_tokens`)
-- [ ] Deploy `main` + restart backend
+- [x] Deploy `main` + migration + worker na **VPS** (2026-08-13)
+- [x] Service account + env `FIREBASE_*` na **VPS** (JSON montado; init ok)
 - [ ] Novo AAB/IPA + teste em dispositivo
 - [ ] Confirmar Push capability no Xcode no archive
 - [ ] Testes E2E mobile (não há harness automatizado)
@@ -112,3 +98,4 @@ Registros marcados com `OrigemRegistroPonto.APP_MEDICO` no schema.
 - Firebase Console: projeto `viva-saude-d4644`, APNs Key `TXP3335ZZL`
 - Arquivos-chave: `backend/src/jobs/push-queue.ts`, `frontend/src/lib/pushNotifications.ts`, `contexto/12-mobile-capacitor.md`
 - Migration: `backend/prisma/migrations/20260813160000_device_push_tokens`
+- VPS: containers atualizados; migration aplicada; worker ativo; **ainda sem** `FIREBASE_SERVICE_ACCOUNT_*`

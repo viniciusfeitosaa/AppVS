@@ -1,7 +1,7 @@
 ﻿# 15 — Estado atual e pendências
 
 **Snapshot:** 2026-08-13  
-**Branch:** `main` (push FCM no código + Firebase/APNs configurados; falta VPS + builds store)
+**Branch:** `main` (push FCM + Firebase na VPS ok; falta builds store + teste no aparelho)
 
 > Este arquivo deve ser o **primeiro** atualizado após entregas relevantes.  
 > É o **mapa de bordo** do projeto (o que está pronto, o que falta, histórico recente).
@@ -10,7 +10,7 @@
 
 O **Viva Saúde** está em produção na VPS (`sejavivasaude.com.br`). Auth, escalas, ponto, vagas, documentos, relatórios, painel de e-mail, robô WhatsApp (Evolution GO), mobile e deploy estão implementados.  
 **Conteúdos / eventos** inclui anúncio, inscrição, frequência, **avaliação por conteúdo** (perguntas customizadas + switch na frequência) e **pipeline de precadastro → aceite → cadastro ATIVO no corpo clínico (sem Avaliação)**.  
-**Push notifications** (FCM + BullMQ): código mergeado; Firebase/APNs (dev+prod) ok no Console; **falta service account + migration na VPS e novo AAB/IPA** — checklist em `12-mobile-capacitor.md`.
+**Push notifications** (FCM + BullMQ): código na `main`, VPS com migration, worker e **Firebase service account**; **falta novo AAB/IPA e teste no celular** — `12-mobile-capacitor.md`.
 
 ## Módulos — status
 
@@ -29,7 +29,7 @@ O **Viva Saúde** está em produção na VPS (`sejavivasaude.com.br`). Auth, esc
 | Painel de E-mail | ✅ | ✅ | NF / demonstrativos com PDF anexo + 2 tipos de competência |
 | WhatsApp (Evolution GO) | ✅ | — | Menu atendimento; pausar/retomar (equipe) |
 | Conteúdos / eventos | ✅ | ✅ | Anúncio, frequência, **avaliação custom por evento**, precadastro→aceite→corpo clínico — `17-conteudos-eventos.md` |
-| Mobile / Capacitor | ✅ | ✅ | Push FCM; Firebase/APNs ok; falta VPS + store — `12-mobile-capacitor.md` |
+| Mobile / Capacitor | ✅ | ✅ | Push FCM na VPS (Firebase ok); falta AAB/IPA + teste — `12` |
 | Configurações / módulos | ✅ | ✅ | Matriz de acesso |
 | Avaliação (master) | ✅ | ✅ | Só cadastro público `/cadastro` (não precadastro aceito) |
 | Atendimentos | — | ⏳ Placeholder | `FeaturePlaceholder` |
