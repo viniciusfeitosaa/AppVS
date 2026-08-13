@@ -15,6 +15,9 @@ export function pathForNotificacaoTipo(tipo: string): string {
       return '/documentos';
     case 'VAGA_NOVA':
       return '/vagas';
+    case 'JUSTIFICATIVA_PONTO_ACEITA':
+    case 'JUSTIFICATIVA_PONTO_RECUSADA':
+      return '/historico-pontos';
     default:
       return '/dashboard';
   }

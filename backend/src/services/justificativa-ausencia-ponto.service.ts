@@ -1,3 +1,4 @@
+import { OrigemRegistroPonto } from '@prisma/client';
 import { prisma } from '../config/database';
 import {
   fimPlantaoAsDate,
@@ -10,6 +11,8 @@ import {
   resolveProducaoMedicoNaEscala,
 } from '../utils/producao-subgrupo.util';
 import { intervaloDiaCivil } from './justificativa-ausencia-ponto.dia';
+import { resolverValorCheioPlantao } from './justificativa-ausencia-ponto.valor';
+import { criarNotificacaoComPush, TIPO_NOTIFICACAO } from './notificacao-medico.service';
 
 export type CriarJustificativaAusenciaPontoInput = {
   escalaPlantaoId: string;
@@ -302,4 +305,221 @@ export async function listMinhasJustificativas(tenantId: string, medicoId: strin
       escala: { select: { id: true, nome: true } },
     },
   });
+}
+
+export type AceitarJustificativaInput = {
+  horarioAlegadoEntrada?: Date;
+  horarioAlegadoSaida?: Date;
+};
+
+function truncMotivo(motivo: string, max = 200): string {
+  const t = String(motivo || '').trim();
+  if (t.length <= max) return t;
+  return `${t.slice(0, max)}…`;
+}
+
+/**
+ * Aceita justificativa pendente: cancela ponto aberto do dia/escala, cria RegistroPonto JUSTIFICADO_SEM_PONTO
+ * com valor cheio e notifica o médico.
+ */
+export async function aceitarJustificativa(
+  tenantId: string,
+  masterId: string,
+  id: string,
+  opts: AceitarJustificativaInput = {}
+) {
+  const justificativa = await prisma.justificativaAusenciaPonto.findFirst({
+    where: { id, tenantId },
+    include: {
+      escalaPlantao: { select: { id: true, medicoId: true, data: true, escalaId: true } },
+    },
+  });
+
+  if (!justificativa) {
+    throwHttp(404, 'Justificativa não encontrada');
+  }
+  if (justificativa.status !== 'PENDENTE') {
+    throwHttp(409, 'Justificativa não está pendente');
+  }
+  if (justificativa.escalaPlantao.medicoId !== justificativa.medicoId) {
+    throwHttp(409, 'Plantão não pertence mais ao médico da justificativa');
+  }
+
+  const entrada = opts.horarioAlegadoEntrada
+    ? new Date(opts.horarioAlegadoEntrada)
+    : justificativa.horarioAlegadoEntrada;
+  const saida = opts.horarioAlegadoSaida
+    ? new Date(opts.horarioAlegadoSaida)
+    : justificativa.horarioAlegadoSaida;
+  if (!(saida.getTime() > entrada.getTime())) {
+    throwHttp(400, 'Horário de saída deve ser posterior ao de entrada');
+  }
+
+  if (
+    await temPontoFechadoNoDia(
+      tenantId,
+      justificativa.medicoId,
+      justificativa.escalaId,
+      justificativa.escalaPlantao.data
+    )
+  ) {
+    throwHttp(409, 'Já existe ponto fechado para esta escala no dia do plantão');
+  }
+
+  const valorCheio = await resolverValorCheioPlantao(tenantId, justificativa.escalaPlantaoId);
+  if (valorCheio == null) {
+    throwHttp(400, 'Sem valor de plantão cadastrado');
+  }
+
+  const dia = intervaloDiaCivilPlantao(justificativa.escalaPlantao.data);
+  const duracaoMinutos = Math.max(1, Math.floor((saida.getTime() - entrada.getTime()) / 60000));
+  const observacao = `Justificativa ${justificativa.id}: ${truncMotivo(justificativa.motivo)}`;
+
+  const updated = await prisma.$transaction(async (tx) => {
+    const locked = await tx.justificativaAusenciaPonto.findFirst({
+      where: { id, tenantId, status: 'PENDENTE' },
+      include: {
+        escalaPlantao: { select: { id: true, medicoId: true, data: true, escalaId: true } },
+      },
+    });
+    if (!locked) {
+      throwHttp(409, 'Justificativa não está pendente');
+    }
+    if (locked.escalaPlantao.medicoId !== locked.medicoId) {
+      throwHttp(409, 'Plantão não pertence mais ao médico da justificativa');
+    }
+
+    const fechado = await tx.registroPonto.findFirst({
+      where: {
+        tenantId,
+        medicoId: locked.medicoId,
+        escalaId: locked.escalaId,
+        checkOutAt: { not: null },
+        checkInAt: { gte: dia.gte, lte: dia.lte },
+      },
+      select: { id: true },
+    });
+    if (fechado) {
+      throwHttp(409, 'Já existe ponto fechado para esta escala no dia do plantão');
+    }
+
+    await tx.registroPonto.deleteMany({
+      where: {
+        tenantId,
+        medicoId: locked.medicoId,
+        escalaId: locked.escalaId,
+        checkOutAt: null,
+        checkInAt: { gte: dia.gte, lte: dia.lte },
+      },
+    });
+
+    const registro = await tx.registroPonto.create({
+      data: {
+        tenantId,
+        medicoId: locked.medicoId,
+        escalaId: locked.escalaId,
+        checkInAt: entrada,
+        checkOutAt: saida,
+        origem: OrigemRegistroPonto.JUSTIFICADO_SEM_PONTO,
+        duracaoMinutos,
+        repasseValorCongelado: valorCheio,
+        observacao,
+      },
+    });
+
+    return tx.justificativaAusenciaPonto.update({
+      where: { id: locked.id },
+      data: {
+        status: 'ACEITA',
+        registroPontoId: registro.id,
+        decididoPorMasterId: masterId,
+        decididoEm: new Date(),
+        horarioAlegadoEntrada: entrada,
+        horarioAlegadoSaida: saida,
+      },
+    });
+  });
+
+  await criarNotificacaoComPush({
+    tenantId,
+    medicoId: updated.medicoId,
+    tipo: TIPO_NOTIFICACAO.JUSTIFICATIVA_PONTO_ACEITA,
+    titulo: 'Justificativa de ponto aceita',
+    corpo: 'Sua justificativa de ausência de ponto foi aceita. O registro aparece no histórico de pontos.',
+    metadata: { justificativaId: id, registroPontoId: updated.registroPontoId },
+  });
+
+  return updated;
+}
+
+/**
+ * Recusa justificativa pendente. Ponto aberto (se houver) permanece intacto.
+ */
+export async function recusarJustificativa(
+  tenantId: string,
+  masterId: string,
+  id: string,
+  comentario?: string
+) {
+  const justificativa = await prisma.justificativaAusenciaPonto.findFirst({
+    where: { id, tenantId },
+  });
+
+  if (!justificativa) {
+    throwHttp(404, 'Justificativa não encontrada');
+  }
+  if (justificativa.status !== 'PENDENTE') {
+    throwHttp(409, 'Justificativa não está pendente');
+  }
+
+  const comentarioMaster = comentario != null ? String(comentario).trim() || null : null;
+
+  const updated = await prisma.justificativaAusenciaPonto.update({
+    where: { id: justificativa.id },
+    data: {
+      status: 'RECUSADA',
+      comentarioMaster,
+      decididoPorMasterId: masterId,
+      decididoEm: new Date(),
+    },
+  });
+
+  await criarNotificacaoComPush({
+    tenantId,
+    medicoId: updated.medicoId,
+    tipo: TIPO_NOTIFICACAO.JUSTIFICATIVA_PONTO_RECUSADA,
+    titulo: 'Justificativa de ponto recusada',
+    corpo: comentarioMaster
+      ? `Sua justificativa de ausência de ponto foi recusada: ${comentarioMaster}`
+      : 'Sua justificativa de ausência de ponto foi recusada.',
+    metadata: { justificativaId: id },
+  });
+
+  return updated;
+}
+
+/**
+ * True se já existe justificativa ACEITA do médico na escala cujo plantão cai no dia civil de checkInAt.
+ * Usado pelo check-in (Task 5) para bloquear segundo pagamento.
+ */
+export async function temJustificativaAceitaNoDiaEscala(
+  tenantId: string,
+  medicoId: string,
+  escalaId: string,
+  checkInAt: Date
+): Promise<boolean> {
+  const { gte } = intervaloDiaCivil(checkInAt);
+  const dataStr = `${gte.getFullYear()}-${String(gte.getMonth() + 1).padStart(2, '0')}-${String(gte.getDate()).padStart(2, '0')}`;
+  const dataPlantao = new Date(`${dataStr}T00:00:00.000Z`);
+  const found = await prisma.justificativaAusenciaPonto.findFirst({
+    where: {
+      tenantId,
+      medicoId,
+      escalaId,
+      status: 'ACEITA',
+      escalaPlantao: { data: dataPlantao },
+    },
+    select: { id: true },
+  });
+  return Boolean(found);
 }

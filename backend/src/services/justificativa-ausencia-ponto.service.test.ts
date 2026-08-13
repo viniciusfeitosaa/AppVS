@@ -1,21 +1,34 @@
 import { prisma } from '../config/database';
 import { resolveProducaoMedicoNaEscala, batchResolveProducaoMedicoNasEscalas } from '../utils/producao-subgrupo.util';
+import { pathForNotificacaoTipo } from '../utils/push-deep-link.util';
+import { criarNotificacaoComPush, TIPO_NOTIFICACAO } from './notificacao-medico.service';
+import { resolverValorCheioPlantao } from './justificativa-ausencia-ponto.valor';
 import {
+  aceitarJustificativa,
   criarJustificativaAusenciaPonto,
   listMinhasJustificativas,
   listPlantoesElegiveisJustificativa,
+  recusarJustificativa,
+  temJustificativaAceitaNoDiaEscala,
 } from './justificativa-ausencia-ponto.service';
 
 jest.mock('../config/database', () => ({
   prisma: {
     escalaPlantao: { findFirst: jest.fn(), findMany: jest.fn() },
-    registroPonto: { findFirst: jest.fn(), findMany: jest.fn() },
+    registroPonto: {
+      findFirst: jest.fn(),
+      findMany: jest.fn(),
+      deleteMany: jest.fn(),
+      create: jest.fn(),
+    },
     justificativaAusenciaPonto: {
       findFirst: jest.fn(),
       findMany: jest.fn(),
       create: jest.fn(),
+      update: jest.fn(),
     },
     tipoPlantao: { findMany: jest.fn() },
+    $transaction: jest.fn(),
   },
 }));
 
@@ -24,15 +37,33 @@ jest.mock('../utils/producao-subgrupo.util', () => ({
   batchResolveProducaoMedicoNasEscalas: jest.fn(),
 }));
 
+jest.mock('./justificativa-ausencia-ponto.valor', () => ({
+  resolverValorCheioPlantao: jest.fn(),
+}));
+
+jest.mock('./notificacao-medico.service', () => ({
+  TIPO_NOTIFICACAO: {
+    JUSTIFICATIVA_PONTO_ACEITA: 'JUSTIFICATIVA_PONTO_ACEITA',
+    JUSTIFICATIVA_PONTO_RECUSADA: 'JUSTIFICATIVA_PONTO_RECUSADA',
+  },
+  criarNotificacaoComPush: jest.fn(),
+}));
+
 const mockPlantaoFindFirst = prisma.escalaPlantao.findFirst as jest.Mock;
 const mockPlantaoFindMany = prisma.escalaPlantao.findMany as jest.Mock;
 const mockRegistroFindFirst = prisma.registroPonto.findFirst as jest.Mock;
+const mockRegistroDeleteMany = prisma.registroPonto.deleteMany as jest.Mock;
+const mockRegistroCreate = prisma.registroPonto.create as jest.Mock;
 const mockJustificativaFindFirst = prisma.justificativaAusenciaPonto.findFirst as jest.Mock;
 const mockJustificativaFindMany = prisma.justificativaAusenciaPonto.findMany as jest.Mock;
 const mockJustificativaCreate = prisma.justificativaAusenciaPonto.create as jest.Mock;
+const mockJustificativaUpdate = prisma.justificativaAusenciaPonto.update as jest.Mock;
 const mockTipoFindMany = prisma.tipoPlantao.findMany as jest.Mock;
+const mockTransaction = prisma.$transaction as jest.Mock;
 const mockResolveProducao = resolveProducaoMedicoNaEscala as jest.Mock;
 const mockBatchProducao = batchResolveProducaoMedicoNasEscalas as jest.Mock;
+const mockResolverValor = resolverValorCheioPlantao as jest.Mock;
+const mockCriarNotif = criarNotificacaoComPush as jest.Mock;
 
 const tenantId = 'tenant-1';
 const medicoId = 'medico-1';
@@ -222,5 +253,214 @@ describe('listMinhasJustificativas', () => {
         orderBy: { createdAt: 'desc' },
       })
     );
+  });
+});
+
+const masterId = 'master-1';
+const justId = 'just-1';
+const entradaAlegada = new Date('2026-08-10T07:00:00');
+const saidaAlegada = new Date('2026-08-10T19:00:00');
+
+function justificativaPendente(overrides: Record<string, unknown> = {}) {
+  return {
+    id: justId,
+    tenantId,
+    medicoId,
+    escalaId,
+    escalaPlantaoId,
+    motivo: 'Esqueci de bater o ponto na saída do plantão',
+    status: 'PENDENTE',
+    horarioAlegadoEntrada: entradaAlegada,
+    horarioAlegadoSaida: saidaAlegada,
+    escalaPlantao: {
+      id: escalaPlantaoId,
+      medicoId,
+      data: dataPlantao,
+      escalaId,
+    },
+    ...overrides,
+  };
+}
+
+describe('aceitarJustificativa', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockResolverValor.mockResolvedValue(1200);
+    mockCriarNotif.mockResolvedValue({ id: 'notif-1' });
+    mockRegistroDeleteMany.mockResolvedValue({ count: 1 });
+    mockRegistroCreate.mockResolvedValue({
+      id: 'reg-just',
+      origem: 'JUSTIFICADO_SEM_PONTO',
+      repasseValorCongelado: 1200,
+    });
+    mockJustificativaUpdate.mockImplementation(async ({ data }: { data: Record<string, unknown> }) => ({
+      ...justificativaPendente(),
+      ...data,
+    }));
+    mockTransaction.mockImplementation(async (fn: (tx: typeof prisma) => Promise<unknown>) => fn(prisma));
+    mockJustificativaFindFirst.mockResolvedValue(justificativaPendente());
+    mockRegistroFindFirst.mockResolvedValue(null);
+  });
+
+  it('cancela ponto aberto da mesma escala/dia e cria JUSTIFICADO_SEM_PONTO com valor cheio', async () => {
+    const updated = await aceitarJustificativa(tenantId, masterId, justId);
+
+    expect(mockRegistroDeleteMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          tenantId,
+          medicoId,
+          escalaId,
+          checkOutAt: null,
+          checkInAt: expect.objectContaining({ gte: expect.any(Date), lte: expect.any(Date) }),
+        }),
+      })
+    );
+    expect(mockRegistroCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          origem: 'JUSTIFICADO_SEM_PONTO',
+          repasseValorCongelado: 1200,
+          checkInAt: entradaAlegada,
+          checkOutAt: saidaAlegada,
+          duracaoMinutos: 12 * 60,
+        }),
+      })
+    );
+    expect(updated.status).toBe('ACEITA');
+    expect(mockCriarNotif).toHaveBeenCalledWith(
+      expect.objectContaining({
+        medicoId,
+        tipo: TIPO_NOTIFICACAO.JUSTIFICATIVA_PONTO_ACEITA,
+      })
+    );
+    expect(pathForNotificacaoTipo(TIPO_NOTIFICACAO.JUSTIFICATIVA_PONTO_ACEITA)).toBe('/historico-pontos');
+  });
+
+  it('rejeita com 400 quando não há valor de plantão', async () => {
+    mockResolverValor.mockResolvedValue(null);
+
+    await expect(aceitarJustificativa(tenantId, masterId, justId)).rejects.toMatchObject({
+      statusCode: 400,
+      message: expect.stringMatching(/valor/i),
+    });
+    expect(mockRegistroCreate).not.toHaveBeenCalled();
+  });
+
+  it('rejeita quando plantão.medicoId difere do médico da justificativa', async () => {
+    mockJustificativaFindFirst.mockResolvedValue(
+      justificativaPendente({
+        escalaPlantao: {
+          id: escalaPlantaoId,
+          medicoId: 'outro-medico',
+          data: dataPlantao,
+          escalaId,
+        },
+      })
+    );
+
+    await expect(aceitarJustificativa(tenantId, masterId, justId)).rejects.toMatchObject({
+      statusCode: 409,
+    });
+    expect(mockRegistroCreate).not.toHaveBeenCalled();
+  });
+
+  it('não apaga ponto aberto de outra escala', async () => {
+    await aceitarJustificativa(tenantId, masterId, justId);
+
+    const where = mockRegistroDeleteMany.mock.calls[0][0].where;
+    expect(where.escalaId).toBe(escalaId);
+    expect(where.escalaId).not.toBe('escala-outra');
+  });
+});
+
+describe('recusarJustificativa', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockCriarNotif.mockResolvedValue({ id: 'notif-2' });
+    mockJustificativaFindFirst.mockResolvedValue(justificativaPendente());
+    mockJustificativaUpdate.mockImplementation(async ({ data }: { data: Record<string, unknown> }) => ({
+      ...justificativaPendente(),
+      ...data,
+    }));
+  });
+
+  it('marca RECUSADA, notifica e não toca em ponto aberto', async () => {
+    const updated = await recusarJustificativa(tenantId, masterId, justId, 'Motivo inválido');
+
+    expect(updated.status).toBe('RECUSADA');
+    expect(mockJustificativaUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          status: 'RECUSADA',
+          comentarioMaster: 'Motivo inválido',
+          decididoPorMasterId: masterId,
+        }),
+      })
+    );
+    expect(mockRegistroDeleteMany).not.toHaveBeenCalled();
+    expect(mockCriarNotif).toHaveBeenCalledWith(
+      expect.objectContaining({
+        tipo: TIPO_NOTIFICACAO.JUSTIFICATIVA_PONTO_RECUSADA,
+      })
+    );
+  });
+
+  it('após recusa, plantão volta a ser elegível (sem bloqueio PENDENTE/ACEITA)', async () => {
+    await recusarJustificativa(tenantId, masterId, justId);
+    mockJustificativaFindFirst.mockResolvedValue(null);
+    mockPlantaoFindFirst.mockResolvedValue(plantaoRow());
+    mockResolveProducao.mockResolvedValue({ allowPonto: true, requireJanelaPlantao: true });
+    mockRegistroFindFirst.mockResolvedValue(null);
+    mockTipoFindMany.mockResolvedValue([]);
+    mockJustificativaCreate.mockImplementation(async ({ data }: { data: Record<string, unknown> }) => ({
+      id: 'just-2',
+      ...data,
+    }));
+
+    const created = await criarJustificativaAusenciaPonto(tenantId, medicoId, inputBase());
+    expect(created.status).toBe('PENDENTE');
+  });
+});
+
+describe('temJustificativaAceitaNoDiaEscala', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('retorna true quando existe ACEITA no dia civil da escala', async () => {
+    mockJustificativaFindFirst.mockResolvedValue({ id: justId });
+
+    const ok = await temJustificativaAceitaNoDiaEscala(
+      tenantId,
+      medicoId,
+      escalaId,
+      new Date('2026-08-10T10:00:00')
+    );
+
+    expect(ok).toBe(true);
+    expect(mockJustificativaFindFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          tenantId,
+          medicoId,
+          escalaId,
+          status: 'ACEITA',
+        }),
+      })
+    );
+  });
+
+  it('retorna false quando não há ACEITA', async () => {
+    mockJustificativaFindFirst.mockResolvedValue(null);
+
+    const ok = await temJustificativaAceitaNoDiaEscala(
+      tenantId,
+      medicoId,
+      escalaId,
+      new Date('2026-08-10T10:00:00')
+    );
+
+    expect(ok).toBe(false);
   });
 });
