@@ -75,7 +75,6 @@ async function sendTextGo(numberE164: string, text: string): Promise<SendTextRes
     throw new Error(`Evolution GO ${res.status}: ${await parseEvolutionError(res)}`);
   }
 
-  let messageId: string | undefined;
   let body: { messageId?: string; error?: string; data?: { Info?: { ID?: string } } };
   try {
     body = (await res.json()) as typeof body;
@@ -85,7 +84,7 @@ async function sendTextGo(numberE164: string, text: string): Promise<SendTextRes
   if (body.error) {
     throw new Error(`Evolution GO: ${body.error}`);
   }
-  messageId = body.messageId || body.data?.Info?.ID;
+  const messageId = body.messageId || body.data?.Info?.ID;
 
   return { ok: true, provider: 'go', messageId };
 }

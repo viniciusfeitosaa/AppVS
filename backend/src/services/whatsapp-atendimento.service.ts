@@ -239,7 +239,7 @@ export function parseContactInfo(
 
   for (const line of lines) {
     const match = line.match(
-      /^(nome|crm|local|email|e-mail|faculdade|duvida|dúvida)\s*[:=\-]\s*(.+)$/i
+      /^(nome|crm|local|email|e-mail|faculdade|duvida|dúvida)\s*[:=-]\s*(.+)$/i
     );
     if (!match) continue;
     const value = match[2].trim();
