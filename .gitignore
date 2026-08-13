@@ -79,3 +79,4 @@ backend/uploads/
 
 # Obsidian — layout de janelas (opcional por máquina; workspace.json versionado no vault)
 contexto/.obsidian/workspace-mobile.json
+.worktrees
