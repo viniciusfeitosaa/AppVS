@@ -17,6 +17,7 @@ import { MasterEscopoProvider } from './context/MasterEscopoContext';
 import { NotificationProvider } from './context/NotificationContext';
 import ProtectedRoute from './components/Layout/ProtectedRoute';
 import AppShell from './components/Layout/AppShell';
+import { PushBootstrap } from './components/PushBootstrap';
 import Login from './pages/Login';
 import Cadastro from './pages/Cadastro';
 import Dashboard from './pages/Dashboard';
@@ -44,6 +45,7 @@ import AcessoNegado from './pages/AcessoNegado';
 import Vagas from './pages/Vagas';
 import Avaliacao from './pages/Avaliacao';
 import ModuloEscalaMaster from './pages/ModuloEscalaMaster';
+import EnviarAvisoPush from './pages/EnviarAvisoPush';
 import {
   ConteudosAdminPage,
   ConteudosMedicoPage,
@@ -190,6 +192,14 @@ function AppRoutes() {
           element={<EnvioDocumentos />}
         />
         <Route
+          path="/enviar-aviso"
+          element={
+            <MasterOnly>
+              <EnviarAvisoPush />
+            </MasterOnly>
+          }
+        />
+        <Route
           path="/email"
           element={
             <MasterOnly>
@@ -221,6 +231,7 @@ function App() {
             future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
           >
             <div className="app-safe-root min-h-dvh">
+              <PushBootstrap />
               <AppRoutes />
             </div>
           </BrowserRouter>

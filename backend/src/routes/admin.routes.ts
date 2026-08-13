@@ -62,6 +62,7 @@ import {
   updateMedicoController,
   upsertRelatorioProcedimentosMesController,
 } from '../controllers/admin.controller';
+import { broadcastPushController } from '../controllers/push.controller';
 import {
   addEquipeToEscalaController,
   addMedicoToEquipeController,
@@ -260,6 +261,7 @@ router.post('/documentos-enviados', requireModuleAccess(ModuloSistema.ENVIO_DOCU
 router.delete('/documentos-enviados/:id', requireModuleAccess(ModuloSistema.ENVIO_DOCUMENTOS), deleteDocumentoEnviadoController);
 router.get('/acessos-modulos', requireModuleAccess(ModuloSistema.CONFIGURACOES), getMatrizAcessosModulosController);
 router.put('/acessos-modulos', requireModuleAccess(ModuloSistema.CONFIGURACOES), salvarMatrizAcessosModulosController);
+router.post('/push/broadcast', requireModuleAccess(ModuloSistema.CONFIGURACOES), broadcastPushController);
 router.get('/subgrupos', requireModuleAccess(ModuloSistema.MEDICOS), listSubgruposController);
 router.post('/subgrupos', requireModuleAccess(ModuloSistema.MEDICOS), createSubgrupoController);
 router.put('/subgrupos/:id', requireModuleAccess(ModuloSistema.MEDICOS), updateSubgrupoController);

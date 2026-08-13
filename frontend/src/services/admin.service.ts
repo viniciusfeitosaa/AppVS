@@ -986,4 +986,13 @@ export const adminService = {
     );
     return response.data;
   },
+
+  broadcastPush: async (payload: { titulo: string; corpo: string }) => {
+    const response = await api.post<{
+      success: boolean;
+      message?: string;
+      data?: { enviados: number };
+    }>('/admin/push/broadcast', payload);
+    return response.data;
+  },
 };

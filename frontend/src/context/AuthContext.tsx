@@ -129,6 +129,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   };
 
   const logout = () => {
+    void import('../lib/pushNotifications').then(({ stopPushNotifications }) =>
+      stopPushNotifications()
+    );
     queryClient.clear();
     localStorage.removeItem('user');
     localStorage.removeItem('accessToken');

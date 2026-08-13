@@ -7,6 +7,7 @@ import { connectDatabase, disconnectDatabase } from './config/database';
 import { connectRedis, disconnectRedis } from './config/redis';
 import { markShuttingDown } from './config/shutdown';
 import { startEmailQueue, stopEmailQueue } from './jobs/email-queue';
+import { startPushQueue, stopPushQueue } from './jobs/push-queue';
 import { safeLogger } from './utils/safe-logger';
 
 const PORT = parseInt(env.PORT) || 3001;
@@ -44,7 +45,10 @@ function startServer() {
       console.log(`🌐 Escutando em 0.0.0.0 (necessário para Render)`);
       connectDatabaseInBackground();
       void connectRedis().then((ok) => {
-        if (ok) startEmailQueue();
+        if (ok) {
+          startEmailQueue();
+          startPushQueue();
+        }
       });
     });
 
@@ -57,6 +61,7 @@ function startServer() {
       server.close(async () => {
         safeLogger.info('Servidor HTTP encerrado (sem novas conexões)');
         await stopEmailQueue();
+        await stopPushQueue();
         await disconnectRedis();
         await disconnectDatabase();
         process.exit(0);

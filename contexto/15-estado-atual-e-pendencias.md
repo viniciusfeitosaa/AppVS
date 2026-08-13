@@ -1,7 +1,7 @@
 ﻿# 15 — Estado atual e pendências
 
-**Snapshot:** 2026-08-07  
-**Branch:** `main` (ambiente VPS; entrega avaliação por conteúdo em produção)
+**Snapshot:** 2026-08-13  
+**Branch:** `main` (push FCM no código + Firebase/APNs configurados; falta VPS + builds store)
 
 > Este arquivo deve ser o **primeiro** atualizado após entregas relevantes.  
 > É o **mapa de bordo** do projeto (o que está pronto, o que falta, histórico recente).
@@ -9,7 +9,8 @@
 ## Resumo executivo
 
 O **Viva Saúde** está em produção na VPS (`sejavivasaude.com.br`). Auth, escalas, ponto, vagas, documentos, relatórios, painel de e-mail, robô WhatsApp (Evolution GO), mobile e deploy estão implementados.  
-**Conteúdos / eventos** inclui anúncio, inscrição, frequência, **avaliação por conteúdo** (perguntas customizadas + switch na frequência) e **pipeline de precadastro → aceite → cadastro ATIVO no corpo clínico (sem Avaliação)**.
+**Conteúdos / eventos** inclui anúncio, inscrição, frequência, **avaliação por conteúdo** (perguntas customizadas + switch na frequência) e **pipeline de precadastro → aceite → cadastro ATIVO no corpo clínico (sem Avaliação)**.  
+**Push notifications** (FCM + BullMQ): código mergeado; Firebase/APNs (dev+prod) ok no Console; **falta service account + migration na VPS e novo AAB/IPA** — checklist em `12-mobile-capacitor.md`.
 
 ## Módulos — status
 
@@ -28,6 +29,7 @@ O **Viva Saúde** está em produção na VPS (`sejavivasaude.com.br`). Auth, esc
 | Painel de E-mail | ✅ | ✅ | NF / demonstrativos com PDF anexo + 2 tipos de competência |
 | WhatsApp (Evolution GO) | ✅ | — | Menu atendimento; pausar/retomar (equipe) |
 | Conteúdos / eventos | ✅ | ✅ | Anúncio, frequência, **avaliação custom por evento**, precadastro→aceite→corpo clínico — `17-conteudos-eventos.md` |
+| Mobile / Capacitor | ✅ | ✅ | Push FCM; Firebase/APNs ok; falta VPS + store — `12-mobile-capacitor.md` |
 | Configurações / módulos | ✅ | ✅ | Matriz de acesso |
 | Avaliação (master) | ✅ | ✅ | Só cadastro público `/cadastro` (não precadastro aceito) |
 | Atendimentos | — | ⏳ Placeholder | `FeaturePlaceholder` |
@@ -62,10 +64,11 @@ Arquivos de referência: `schema.prisma` (`Escala`, `EscalaMedico`, `EscalaPlant
 
 ## Pendências prioritárias
 
-1. **Atendimentos** — definir escopo e implementar (hoje só placeholder)
-2. **Sincronizar README/CHECKLIST** ou marcar como arquivados apontando para `contexto/`
-3. **Harness** — manter esta pasta após cada feature (ver `16-como-atualizar.md`)
-4. **WhatsApp** — health no `/health` do backend (ping Evolution GO); painel master opcional (QR/status)
+1. **Push (VPS + store)** — copiar service account JSON; `FIREBASE_SERVICE_ACCOUNT_PATH` (ou `_JSON`); `prisma migrate deploy` (`device_push_tokens`); restart backend; novo AAB/IPA — ver checklist em `12-mobile-capacitor.md`
+2. **Atendimentos** — definir escopo e implementar (hoje só placeholder)
+3. **Sincronizar README/CHECKLIST** ou marcar como arquivados apontando para `contexto/`
+4. **Harness** — manter esta pasta após cada feature (ver `16-como-atualizar.md`)
+5. **WhatsApp** — health no `/health` do backend (ping Evolution GO); painel master opcional (QR/status)
 
 ## Pendências menores
 
@@ -79,6 +82,7 @@ Arquivos de referência: `schema.prisma` (`Escala`, `EscalaMedico`, `EscalaPlant
 
 | Data | Entrega |
 |------|---------|
+| 2026-08-13 | **Push notifications** FCM iOS/Android + BullMQ + broadcast Master; Firebase `viva-saude-d4644` + APNs; falta VPS — `12` |
 | 2026-08-12 | Conteúdos: aba **Palestrantes** no Master — lista, busca e detalhe (dados + conteúdos vinculados) |
 | 2026-08-07 | Conteúdos: **painel de resultados da avaliação** — stats por pergunta, textos e respostas individuais |
 | 2026-08-07 | Conteúdos: avaliação com tipo **questão (gabarito)** — opções + resposta correta no admin; gabarito oculto no app/link |

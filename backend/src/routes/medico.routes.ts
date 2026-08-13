@@ -22,6 +22,10 @@ import {
   deleteVagaMedicoController,
 } from '../controllers/medico.controller';
 import {
+  registerPushTokenController,
+  unregisterPushTokenController,
+} from '../controllers/push.controller';
+import {
   confirmarPresencaMedicoController,
   downloadCapaMedicoController,
   getEventoMedicoController,
@@ -98,6 +102,9 @@ router.post(
   requireRole([UserRole.MEDICO]),
   marcarTodasNotificacoesLidasMedicoController
 );
+
+router.post('/push/register', requireRole([UserRole.MEDICO]), registerPushTokenController);
+router.post('/push/unregister', requireRole([UserRole.MEDICO]), unregisterPushTokenController);
 
 router.get(
   '/dashboard',

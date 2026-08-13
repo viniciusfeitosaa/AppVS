@@ -49,5 +49,9 @@
 	<string>O Viva Saúde usa a câmera para registrar a foto no check-in do ponto eletrônico.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>O Viva Saúde usa sua localização para validar o registro de ponto no local autorizado.</string>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>remote-notification</string>
+	</array>
 </dict>
 </plist>

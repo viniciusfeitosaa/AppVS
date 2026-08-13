@@ -102,6 +102,7 @@ model Tenant {
   contratoEquipes         ContratoEquipe[]
   resetSenhaTokens        ResetSenhaToken[]
   notificacoesMedico      NotificacaoMedico[]
+  devicePushTokens        DevicePushToken[]
   solicitacoesTrocaPlantao SolicitacaoTrocaPlantao[]
   vagas                   Vaga[]
   vagaInteresses          VagaInteresse[]
@@ -229,6 +230,7 @@ model Medico {
   subgrupoMedicos SubgrupoMedico[]
   equipeMedicos   EquipeMedico[]
   notificacoes    NotificacaoMedico[]
+  devicePushTokens DevicePushToken[]
   solicitacoesTrocaComoSolicitante SolicitacaoTrocaPlantao[] @relation("SolicitacaoTrocaSolicitante")
   solicitacoesTrocaComoDestino     SolicitacaoTrocaPlantao[] @relation("SolicitacaoTrocaDestino")
   vagasPublicadas                Vaga[]
@@ -792,6 +794,25 @@ model NotificacaoMedico {
   @@map("notificacoes_medico")
   @@index([tenantId, medicoId, createdAt])
   @@index([medicoId, lidaEm])
+}
+
+/// Tokens FCM para push no app Capacitor (iOS/Android).
+model DevicePushToken {
+  id        String   @id @default(uuid())
+  tenantId  String   @map("tenant_id")
+  medicoId  String   @map("medico_id")
+  token     String   @db.VarChar(512)
+  platform  String   @db.VarChar(16) // ios | android
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  medico Medico @relation(fields: [medicoId], references: [id], onDelete: Cascade)
+
+  @@map("device_push_tokens")
+  @@unique([token])
+  @@index([tenantId, medicoId])
+  @@index([medicoId])
 }
 
 // Modelo de Sessão (Tokens JWT)

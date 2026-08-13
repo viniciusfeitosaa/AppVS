@@ -21,6 +21,11 @@ frontend/ios/App/build/
 frontend/android/.gradle/
 frontend/android/app/build/
 frontend/android/build/
+# Firebase / FCM — não versionar chaves reais
+frontend/android/app/google-services.json
+frontend/ios/App/App/GoogleService-Info.plist
+*.firebase-adminsdk*.json
+backend/secrets/
 
 # Gerado a partir de .env (ver scripts/write-capacitor-config.mjs)
 frontend/capacitor.config.json

@@ -1,0 +1,10 @@
+{
+  "_comment": "Substitua este arquivo pelo google-services.json baixado do Firebase Console (app Android). Não commitar o arquivo real com chaves.",
+  "project_info": {
+    "project_number": "REPLACE",
+    "project_id": "REPLACE",
+    "storage_bucket": "REPLACE.appspot.com"
+  },
+  "client": [],
+  "configuration_version": "1"
+}

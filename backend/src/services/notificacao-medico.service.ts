@@ -1,4 +1,7 @@
+import { Prisma } from '@prisma/client';
 import { prisma } from '../config/database';
+import { enqueuePushJob } from '../jobs/push-queue';
+import { pathForNotificacaoTipo } from '../utils/push-deep-link.util';
 
 export const TIPO_NOTIFICACAO = {
   EQUIPE_VINCULO: 'EQUIPE_VINCULO',
@@ -7,7 +10,48 @@ export const TIPO_NOTIFICACAO = {
   ESCALA_EQUIPE_VINCULO: 'ESCALA_EQUIPE_VINCULO',
   TROCA_PLANTAO_SOLICITADA: 'TROCA_PLANTAO_SOLICITADA',
   BOAS_VINDAS: 'BOAS_VINDAS',
+  AVISO_ADMIN: 'AVISO_ADMIN',
 } as const;
+
+type NotifCreateInput = {
+  tenantId: string;
+  medicoId: string;
+  tipo: string;
+  titulo: string;
+  corpo: string;
+  metadata?: Prisma.InputJsonValue;
+};
+
+/** Persiste notificação in-app e enfileira push FCM (BullMQ). */
+export async function criarNotificacaoComPush(data: NotifCreateInput) {
+  const row = await prisma.notificacaoMedico.create({
+    data: {
+      tenantId: data.tenantId,
+      medicoId: data.medicoId,
+      tipo: data.tipo,
+      titulo: data.titulo,
+      corpo: data.corpo,
+      metadata: data.metadata ?? undefined,
+    },
+  });
+  void enqueuePushJob({
+    tenantId: row.tenantId,
+    medicoId: row.medicoId,
+    notificacaoId: row.id,
+    tipo: row.tipo,
+    titulo: row.titulo,
+    corpo: row.corpo,
+    path: pathForNotificacaoTipo(row.tipo),
+  }).catch((err) => {
+    console.error('[notificacao] enqueue push falhou:', err?.message ?? err);
+  });
+  return row;
+}
+
+async function criarNotificacoesComPushMany(items: NotifCreateInput[]) {
+  if (items.length === 0) return;
+  await Promise.all(items.map((item) => criarNotificacaoComPush(item)));
+}
 
 /** Após marcada como lida, a notificação é removida do banco após este período (menos linhas, consultas mais leves). */
 export const RETENCAO_MS_NOTIFICACAO_LIDA = 24 * 60 * 60 * 1000;
@@ -31,15 +75,13 @@ export async function notificarBoasVindasMedico(tenantId: string, medicoId: stri
   const marca = tenant?.nome?.trim() || 'COOPVITTA';
   const primeiro = nomeCompleto.trim().split(/\s+/)[0] || 'Profissional';
 
-  await prisma.notificacaoMedico.create({
-    data: {
-      tenantId,
-      medicoId,
-      tipo: TIPO_NOTIFICACAO.BOAS_VINDAS,
-      titulo: `Bem-vindo à ${marca}`,
-      corpo: `Olá, ${primeiro}! Sua conta está ativa. Use o painel para ponto eletrônico, documentos e informações da sua escala. Estamos felizes em tê-lo(a) na equipe.`,
-      metadata: { origem: 'cadastro' as const },
-    },
+  await criarNotificacaoComPush({
+    tenantId,
+    medicoId,
+    tipo: TIPO_NOTIFICACAO.BOAS_VINDAS,
+    titulo: `Bem-vindo à ${marca}`,
+    corpo: `Olá, ${primeiro}! Sua conta está ativa. Use o painel para ponto eletrônico, documentos e informações da sua escala. Estamos felizes em tê-lo(a) na equipe.`,
+    metadata: { origem: 'cadastro' as const },
   });
 }
 
@@ -49,15 +91,13 @@ export async function notificarMedicoVinculoEquipe(
   equipeNome: string,
   equipeId: string
 ) {
-  await prisma.notificacaoMedico.create({
-    data: {
-      tenantId,
-      medicoId,
-      tipo: TIPO_NOTIFICACAO.EQUIPE_VINCULO,
-      titulo: 'Você entrou em uma equipe',
-      corpo: `Você foi adicionado à equipe "${equipeNome}".`,
-      metadata: { equipeId, equipeNome },
-    },
+  await criarNotificacaoComPush({
+    tenantId,
+    medicoId,
+    tipo: TIPO_NOTIFICACAO.EQUIPE_VINCULO,
+    titulo: 'Você entrou em uma equipe',
+    corpo: `Você foi adicionado à equipe "${equipeNome}".`,
+    metadata: { equipeId, equipeNome },
   });
 }
 
@@ -67,15 +107,13 @@ export async function notificarMedicoVinculoSubgrupo(
   subgrupoNome: string,
   subgrupoId: string
 ) {
-  await prisma.notificacaoMedico.create({
-    data: {
-      tenantId,
-      medicoId,
-      tipo: TIPO_NOTIFICACAO.SUBGRUPO_VINCULO,
-      titulo: 'Novo vínculo de subgrupo',
-      corpo: `Você foi vinculado ao subgrupo "${subgrupoNome}".`,
-      metadata: { subgrupoId, subgrupoNome },
-    },
+  await criarNotificacaoComPush({
+    tenantId,
+    medicoId,
+    tipo: TIPO_NOTIFICACAO.SUBGRUPO_VINCULO,
+    titulo: 'Novo vínculo de subgrupo',
+    corpo: `Você foi vinculado ao subgrupo "${subgrupoNome}".`,
+    metadata: { subgrupoId, subgrupoNome },
   });
 }
 
@@ -102,16 +140,16 @@ export async function notificarMedicosNovaEscala(
   const titulo = 'Nova escala disponível';
   const corpo = `A escala "${escala.nome}" foi cadastrada no contrato "${contratoNome}". Confira em Escalas quando precisar.`;
 
-  await prisma.notificacaoMedico.createMany({
-    data: medicoIds.map((medicoId) => ({
+  await criarNotificacoesComPushMany(
+    medicoIds.map((medicoId) => ({
       tenantId,
       medicoId,
       tipo: TIPO_NOTIFICACAO.ESCALA_NOVA,
       titulo,
       corpo,
       metadata: { escalaId: escala.id, contratoAtivoId, escalaNome: escala.nome },
-    })),
-  });
+    }))
+  );
 }
 
 export async function notificarMedicosEquipeNaEscala(
@@ -131,16 +169,16 @@ export async function notificarMedicosEquipeNaEscala(
   const titulo = 'Sua equipe na escala';
   const corpo = `A equipe "${equipeNome}" passou a integrar a escala "${escalaNome}".`;
 
-  await prisma.notificacaoMedico.createMany({
-    data: medicoIds.map((medicoId) => ({
+  await criarNotificacoesComPushMany(
+    medicoIds.map((medicoId) => ({
       tenantId,
       medicoId,
       tipo: TIPO_NOTIFICACAO.ESCALA_EQUIPE_VINCULO,
       titulo,
       corpo,
       metadata: { escalaId, equipeId, escalaNome, equipeNome },
-    })),
-  });
+    }))
+  );
 }
 
 /** Notifica colega e solicitante ao pedir troca de plantão (sem alterar a escala no banco). */
@@ -202,41 +240,37 @@ export async function notificarTrocaPlantaoSolicitada(
     ? `Pedido enviado: você oferece trocar seu plantão de ${dataFmt} (${gradeLabel}) pelo plantão de ${destinoNome} em ${fmt(dataContrapartidaIso!)} (${gradeLabelContrapartida}), escala "${escalaNome}". Aguardando resposta.`
     : `Seu pedido de troca de plantão com ${destinoNome} foi registrado (${escalaNome}, ${dataFmt}, ${gradeLabel}). O profissional foi notificado.`;
 
-  await prisma.notificacaoMedico.create({
-    data: {
-      tenantId,
-      medicoId: medicoDestinoId,
-      tipo: TIPO_NOTIFICACAO.TROCA_PLANTAO_SOLICITADA,
-      titulo: ehPermuta ? 'Pedido de permuta de plantão' : 'Pedido de troca de plantão',
-      corpo: corpoDestino,
-      metadata: {
-        ...(solicitacaoId ? { solicitacaoId } : {}),
-        plantaoId,
-        ...(contrapartidaPlantaoId ? { contrapartidaPlantaoId } : {}),
-        escalaId,
-        medicoSolicitanteId,
-        medicoDestinoId,
-        papel: 'destino',
-      },
+  await criarNotificacaoComPush({
+    tenantId,
+    medicoId: medicoDestinoId,
+    tipo: TIPO_NOTIFICACAO.TROCA_PLANTAO_SOLICITADA,
+    titulo: ehPermuta ? 'Pedido de permuta de plantão' : 'Pedido de troca de plantão',
+    corpo: corpoDestino,
+    metadata: {
+      ...(solicitacaoId ? { solicitacaoId } : {}),
+      plantaoId,
+      ...(contrapartidaPlantaoId ? { contrapartidaPlantaoId } : {}),
+      escalaId,
+      medicoSolicitanteId,
+      medicoDestinoId,
+      papel: 'destino',
     },
   });
 
-  await prisma.notificacaoMedico.create({
-    data: {
-      tenantId,
-      medicoId: medicoSolicitanteId,
-      tipo: TIPO_NOTIFICACAO.TROCA_PLANTAO_SOLICITADA,
-      titulo: ehPermuta ? 'Permuta de plantão enviada' : 'Solicitação de troca enviada',
-      corpo: corpoSolicitante,
-      metadata: {
-        ...(solicitacaoId ? { solicitacaoId } : {}),
-        plantaoId,
-        ...(contrapartidaPlantaoId ? { contrapartidaPlantaoId } : {}),
-        escalaId,
-        medicoSolicitanteId,
-        medicoDestinoId,
-        papel: 'solicitante',
-      },
+  await criarNotificacaoComPush({
+    tenantId,
+    medicoId: medicoSolicitanteId,
+    tipo: TIPO_NOTIFICACAO.TROCA_PLANTAO_SOLICITADA,
+    titulo: ehPermuta ? 'Permuta de plantão enviada' : 'Solicitação de troca enviada',
+    corpo: corpoSolicitante,
+    metadata: {
+      ...(solicitacaoId ? { solicitacaoId } : {}),
+      plantaoId,
+      ...(contrapartidaPlantaoId ? { contrapartidaPlantaoId } : {}),
+      escalaId,
+      medicoSolicitanteId,
+      medicoDestinoId,
+      papel: 'solicitante',
     },
   });
 }
@@ -277,8 +311,8 @@ export async function notificarTrocaPlantaoAbertaEquipe(
   const corpoColega = `${solicitanteNome} abriu permuta com a equipe na escala "${escalaNome}": plantão dele no dia ${dataFmt} (${gradeLabel}). O primeiro a aceitar escolhe qual plantão seu permuta. Abra o painel para responder.`;
 
   if (colegaMedicoIds.length > 0) {
-    await prisma.notificacaoMedico.createMany({
-      data: colegaMedicoIds.map((medicoId) => ({
+    await criarNotificacoesComPushMany(
+      colegaMedicoIds.map((medicoId) => ({
         tenantId,
         medicoId,
         tipo: TIPO_NOTIFICACAO.TROCA_PLANTAO_SOLICITADA,
@@ -292,25 +326,23 @@ export async function notificarTrocaPlantaoAbertaEquipe(
           papel: 'destino_equipe' as const,
           paraEquipeInteira: true,
         },
-      })),
-    });
+      }))
+    );
   }
 
-  await prisma.notificacaoMedico.create({
-    data: {
-      tenantId,
-      medicoId: medicoSolicitanteId,
-      tipo: TIPO_NOTIFICACAO.TROCA_PLANTAO_SOLICITADA,
-      titulo: 'Pedido enviado à equipe',
-      corpo: `Seu pedido de permuta (${escalaNome}, ${dataFmt}) foi enviado à equipe. O primeiro colega a aceitar fecha a troca.`,
-      metadata: {
-        solicitacaoId,
-        plantaoId,
-        escalaId,
-        medicoSolicitanteId,
-        papel: 'solicitante_equipe' as const,
-        paraEquipeInteira: true,
-      },
+  await criarNotificacaoComPush({
+    tenantId,
+    medicoId: medicoSolicitanteId,
+    tipo: TIPO_NOTIFICACAO.TROCA_PLANTAO_SOLICITADA,
+    titulo: 'Pedido enviado à equipe',
+    corpo: `Seu pedido de permuta (${escalaNome}, ${dataFmt}) foi enviado à equipe. O primeiro colega a aceitar fecha a troca.`,
+    metadata: {
+      solicitacaoId,
+      plantaoId,
+      escalaId,
+      medicoSolicitanteId,
+      papel: 'solicitante_equipe' as const,
+      paraEquipeInteira: true,
     },
   });
 }
@@ -354,41 +386,37 @@ export async function notificarCederPlantaoParaColega(
 
   const corpoSolicitante = `Pedido de cessão enviado: você cede seu plantão de ${dataFmt} (${gradeLabel}) para ${destinoNome}, escala "${escalaNome}". Aguardando resposta.`;
 
-  await prisma.notificacaoMedico.create({
-    data: {
-      tenantId,
-      medicoId: medicoDestinoId,
-      tipo: TIPO_NOTIFICACAO.TROCA_PLANTAO_SOLICITADA,
-      titulo: 'Cessão de plantão',
-      corpo: corpoDestino,
-      metadata: {
-        solicitacaoId,
-        plantaoId,
-        escalaId,
-        medicoSolicitanteId,
-        medicoDestinoId,
-        papel: 'destino' as const,
-        tipoSolicitacao: 'CEDER' as const,
-      },
+  await criarNotificacaoComPush({
+    tenantId,
+    medicoId: medicoDestinoId,
+    tipo: TIPO_NOTIFICACAO.TROCA_PLANTAO_SOLICITADA,
+    titulo: 'Cessão de plantão',
+    corpo: corpoDestino,
+    metadata: {
+      solicitacaoId,
+      plantaoId,
+      escalaId,
+      medicoSolicitanteId,
+      medicoDestinoId,
+      papel: 'destino' as const,
+      tipoSolicitacao: 'CEDER' as const,
     },
   });
 
-  await prisma.notificacaoMedico.create({
-    data: {
-      tenantId,
-      medicoId: medicoSolicitanteId,
-      tipo: TIPO_NOTIFICACAO.TROCA_PLANTAO_SOLICITADA,
-      titulo: 'Cessão enviada',
-      corpo: corpoSolicitante,
-      metadata: {
-        solicitacaoId,
-        plantaoId,
-        escalaId,
-        medicoSolicitanteId,
-        medicoDestinoId,
-        papel: 'solicitante' as const,
-        tipoSolicitacao: 'CEDER' as const,
-      },
+  await criarNotificacaoComPush({
+    tenantId,
+    medicoId: medicoSolicitanteId,
+    tipo: TIPO_NOTIFICACAO.TROCA_PLANTAO_SOLICITADA,
+    titulo: 'Cessão enviada',
+    corpo: corpoSolicitante,
+    metadata: {
+      solicitacaoId,
+      plantaoId,
+      escalaId,
+      medicoSolicitanteId,
+      medicoDestinoId,
+      papel: 'solicitante' as const,
+      tipoSolicitacao: 'CEDER' as const,
     },
   });
 }
@@ -429,8 +457,8 @@ export async function notificarCederPlantaoAbertaEquipe(
   const corpoColega = `${solicitanteNome} cedeu o plantão do dia ${dataFmt} (${gradeLabel}) à equipe na escala "${escalaNome}". O primeiro a aceitar assume esse plantão (sem permuta). Abra o painel para responder.`;
 
   if (colegaMedicoIds.length > 0) {
-    await prisma.notificacaoMedico.createMany({
-      data: colegaMedicoIds.map((medicoId) => ({
+    await criarNotificacoesComPushMany(
+      colegaMedicoIds.map((medicoId) => ({
         tenantId,
         medicoId,
         tipo: TIPO_NOTIFICACAO.TROCA_PLANTAO_SOLICITADA,
@@ -445,26 +473,24 @@ export async function notificarCederPlantaoAbertaEquipe(
           paraEquipeInteira: true,
           tipoSolicitacao: 'CEDER' as const,
         },
-      })),
-    });
+      }))
+    );
   }
 
-  await prisma.notificacaoMedico.create({
-    data: {
-      tenantId,
-      medicoId: medicoSolicitanteId,
-      tipo: TIPO_NOTIFICACAO.TROCA_PLANTAO_SOLICITADA,
-      titulo: 'Cessão enviada à equipe',
-      corpo: `Seu pedido de cessão (${escalaNome}, ${dataFmt}) foi enviado à equipe. O primeiro colega a aceitar assume o plantão.`,
-      metadata: {
-        solicitacaoId,
-        plantaoId,
-        escalaId,
-        medicoSolicitanteId,
-        papel: 'solicitante_equipe' as const,
-        paraEquipeInteira: true,
-        tipoSolicitacao: 'CEDER' as const,
-      },
+  await criarNotificacaoComPush({
+    tenantId,
+    medicoId: medicoSolicitanteId,
+    tipo: TIPO_NOTIFICACAO.TROCA_PLANTAO_SOLICITADA,
+    titulo: 'Cessão enviada à equipe',
+    corpo: `Seu pedido de cessão (${escalaNome}, ${dataFmt}) foi enviado à equipe. O primeiro colega a aceitar assume o plantão.`,
+    metadata: {
+      solicitacaoId,
+      plantaoId,
+      escalaId,
+      medicoSolicitanteId,
+      papel: 'solicitante_equipe' as const,
+      paraEquipeInteira: true,
+      tipoSolicitacao: 'CEDER' as const,
     },
   });
 }
@@ -511,4 +537,40 @@ export async function marcarTodasNotificacoesLidasService(tenantId: string, medi
     where: { tenantId, medicoId, lidaEm: null },
     data: { lidaEm: new Date() },
   });
+}
+
+/** Aviso geral do Master para todos os médicos ativos do tenant. */
+export async function broadcastAvisoAdminService(
+  tenantId: string,
+  input: { titulo: string; corpo: string; masterId?: string }
+) {
+  const titulo = input.titulo.trim().slice(0, 200);
+  const corpo = input.corpo.trim().slice(0, 4000);
+  if (titulo.length < 3 || corpo.length < 3) {
+    throw { statusCode: 400, message: 'Título e corpo são obrigatórios (mín. 3 caracteres)' };
+  }
+
+  const medicos = await prisma.medico.findMany({
+    where: { tenantId, ativo: true },
+    select: { id: true },
+  });
+  if (medicos.length === 0) {
+    return { enviados: 0 };
+  }
+
+  await criarNotificacoesComPushMany(
+    medicos.map((m) => ({
+      tenantId,
+      medicoId: m.id,
+      tipo: TIPO_NOTIFICACAO.AVISO_ADMIN,
+      titulo,
+      corpo,
+      metadata: {
+        origem: 'broadcast_master' as const,
+        ...(input.masterId ? { masterId: input.masterId } : {}),
+      },
+    }))
+  );
+
+  return { enviados: medicos.length };
 }

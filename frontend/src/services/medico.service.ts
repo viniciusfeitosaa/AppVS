@@ -172,6 +172,17 @@ export const medicoService = {
     await api.post('/medico/notificacoes/marcar-todas-lidas');
   },
 
+  registerPushToken: async (payload: {
+    token: string;
+    platform: 'ios' | 'android';
+  }): Promise<void> => {
+    await api.post('/medico/push/register', payload);
+  },
+
+  unregisterPushToken: async (payload: { token?: string } = {}): Promise<void> => {
+    await api.post('/medico/push/unregister', payload);
+  },
+
   listVagas: async (): Promise<ListVagasMedicoResponse> => {
     const response = await api.get<ListVagasMedicoResponse>('/medico/vagas');
     return response.data;
