@@ -1,7 +1,7 @@
 # Design: Justificativa de ausência de ponto
 
 **Data:** 2026-08-13  
-**Status:** Aprovado em brainstorming (aguardando review do arquivo antes do plano)  
+**Status:** Aprovado (elegibilidade ampliada; plano em `docs/superpowers/plans/2026-08-13-justificativa-ausencia-ponto.md`)  
 **Etapa:** `contexto/07-ponto-eletronico.md`  
 **Abordagem:** Pedido separado (`JustificativaAusenciaPonto`) → aprovação Master → `RegistroPonto` com origem `JUSTIFICADO_SEM_PONTO`
 
