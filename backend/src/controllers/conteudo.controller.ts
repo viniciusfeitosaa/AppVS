@@ -4,7 +4,10 @@ import { ConteudoEventoStatus } from '@prisma/client';
 import {
   aceitarPrecadastrosAdminService,
   abrirFrequenciaAdminService,
+  aplicarTemplateAvaliacaoAdminService,
+  salvarAvaliacaoFormularioAdminService,
   confirmarPresencaMedicoService,
+  setAvaliacaoAtivaAdminService,
   convidarPalestranteAdminService,
   createEventoAdminService,
   deleteParticipanteAdminService,
@@ -14,6 +17,7 @@ import {
   getEventoAdminService,
   getEventoCapaPathAdminService,
   getEventoMedicoService,
+  getAvaliacaoResultadosAdminService,
   getPublicCadastroCorpoFormService,
   getPublicFrequenciaService,
   getPublicInscricaoFormService,
@@ -165,6 +169,58 @@ export const fecharFrequenciaAdminController = async (req: Request, res: Respons
   }
 };
 
+export const aplicarTemplateAvaliacaoAdminController = async (req: Request, res: Response) => {
+  try {
+    const data = await aplicarTemplateAvaliacaoAdminService(req.user!.tenantId, req.params.id);
+    return res.json({
+      success: true,
+      data,
+      message: 'Modelo de avaliação carregado e ativado',
+    });
+  } catch (error) {
+    return handleServiceError(res, error);
+  }
+};
+
+export const salvarAvaliacaoFormularioAdminController = async (req: Request, res: Response) => {
+  try {
+    const data = await salvarAvaliacaoFormularioAdminService(req.user!.tenantId, req.params.id, {
+      formulario: req.body?.formulario ?? req.body,
+      ativa: req.body?.ativa,
+    });
+    return res.json({
+      success: true,
+      data,
+      message: 'Avaliação salva',
+    });
+  } catch (error) {
+    return handleServiceError(res, error);
+  }
+};
+
+export const setAvaliacaoAtivaAdminController = async (req: Request, res: Response) => {
+  try {
+    const ativa = req.body?.ativa === true || req.body?.ativa === 'true';
+    const data = await setAvaliacaoAtivaAdminService(req.user!.tenantId, req.params.id, ativa);
+    return res.json({
+      success: true,
+      data,
+      message: ativa ? 'Avaliação ativada' : 'Avaliação desativada',
+    });
+  } catch (error) {
+    return handleServiceError(res, error);
+  }
+};
+
+export const getAvaliacaoResultadosAdminController = async (req: Request, res: Response) => {
+  try {
+    const data = await getAvaliacaoResultadosAdminService(req.user!.tenantId, req.params.id);
+    return res.json({ success: true, data });
+  } catch (error) {
+    return handleServiceError(res, error);
+  }
+};
+
 export const regenerarTokenAdminController = async (req: Request, res: Response) => {
   try {
     const raw = req.params.tipo;
@@ -224,7 +280,7 @@ export const aceitarPrecadastrosAdminController = async (req: Request, res: Resp
     return res.json({
       success: true,
       data,
-      message: `${data.aceitos} de ${data.total} precadastro(s) aceito(s)`,
+      message: `${data.aceitos} de ${data.total} pré-cadastro(s) aceito(s)`,
     });
   } catch (error) {
     return handleServiceError(res, error);
@@ -288,7 +344,12 @@ export const inscreverMedicoController = async (req: Request, res: Response) => 
 
 export const confirmarPresencaMedicoController = async (req: Request, res: Response) => {
   try {
-    const data = await confirmarPresencaMedicoService(req.user!.tenantId, req.user!.id, req.params.id);
+    const data = await confirmarPresencaMedicoService(
+      req.user!.tenantId,
+      req.user!.id,
+      req.params.id,
+      req.body?.respostas
+    );
     return res.json({
       success: true,
       data,
@@ -372,7 +433,11 @@ export const getPublicFrequenciaController = async (req: Request, res: Response)
 
 export const submitPublicFrequenciaController = async (req: Request, res: Response) => {
   try {
-    const data = await submitPublicFrequenciaService(req.params.token, req.body.email);
+    const data = await submitPublicFrequenciaService(
+      req.params.token,
+      req.body.email,
+      req.body.respostas
+    );
     return res.json({
       success: true,
       data,

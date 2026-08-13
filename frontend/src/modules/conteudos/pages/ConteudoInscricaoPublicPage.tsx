@@ -3,8 +3,23 @@ import { useParams } from 'react-router-dom';
 import { BrandLogo } from '../../../components/brand/BrandLogo';
 import { conteudoPublicService, type ConteudoEvento } from '../api/conteudo.service';
 import { maskCpf } from '../../../features/cadastro-coop/utils/masks';
+import { formatPalestranteNome } from '../utils/titulo-medico';
 
 type PerfilInscricao = 'MEDICO' | 'ESTUDANTE';
+
+function formatEventoQuando(iso: string) {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  const data = d.toLocaleDateString('pt-BR', {
+    weekday: 'long',
+    day: '2-digit',
+    month: 'long',
+    year: 'numeric',
+  });
+  const hora = d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+  const dataFmt = data.charAt(0).toUpperCase() + data.slice(1);
+  return `${dataFmt} às ${hora}`;
+}
 
 const ConteudoInscricaoPublicPage = () => {
   const { token } = useParams<{ token: string }>();
@@ -77,7 +92,7 @@ const ConteudoInscricaoPublicPage = () => {
       setSuccess(true);
     } catch (err: unknown) {
       const e2 = err as { response?: { data?: { error?: string } } };
-      setError(e2.response?.data?.error || 'Não foi possível concluir o precadastro');
+      setError(e2.response?.data?.error || 'Não foi possível concluir o pré-cadastro');
     }
   };
 
@@ -99,17 +114,21 @@ const ConteudoInscricaoPublicPage = () => {
         )}
 
         {evento && (
-          <p className="text-xs text-center text-viva-600">
-            {new Date(evento.iniciaEm).toLocaleString('pt-BR')}
-            {evento.palestrante ? ` · ${evento.palestrante.nome}` : ''}
-          </p>
+          <div className="text-center space-y-0.5">
+            {evento.palestrante?.nome ? (
+              <p className="text-sm font-medium text-viva-900">
+                {formatPalestranteNome(evento.palestrante.nome)}
+              </p>
+            ) : null}
+            <p className="text-xs text-viva-600">{formatEventoQuando(evento.iniciaEm)}</p>
+          </div>
         )}
 
         {loading ? (
           <p className="text-sm text-center text-viva-600">Carregando…</p>
         ) : success ? (
           <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 px-4 py-3 rounded text-sm">
-            Precadastro e inscrição confirmados. Em breve nossa equipe poderá entrar em contato.
+            Inscrição confirmada. Em breve nossa equipe poderá entrar em contato.
           </div>
         ) : !evento ? (
           <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded text-sm">

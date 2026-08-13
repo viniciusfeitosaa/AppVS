@@ -3,6 +3,11 @@ import { Link, Navigate, useParams } from 'react-router-dom';
 import { useState } from 'react';
 import { useAuth } from '../../../context/AuthContext';
 import { conteudoMedicoService } from '../api/conteudo.service';
+import {
+  AvaliacaoPerguntasForm,
+  type AvaliacaoFormulario,
+  type AvaliacaoRespostasMap,
+} from '../components/AvaliacaoPerguntasForm';
 
 const ConteudoMedicoDetalhePage = () => {
   const { user } = useAuth();
@@ -10,6 +15,7 @@ const ConteudoMedicoDetalhePage = () => {
   const queryClient = useQueryClient();
   const [msg, setMsg] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
+  const [respostas, setRespostas] = useState<AvaliacaoRespostasMap>({});
 
   if (user?.role === 'MASTER') {
     return <Navigate to="/conteudos" replace />;
@@ -43,7 +49,19 @@ const ConteudoMedicoDetalhePage = () => {
   const presencaMutation = useMutation({
     mutationFn: () => {
       if (!id) throw new Error('id');
-      return conteudoMedicoService.confirmarPresenca(id);
+      const form =
+        detailQuery.data?.avaliacaoAtiva && detailQuery.data.avaliacao
+          ? (detailQuery.data.avaliacao as AvaliacaoFormulario)
+          : null;
+      if (form) {
+        for (const p of form.perguntas) {
+          if (p.obrigatoria === false) continue;
+          if (!(respostas[p.id] || '').trim()) {
+            throw new Error(`Responda: ${p.texto}`);
+          }
+        }
+      }
+      return conteudoMedicoService.confirmarPresenca(id, form ? respostas : undefined);
     },
     onSuccess: async (res) => {
       setMsg(
@@ -55,12 +73,23 @@ const ConteudoMedicoDetalhePage = () => {
       await queryClient.invalidateQueries({ queryKey: ['medico', 'conteudos'] });
     },
     onError: (e: unknown) => {
+      if (e instanceof Error && e.message.startsWith('Responda:')) {
+        setErr(e.message);
+        return;
+      }
       const error = e as { response?: { data?: { error?: string } } };
       setErr(error.response?.data?.error || 'Não foi possível confirmar presença');
     },
   });
 
   const ev = detailQuery.data;
+  const formAvaliacao =
+    ev?.avaliacaoAtiva && ev.avaliacao ? (ev.avaliacao as AvaliacaoFormulario) : null;
+  const mostrarAvaliacao =
+    !!ev?.jaInscrito &&
+    !!ev?.frequenciaAberta &&
+    !!formAvaliacao &&
+    !ev.avaliadoEm;
 
   if (detailQuery.isLoading) {
     return <div className="p-6 text-sm text-viva-600">Carregando…</div>;
@@ -126,6 +155,17 @@ const ConteudoMedicoDetalhePage = () => {
         </div>
       )}
 
+      {mostrarAvaliacao && formAvaliacao && (
+        <div className="rounded-2xl border border-viva-200 bg-white p-4 sm:p-5 space-y-4">
+          <AvaliacaoPerguntasForm
+            form={formAvaliacao}
+            value={respostas}
+            onChange={setRespostas}
+            disabled={presencaMutation.isPending}
+          />
+        </div>
+      )}
+
       <div className="flex flex-wrap gap-2">
         {ev.status === 'PUBLICADO' && (
           <button
@@ -138,21 +178,30 @@ const ConteudoMedicoDetalhePage = () => {
           </button>
         )}
 
-        {ev.jaInscrito && ev.frequenciaAberta && !ev.presenteEm && (
-          <button
-            type="button"
-            disabled={presencaMutation.isPending}
-            onClick={() => presencaMutation.mutate()}
-            className="rounded-lg bg-emerald-700 text-white px-5 py-2.5 text-sm font-semibold disabled:opacity-50"
-          >
-            {presencaMutation.isPending ? 'Confirmando…' : 'Confirmar presença'}
-          </button>
-        )}
+        {ev.jaInscrito &&
+          ev.frequenciaAberta &&
+          (!ev.presenteEm || (formAvaliacao && !ev.avaliadoEm)) && (
+            <button
+              type="button"
+              disabled={presencaMutation.isPending}
+              onClick={() => presencaMutation.mutate()}
+              className="rounded-lg bg-emerald-700 text-white px-5 py-2.5 text-sm font-semibold disabled:opacity-50"
+            >
+              {presencaMutation.isPending
+                ? 'Confirmando…'
+                : formAvaliacao && !ev.presenteEm
+                  ? 'Confirmar presença e avaliação'
+                  : formAvaliacao && !ev.avaliadoEm
+                    ? 'Enviar avaliação'
+                    : 'Confirmar presença'}
+            </button>
+          )}
       </div>
 
       {ev.jaInscrito && ev.presenteEm && (
         <p className="text-sm text-emerald-800 rounded-xl bg-emerald-50 border border-emerald-100 px-4 py-3">
           Presença registrada às {new Date(ev.presenteEm).toLocaleString('pt-BR')}
+          {ev.avaliadoEm ? ' · Avaliação enviada' : ''}
         </p>
       )}
 

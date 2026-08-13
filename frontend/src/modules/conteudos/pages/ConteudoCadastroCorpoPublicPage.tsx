@@ -105,7 +105,7 @@ const ConteudoCadastroCorpoPublicPage = () => {
           </h1>
           {eventoTitulo && (
             <p className="text-sm text-viva-600 mt-1 text-center">
-              Via precadastro: {eventoTitulo}
+              Via pré-cadastro: {eventoTitulo}
             </p>
           )}
         </div>

@@ -14,6 +14,10 @@ import { CapaUploadField } from '../components/CapaUploadField';
 import { DateTimeField } from '../components/DateTimeField';
 import { LocalQrCode } from '../components/LocalQrCode';
 import { ShareLinkCard } from '../components/ShareLinkCard';
+import AvaliacaoEditorAdmin from '../components/AvaliacaoEditorAdmin';
+import AvaliacaoResultadosAdmin from '../components/AvaliacaoResultadosAdmin';
+import type { AvaliacaoFormulario } from '../components/AvaliacaoPerguntasForm';
+import { formatPalestranteNome } from '../utils/titulo-medico';
 
 function statusLabel(s: ConteudoEventoStatus) {
   if (s === 'PUBLICADO') return 'Inscrições abertas';
@@ -54,13 +58,14 @@ const ConteudosAdminPage = () => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [viewMode, setViewMode] = useState<'eventos' | 'precadastros'>('eventos');
+  const [viewMode, setViewMode] = useState<'eventos' | 'precadastros' | 'palestrantes'>('eventos');
   const [form, setForm] = useState(emptyForm);
   const [error, setError] = useState<string | null>(null);
   const [okMsg, setOkMsg] = useState<string | null>(null);
   const [palNome, setPalNome] = useState('');
   const [palEmail, setPalEmail] = useState('');
   const [palSearch, setPalSearch] = useState('');
+  const [palestrantesTabSearch, setPalestrantesTabSearch] = useState('');
   const [selectedPalId, setSelectedPalId] = useState('');
   const [palMode, setPalMode] = useState<'existente' | 'novo'>('existente');
   const [excluirParticipante, setExcluirParticipante] = useState<{
@@ -70,6 +75,7 @@ const ConteudosAdminPage = () => {
     email: string;
   } | null>(null);
   const [detalhePrecadastro, setDetalhePrecadastro] = useState<ConteudoPrecadastro | null>(null);
+  const [detalhePalestrante, setDetalhePalestrante] = useState<ConteudoPalestrante | null>(null);
   const [selectedPrecadastroIds, setSelectedPrecadastroIds] = useState<string[]>([]);
   const [confirmAceitar, setConfirmAceitar] = useState(false);
 
@@ -104,11 +110,29 @@ const ConteudosAdminPage = () => {
     enabled: !!selectedId,
   });
 
+  const avaliacaoResultadosQuery = useQuery({
+    queryKey: ['admin', 'conteudos', 'avaliacao-resultados', selectedId],
+    queryFn: async () => {
+      if (!selectedId) return null;
+      return (await conteudoAdminService.getAvaliacaoResultados(selectedId)).data.data;
+    },
+    enabled: !!selectedId && viewMode === 'eventos',
+    refetchInterval: 30_000,
+    refetchOnWindowFocus: true,
+  });
+
   const palestrantesQuery = useQuery({
     queryKey: ['admin', 'conteudos', 'palestrantes', palSearch],
     queryFn: async () =>
       (await conteudoAdminService.listPalestrantes(palSearch || undefined)).data.data,
     enabled: !!selectedId && viewMode === 'eventos',
+  });
+
+  const palestrantesListaQuery = useQuery({
+    queryKey: ['admin', 'conteudos', 'palestrantes-lista', palestrantesTabSearch],
+    queryFn: async () =>
+      (await conteudoAdminService.listPalestrantes(palestrantesTabSearch || undefined)).data.data,
+    enabled: !!user && user.role === 'MASTER' && !moduloOff && viewMode === 'palestrantes',
   });
 
   const precadastrosQuery = useQuery({
@@ -265,12 +289,44 @@ const ConteudosAdminPage = () => {
     },
   });
 
+  const avaliacaoSaveMutation = useMutation({
+    mutationFn: async (payload: { formulario: AvaliacaoFormulario; ativa: boolean }) => {
+      if (!selectedId) throw new Error('Sem id');
+      return conteudoAdminService.salvarAvaliacao(selectedId, payload);
+    },
+    onSuccess: async () => {
+      setError(null);
+      setOkMsg('Perguntas da avaliação salvas para este conteúdo');
+      await invalidate();
+    },
+    onError: (e: unknown) => {
+      const err = e as { response?: { data?: { error?: string } } };
+      setError(err.response?.data?.error || 'Falha ao salvar avaliação');
+    },
+  });
+
+  const avaliacaoAtivaMutation = useMutation({
+    mutationFn: async (ativa: boolean) => {
+      if (!selectedId) throw new Error('Sem id');
+      return conteudoAdminService.setAvaliacaoAtiva(selectedId, ativa);
+    },
+    onSuccess: async (_d, ativa) => {
+      setError(null);
+      setOkMsg(ativa ? 'Avaliação ativada na frequência' : 'Avaliação desativada');
+      await invalidate();
+    },
+    onError: (e: unknown) => {
+      const err = e as { response?: { data?: { error?: string } } };
+      setError(err.response?.data?.error || 'Falha ao alterar avaliação');
+    },
+  });
+
   const deleteParticipanteMutation = useMutation({
     mutationFn: (target: { eventoId: string; id: string }) =>
       conteudoAdminService.deleteParticipante(target.eventoId, target.id),
     onSuccess: async () => {
       setError(null);
-      setOkMsg('Participante excluído da lista e dos precadastros');
+      setOkMsg('Participante excluído da lista e dos pré-cadastros');
       setExcluirParticipante(null);
       await invalidate();
     },
@@ -289,7 +345,7 @@ const ConteudosAdminPage = () => {
       setOkMsg(
         falhas.length
           ? `${d.aceitos}/${d.total} aceitos. ${falhas.length} com erro (veja lista).`
-          : `${d.aceitos} precadastro(s) aceito(s) — e-mail com link de cadastro enviado.`
+          : `${d.aceitos} pré-cadastro(s) aceito(s) — e-mail com link de cadastro enviado.`
       );
       setSelectedPrecadastroIds([]);
       setConfirmAceitar(false);
@@ -297,7 +353,7 @@ const ConteudosAdminPage = () => {
     },
     onError: (e: unknown) => {
       const err = e as { response?: { data?: { error?: string } } };
-      setError(err.response?.data?.error || 'Falha ao aceitar precadastros');
+      setError(err.response?.data?.error || 'Falha ao aceitar pré-cadastros');
     },
   });
 
@@ -349,7 +405,16 @@ const ConteudosAdminPage = () => {
               viewMode === 'precadastros' ? 'bg-viva-800 text-white' : 'border border-viva-300 text-viva-800'
             }`}
           >
-            Precadastros
+            Pré-cadastros
+          </button>
+          <button
+            type="button"
+            onClick={() => setViewMode('palestrantes')}
+            className={`rounded-lg px-3 py-1.5 text-sm ${
+              viewMode === 'palestrantes' ? 'bg-viva-800 text-white' : 'border border-viva-300 text-viva-800'
+            }`}
+          >
+            Palestrantes
           </button>
         </div>
       </header>
@@ -368,7 +433,7 @@ const ConteudosAdminPage = () => {
         <section className="rounded-2xl border border-viva-200 bg-white overflow-hidden">
           <div className="px-4 py-3 border-b border-viva-100 flex flex-wrap items-start justify-between gap-3">
             <div>
-              <h2 className="font-semibold text-viva-900">Precadastros (candidatos ao corpo clínico)</h2>
+              <h2 className="font-semibold text-viva-900">Pré-cadastros (candidatos ao corpo clínico)</h2>
               <p className="text-xs text-viva-600 mt-1">
                 Ainda não estão no corpo clínico. Aceite um ou vários: enviamos e-mail com link para completar o
                 cadastro; ao concluir, o acesso é liberado na hora (sem Avaliação).
@@ -403,7 +468,7 @@ const ConteudosAdminPage = () => {
           {precadastrosQuery.isLoading ? (
             <p className="p-4 text-sm text-viva-600">Carregando…</p>
           ) : (precadastrosQuery.data || []).length === 0 ? (
-            <p className="p-4 text-sm text-viva-600">Nenhum precadastro ainda.</p>
+            <p className="p-4 text-sm text-viva-600">Nenhum pré-cadastro ainda.</p>
           ) : (
             <ul className="divide-y divide-viva-100">
               {(precadastrosQuery.data || []).map((p: ConteudoPrecadastro) => {
@@ -480,6 +545,89 @@ const ConteudosAdminPage = () => {
                   </li>
                 );
               })}
+            </ul>
+          )}
+        </section>
+      ) : viewMode === 'palestrantes' ? (
+        <section className="rounded-2xl border border-viva-200 bg-white overflow-hidden">
+          <div className="px-4 py-3 border-b border-viva-100 flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h2 className="font-semibold text-viva-900">Palestrantes</h2>
+              <p className="text-xs text-viva-600 mt-1">
+                Cadastros de quem já foi convidado ou vinculado a conteúdos. Clique para ver os dados
+                completos e em quais aulas participou.
+              </p>
+            </div>
+            <label className="block w-full sm:w-64">
+              <span className="sr-only">Buscar palestrante</span>
+              <input
+                className="w-full rounded-lg border border-viva-200 bg-white px-3 py-2 text-sm text-viva-900 shadow-sm outline-none transition focus:border-viva-500 focus:ring-2 focus:ring-viva-500/20"
+                placeholder="Buscar nome, e-mail, CRM…"
+                value={palestrantesTabSearch}
+                onChange={(e) => setPalestrantesTabSearch(e.target.value)}
+              />
+            </label>
+          </div>
+          {palestrantesListaQuery.isLoading ? (
+            <p className="p-4 text-sm text-viva-600">Carregando…</p>
+          ) : (palestrantesListaQuery.data || []).length === 0 ? (
+            <p className="p-4 text-sm text-viva-600">
+              {palestrantesTabSearch.trim()
+                ? 'Nenhum palestrante encontrado com essa busca.'
+                : 'Nenhum palestrante cadastrado ainda. Convide pelo detalhe de um evento.'}
+            </p>
+          ) : (
+            <ul className="divide-y divide-viva-100">
+              {(palestrantesListaQuery.data || []).map((p: ConteudoPalestrante) => (
+                <li key={p.id}>
+                  <button
+                    type="button"
+                    onClick={() => setDetalhePalestrante(p)}
+                    className="w-full px-4 py-3 text-left hover:bg-viva-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-viva-500/30"
+                  >
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div className="min-w-0 flex items-start gap-3">
+                        <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-viva-100 text-sm font-semibold text-viva-800">
+                          {(p.nome || '?').slice(0, 1).toUpperCase()}
+                        </span>
+                        <div className="min-w-0 space-y-0.5">
+                          <p className="text-sm font-medium text-viva-950 truncate">{p.nome}</p>
+                          <p className="text-xs text-viva-600 truncate">
+                            {[
+                              p.email,
+                              p.telefone,
+                              p.crm ? `CRM ${p.crm}` : null,
+                              p.especialidade,
+                            ]
+                              .filter(Boolean)
+                              .join(' · ')}
+                          </p>
+                          {(p.eventosCount ?? 0) > 0 && (
+                            <p className="text-[11px] text-viva-500">
+                              {p.eventosCount} conteúdo
+                              {(p.eventosCount ?? 0) === 1 ? '' : 's'}
+                              {p.eventos?.[0]
+                                ? ` · último: ${p.eventos[0].titulo}`
+                                : ''}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <span
+                          className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${
+                            p.status === 'COMPLETO'
+                              ? 'bg-emerald-100 text-emerald-800'
+                              : 'bg-amber-100 text-amber-900'
+                          }`}
+                        >
+                          {p.status === 'COMPLETO' ? 'Cadastro completo' : 'Aguardando formulário'}
+                        </span>
+                      </div>
+                    </div>
+                  </button>
+                </li>
+              ))}
             </ul>
           )}
         </section>
@@ -934,6 +1082,60 @@ const ConteudosAdminPage = () => {
                   )}
                 </div>
 
+                <div
+                  className={`flex flex-wrap items-center justify-between gap-3 rounded-xl border px-3 py-3 ${
+                    evento.avaliacaoAtiva
+                      ? 'border-sky-200 bg-sky-50/70'
+                      : 'border-viva-100 bg-viva-50/40'
+                  }`}
+                >
+                  <div className="min-w-0 space-y-0.5">
+                    <p className="text-sm font-semibold text-viva-950">
+                      Perguntas na tela de frequência
+                    </p>
+                    <p className="text-xs text-viva-600 leading-relaxed">
+                      {evento.avaliacaoAtiva
+                        ? 'Ativo: ao confirmar presença, as perguntas da avaliação são exibidas.'
+                        : evento.avaliacao?.perguntas?.length
+                          ? 'Desligado: só registra presença, sem mostrar as perguntas.'
+                          : 'Desligado. Crie e salve as perguntas em “Avaliação da aula” para poder ativar.'}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={!!evento.avaliacaoAtiva}
+                    aria-label="Mostrar perguntas na frequência"
+                    disabled={
+                      avaliacaoAtivaMutation.isPending ||
+                      (!evento.avaliacaoAtiva && !evento.avaliacao?.perguntas?.length)
+                    }
+                    title={
+                      !evento.avaliacao?.perguntas?.length
+                        ? 'Salve ao menos uma pergunta em Avaliação da aula'
+                        : undefined
+                    }
+                    onClick={() => {
+                      if (!evento.avaliacao?.perguntas?.length && !evento.avaliacaoAtiva) {
+                        setError(
+                          'Crie e salve as perguntas em “Avaliação da aula” antes de ativar.'
+                        );
+                        return;
+                      }
+                      avaliacaoAtivaMutation.mutate(!evento.avaliacaoAtiva);
+                    }}
+                    className={`relative inline-flex h-8 w-14 shrink-0 items-center rounded-full transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-viva-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 ${
+                      evento.avaliacaoAtiva ? 'bg-sky-600' : 'bg-slate-300'
+                    }`}
+                  >
+                    <span
+                      className={`inline-block h-6 w-6 transform rounded-full bg-white shadow transition-transform duration-200 ease-out ${
+                        evento.avaliacaoAtiva ? 'translate-x-7' : 'translate-x-1'
+                      }`}
+                    />
+                  </button>
+                </div>
+
                 {evento.linkFrequencia && (
                   <ShareLinkCard
                     label="Link público de frequência"
@@ -985,6 +1187,61 @@ const ConteudosAdminPage = () => {
               </article>
 
               <article className="rounded-2xl border border-viva-200 bg-white p-4 shadow-[0_8px_24px_rgba(26,64,17,0.03)] sm:p-5 space-y-4">
+                <header className="space-y-1">
+                  <h3 className="font-display text-lg font-semibold text-viva-950">
+                    Avaliação da aula
+                  </h3>
+                  <p className="text-xs text-viva-600 leading-relaxed">
+                    Monte as perguntas deste conteúdo. O switch em <strong>Frequência</strong> define se
+                    elas aparecem (ou não) na tela de presença.
+                  </p>
+                </header>
+
+                <AvaliacaoEditorAdmin
+                  key={`avaliacao-editor-${evento.id}-${evento.updatedAt || ''}`}
+                  initial={(evento.avaliacao as AvaliacaoFormulario | null) || null}
+                  metaSugerida={{
+                    tema: evento.titulo,
+                    palestrante: evento.palestrante?.nome
+                      ? formatPalestranteNome(evento.palestrante.nome)
+                      : '',
+                  }}
+                  busy={avaliacaoSaveMutation.isPending}
+                  onSave={(formulario) =>
+                    avaliacaoSaveMutation.mutate({
+                      formulario,
+                      ativa: !!evento.avaliacaoAtiva,
+                    })
+                  }
+                />
+              </article>
+
+              <article className="rounded-2xl border border-viva-200 bg-white p-4 shadow-[0_8px_24px_rgba(26,64,17,0.03)] sm:p-5 space-y-4">
+                <header className="flex flex-wrap items-end justify-between gap-2">
+                  <div className="space-y-1">
+                    <h3 className="font-display text-lg font-semibold text-viva-950">
+                      Resultados da avaliação
+                    </h3>
+                    <p className="text-xs text-viva-600 leading-relaxed">
+                      Estatísticas por pergunta, mensagens em texto e respostas de cada participante.
+                    </p>
+                  </div>
+                  {avaliacaoResultadosQuery.data && (
+                    <span className="rounded-full bg-sky-50 px-2.5 py-1 text-xs font-semibold text-sky-900 ring-1 ring-sky-100">
+                      {avaliacaoResultadosQuery.data.resumo.avaliaram} avaliação
+                      {avaliacaoResultadosQuery.data.resumo.avaliaram === 1 ? '' : 'ões'}
+                    </span>
+                  )}
+                </header>
+
+                <AvaliacaoResultadosAdmin
+                  data={avaliacaoResultadosQuery.data}
+                  loading={avaliacaoResultadosQuery.isFetching}
+                  onRefresh={() => avaliacaoResultadosQuery.refetch()}
+                />
+              </article>
+
+              <article className="rounded-2xl border border-viva-200 bg-white p-4 shadow-[0_8px_24px_rgba(26,64,17,0.03)] sm:p-5 space-y-4">
                 <header className="flex flex-wrap items-end justify-between gap-2">
                   <div className="space-y-1">
                     <h3 className="font-display text-lg font-semibold text-viva-950">Participantes</h3>
@@ -1002,7 +1259,7 @@ const ConteudosAdminPage = () => {
                 {evento.linkInscricao && (
                   <ShareLinkCard
                     label="Link público de inscrição"
-                    description="Para quem não está no app — gera precadastro com dados mínimos."
+                    description="Para quem não está no app — gera pré-cadastro com dados mínimos."
                     url={evento.linkInscricao}
                     disabledHint={
                       evento.status !== 'PUBLICADO'
@@ -1055,12 +1312,13 @@ const ConteudosAdminPage = () => {
                                 : p.presencaOrigem === 'LINK_PUBLICO'
                                   ? ' · link'
                                   : ''}
+                              {p.avaliadoEm ? ' · avaliou a aula' : ''}
                             </p>
                           )}
                         </div>
                         <div className="shrink-0 flex flex-col items-end gap-1">
                           <span className="rounded-full bg-viva-50 px-2 py-0.5 text-[11px] font-semibold text-viva-700">
-                            {p.origem === 'MEDICO' ? 'App' : 'Precadastro'}
+                            {p.origem === 'MEDICO' ? 'App' : 'Pré-cadastro'}
                           </span>
                           <span
                             className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${
@@ -1097,6 +1355,116 @@ const ConteudosAdminPage = () => {
       </div>
       )}
 
+      {detalhePalestrante && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50"
+          onClick={() => setDetalhePalestrante(null)}
+          role="presentation"
+        >
+          <div
+            className="bg-white rounded-2xl shadow-xl max-w-lg w-full p-6 border border-viva-100 max-h-[90vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="detalhe-palestrante-titulo"
+          >
+            <header className="mb-4 space-y-1">
+              <h3 id="detalhe-palestrante-titulo" className="text-lg font-semibold text-viva-950">
+                Dados do palestrante
+              </h3>
+              <p className="text-sm text-viva-800 font-medium">{detalhePalestrante.nome}</p>
+            </header>
+
+            <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-3 text-sm">
+              {(
+                [
+                  ['E-mail', detalhePalestrante.email],
+                  ['Telefone', detalhePalestrante.telefone || '—'],
+                  ['CPF', detalhePalestrante.cpf || '—'],
+                  ['CRM', detalhePalestrante.crm || '—'],
+                  ['Especialidade', detalhePalestrante.especialidade || '—'],
+                  [
+                    'Status',
+                    detalhePalestrante.status === 'COMPLETO'
+                      ? 'Cadastro completo'
+                      : 'Aguardando formulário',
+                  ],
+                  [
+                    'Vinculado a médico do app',
+                    detalhePalestrante.medicoId ? 'Sim' : 'Não',
+                  ],
+                  [
+                    'Cadastrado em',
+                    detalhePalestrante.createdAt
+                      ? new Date(detalhePalestrante.createdAt).toLocaleString('pt-BR')
+                      : '—',
+                  ],
+                ] as Array<[string, string]>
+              ).map(([label, value]) => (
+                <div key={label} className={label === 'E-mail' ? 'sm:col-span-2' : undefined}>
+                  <dt className="text-[11px] font-medium text-viva-600">{label}</dt>
+                  <dd className="text-viva-950 mt-0.5 break-words">{value}</dd>
+                </div>
+              ))}
+            </dl>
+
+            {detalhePalestrante.bio && (
+              <div className="mt-4 rounded-xl border border-viva-100 bg-viva-50/50 p-3">
+                <p className="text-[11px] font-medium text-viva-600 mb-1">Bio</p>
+                <p className="text-sm text-viva-900 whitespace-pre-wrap">{detalhePalestrante.bio}</p>
+              </div>
+            )}
+
+            <div className="mt-4 space-y-2">
+              <p className="text-xs font-semibold text-viva-800">
+                Conteúdos ({detalhePalestrante.eventosCount ?? detalhePalestrante.eventos?.length ?? 0})
+              </p>
+              {(detalhePalestrante.eventos || []).length === 0 ? (
+                <p className="text-xs text-viva-600">Ainda não vinculado a nenhum conteúdo.</p>
+              ) : (
+                <ul className="max-h-40 overflow-y-auto divide-y divide-viva-100 rounded-xl border border-viva-100">
+                  {(detalhePalestrante.eventos || []).map((ev) => (
+                    <li key={ev.id} className="px-3 py-2 text-sm">
+                      <p className="font-medium text-viva-950">{ev.titulo}</p>
+                      <p className="text-[11px] text-viva-600">
+                        {new Date(ev.iniciaEm).toLocaleString('pt-BR')} ·{' '}
+                        {statusLabel(ev.status)}
+                      </p>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+
+            <div className="mt-5 flex flex-wrap justify-end gap-2">
+              {(detalhePalestrante.eventos || [])[0] && (
+                <button
+                  type="button"
+                  className="rounded-lg bg-viva-800 px-4 py-2 text-sm font-semibold text-white hover:bg-viva-900"
+                  onClick={() => {
+                    const evId = detalhePalestrante.eventos![0]!.id;
+                    setDetalhePalestrante(null);
+                    setViewMode('eventos');
+                    setSelectedId(evId);
+                    setOkMsg(null);
+                    setError(null);
+                  }}
+                >
+                  Abrir último conteúdo
+                </button>
+              )}
+              <button
+                type="button"
+                className="rounded-lg border border-viva-300 px-4 py-2 text-sm font-medium text-viva-800 hover:bg-viva-50"
+                onClick={() => setDetalhePalestrante(null)}
+              >
+                Fechar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {detalhePrecadastro && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50"
@@ -1112,7 +1480,7 @@ const ConteudosAdminPage = () => {
           >
             <header className="mb-4 space-y-1">
               <h3 id="detalhe-precadastro-titulo" className="text-lg font-semibold text-viva-950">
-                Dados do precadastro
+                Dados do pré-cadastro
               </h3>
               <p className="text-sm text-viva-800 font-medium">{detalhePrecadastro.nome}</p>
             </header>
@@ -1251,7 +1619,7 @@ const ConteudosAdminPage = () => {
             aria-labelledby="aceitar-precadastro-titulo"
           >
             <h3 id="aceitar-precadastro-titulo" className="text-lg font-semibold text-viva-950 mb-2">
-              Aceitar precadastro{selectedPrecadastroIds.length > 1 ? 's' : ''}?
+              Aceitar pré-cadastro{selectedPrecadastroIds.length > 1 ? 's' : ''}?
             </h3>
             <p className="text-sm text-viva-700 mb-3">
               {selectedPrecadastroIds.length} pessoa(s) receberão e-mail com link para completar o cadastro.
@@ -1304,8 +1672,8 @@ const ConteudosAdminPage = () => {
             </p>
             <p className="text-xs text-viva-600 mb-1">{excluirParticipante.email}</p>
             <p className="text-sm text-viva-600 mb-5">
-              A pessoa será removida da lista de participantes deste conteúdo e, se for precadastro,
-              também da lista unificada de precadastros. Esta ação não pode ser desfeita.
+              A pessoa será removida da lista de participantes deste conteúdo e, se for pré-cadastro,
+              também da lista unificada de pré-cadastros. Esta ação não pode ser desfeita.
             </p>
             <div className="flex flex-wrap gap-2 justify-end">
               <button

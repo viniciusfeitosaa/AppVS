@@ -15,6 +15,15 @@ export type ConteudoPalestrante = {
   especialidade?: string | null;
   medicoId?: string | null;
   status: ConteudoPalestranteStatus;
+  createdAt?: string;
+  updatedAt?: string;
+  eventosCount?: number;
+  eventos?: Array<{
+    id: string;
+    titulo: string;
+    iniciaEm: string;
+    status: ConteudoEventoStatus;
+  }>;
 };
 
 export type ConteudoEvento = {
@@ -37,6 +46,22 @@ export type ConteudoEvento = {
   frequenciaAberta?: boolean;
   frequenciaAbertaEm?: string | null;
   frequenciaFechadaEm?: string | null;
+  avaliacaoAtiva?: boolean;
+  avaliacao?: {
+    titulo: string;
+    subtitulo?: string | null;
+    meta?: { tema?: string; palestrante?: string } | null;
+    perguntas: Array<{
+      id: string;
+      tipo: 'estrelas' | 'radio' | 'texto' | 'quiz';
+      texto: string;
+      obrigatoria?: boolean;
+      opcoes?: Array<{ valor: string; label: string }>;
+      respostaCorreta?: string;
+    }>;
+  } | null;
+  avaliadoEm?: string | null;
+  precisaAvaliacao?: boolean;
   tokenPalestrante?: string;
   tokenInscricao?: string;
   tokenFrequencia?: string;
@@ -67,6 +92,8 @@ export type ConteudoParticipante = {
   consentimentoLgpd: boolean;
   presenteEm?: string | null;
   presencaOrigem?: 'APP' | 'LINK_PUBLICO' | null;
+  avaliacaoRespostas?: Record<string, string | number> | null;
+  avaliadoEm?: string | null;
   createdAt: string;
 };
 
@@ -110,6 +137,44 @@ export type CreateEventoPayload = {
   descricao?: string | null;
   palestranteId?: string | null;
   status?: ConteudoEventoStatus;
+};
+
+export type AvaliacaoResultadosPayload = {
+  eventoId: string;
+  titulo: string;
+  avaliacaoAtiva: boolean;
+  formulario: ConteudoEvento['avaliacao'];
+  resumo: {
+    inscritos: number;
+    presentes: number;
+    avaliaram: number;
+    taxaRespostaPresentes: number | null;
+  };
+  perguntas: Array<{
+    id: string;
+    tipo: string;
+    texto: string;
+    totalRespostas: number;
+    opcoes?: Array<{ valor: string; label: string; total: number; pct: number }>;
+    mediaEstrelas?: number | null;
+    acertos?: { total: number; corretos: number; pct: number } | null;
+    respostaCorreta?: string;
+    textos?: Array<{
+      participanteId: string;
+      nome: string;
+      email: string;
+      resposta: string;
+      avaliadoEm: string;
+    }>;
+  }>;
+  respostas: Array<{
+    participanteId: string;
+    nome: string;
+    email: string;
+    origem: string;
+    avaliadoEm: string;
+    respostas: Record<string, string>;
+  }>;
 };
 
 export const conteudoAdminService = {
@@ -158,6 +223,27 @@ export const conteudoAdminService = {
     api.post<{ success: boolean; data: ConteudoEvento }>(
       `/admin/conteudos/eventos/${id}/frequencia/fechar`
     ),
+  aplicarTemplateAvaliacao: (id: string) =>
+    api.post<{ success: boolean; data: ConteudoEvento }>(
+      `/admin/conteudos/eventos/${id}/avaliacao/template-viva-atualiza`
+    ),
+  salvarAvaliacao: (
+    id: string,
+    payload: { formulario: ConteudoEvento['avaliacao']; ativa?: boolean }
+  ) =>
+    api.put<{ success: boolean; data: ConteudoEvento }>(
+      `/admin/conteudos/eventos/${id}/avaliacao`,
+      payload
+    ),
+  setAvaliacaoAtiva: (id: string, ativa: boolean) =>
+    api.patch<{ success: boolean; data: ConteudoEvento }>(
+      `/admin/conteudos/eventos/${id}/avaliacao/ativa`,
+      { ativa }
+    ),
+  getAvaliacaoResultados: (id: string) =>
+    api.get<{ success: boolean; data: AvaliacaoResultadosPayload }>(
+      `/admin/conteudos/eventos/${id}/avaliacao/resultados`
+    ),
   listPrecadastros: () =>
     api.get<{ success: boolean; data: ConteudoPrecadastro[] }>('/admin/conteudos/precadastros'),
   aceitarPrecadastros: (ids: string[]) =>
@@ -198,10 +284,11 @@ export const conteudoMedicoService = {
     api.get<{ success: boolean; data: ConteudoEvento }>(`/medico/conteudos/${id}`),
   inscrever: (id: string) =>
     api.post<{ success: boolean; data: unknown }>(`/medico/conteudos/${id}/inscrever`),
-  confirmarPresenca: (id: string) =>
-    api.post<{ success: boolean; data: { presenteEm: string; jaRegistrado: boolean } }>(
-      `/medico/conteudos/${id}/presenca`
-    ),
+  confirmarPresenca: (id: string, respostas?: Record<string, string>) =>
+    api.post<{
+      success: boolean;
+      data: { presenteEm: string; jaRegistrado: boolean; avaliadoEm?: string | null };
+    }>(`/medico/conteudos/${id}/presenca`, respostas ? { respostas } : {}),
   capaUrl: (id: string) => {
     const base = api.defaults.baseURL || '/api';
     return `${base}/medico/conteudos/${id}/capa`;
@@ -266,15 +353,26 @@ export const conteudoPublicService = {
           iniciaEm: string;
           status: ConteudoEventoStatus;
           frequenciaAberta: boolean;
+          palestranteNome?: string | null;
+          avaliacaoAtiva?: boolean;
+          avaliacao?: ConteudoEvento['avaliacao'];
         };
       };
     }>(`/conteudos/public/frequencia/${token}`),
-  submitFrequencia: (token: string, email: string) =>
+  submitFrequencia: (token: string, email: string, respostas?: Record<string, string>) =>
     api.post<{
       success: boolean;
-      data: { presenteEm: string; jaRegistrado: boolean };
+      data: {
+        presenteEm: string | null;
+        jaRegistrado: boolean;
+        registrado?: boolean;
+        avaliadoEm?: string | null;
+      };
       message?: string;
-    }>(`/conteudos/public/frequencia/${token}`, { email }),
+    }>(`/conteudos/public/frequencia/${token}`, {
+      email,
+      ...(respostas ? { respostas } : {}),
+    }),
   getCadastroCorpo: (token: string) =>
     api.get<{
       success: boolean;

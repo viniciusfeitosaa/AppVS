@@ -363,7 +363,7 @@ export async function enviarEmailPrecadastroAceito(params: {
     bodyParagraphsHtml: [
       p(`Olá, <strong style="color:#0f172a;">${escapeHtmlText(primeiro)}</strong>.`),
       p(
-        `A equipe da ${escapeHtmlText(orgName)} aceitou o seu precadastro e convida você a integrar o <strong>corpo clínico</strong>.`
+        `A equipe da ${escapeHtmlText(orgName)} aceitou o seu pré-cadastro e convida você a integrar o <strong>corpo clínico</strong>.`
       ),
       p('Complete o cadastro pelo link abaixo. Ainda precisamos destes dados:'),
       lista,
@@ -382,7 +382,7 @@ export async function enviarEmailPrecadastroAceito(params: {
   const text = [
     `Olá, ${primeiro}.`,
     '',
-    `A equipe da ${orgName} aceitou o seu precadastro para o corpo clínico.`,
+    `A equipe da ${orgName} aceitou o seu pré-cadastro para o corpo clínico.`,
     '',
     'Dados ainda necessários:',
     listaText || '(complete o formulário no link)',

@@ -1,7 +1,7 @@
 ﻿# 15 — Estado atual e pendências
 
-**Snapshot:** 2026-08-05  
-**Branch:** `main` (sync com `origin/main` após push desta entrega)
+**Snapshot:** 2026-08-07  
+**Branch:** `main` (ambiente VPS; entrega avaliação por conteúdo em produção)
 
 > Este arquivo deve ser o **primeiro** atualizado após entregas relevantes.  
 > É o **mapa de bordo** do projeto (o que está pronto, o que falta, histórico recente).
@@ -9,7 +9,7 @@
 ## Resumo executivo
 
 O **Viva Saúde** está em produção na VPS (`sejavivasaude.com.br`). Auth, escalas, ponto, vagas, documentos, relatórios, painel de e-mail, robô WhatsApp (Evolution GO), mobile e deploy estão implementados.  
-**Conteúdos / eventos** inclui anúncio, inscrição (médico/estudante + CPF), frequência na aula e **pipeline de precadastro → aceite → cadastro ATIVO no corpo clínico (sem Avaliação)**.
+**Conteúdos / eventos** inclui anúncio, inscrição, frequência, **avaliação por conteúdo** (perguntas customizadas + switch na frequência) e **pipeline de precadastro → aceite → cadastro ATIVO no corpo clínico (sem Avaliação)**.
 
 ## Módulos — status
 
@@ -27,7 +27,7 @@ O **Viva Saúde** está em produção na VPS (`sejavivasaude.com.br`). Auth, esc
 | Relatórios | ✅ | ✅ | Procedimentos + ponto; PDF com logo VS |
 | Painel de E-mail | ✅ | ✅ | NF / demonstrativos com PDF anexo + 2 tipos de competência |
 | WhatsApp (Evolution GO) | ✅ | — | Menu atendimento; pausar/retomar (equipe) |
-| Conteúdos / eventos | ✅ | ✅ | Anúncio, frequência, precadastro→aceite→corpo clínico — `17-conteudos-eventos.md` |
+| Conteúdos / eventos | ✅ | ✅ | Anúncio, frequência, **avaliação custom por evento**, precadastro→aceite→corpo clínico — `17-conteudos-eventos.md` |
 | Configurações / módulos | ✅ | ✅ | Matriz de acesso |
 | Avaliação (master) | ✅ | ✅ | Só cadastro público `/cadastro` (não precadastro aceito) |
 | Atendimentos | — | ⏳ Placeholder | `FeaturePlaceholder` |
@@ -79,6 +79,11 @@ Arquivos de referência: `schema.prisma` (`Escala`, `EscalaMedico`, `EscalaPlant
 
 | Data | Entrega |
 |------|---------|
+| 2026-08-12 | Conteúdos: aba **Palestrantes** no Master — lista, busca e detalhe (dados + conteúdos vinculados) |
+| 2026-08-07 | Conteúdos: **painel de resultados da avaliação** — stats por pergunta, textos e respostas individuais |
+| 2026-08-07 | Conteúdos: avaliação com tipo **questão (gabarito)** — opções + resposta correta no admin; gabarito oculto no app/link |
+| 2026-08-07 | WhatsApp: após dados de contato, **pergunta a dúvida** (etapa `collecting_duvida`) em todos os setores |
+| 2026-08-07 | Conteúdos: **avaliação por conteúdo** — editor de perguntas + switch na Frequência (mostrar ou não na presença) |
 | 2026-08-05 | Conteúdos: **aceite de precadastro** → e-mail + cadastro `ATIVO` (**sem Avaliação**) — opção A; mapa de bordo |
 | 2026-08-05 | Conteúdos: popup detalhe precadastro; **excluir** participante/precadastro |
 | 2026-07-31 | Conteúdos: CPF no palestrante; sem URL de foto no form |
@@ -91,6 +96,23 @@ Arquivos de referência: `schema.prisma` (`Escala`, `EscalaMedico`, `EscalaPlant
 | 2026-07 | Painel e-mail, Evolution GO |
 | 2026-04 | Trocas de plantão |
 | 2026-03 | Módulo vagas, valores plantão |
+
+### Detalhe — Conteúdos: avaliação da aula por evento (2026-08-07)
+
+**Objetivo:** cada conteúdo tem suas próprias perguntas de avaliação (não só template fixo). Exibir ou ocultar na tela de frequência via switch.
+
+| Item | Comportamento |
+|------|----------------|
+| Editor (admin) | Em **Avaliação da aula**: criar/editar/remover/reordenar perguntas (estrelas, múltipla escolha, texto livre); opcional “modelo Viva Atualiza” só como atalho |
+| Switch (admin) | Em **Frequência**: slide “Perguntas na tela de frequência” — se **ligado**, perguntas aparecem ao confirmar presença; se **desligado**, só registra presença |
+| App + link público | Respeitam `avaliacaoAtiva` + formulário salvo; respostas em `avaliacao_respostas` / `avaliado_em` no participante |
+| Ativação | Switch só liga se já existirem perguntas salvas |
+
+**Schema / migration:** `avaliacao_ativa`, `avaliacao_formulario` em `conteudo_eventos`; respostas no participante — `20260807140000_conteudo_avaliacao_frequencia`
+
+**API admin (resumo):** `PUT …/eventos/:id/avaliacao` (salvar form); `PATCH …/avaliacao/ativa`; atalho template Viva Atualiza
+
+**Arquivos:** `conteudo-avaliacao.const.ts`, `conteudo.service.ts`, rotas admin, `AvaliacaoEditorAdmin.tsx`, `AvaliacaoPerguntasForm.tsx`, `ConteudosAdminPage.tsx`, `ConteudoFrequenciaPublicPage.tsx`, `ConteudoMedicoDetalhePage.tsx`
 
 ### Detalhe — Conteúdos: precadastro → corpo clínico (2026-08-05)
 

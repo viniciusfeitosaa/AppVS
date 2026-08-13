@@ -16,6 +16,14 @@ import { TERMOS_CADASTRO_VERSAO } from '../constants/termos-cadastro.const';
 import { enviarEmailPrecadastroAceito } from './cadastro-publico-email.service';
 import { hashPassword } from '../utils/password.util';
 import { resolveRegistroConselhoParaCadastro } from '../utils/profissao-registro.util';
+import {
+  buildTemplateVivaAtualizaAvaliacao,
+  formAvaliacaoSemGabarito,
+  sanitizeAvaliacaoFormulario,
+  validarRespostasAvaliacao,
+  type AvaliacaoFormulario,
+  type AvaliacaoRespostasMap,
+} from '../constants/conteudo-avaliacao.const';
 
 const palestranteSelect = {
   id: true,
@@ -56,6 +64,8 @@ function formatEventoAdmin(
     frequenciaAberta: boolean;
     frequenciaAbertaEm: Date | null;
     frequenciaFechadaEm: Date | null;
+    avaliacaoAtiva?: boolean;
+    avaliacaoFormulario?: Prisma.JsonValue | null;
     createdAt: Date;
     updatedAt: Date;
     palestrante: Prisma.ConteudoPalestranteGetPayload<{ select: typeof palestranteSelect }> | null;
@@ -66,6 +76,8 @@ function formatEventoAdmin(
   const base = getFrontendAppBaseUrl();
   const participantesCount = evento._count?.participantes ?? undefined;
   const presentesCount = opts?.presentesCount;
+  const form = sanitizeAvaliacaoFormulario(evento.avaliacaoFormulario ?? null);
+  const avaliacaoAtiva = !!(evento.avaliacaoAtiva && form);
   return {
     id: evento.id,
     titulo: evento.titulo,
@@ -87,6 +99,8 @@ function formatEventoAdmin(
     frequenciaAberta: evento.frequenciaAberta,
     frequenciaAbertaEm: evento.frequenciaAbertaEm?.toISOString() ?? null,
     frequenciaFechadaEm: evento.frequenciaFechadaEm?.toISOString() ?? null,
+    avaliacaoAtiva,
+    avaliacao: form,
     createdAt: evento.createdAt.toISOString(),
     updatedAt: evento.updatedAt.toISOString(),
     ...(opts?.includeTokens
@@ -112,10 +126,16 @@ function formatEventoPublico(evento: {
   iniciaEm: Date;
   status: ConteudoEventoStatus;
   frequenciaAberta?: boolean;
+  avaliacaoAtiva?: boolean;
+  avaliacaoFormulario?: Prisma.JsonValue | null;
   palestrante: { id: string; nome: string; bio: string | null; fotoUrl: string | null; especialidade: string | null } | null;
   jaInscrito?: boolean;
   presenteEm?: Date | null;
+  avaliadoEm?: Date | null;
 }) {
+  const form = sanitizeAvaliacaoFormulario(evento.avaliacaoFormulario ?? null);
+  const precisaAvaliacao =
+    !!(evento.avaliacaoAtiva && form) && !evento.avaliadoEm;
   return {
     id: evento.id,
     titulo: evento.titulo,
@@ -127,6 +147,10 @@ function formatEventoPublico(evento: {
     iniciaEm: evento.iniciaEm.toISOString(),
     status: evento.status,
     frequenciaAberta: evento.frequenciaAberta ?? false,
+    avaliacaoAtiva: !!(evento.avaliacaoAtiva && form),
+    avaliacao: form ? formAvaliacaoSemGabarito(form) : null,
+    avaliadoEm: evento.avaliadoEm ? evento.avaliadoEm.toISOString() : null,
+    precisaAvaliacao,
     palestrante: evento.palestrante
       ? {
           id: evento.palestrante.id,
@@ -147,14 +171,54 @@ export async function listPalestrantesAdminService(tenantId: string, q?: string)
     where.OR = [
       { nome: { contains: q.trim(), mode: 'insensitive' } },
       { email: { contains: q.trim(), mode: 'insensitive' } },
+      { crm: { contains: q.trim(), mode: 'insensitive' } },
+      { especialidade: { contains: q.trim(), mode: 'insensitive' } },
     ];
   }
-  return prisma.conteudoPalestrante.findMany({
+  const rows = await prisma.conteudoPalestrante.findMany({
     where,
-    select: palestranteSelect,
+    select: {
+      ...palestranteSelect,
+      createdAt: true,
+      updatedAt: true,
+      eventos: {
+        select: {
+          id: true,
+          titulo: true,
+          iniciaEm: true,
+          status: true,
+        },
+        orderBy: { iniciaEm: 'desc' },
+        take: 20,
+      },
+      _count: { select: { eventos: true } },
+    },
     orderBy: { nome: 'asc' },
-    take: 50,
+    take: 200,
   });
+
+  return rows.map((p) => ({
+    id: p.id,
+    nome: p.nome,
+    email: p.email,
+    telefone: p.telefone,
+    cpf: p.cpf,
+    bio: p.bio,
+    fotoUrl: p.fotoUrl,
+    crm: p.crm,
+    especialidade: p.especialidade,
+    medicoId: p.medicoId,
+    status: p.status,
+    createdAt: p.createdAt.toISOString(),
+    updatedAt: p.updatedAt.toISOString(),
+    eventosCount: p._count.eventos,
+    eventos: p.eventos.map((e) => ({
+      id: e.id,
+      titulo: e.titulo,
+      iniciaEm: e.iniciaEm.toISOString(),
+      status: e.status,
+    })),
+  }));
 }
 
 export async function listEventosAdminService(tenantId: string) {
@@ -372,6 +436,326 @@ export async function fecharFrequenciaAdminService(tenantId: string, id: string)
   return formatEventoAdmin(evento, { includeTokens: true, presentesCount });
 }
 
+/**
+ * Aplica o template Avaliação Viva Atualiza (9 perguntas) e ativa a avaliação na frequência.
+ * Mantido como atalho; preferir salvarAvaliacaoFormularioAdminService com formulário customizado.
+ */
+export async function aplicarTemplateAvaliacaoAdminService(tenantId: string, id: string) {
+  const existing = await prisma.conteudoEvento.findFirst({
+    where: { id, tenantId },
+    include: { palestrante: { select: { nome: true } } },
+  });
+  if (!existing) notFound();
+
+  const form = buildTemplateVivaAtualizaAvaliacao({
+    tema: existing.titulo,
+    palestrante: existing.palestrante?.nome
+      ? existing.palestrante.nome.startsWith('Dr')
+        ? existing.palestrante.nome
+        : `Dr(a). ${existing.palestrante.nome}`
+      : 'A definir',
+  });
+
+  const evento = await prisma.conteudoEvento.update({
+    where: { id },
+    data: {
+      avaliacaoAtiva: true,
+      avaliacaoFormulario: form as unknown as Prisma.InputJsonValue,
+    },
+    include: {
+      palestrante: { select: palestranteSelect },
+      _count: { select: { participantes: true } },
+    },
+  });
+
+  const presentesCount = await prisma.conteudoParticipante.count({
+    where: { tenantId, eventoId: id, presenteEm: { not: null } },
+  });
+  return formatEventoAdmin(evento, { includeTokens: true, presentesCount });
+}
+
+/**
+ * Salva o formulário de avaliação personalizado (perguntas/respostas do master).
+ * Cada conteúdo pode ter perguntas diferentes.
+ */
+export async function salvarAvaliacaoFormularioAdminService(
+  tenantId: string,
+  id: string,
+  input: { formulario: unknown; ativa?: boolean }
+) {
+  const existing = await prisma.conteudoEvento.findFirst({ where: { id, tenantId } });
+  if (!existing) notFound();
+
+  const form = sanitizeAvaliacaoFormulario(input.formulario);
+  if (!form) {
+    throw {
+      statusCode: 400,
+      message:
+        'Formulário inválido. Informe um título e ao menos uma pergunta (texto, estrelas ou múltipla escolha).',
+    };
+  }
+
+  const ativa =
+    input.ativa === undefined
+      ? existing.avaliacaoAtiva || form.perguntas.length > 0
+      : !!input.ativa;
+
+  const evento = await prisma.conteudoEvento.update({
+    where: { id },
+    data: {
+      avaliacaoFormulario: form as unknown as Prisma.InputJsonValue,
+      avaliacaoAtiva: ativa && form.perguntas.length > 0,
+    },
+    include: {
+      palestrante: { select: palestranteSelect },
+      _count: { select: { participantes: true } },
+    },
+  });
+
+  const presentesCount = await prisma.conteudoParticipante.count({
+    where: { tenantId, eventoId: id, presenteEm: { not: null } },
+  });
+  return formatEventoAdmin(evento, { includeTokens: true, presentesCount });
+}
+
+/** Ativa/desativa avaliação (formulário deve existir). */
+export async function setAvaliacaoAtivaAdminService(
+  tenantId: string,
+  id: string,
+  ativa: boolean
+) {
+  const existing = await prisma.conteudoEvento.findFirst({ where: { id, tenantId } });
+  if (!existing) notFound();
+  if (ativa && !sanitizeAvaliacaoFormulario(existing.avaliacaoFormulario)) {
+    throw {
+      statusCode: 400,
+      message: 'Crie e salve as perguntas da avaliação antes de ativar.',
+    };
+  }
+
+  const evento = await prisma.conteudoEvento.update({
+    where: { id },
+    data: { avaliacaoAtiva: !!ativa },
+    include: {
+      palestrante: { select: palestranteSelect },
+      _count: { select: { participantes: true } },
+    },
+  });
+
+  const presentesCount = await prisma.conteudoParticipante.count({
+    where: { tenantId, eventoId: id, presenteEm: { not: null } },
+  });
+  return formatEventoAdmin(evento, { includeTokens: true, presentesCount });
+}
+
+function asRespostasMap(raw: Prisma.JsonValue | null | undefined): Record<string, string> {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {};
+  const out: Record<string, string> = {};
+  for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
+    if (v === null || v === undefined) continue;
+    const s = String(v).trim();
+    if (s) out[k] = s;
+  }
+  return out;
+}
+
+/**
+ * Relatório de respostas da avaliação do conteúdo: agregado + linhas individuais + textos livres.
+ */
+export async function getAvaliacaoResultadosAdminService(tenantId: string, eventoId: string) {
+  const evento = await prisma.conteudoEvento.findFirst({
+    where: { id: eventoId, tenantId },
+    select: {
+      id: true,
+      titulo: true,
+      avaliacaoFormulario: true,
+      avaliacaoAtiva: true,
+    },
+  });
+  if (!evento) notFound();
+
+  const form = sanitizeAvaliacaoFormulario(evento.avaliacaoFormulario ?? null);
+
+  const rows = await prisma.conteudoParticipante.findMany({
+    where: { tenantId, eventoId },
+    orderBy: { avaliadoEm: 'desc' },
+    select: {
+      id: true,
+      nome: true,
+      email: true,
+      origem: true,
+      presenteEm: true,
+      avaliadoEm: true,
+      avaliacaoRespostas: true,
+    },
+  });
+
+  const inscritos = rows.length;
+  const presentes = rows.filter((r) => !!r.presenteEm).length;
+  const comResposta = rows.filter((r) => {
+    if (r.avaliadoEm) return true;
+    // legado / parcial: tem JSON de respostas mesmo sem data
+    if (r.avaliacaoRespostas == null) return false;
+    if (typeof r.avaliacaoRespostas !== 'object' || Array.isArray(r.avaliacaoRespostas)) return false;
+    return Object.keys(r.avaliacaoRespostas as object).length > 0;
+  });
+  const avaliaram = comResposta.length;
+  const taxaRespostaPresentes =
+    presentes > 0 ? Math.round((avaliaram / presentes) * 1000) / 10 : null;
+
+  const respostasIndividuais = comResposta.map((r) => ({
+    participanteId: r.id,
+    nome: r.nome,
+    email: r.email,
+    origem: r.origem,
+    avaliadoEm: (r.avaliadoEm || r.presenteEm || new Date()).toISOString(),
+    respostas: asRespostasMap(r.avaliacaoRespostas),
+  }));
+
+  type OpcaoStat = { valor: string; label: string; total: number; pct: number };
+  type TextoItem = {
+    participanteId: string;
+    nome: string;
+    email: string;
+    resposta: string;
+    avaliadoEm: string;
+  };
+
+  const perguntasStats =
+    form?.perguntas.map((p) => {
+      const valores = comResposta
+        .map((r) => {
+          const map = asRespostasMap(r.avaliacaoRespostas);
+          const v = map[p.id];
+          return v
+            ? {
+                valor: v,
+                participanteId: r.id,
+                nome: r.nome,
+                email: r.email,
+                avaliadoEm: (r.avaliadoEm || r.presenteEm || new Date()).toISOString(),
+              }
+            : null;
+        })
+        .filter((x): x is NonNullable<typeof x> => !!x);
+
+      const totalRespostas = valores.length;
+
+      if (p.tipo === 'texto') {
+        return {
+          id: p.id,
+          tipo: p.tipo,
+          texto: p.texto,
+          totalRespostas,
+          textos: valores.map((v) => ({
+            participanteId: v.participanteId,
+            nome: v.nome,
+            email: v.email,
+            resposta: v.valor,
+            avaliadoEm: v.avaliadoEm,
+          })) as TextoItem[],
+          opcoes: undefined as OpcaoStat[] | undefined,
+          mediaEstrelas: null as number | null,
+          acertos: null as { total: number; corretos: number; pct: number } | null,
+          respostaCorreta: undefined as string | undefined,
+        };
+      }
+
+      const counts = new Map<string, number>();
+      for (const v of valores) {
+        counts.set(v.valor, (counts.get(v.valor) || 0) + 1);
+      }
+
+      const opcoesBase: Array<{ valor: string; label: string }> = p.opcoes?.length
+        ? p.opcoes.map((o) => ({ valor: o.valor, label: o.label }))
+        : Array.from(counts.keys()).map((valor) => ({ valor, label: valor }));
+
+      const known = new Set(opcoesBase.map((o) => o.valor));
+      for (const valor of counts.keys()) {
+        if (!known.has(valor)) {
+          opcoesBase.push({ valor, label: valor });
+          known.add(valor);
+        }
+      }
+
+      const opcoes: OpcaoStat[] = opcoesBase.map((o) => {
+        const total = counts.get(o.valor) || 0;
+        const pct = totalRespostas > 0 ? Math.round((total / totalRespostas) * 1000) / 10 : 0;
+        return { valor: o.valor, label: o.label, total, pct };
+      });
+
+      let mediaEstrelas: number | null = null;
+      if (p.tipo === 'estrelas' && totalRespostas > 0) {
+        const nums = valores.map((v) => Number(v.valor)).filter((n) => Number.isFinite(n));
+        if (nums.length) {
+          mediaEstrelas =
+            Math.round((nums.reduce((a, b) => a + b, 0) / nums.length) * 10) / 10;
+        }
+      }
+
+      let acertos: { total: number; corretos: number; pct: number } | null = null;
+      if (p.tipo === 'quiz' && p.respostaCorreta && totalRespostas > 0) {
+        const corretos = valores.filter((v) => v.valor === p.respostaCorreta).length;
+        acertos = {
+          total: totalRespostas,
+          corretos,
+          pct: Math.round((corretos / totalRespostas) * 1000) / 10,
+        };
+      }
+
+      return {
+        id: p.id,
+        tipo: p.tipo,
+        texto: p.texto,
+        totalRespostas,
+        textos: undefined as TextoItem[] | undefined,
+        opcoes,
+        mediaEstrelas,
+        acertos,
+        respostaCorreta: p.tipo === 'quiz' ? p.respostaCorreta : undefined,
+      };
+    }) ?? [];
+
+  return {
+    eventoId: evento.id,
+    titulo: evento.titulo,
+    avaliacaoAtiva: evento.avaliacaoAtiva,
+    formulario: form,
+    resumo: {
+      inscritos,
+      presentes,
+      avaliaram,
+      taxaRespostaPresentes,
+    },
+    perguntas: perguntasStats,
+    respostas: respostasIndividuais,
+  };
+}
+
+function resolverFormAvaliacaoEvento(evento: {
+  avaliacaoAtiva: boolean;
+  avaliacaoFormulario: Prisma.JsonValue | null;
+}): AvaliacaoFormulario | null {
+  if (!evento.avaliacaoAtiva) return null;
+  return sanitizeAvaliacaoFormulario(evento.avaliacaoFormulario);
+}
+
+function prepararRespostasSeNecessario(
+  form: AvaliacaoFormulario | null,
+  respostasRaw: unknown,
+  jaAvaliado: boolean
+): AvaliacaoRespostasMap | null {
+  if (!form) return null;
+  if (jaAvaliado) return null;
+  if (respostasRaw === undefined || respostasRaw === null) {
+    throw {
+      statusCode: 400,
+      message: 'Preencha a avaliação da aula para confirmar a presença.',
+    };
+  }
+  return validarRespostasAvaliacao(form, respostasRaw);
+}
+
 export async function regenerarTokenAdminService(
   tenantId: string,
   id: string,
@@ -485,12 +869,15 @@ export async function listParticipantesAdminService(tenantId: string, eventoId: 
       consentimentoLgpd: true,
       presenteEm: true,
       presencaOrigem: true,
+      avaliacaoRespostas: true,
+      avaliadoEm: true,
       createdAt: true,
     },
   }).then((rows) =>
     rows.map((r) => ({
       ...r,
       presenteEm: r.presenteEm?.toISOString() ?? null,
+      avaliadoEm: r.avaliadoEm?.toISOString() ?? null,
       createdAt: r.createdAt.toISOString(),
     }))
   );
@@ -632,10 +1019,10 @@ export async function aceitarPrecadastrosAdminService(
 ) {
   const uniqueIds = [...new Set((ids || []).filter(Boolean))];
   if (uniqueIds.length === 0) {
-    throw { statusCode: 400, message: 'Selecione ao menos um precadastro.' };
+    throw { statusCode: 400, message: 'Selecione ao menos um pré-cadastro.' };
   }
   if (uniqueIds.length > 100) {
-    throw { statusCode: 400, message: 'Selecione no máximo 100 precadastros por vez.' };
+    throw { statusCode: 400, message: 'Selecione no máximo 100 pré-cadastros por vez.' };
   }
 
   const rows = await prisma.conteudoParticipante.findMany({
@@ -660,7 +1047,7 @@ export async function aceitarPrecadastrosAdminService(
   for (const id of uniqueIds) {
     const row = byId.get(id);
     if (!row) {
-      results.push({ id, nome: '', email: '', ok: false, message: 'Precadastro não encontrado.' });
+      results.push({ id, nome: '', email: '', ok: false, message: 'Pré-cadastro não encontrado.' });
       continue;
     }
     if (row.precadastroStatus === ConteudoPrecadastroStatus.CONVERTIDO) {
@@ -998,7 +1385,7 @@ export async function listEventosMedicoService(tenantId: string, medicoId: strin
       },
       participantes: {
         where: { medicoId },
-        select: { id: true, presenteEm: true },
+        select: { id: true, presenteEm: true, avaliadoEm: true },
         take: 1,
       },
     },
@@ -1010,6 +1397,7 @@ export async function listEventosMedicoService(tenantId: string, medicoId: strin
       ...e,
       jaInscrito: e.participantes.length > 0,
       presenteEm: e.participantes[0]?.presenteEm ?? null,
+      avaliadoEm: e.participantes[0]?.avaliadoEm ?? null,
     })
   );
 }
@@ -1027,7 +1415,7 @@ export async function getEventoMedicoService(tenantId: string, medicoId: string,
       },
       participantes: {
         where: { medicoId },
-        select: { id: true, presenteEm: true },
+        select: { id: true, presenteEm: true, avaliadoEm: true },
         take: 1,
       },
     },
@@ -1037,6 +1425,7 @@ export async function getEventoMedicoService(tenantId: string, medicoId: string,
     ...evento,
     jaInscrito: evento.participantes.length > 0,
     presenteEm: evento.participantes[0]?.presenteEm ?? null,
+    avaliadoEm: evento.participantes[0]?.avaliadoEm ?? null,
   });
 }
 
@@ -1090,7 +1479,8 @@ export async function inscreverMedicoService(tenantId: string, medicoId: string,
 export async function confirmarPresencaMedicoService(
   tenantId: string,
   medicoId: string,
-  eventoId: string
+  eventoId: string,
+  respostasRaw?: unknown
 ) {
   const evento = await prisma.conteudoEvento.findFirst({
     where: {
@@ -1111,10 +1501,29 @@ export async function confirmarPresencaMedicoService(
     throw { statusCode: 400, message: 'Você precisa estar inscrito para confirmar presença.' };
   }
 
+  const form = resolverFormAvaliacaoEvento(evento);
+  const respostas = prepararRespostasSeNecessario(form, respostasRaw, !!participante.avaliadoEm);
+
   if (participante.presenteEm) {
+    // Já presente: ainda pode enviar avaliação pendente
+    if (respostas) {
+      const updated = await prisma.conteudoParticipante.update({
+        where: { id: participante.id },
+        data: {
+          avaliacaoRespostas: respostas as unknown as Prisma.InputJsonValue,
+          avaliadoEm: new Date(),
+        },
+      });
+      return {
+        presenteEm: updated.presenteEm!.toISOString(),
+        jaRegistrado: true,
+        avaliadoEm: updated.avaliadoEm!.toISOString(),
+      };
+    }
     return {
       presenteEm: participante.presenteEm.toISOString(),
       jaRegistrado: true,
+      avaliadoEm: participante.avaliadoEm?.toISOString() ?? null,
     };
   }
 
@@ -1123,12 +1532,19 @@ export async function confirmarPresencaMedicoService(
     data: {
       presenteEm: new Date(),
       presencaOrigem: ConteudoPresencaOrigem.APP,
+      ...(respostas
+        ? {
+            avaliacaoRespostas: respostas as unknown as Prisma.InputJsonValue,
+            avaliadoEm: new Date(),
+          }
+        : {}),
     },
   });
 
   return {
     presenteEm: updated.presenteEm!.toISOString(),
     jaRegistrado: false,
+    avaliadoEm: updated.avaliadoEm?.toISOString() ?? null,
   };
 }
 
@@ -1356,9 +1772,14 @@ export async function getPublicFrequenciaService(token: string) {
       iniciaEm: true,
       frequenciaAberta: true,
       status: true,
+      avaliacaoAtiva: true,
+      avaliacaoFormulario: true,
+      palestrante: { select: { nome: true } },
     },
   });
   if (!evento) notFound('Link de frequência inválido.');
+
+  const form = resolverFormAvaliacaoEvento(evento);
 
   return {
     evento: {
@@ -1367,11 +1788,18 @@ export async function getPublicFrequenciaService(token: string) {
       iniciaEm: evento.iniciaEm.toISOString(),
       status: evento.status,
       frequenciaAberta: evento.frequenciaAberta,
+      palestranteNome: evento.palestrante?.nome ?? null,
+      avaliacaoAtiva: !!form,
+      avaliacao: form ? formAvaliacaoSemGabarito(form) : null,
     },
   };
 }
 
-export async function submitPublicFrequenciaService(token: string, emailRaw: string) {
+export async function submitPublicFrequenciaService(
+  token: string,
+  emailRaw: string,
+  respostasRaw?: unknown
+) {
   const evento = await prisma.conteudoEvento.findFirst({
     where: { tokenFrequencia: token },
   });
@@ -1380,12 +1808,26 @@ export async function submitPublicFrequenciaService(token: string, emailRaw: str
     throw { statusCode: 400, message: 'A frequência não está aberta no momento.' };
   }
 
+  const form = resolverFormAvaliacaoEvento(evento);
+  // Se avaliação ativa, validamos respostas antes (anti-enumeração: se e-mail inválido ainda devolvemos ack genérico
+  // apenas se respostas forem válidas quando form ativo).
+  let respostasValidas: AvaliacaoRespostasMap | null = null;
+  if (form) {
+    if (respostasRaw === undefined || respostasRaw === null) {
+      throw {
+        statusCode: 400,
+        message: 'Preencha a avaliação da aula para confirmar a presença.',
+      };
+    }
+    respostasValidas = validarRespostasAvaliacao(form, respostasRaw);
+  }
+
   const email = (emailRaw || '').trim().toLowerCase();
-  // Resposta uniforme (anti-enumeração): não revelar se o e-mail está na lista
   const ack = {
     presenteEm: null as string | null,
     jaRegistrado: false,
     registrado: false,
+    avaliadoEm: null as string | null,
   };
 
   if (!email.includes('@')) {
@@ -1400,10 +1842,29 @@ export async function submitPublicFrequenciaService(token: string, emailRaw: str
   }
 
   if (participante.presenteEm) {
+    if (respostasValidas && !participante.avaliadoEm) {
+      const updated = await prisma.conteudoParticipante.update({
+        where: { id: participante.id },
+        data: {
+          avaliacaoRespostas: respostasValidas as unknown as Prisma.InputJsonValue,
+          avaliadoEm: new Date(),
+        },
+      });
+      console.log(
+        `[conteudos] frequencia+avaliacao (já presente) email=${email} evento=${evento.id}`
+      );
+      return {
+        presenteEm: updated.presenteEm!.toISOString(),
+        jaRegistrado: true,
+        registrado: true,
+        avaliadoEm: updated.avaliadoEm!.toISOString(),
+      };
+    }
     return {
       presenteEm: participante.presenteEm.toISOString(),
       jaRegistrado: true,
       registrado: true,
+      avaliadoEm: participante.avaliadoEm?.toISOString() ?? null,
     };
   }
 
@@ -1412,13 +1873,24 @@ export async function submitPublicFrequenciaService(token: string, emailRaw: str
     data: {
       presenteEm: new Date(),
       presencaOrigem: ConteudoPresencaOrigem.LINK_PUBLICO,
+      ...(respostasValidas
+        ? {
+            avaliacaoRespostas: respostasValidas as unknown as Prisma.InputJsonValue,
+            avaliadoEm: new Date(),
+          }
+        : {}),
     },
   });
+
+  console.log(
+    `[conteudos] frequencia${respostasValidas ? '+avaliacao' : ''} email=${email} evento=${evento.id} avaliou=${!!respostasValidas}`
+  );
 
   return {
     presenteEm: updated.presenteEm!.toISOString(),
     jaRegistrado: false,
     registrado: true,
+    avaliadoEm: updated.avaliadoEm?.toISOString() ?? null,
   };
 }
 

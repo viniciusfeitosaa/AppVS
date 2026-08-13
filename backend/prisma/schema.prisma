@@ -1028,6 +1028,10 @@ model ConteudoEvento {
   frequenciaAberta   Boolean              @default(false) @map("frequencia_aberta")
   frequenciaAbertaEm DateTime?            @map("frequencia_aberta_em")
   frequenciaFechadaEm DateTime?           @map("frequencia_fechada_em")
+  /// Exige preenchimento da avaliação de aula ao confirmar presença.
+  avaliacaoAtiva     Boolean              @default(false) @map("avaliacao_ativa")
+  /// JSON: { titulo, meta, perguntas[] } — ver conteudo-avaliacao.const.ts
+  avaliacaoFormulario Json?               @map("avaliacao_formulario")
   criadoPorMasterId  String?              @map("criado_por_master_id")
   createdAt          DateTime             @default(now()) @map("created_at")
   updatedAt          DateTime             @updatedAt @map("updated_at")
@@ -1071,6 +1075,9 @@ model ConteudoParticipante {
   precadastroAceitoPorMasterId String?              @map("precadastro_aceito_por_master_id")
   presenteEm             DateTime?                  @map("presente_em")
   presencaOrigem         ConteudoPresencaOrigem?    @map("presenca_origem")
+  /// Respostas da avaliação de aula (mapa perguntaId → valor).
+  avaliacaoRespostas     Json?                      @map("avaliacao_respostas")
+  avaliadoEm             DateTime?                  @map("avaliado_em")
   createdAt              DateTime                   @default(now()) @map("created_at")
 
   tenant Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)

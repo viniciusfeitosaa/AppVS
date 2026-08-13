@@ -25,7 +25,7 @@ export type AtendimentoContactInfo = {
   raw: string;
 };
 
-type SessionState = 'menu' | 'collecting_info' | 'queued';
+type SessionState = 'menu' | 'collecting_info' | 'collecting_duvida' | 'queued';
 
 type AtendimentoSession = {
   state: SessionState;
@@ -115,21 +115,6 @@ function askContactInfoMessage(dept: AtendimentoDepartment, label: string): stri
     ].join('\n');
   }
 
-  if (dept === 'duvidas') {
-    return [
-      `Você selecionou *${label}*.`,
-      '',
-      'Para facilitar o atendimento, informe:',
-      '• *Nome completo*',
-      '• *CRM*',
-      '• *Local onde trabalha*',
-      '• *Qual a sua dúvida?*',
-      '',
-      '_Envie tudo em uma única mensagem._',
-      COMMANDS_HINT,
-    ].join('\n');
-  }
-
   return [
     `Você selecionou *${label}*.`,
     '',
@@ -139,6 +124,17 @@ function askContactInfoMessage(dept: AtendimentoDepartment, label: string): stri
     '• *Local onde trabalha*',
     '',
     '_Envie tudo em uma única mensagem._',
+    COMMANDS_HINT,
+  ].join('\n');
+}
+
+function askDuvidaMessage(): string {
+  return [
+    'Obrigado pelos dados! 🙂',
+    '',
+    'Para facilitar o atendimento, *qual a sua dúvida ou o que precisa?*',
+    '',
+    '_Descreva em uma mensagem (quanto mais detalhe, melhor)._',
     COMMANDS_HINT,
   ].join('\n');
 }
@@ -155,18 +151,6 @@ function invalidContactInfoMessage(dept?: AtendimentoDepartment): string {
     ].join('\n');
   }
 
-  if (dept === 'duvidas') {
-    return [
-      'Não consegui identificar seus dados. Por favor, envie em uma mensagem:',
-      '• Nome completo',
-      '• CRM',
-      '• Local onde trabalha',
-      '• Qual a sua dúvida',
-      '',
-      COMMANDS_HINT,
-    ].join('\n');
-  }
-
   return [
     'Não consegui identificar seus dados. Por favor, envie em uma mensagem:',
     '• Nome completo',
@@ -177,9 +161,17 @@ function invalidContactInfoMessage(dept?: AtendimentoDepartment): string {
   ].join('\n');
 }
 
+function invalidDuvidaMessage(): string {
+  return [
+    'Por favor, descreva a sua dúvida com um pouco mais de detalhe (ao menos algumas palavras).',
+    '',
+    COMMANDS_HINT,
+  ].join('\n');
+}
+
 function queuedMessage(label: string): string {
   return [
-    `Obrigado! Seus dados foram registrados no setor *${label}*.`,
+    `Obrigado! Seus dados e a sua dúvida foram registrados no setor *${label}*.`,
     '',
     'Em breve você será atendido(a) por nossa equipe. Aguarde um instante, por favor. 🙏',
     '',
@@ -272,6 +264,11 @@ export function parseContactInfo(
       email = email || lines.find((l) => l.includes('@')) || lines[2];
       if (/crm|\d{4,}/i.test(mid)) crm = mid;
       else faculdade = mid;
+      // linhas extras (após dados) → possível dúvida enviada junto
+      if (!duvida && lines.length > 3) {
+        const rest = lines.slice(3).filter((l) => !l.includes('@'));
+        if (rest.length) duvida = rest.join(' ');
+      }
     } else if (!nome && lines.length >= 2) {
       nome = lines[0];
       const mid = lines[1];
@@ -279,20 +276,11 @@ export function parseContactInfo(
       else if (/crm|\d{4,}/i.test(mid)) crm = mid;
       else faculdade = mid;
     }
-  } else if (department === 'duvidas') {
-    if (!nome && !crm && !local && !duvida && lines.length >= 4) {
-      nome = lines[0];
-      crm = lines[1];
-      local = lines[2];
-      duvida = lines.slice(3).join(' ');
-    } else if (!nome && !crm && !local && lines.length >= 3) {
-      nome = lines[0];
-      crm = lines[1];
-      local = lines[2];
-      if (lines.length > 3) duvida = lines.slice(3).join(' ');
-    }
   } else if (!nome && !crm && !local && lines.length >= 3) {
-    [nome, crm, local] = lines;
+    nome = lines[0];
+    crm = lines[1];
+    local = lines[2];
+    if (!duvida && lines.length > 3) duvida = lines.slice(3).join(' ');
   } else if (!nome && !crm && lines.length === 2) {
     [nome, crm] = lines;
   }
@@ -313,17 +301,17 @@ function isValidContactInfo(text: string, department: AtendimentoDepartment): bo
     return !!(parsed.nome && identidade && looksLikeEmail(parsed.email));
   }
 
-  if (department === 'duvidas') {
-    const base = [parsed.nome, parsed.crm, parsed.local].filter(Boolean).length >= 2;
-    const hasDuvida =
-      !!(parsed.duvida && parsed.duvida.trim().length >= 5) ||
-      (base && parsed.raw.split(/\s+/).length >= 8);
-    return base && hasDuvida;
-  }
-
+  // Dados de contato apenas; a dúvida vem na etapa seguinte (collecting_duvida).
   const parts = [parsed.nome, parsed.crm, parsed.local].filter(Boolean);
   if (parts.length >= 2) return true;
   return parsed.raw.split(/\s+/).length >= 4;
+}
+
+function isValidDuvidaText(text: string): boolean {
+  const t = text.trim();
+  if (t.length < 5) return false;
+  // evita só “oi”, “1”, “ok” etc.
+  return t.split(/\s+/).filter(Boolean).length >= 2 || t.length >= 12;
 }
 
 async function startDepartmentFlow(
@@ -626,6 +614,58 @@ export async function handleIncomingWhatsAppMessage(payload: EvolutionWebhookPay
     }
 
     const contactInfo = parseContactInfo(text, session.department || 'administrativo');
+    // Dúvida na mesma mensagem só se veio como campo extra/rótulo (não o texto inteiro dos dados).
+    const duvidaInline =
+      contactInfo.duvida && contactInfo.duvida.trim().length >= 5
+        ? contactInfo.duvida.trim()
+        : undefined;
+
+    if (duvidaInline) {
+      const full: AtendimentoContactInfo = { ...contactInfo, duvida: duvidaInline };
+      const label = departmentLabel(session.department);
+      await sendWhatsAppText(phone, queuedMessage(label));
+      await saveSession(phone, {
+        state: 'queued',
+        department: session.department,
+        contactInfo: full,
+        updatedAt: new Date().toISOString(),
+      });
+      logQueuedContact(phone, session.department!, full, pushName);
+      return true;
+    }
+
+    await sendWhatsAppText(phone, askDuvidaMessage());
+    await saveSession(phone, {
+      state: 'collecting_duvida',
+      department: session.department,
+      contactInfo: {
+        ...contactInfo,
+        duvida: undefined,
+      },
+      updatedAt: new Date().toISOString(),
+    });
+    console.log(
+      `[whatsapp-atendimento] ${phone}${pushName ? ` (${pushName})` : ''} → pedindo dúvida (${session.department})`
+    );
+    return true;
+  }
+
+  if (session.state === 'collecting_duvida') {
+    if (choice) {
+      await startDepartmentFlow(phone, DEPARTMENTS[choice], pushName);
+      return true;
+    }
+
+    if (!isValidDuvidaText(text)) {
+      await sendWhatsAppText(phone, invalidDuvidaMessage());
+      return true;
+    }
+
+    const contactInfo: AtendimentoContactInfo = {
+      ...(session.contactInfo || { raw: '' }),
+      duvida: text.trim(),
+      raw: [session.contactInfo?.raw, text.trim()].filter(Boolean).join('\n'),
+    };
     const label = departmentLabel(session.department);
     await sendWhatsAppText(phone, queuedMessage(label));
     await saveSession(phone, {

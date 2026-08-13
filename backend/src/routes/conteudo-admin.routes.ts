@@ -2,6 +2,8 @@ import { Router } from 'express';
 import {
   aceitarPrecadastrosAdminController,
   abrirFrequenciaAdminController,
+  aplicarTemplateAvaliacaoAdminController,
+  salvarAvaliacaoFormularioAdminController,
   convidarPalestranteAdminController,
   createEventoAdminController,
   deleteParticipanteAdminController,
@@ -9,6 +11,7 @@ import {
   encerrarEventoAdminController,
   fecharFrequenciaAdminController,
   getEventoAdminController,
+  getAvaliacaoResultadosAdminController,
   listEventosAdminController,
   listPalestrantesAdminController,
   listParticipantesAdminController,
@@ -16,6 +19,7 @@ import {
   publicarEventoAdminController,
   rascunhoEventoAdminController,
   regenerarTokenAdminController,
+  setAvaliacaoAtivaAdminController,
   updateEventoAdminController,
   uploadCapaAdminController,
 } from '../controllers/conteudo.controller';
@@ -42,6 +46,22 @@ router.patch('/eventos/:id/encerrar', validateUUIDParam('id'), encerrarEventoAdm
 router.patch('/eventos/:id/rascunho', validateUUIDParam('id'), rascunhoEventoAdminController);
 router.post('/eventos/:id/frequencia/abrir', validateUUIDParam('id'), abrirFrequenciaAdminController);
 router.post('/eventos/:id/frequencia/fechar', validateUUIDParam('id'), fecharFrequenciaAdminController);
+router.post(
+  '/eventos/:id/avaliacao/template-viva-atualiza',
+  validateUUIDParam('id'),
+  aplicarTemplateAvaliacaoAdminController
+);
+router.put(
+  '/eventos/:id/avaliacao',
+  validateUUIDParam('id'),
+  salvarAvaliacaoFormularioAdminController
+);
+router.patch('/eventos/:id/avaliacao/ativa', validateUUIDParam('id'), setAvaliacaoAtivaAdminController);
+router.get(
+  '/eventos/:id/avaliacao/resultados',
+  validateUUIDParam('id'),
+  getAvaliacaoResultadosAdminController
+);
 router.patch(
   '/eventos/:id/tokens/:tipo',
   validateUUIDParam('id'),

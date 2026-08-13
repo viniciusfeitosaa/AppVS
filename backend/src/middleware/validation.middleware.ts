@@ -1026,12 +1026,13 @@ export const validatePublicInscricaoForm = [
 
 export const validatePublicFrequenciaForm = [
   body('email').trim().isEmail().withMessage('Informe um e-mail válido').isLength({ max: 255 }),
+  body('respostas').optional().isObject().withMessage('Respostas da avaliação inválidas'),
   handleValidationErrors,
 ];
 
 export const validateAceitarPrecadastros = [
-  body('ids').isArray({ min: 1 }).withMessage('Informe ao menos um precadastro'),
-  body('ids.*').isUUID().withMessage('ID de precadastro inválido'),
+  body('ids').isArray({ min: 1 }).withMessage('Informe ao menos um pré-cadastro'),
+  body('ids.*').isUUID().withMessage('ID de pré-cadastro inválido'),
   handleValidationErrors,
 ];
 
