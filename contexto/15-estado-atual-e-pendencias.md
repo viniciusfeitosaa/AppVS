@@ -22,7 +22,7 @@ O **Viva Saúde** está em produção na VPS (`sejavivasaude.com.br`). Auth, esc
 | Contratos | ✅ | ✅ | |
 | Escalas / plantões | ✅ | ✅ | Trocas; **multi-escala no mesmo mês** (ver abaixo) |
 | Valores plantão/ponto | ✅ | ✅ | Por contrato/escala |
-| Ponto eletrônico | ✅ | ✅ | Geo, foto, histórico; seletor de escala |
+| Ponto eletrônico | ✅ | ✅ | Geo, foto, histórico; seletor de escala; **justificativa ausência** (`JUSTIFICADO_SEM_PONTO`) — `07` |
 | Vagas | ✅ | ✅ | Wizard de anúncio |
 | Documentos | ✅ | ✅ | DocuSeal opcional |
 | Relatórios | ✅ | ✅ | Procedimentos + ponto; PDF com logo VS |
@@ -64,11 +64,12 @@ Arquivos de referência: `schema.prisma` (`Escala`, `EscalaMedico`, `EscalaPlant
 
 ## Pendências prioritárias
 
-1. **Push (VPS + store)** — copiar service account JSON; `FIREBASE_SERVICE_ACCOUNT_PATH` (ou `_JSON`); `prisma migrate deploy` (`device_push_tokens`); restart backend; novo AAB/IPA — ver checklist em `12-mobile-capacitor.md`
-2. **Atendimentos** — definir escopo e implementar (hoje só placeholder)
-3. **Sincronizar README/CHECKLIST** ou marcar como arquivados apontando para `contexto/`
-4. **Harness** — manter esta pasta após cada feature (ver `16-como-atualizar.md`)
-5. **WhatsApp** — health no `/health` do backend (ping Evolution GO); painel master opcional (QR/status)
+1. **Justificativa de ponto (VPS + E2E)** — `prisma migrate deploy` (`20260813200000_justificativa_ausencia_ponto`); restart backend; teste manual médico → Master aceita → badge + bloqueio check-in — `07-ponto-eletronico.md`
+2. **Push (VPS + store)** — copiar service account JSON; `FIREBASE_SERVICE_ACCOUNT_PATH` (ou `_JSON`); `prisma migrate deploy` (`device_push_tokens`); restart backend; novo AAB/IPA — ver checklist em `12-mobile-capacitor.md`
+3. **Atendimentos** — definir escopo e implementar (hoje só placeholder)
+4. **Sincronizar README/CHECKLIST** ou marcar como arquivados apontando para `contexto/`
+5. **Harness** — manter esta pasta após cada feature (ver `16-como-atualizar.md`)
+6. **WhatsApp** — health no `/health` do backend (ping Evolution GO); painel master opcional (QR/status)
 
 ## Pendências menores
 
@@ -82,6 +83,7 @@ Arquivos de referência: `schema.prisma` (`Escala`, `EscalaMedico`, `EscalaPlant
 
 | Data | Entrega |
 |------|---------|
+| 2026-08-13 | **Justificativa de ausência de ponto** — pedido médico, fila Master, `JUSTIFICADO_SEM_PONTO` valor cheio, badge; falta migration VPS + E2E — `07` |
 | 2026-08-13 | **Push notifications** FCM iOS/Android + BullMQ + broadcast Master; Firebase `viva-saude-d4644` + APNs; falta VPS — `12` |
 | 2026-08-12 | Conteúdos: aba **Palestrantes** no Master — lista, busca e detalhe (dados + conteúdos vinculados) |
 | 2026-08-07 | Conteúdos: **painel de resultados da avaliação** — stats por pergunta, textos e respostas individuais |
@@ -100,6 +102,22 @@ Arquivos de referência: `schema.prisma` (`Escala`, `EscalaMedico`, `EscalaPlant
 | 2026-07 | Painel e-mail, Evolution GO |
 | 2026-04 | Trocas de plantão |
 | 2026-03 | Módulo vagas, valores plantão |
+
+### Detalhe — Justificativa de ausência de ponto (2026-08-13)
+
+**Objetivo:** médico que não concluiu o ponto (esqueceu check-out ou não bateu) solicita justificativa; Master aprova com **valor cheio do plantão**; histórico deixa explícito que não houve ponto real.
+
+| Item | Comportamento |
+|------|----------------|
+| Elegibilidade | Sem ponto **fechado** no dia/escala; inclui “só check-in”; bloqueia se `PENDENTE`/`ACEITA` no plantão |
+| Aceite | Cancela ponto aberto sem repasse; cria `RegistroPonto` `JUSTIFICADO_SEM_PONTO`; horários = auditoria |
+| Pós-aceite | Check-in normal bloqueado no mesmo dia/escala; badge **Sem ponto — justificado** |
+| API médico | `GET/POST /api/ponto/justificativas-ausencia/…` |
+| API Master | `GET/POST /api/admin/justificativas-ausencia/…` (módulo `PONTO_ELETRONICO`) |
+
+**Migration:** `20260813200000_justificativa_ausencia_ponto` — **pendente na VPS** + teste E2E manual.
+
+**Arquivos:** `justificativa-ausencia-ponto.service.ts`, `JustificarAusenciaPonto.tsx`, `JustificativasPontoAdmin.tsx`, `SituacaoRegistroPonto.tsx`, `contexto/07-ponto-eletronico.md`
 
 ### Detalhe — Conteúdos: avaliação da aula por evento (2026-08-07)
 
