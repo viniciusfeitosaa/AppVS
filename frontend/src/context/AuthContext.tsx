@@ -3,6 +3,9 @@ import { authService, LoginCredentials } from '../services/auth.service';
 import { queryClient } from '../lib/queryClient';
 import { decodeJwtPayloadUnsafe } from '../utils/jwtPayload';
 
+/** Helpers de permissão (payload de `getModulosAcesso`). */
+export { canEdit, hasAccess, isAdminPleno, nivelDeModulo } from '../services/auth.service';
+
 /** Alinha role ao access token (fonte de verdade na sessão) e normaliza strings legadas. */
 function mergeRoleFromAccessToken(user: User): User {
   let next = { ...user };

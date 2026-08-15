@@ -2,13 +2,19 @@ import { useState } from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '../../context/AuthContext';
-import { authService } from '../../services/auth.service';
+import {
+  authService,
+  hasAccess as hasModuloAccess,
+  isAdminPleno as isAdminPlenoFromPerms,
+} from '../../services/auth.service';
 import { medicoService } from '../../services/medico.service';
 import { pontoService } from '../../services/ponto.service';
 import { ModuloSistema } from '../../constants/modulos';
 import NotificationBell from './NotificationBell';
 import GlobalToasts from './GlobalToasts';
 import { BrandLogo } from '../brand/BrandLogo';
+
+export { canEdit, hasAccess, isAdminPleno } from '../../services/auth.service';
 
 type MenuItem = { to: string; label: string };
 type MenuGroup = { title: string; items: MenuItem[] };
@@ -128,11 +134,13 @@ const AppShell = () => {
     enabled: !!user,
   });
 
-  const modulosMap = modulosAcessoResp?.data?.map || ({} as Record<ModuloSistema, boolean>);
-  /** Cadastros pendentes / Avaliação: só Master (independente do mapa da API). */
+  const perms = modulosAcessoResp?.data;
+  const isAdminPleno = isAdminPlenoFromPerms(perms);
+  /** Cadastros pendentes / Avaliação: só Master. Enquanto carrega, mantém menu aberto (compat). */
   const hasAccess = (modulo: ModuloSistema) => {
     if (modulo === 'AVALIACAO' && !isMaster) return false;
-    return modulosMap[modulo] ?? true;
+    if (!modulosAcessoResp) return true;
+    return hasModuloAccess(perms, modulo);
   };
 
   /** Evita 2× GET /ponto/meu-dia: o dashboard já inclui meuDia (mesma query key que a página Dashboard). */
@@ -193,6 +201,7 @@ const AppShell = () => {
             { to: '/email', label: 'Painel de E-mail' },
             { to: '/enviar-aviso', label: 'Enviar aviso push' },
             { to: '/conteudos', label: 'Conteúdos' },
+            ...(isAdminPleno ? [{ to: '/perfis-equipe', label: 'Perfis e equipe' } as MenuItem] : []),
             { to: '/perfil', label: 'Minha Conta' },
           ],
         },
@@ -408,7 +417,7 @@ const AppShell = () => {
               <div className="rounded-2xl border border-viva-200/60 bg-gradient-to-br from-viva-50/80 to-viva-100/40 px-4 py-3">
                 <p className="text-sm font-semibold text-viva-900 truncate font-display">{user?.nomeCompleto || 'Usuário'}</p>
                 <p className="text-xs text-viva-600 mt-0.5 font-serif">
-                  {isMaster ? 'Perfil Master' : 'Perfil Profissional'}
+                  {isMaster ? 'Perfil Administrador' : 'Perfil Profissional'}
                 </p>
               </div>
 

@@ -15,6 +15,9 @@ export type ModuloSistema =
   | 'PERFIL'
   | 'CONTEUDOS';
 
+/** Nível de acesso por módulo (perfis staff / admin pleno). */
+export type NivelAcessoModulo = 'OFF' | 'VER' | 'EDITAR';
+
 export const MODULO_LABEL: Record<ModuloSistema, string> = {
   DASHBOARD: 'Dashboard',
   MEDICOS: 'Médicos',
