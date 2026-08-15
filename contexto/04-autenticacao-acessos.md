@@ -158,3 +158,4 @@ Endpoints admin (matriz histórica MASTER/MEDICO):
 - [ ] Estender `requireModuleWrite` aos demais módulos além de ESCALAS (v1.1)
 - [ ] Revisar se `CHECKLIST` de “Fase 2 Autenticação” pode ser arquivado
 - [ ] Migration `20260814210000_perfil_acesso_staff` na VPS + smoke test staff Escalista
+- [ ] Migration `20260815223000_fix_modulo_vagas_enum` na VPS (repara VAGAS se ausente no enum)
