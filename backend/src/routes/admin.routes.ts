@@ -87,6 +87,7 @@ import {
 } from '../controllers/grupo-equipe.controller';
 import {
   authenticateToken,
+  requireAdminPleno,
   requireAnyModuleAccess,
   requireModuleAccess,
   requireModuleWrite,
@@ -94,12 +95,36 @@ import {
 } from '../middleware/auth.middleware';
 import { uploadDocumentoEnviado } from '../middleware/upload.middleware';
 import { ModuloSistema, UserRole } from '@prisma/client';
-import { validateUUIDParam, validateCreateEscala, validateUpdateEscala, validateCreateEscalaPlantao, validateReplicarPlantoesMes, validateAlocarMedicoEscala, validateUpsertAdicionalPlantao, validateListAdicionaisPlantao, validateRemoverAdicionalPlantao, validateCreateTipoPlantao, validateUpdateTipoPlantao, validateSetConfigPonto, validateListJustificativasAdminQuery, validateAceitarJustificativaAusenciaPonto, validateRecusarJustificativaAusenciaPonto } from '../middleware/validation.middleware';
+import {
+  validateUUIDParam,
+  validateCreateEscala,
+  validateUpdateEscala,
+  validateCreateEscalaPlantao,
+  validateReplicarPlantoesMes,
+  validateAlocarMedicoEscala,
+  validateUpsertAdicionalPlantao,
+  validateListAdicionaisPlantao,
+  validateRemoverAdicionalPlantao,
+  validateCreateTipoPlantao,
+  validateUpdateTipoPlantao,
+  validateSetConfigPonto,
+  validateListJustificativasAdminQuery,
+  validateAceitarJustificativaAusenciaPonto,
+  validateRecusarJustificativaAusenciaPonto,
+  validateCreatePerfilAcesso,
+  validateUpdatePerfilAcesso,
+} from '../middleware/validation.middleware';
 import {
   listJustificativasAdminController,
   aceitarJustificativaController,
   recusarJustificativaController,
 } from '../controllers/justificativa-ausencia-ponto.controller';
+import {
+  createPerfilAcessoController,
+  getPerfilAcessoController,
+  listPerfisAcessoController,
+  updatePerfilAcessoController,
+} from '../controllers/perfil-acesso.controller';
 import blogAdminRoutes from './blog-admin.routes';
 import conteudoAdminRoutes from './conteudo-admin.routes';
 
@@ -330,6 +355,27 @@ router.delete('/documentos-enviados/:id', requireModuleAccess(ModuloSistema.ENVI
 router.get('/acessos-modulos', requireModuleAccess(ModuloSistema.CONFIGURACOES), getMatrizAcessosModulosController);
 router.put('/acessos-modulos', requireModuleAccess(ModuloSistema.CONFIGURACOES), salvarMatrizAcessosModulosController);
 router.post('/push/broadcast', requireModuleAccess(ModuloSistema.CONFIGURACOES), broadcastPushController);
+
+router.get('/perfis-acesso', requireAdminPleno(), listPerfisAcessoController);
+router.post(
+  '/perfis-acesso',
+  requireAdminPleno(),
+  validateCreatePerfilAcesso,
+  createPerfilAcessoController
+);
+router.get(
+  '/perfis-acesso/:id',
+  requireAdminPleno(),
+  validateUUIDParam('id'),
+  getPerfilAcessoController
+);
+router.put(
+  '/perfis-acesso/:id',
+  requireAdminPleno(),
+  validateUUIDParam('id'),
+  validateUpdatePerfilAcesso,
+  updatePerfilAcessoController
+);
 router.get('/subgrupos', requireModuleAccess(ModuloSistema.MEDICOS), listSubgruposController);
 router.post('/subgrupos', requireModuleAccess(ModuloSistema.MEDICOS), createSubgrupoController);
 router.put('/subgrupos/:id', requireModuleAccess(ModuloSistema.MEDICOS), updateSubgrupoController);
