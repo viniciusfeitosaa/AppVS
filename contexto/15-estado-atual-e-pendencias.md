@@ -1,7 +1,7 @@
 ﻿# 15 — Estado atual e pendências
 
-**Snapshot:** 2026-08-13  
-**Branch:** `main` (push FCM + Firebase na VPS ok; falta builds store + teste no aparelho)
+**Snapshot:** 2026-08-14  
+**Branch:** `feat/perfis-acesso-staff` (perfis staff entregue; merge pendente) — `main` com push FCM + Firebase na VPS ok; falta builds store + teste no aparelho
 
 > Este arquivo deve ser o **primeiro** atualizado após entregas relevantes.  
 > É o **mapa de bordo** do projeto (o que está pronto, o que falta, histórico recente).
@@ -20,7 +20,7 @@ O **Viva Saúde** está em produção na VPS (`sejavivasaude.com.br`). Auth, esc
 | Dashboard | ✅ | ✅ | |
 | Médicos | ✅ | ✅ | Convites, status cadastro; ATIVO via convite **ou** precadastro aceito |
 | Contratos | ✅ | ✅ | |
-| Escalas / plantões | ✅ | ✅ | Trocas; **multi-escala no mesmo mês** (ver abaixo) |
+| Escalas / plantões | ✅ | ✅ | Trocas; **multi-escala no mesmo mês** (médico); **1 escala por equipe** — `06` |
 | Valores plantão/ponto | ✅ | ✅ | Por contrato/escala |
 | Ponto eletrônico | ✅ | ✅ | Geo, foto, histórico; seletor de escala; **justificativa ausência** (`JUSTIFICADO_SEM_PONTO`) — `07` |
 | Vagas | ✅ | ✅ | Wizard de anúncio |
@@ -30,7 +30,8 @@ O **Viva Saúde** está em produção na VPS (`sejavivasaude.com.br`). Auth, esc
 | WhatsApp (Evolution GO) | ✅ | — | Menu atendimento; pausar/retomar (equipe) |
 | Conteúdos / eventos | ✅ | ✅ | Anúncio, frequência, **avaliação custom por evento**, precadastro→aceite→corpo clínico — `17-conteudos-eventos.md` |
 | Mobile / Capacitor | ✅ | ✅ | Push FCM na VPS (Firebase ok); falta AAB/IPA + teste — `12` |
-| Configurações / módulos | ✅ | ✅ | Matriz de acesso |
+| Configurações / módulos | ✅ | ✅ | Matriz de acesso MASTER/MEDICO |
+| Perfis staff / escalista | ✅ | ✅ | `PerfilAcesso` OFF/VER/EDITAR; `/perfis-equipe`; Escalas v1 — `04` |
 | Avaliação (master) | ✅ | ✅ | Só cadastro público `/cadastro` (não precadastro aceito) |
 | Atendimentos | — | ⏳ Placeholder | `FeaturePlaceholder` |
 | Landing | ✅ | ✅ | + pasta `landing/` |
@@ -64,12 +65,13 @@ Arquivos de referência: `schema.prisma` (`Escala`, `EscalaMedico`, `EscalaPlant
 
 ## Pendências prioritárias
 
-1. **Justificativa de ponto (VPS + E2E)** — `prisma migrate deploy` (`20260813200000_justificativa_ausencia_ponto`); restart backend; teste manual médico → Master aceita → badge + bloqueio check-in — `07-ponto-eletronico.md`
-2. **Push (VPS + store)** — copiar service account JSON; `FIREBASE_SERVICE_ACCOUNT_PATH` (ou `_JSON`); `prisma migrate deploy` (`device_push_tokens`); restart backend; novo AAB/IPA — ver checklist em `12-mobile-capacitor.md`
-3. **Atendimentos** — definir escopo e implementar (hoje só placeholder)
-4. **Sincronizar README/CHECKLIST** ou marcar como arquivados apontando para `contexto/`
-5. **Harness** — manter esta pasta após cada feature (ver `16-como-atualizar.md`)
-6. **WhatsApp** — health no `/health` do backend (ping Evolution GO); painel master opcional (QR/status)
+1. **Perfis staff (VPS + smoke)** — `prisma migrate deploy` (`20260814210000_perfil_acesso_staff`); criar perfil Escalista; login staff VER vs EDITAR — `04-autenticacao-acessos.md`
+2. **Justificativa de ponto (VPS + E2E)** — `prisma migrate deploy` (`20260813200000_justificativa_ausencia_ponto`); restart backend; teste manual médico → Master aceita → badge + bloqueio check-in — `07-ponto-eletronico.md`
+3. **Push (VPS + store)** — copiar service account JSON; `FIREBASE_SERVICE_ACCOUNT_PATH` (ou `_JSON`); `prisma migrate deploy` (`device_push_tokens`); restart backend; novo AAB/IPA — ver checklist em `12-mobile-capacitor.md`
+4. **Atendimentos** — definir escopo e implementar (hoje só placeholder)
+5. **Sincronizar README/CHECKLIST** ou marcar como arquivados apontando para `contexto/`
+6. **Harness** — manter esta pasta após cada feature (ver `16-como-atualizar.md`)
+7. **WhatsApp** — health no `/health` do backend (ping Evolution GO); painel master opcional (QR/status)
 
 ## Pendências menores
 
@@ -83,6 +85,9 @@ Arquivos de referência: `schema.prisma` (`Escala`, `EscalaMedico`, `EscalaPlant
 
 | Data | Entrega |
 |------|---------|
+| 2026-08-14 | **Perfis de acesso staff** — `PerfilAcesso` OFF/VER/EDITAR; `/perfis-equipe`; Escalas read-only se VER; migration `20260814210000` — `04` |
+| 2026-08-14 | **Tipos de plantão** movidos para Escalas (aba Tipos); ValoresPlantao só aponta link — `06` |
+| 2026-08-14 | **1 escala por equipe** — UI `SubgruposEquipes` + API 409 ao vincular segunda; excluir libera nova — `06` |
 | 2026-08-13 | **Justificativa de ausência de ponto** — pedido médico, fila Master, `JUSTIFICADO_SEM_PONTO` valor cheio, badge; falta migration VPS + E2E — `07` |
 | 2026-08-13 | **Push notifications** FCM iOS/Android + BullMQ + broadcast Master; Firebase `viva-saude-d4644` + APNs; falta VPS — `12` |
 | 2026-08-12 | Conteúdos: aba **Palestrantes** no Master — lista, busca e detalhe (dados + conteúdos vinculados) |

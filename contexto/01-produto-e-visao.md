@@ -1,7 +1,7 @@
 # 01 — Produto e visão
 
 **Status:** ✅ Estável (conceito)  
-**Última atualização:** 2026-05-28
+**Última atualização:** 2026-08-14
 
 ## O que é
 
@@ -18,7 +18,10 @@
 |---------|-------------------|---------------|
 | Médico | `MEDICO` | Ponto, calendário de plantões, documentos, vagas, perfil |
 | Gestor / admin clínico | `MASTER` | Médicos, escalas, contratos, relatórios, configurações |
+| Staff / escalista | `MASTER` (com perfil) | Conta e-mail/senha como admin, restrita por perfil customizado (ex.: só Escalas em VER ou EDITAR); não gerencia perfis nem configurações globais |
 | Visitante | — | Landing, cadastro público, política de privacidade |
+
+**Staff (escalista etc.):** o administrador pleno cria perfis nomeados (ex.: “Escalista”) com nível por módulo (`OFF` / `VER` / `EDITAR`) e vincula usuários staff em **Perfis e equipe** (`/perfis-equipe`). O escalista enxerga apenas os módulos liberados — tipicamente Escalas para montar plantões — sem acesso pleno a Configurações ou gestão de outros admins. Médicos (`MEDICO`) e a matriz MASTER/MEDICO em Minha Conta não mudam; staff resolve permissões pelo perfil customizado.
 
 ## Domínios de negócio (módulos)
 
