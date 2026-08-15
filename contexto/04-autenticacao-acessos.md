@@ -126,7 +126,8 @@ Defaults em `backend/src/constants/modulos.const.ts`.
 
 Endpoints admin (matriz histórica MASTER/MEDICO):
 
-- `GET/PUT /api/admin/acessos-modulos` — matriz MASTER configura o que cada perfil vê (médicos)
+- `GET /api/admin/acessos-modulos` — matriz MASTER/MEDICO (acesso ≥ VER em CONFIGURACOES)
+- `PUT /api/admin/acessos-modulos` e `POST /api/admin/push/broadcast` — **somente admin pleno** (`requireAdminPleno`)
 
 ## Segurança
 
@@ -147,6 +148,7 @@ Endpoints admin (matriz histórica MASTER/MEDICO):
 - `requireModuleWrite` em rotas mutáveis de ESCALAS; login bloqueia usuário/perfil inativo
 - Front: `/perfis-equipe`, `hasAccess`/`canEdit`, Escalas/Subgrupos só leitura se VER
 - Regras: sem CONFIGURACOES=EDITAR em perfis custom; PERFIL ≥ VER
+- Gate segurança: mutações CONFIGURACOES (matriz + broadcast) só admin pleno; `requireModuleWrite` nos demais módulos = v1.1
 - Arquivos: `acesso-modulo.service.ts`, `auth.middleware.ts`, `perfil-acesso.*`, `usuario-staff.*`, `PerfisEquipe.tsx`, `useModuloNivel.ts`, `Escalas.tsx`, `SubgruposEquipes.tsx`
 - Migration: `20260814210000_perfil_acesso_staff`
 - Design: `docs/superpowers/specs/2026-08-14-perfis-acesso-staff-design.md`
