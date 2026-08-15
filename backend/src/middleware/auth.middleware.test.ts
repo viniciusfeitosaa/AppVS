@@ -196,4 +196,27 @@ describe('auth middleware niveis', () => {
       expect(next).not.toHaveBeenCalled();
     });
   });
+
+  describe('gate Task10 Finding1 — CONFIGURACOES mutações (admin pleno)', () => {
+    it('staff CONFIGURACOES=VER: requireModuleAccess next(); requireAdminPleno 403 (PUT matriz / POST broadcast)', async () => {
+      mockPossuiAcesso.mockResolvedValue(true);
+      mockGetNiveis.mockResolvedValue({ isAdminPleno: false, map: {} });
+      const req = mockReq({ id: userId, role: UserRole.MASTER, tenantId });
+
+      const resAccess = mockRes();
+      await requireModuleAccess(ModuloSistema.CONFIGURACOES)(req, resAccess, next);
+      expect(next).toHaveBeenCalledTimes(1);
+      expect(resAccess.status).not.toHaveBeenCalled();
+
+      const resPleno = mockRes();
+      const nextPleno = jest.fn();
+      await requireAdminPleno()(req, resPleno, nextPleno);
+      expect(resPleno.status).toHaveBeenCalledWith(403);
+      expect(resPleno.json).toHaveBeenCalledWith({
+        success: false,
+        error: expect.stringMatching(/admin(?:istrador)? pleno/i),
+      });
+      expect(nextPleno).not.toHaveBeenCalled();
+    });
+  });
 });

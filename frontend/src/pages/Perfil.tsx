@@ -13,6 +13,7 @@ import {
 } from '../constants/documentosPerfil';
 import { MODULO_LABEL, ModuloSistema } from '../constants/modulos';
 import { ESPECIALIDADES_MEDICAS } from '../constants/profissoesEspecialidades';
+import { useModuloNivel } from '../hooks/useModuloNivel';
 
 type TabPerfil = 'pessoais' | 'bancarios' | 'documentos' | 'conta';
 
@@ -21,6 +22,7 @@ const Perfil = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const isMaster = user?.role === 'MASTER';
+  const { isAdminPleno } = useModuloNivel('CONFIGURACOES');
   const [activeTab, setActiveTab] = useState<TabPerfil>('pessoais');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -70,7 +72,7 @@ const Perfil = () => {
   const { data: acessosResp, isLoading: loadingAcessos } = useQuery({
     queryKey: ['admin', 'acessos-modulos', user?.id],
     queryFn: () => adminService.getMatrizAcessosModulos(),
-    enabled: !!user && isMaster,
+    enabled: !!user && isMaster && isAdminPleno,
   });
 
   useEffect(() => {
@@ -531,7 +533,7 @@ const Perfil = () => {
         </div>
       )}
 
-      {isMaster && (
+      {isMaster && isAdminPleno && (
         <div className="card stagger-2 border-l-4 border-l-viva-500">
           <h3 className="text-sm font-semibold uppercase tracking-wider text-viva-600 mb-2 font-display">Administração de Acesso por Módulo</h3>
           <p className="text-sm text-viva-700 mb-4 font-serif">

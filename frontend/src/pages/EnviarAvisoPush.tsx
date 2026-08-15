@@ -1,7 +1,9 @@
 import { useState } from 'react';
 import { adminService } from '../services/admin.service';
+import { useModuloNivel } from '../hooks/useModuloNivel';
 
 const EnviarAvisoPush = () => {
+  const { isAdminPleno, loaded } = useModuloNivel('CONFIGURACOES');
   const [titulo, setTitulo] = useState('');
   const [corpo, setCorpo] = useState('');
   const [loading, setLoading] = useState(false);
@@ -10,6 +12,7 @@ const EnviarAvisoPush = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!isAdminPleno) return;
     setLoading(true);
     setError(null);
     setSuccess(null);
@@ -27,6 +30,16 @@ const EnviarAvisoPush = () => {
       setLoading(false);
     }
   };
+
+  if (loaded && !isAdminPleno) {
+    return (
+      <div className="card border-l-4 border-amber-400 bg-amber-50/50 p-4">
+        <p className="text-sm text-viva-800 font-serif">
+          Apenas o administrador pleno pode enviar avisos push.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">

@@ -358,8 +358,8 @@ router.get('/documentos-enviados', requireModuleAccess(ModuloSistema.ENVIO_DOCUM
 router.post('/documentos-enviados', requireModuleAccess(ModuloSistema.ENVIO_DOCUMENTOS), uploadDocumentoEnviado.single('arquivo'), uploadDocumentoEnviadoController);
 router.delete('/documentos-enviados/:id', requireModuleAccess(ModuloSistema.ENVIO_DOCUMENTOS), deleteDocumentoEnviadoController);
 router.get('/acessos-modulos', requireModuleAccess(ModuloSistema.CONFIGURACOES), getMatrizAcessosModulosController);
-router.put('/acessos-modulos', requireModuleAccess(ModuloSistema.CONFIGURACOES), salvarMatrizAcessosModulosController);
-router.post('/push/broadcast', requireModuleAccess(ModuloSistema.CONFIGURACOES), broadcastPushController);
+router.put('/acessos-modulos', requireAdminPleno(), salvarMatrizAcessosModulosController);
+router.post('/push/broadcast', requireAdminPleno(), broadcastPushController);
 
 router.get('/perfis-acesso', requireAdminPleno(), listPerfisAcessoController);
 router.post(

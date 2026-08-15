@@ -260,8 +260,8 @@ const AppShell = () => {
     .map((group) => ({
       ...group,
       items: group.items.filter((item) => {
-        // Rota só admin pleno — sem módulo em moduloByRoute
-        if (item.to === '/perfis-equipe') return isAdminPleno;
+        // Rotas só admin pleno (matriz/broadcast/perfis)
+        if (item.to === '/perfis-equipe' || item.to === '/enviar-aviso') return isAdminPleno;
         return hasAccess(moduloByRoute[item.to]);
       }),
     }))
