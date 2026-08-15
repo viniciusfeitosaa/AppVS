@@ -6,6 +6,7 @@ import autoTable from 'jspdf-autotable';
 import { useAuth } from '../context/AuthContext';
 import { useMasterEscopo } from '../context/MasterEscopoContext';
 import { useDebouncedValue } from '../hooks/useDebouncedValue';
+import { useModuloNivel } from '../hooks/useModuloNivel';
 import {
   adminService,
   Escala,
@@ -17,6 +18,7 @@ import {
 import { fixMojibake } from '../utils/validation.util';
 import { notify } from '../lib/notificationEmitter';
 import { addPdfBrandHeader } from '../utils/pdf-branding';
+import { TiposPlantaoContratoPanel } from '../components/TiposPlantaoContratoPanel';
 
 interface EscalaFormState {
   contratoAtivoId: string;
@@ -176,6 +178,7 @@ const Escalas = () => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const isMaster = user?.role === 'MASTER';
+  const { canEdit: podeEditarEscalas } = useModuloNivel('ESCALAS');
   const {
     contratoId: filtroListaContratoId,
     subgrupoId: selectedSubgrupoId,
@@ -219,7 +222,7 @@ const Escalas = () => {
   const [searchGrupos, setSearchGrupos] = useState('');
   /** Contrato / subgrupo / equipe vêm do MasterEscopo (partilhado entre módulos + localStorage). */
   /** Aba ativa no painel lateral da equipe. */
-  const [equipePanelTab, setEquipePanelTab] = useState<'calendario' | 'editar' | 'membros' | 'historico' | 'relatorio'>('calendario');
+  const [equipePanelTab, setEquipePanelTab] = useState<'calendario' | 'editar' | 'membros' | 'historico' | 'relatorio' | 'tipos'>('calendario');
   /** Aba Membros: busca e seleção para adicionar profissionais à equipe. */
   const [membrosEquipeBusca, setMembrosEquipeBusca] = useState('');
   const [membrosNaEquipeBusca, setMembrosNaEquipeBusca] = useState('');
@@ -774,8 +777,8 @@ const Escalas = () => {
   }, [selectedEscalaId, selectedEscala]);
 
   const gradeSomenteLeitura = useMemo(
-    () => selectedEscala?.ativo === true && !gradeEdicaoLiberada,
-    [selectedEscala?.ativo, gradeEdicaoLiberada]
+    () => !podeEditarEscalas || (selectedEscala?.ativo === true && !gradeEdicaoLiberada),
+    [podeEditarEscalas, selectedEscala?.ativo, gradeEdicaoLiberada]
   );
 
   /** Calendário da equipe não define selectedEscalaId; tipos vinham vazios e a UI caía só em MT/SN fixos. */
@@ -1630,6 +1633,7 @@ const Escalas = () => {
       { id: 'calendario', label: 'Calendário' },
       { id: 'editar', label: 'Editar escala' },
       { id: 'membros', label: 'Membros' },
+      { id: 'tipos', label: 'Tipos' },
       { id: 'historico', label: 'Histórico' },
       { id: 'relatorio', label: 'Relatório' },
     ];
@@ -1692,13 +1696,15 @@ const Escalas = () => {
                     onChange={(e) => setSearchGrupos(e.target.value)}
                     className="w-full pl-10 pr-4 py-2.5 text-base border border-viva-200 rounded-lg outline-none bg-viva-50/50 focus:ring-2 focus:ring-viva-500/30 focus:border-viva-500"
                   />
-                  <Link
-                    to="/subgrupos-equipes"
-                    className="flex-shrink-0 flex items-center justify-center w-12 h-12 rounded-lg bg-viva-100 hover:bg-viva-200 text-viva-800 transition"
-                    title="Criar subgrupo ou equipe"
-                  >
-                    <svg className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" /></svg>
-                  </Link>
+                  {podeEditarEscalas && (
+                    <Link
+                      to="/subgrupos-equipes"
+                      className="flex-shrink-0 flex items-center justify-center w-12 h-12 rounded-lg bg-viva-100 hover:bg-viva-200 text-viva-800 transition"
+                      title="Criar subgrupo ou equipe"
+                    >
+                      <svg className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" /></svg>
+                    </Link>
+                  )}
                 </div>
               </div>
             ) : null}
@@ -1829,6 +1835,7 @@ const Escalas = () => {
                   {tab.id === 'calendario' && <svg className="w-6 h-6 mb-1" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" /><path d="M16 2v4M8 2v4M3 10h18" /></svg>}
                   {tab.id === 'editar' && <svg className="w-6 h-6 mb-1" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>}
                   {tab.id === 'membros' && <svg className="w-6 h-6 mb-1" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" /></svg>}
+                  {tab.id === 'tipos' && <svg className="w-6 h-6 mb-1" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M12 8v4l3 3" /><circle cx="12" cy="12" r="9" /></svg>}
                   {tab.id === 'historico' && <svg className="w-6 h-6 mb-1" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" /><path d="M12 6v6l4 2" /></svg>}
                   {tab.id === 'relatorio' && <svg className="w-6 h-6 mb-1" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8" /></svg>}
                   <span>{tab.label}</span>
@@ -1855,16 +1862,20 @@ const Escalas = () => {
                       </div>
                       <h3 className="text-lg font-semibold text-viva-900 mb-2">Nenhuma escala vinculada</h3>
                       <p className="text-sm text-gray-600 mb-4">O subgrupo desta equipe ainda não possui escala. Crie uma escala e vincule o subgrupo e a equipe para visualizar o calendário.</p>
-                      <Link
-                        to="/subgrupos-equipes"
-                        state={{
-                          subgrupoId: selectedEquipe?.subgrupoId ?? selectedEquipe?.subgrupo?.id ?? '',
-                          equipeId: selectedEquipeId ?? '',
-                        }}
-                        className="btn btn-primary"
-                      >
-                        Criar escala e vincular
-                      </Link>
+                      {podeEditarEscalas ? (
+                        <Link
+                          to="/subgrupos-equipes"
+                          state={{
+                            subgrupoId: selectedEquipe?.subgrupoId ?? selectedEquipe?.subgrupo?.id ?? '',
+                            equipeId: selectedEquipeId ?? '',
+                          }}
+                          className="btn btn-primary"
+                        >
+                          Criar escala e vincular
+                        </Link>
+                      ) : (
+                        <p className="text-sm text-viva-600 font-serif">Somente leitura — peça acesso EDITAR em Escalas para criar.</p>
+                      )}
                     </div>
                   );
                 }
@@ -2088,6 +2099,10 @@ const Escalas = () => {
                       <>
                         <div className="mb-4 pb-4 border-b border-viva-100">
                           <p className="text-xs font-semibold uppercase tracking-wide text-viva-600 mb-2">Adicionar profissionais</p>
+                          {!podeEditarEscalas ? (
+                            <p className="text-sm text-viva-600 font-serif">Somente leitura — sem permissão para alterar membros.</p>
+                          ) : (
+                          <>
                           <input
                             type="text"
                             className="input w-full py-2 text-sm mb-2"
@@ -2154,6 +2169,8 @@ const Escalas = () => {
                               </button>
                             </>
                           )}
+                          </>
+                          )}
                         </div>
                         <p className="text-xs font-semibold uppercase tracking-wide text-viva-600 mb-2">Na equipe</p>
                         {equipeMedicos.length === 0 ? (
@@ -2194,14 +2211,16 @@ const Escalas = () => {
                                             Alocado na escala
                                           </span>
                                         )}
-                                        <button
-                                          type="button"
-                                          className="btn btn-secondary text-xs py-1 px-2"
-                                          disabled={membrosEquipeActionLoading}
-                                          onClick={() => removerMedicoDaEquipePainel(equipeIdAlvo, em.medicoId)}
-                                        >
-                                          Remover
-                                        </button>
+                                        {podeEditarEscalas && (
+                                          <button
+                                            type="button"
+                                            className="btn btn-secondary text-xs py-1 px-2"
+                                            disabled={membrosEquipeActionLoading}
+                                            onClick={() => removerMedicoDaEquipePainel(equipeIdAlvo, em.medicoId)}
+                                          >
+                                            Remover
+                                          </button>
+                                        )}
                                       </div>
                                     </li>
                                   )
@@ -2215,6 +2234,18 @@ const Escalas = () => {
                   </div>
                 );
               })()}
+              {equipePanelTab === 'tipos' && isMaster && (
+                <TiposPlantaoContratoPanel
+                  compact
+                  readOnly={!podeEditarEscalas}
+                  contratoAtivoId={
+                    contratoAtivoIdContext ||
+                    contratoAtivoIdParaTipos ||
+                    filtroListaContratoId ||
+                    ''
+                  }
+                />
+              )}
               {equipePanelTab === 'historico' && (() => {
                 if (!selectedEquipeId) {
                   return (
@@ -2651,7 +2682,7 @@ const Escalas = () => {
                                   )}
                                 </div>
                               </div>
-                              {isMaster && !!contratoAtivoIdContext && plantoesDiaDateStr && (
+                              {isMaster && podeEditarEscalas && !!contratoAtivoIdContext && plantoesDiaDateStr && (
                                 <button
                                   type="button"
                                   className="px-3 py-1.5 rounded-lg bg-white/15 hover:bg-white/25 transition text-[12px] font-semibold normal-case"
@@ -2796,16 +2827,18 @@ const Escalas = () => {
                       <option key={e.id} value={e.id}>{e.nome}</option>
                     ))}
                   </select>
-                  <button type="button" className="btn btn-primary" onClick={() => { setForm({ ...emptyForm, ...getDefaultScaleDates() }); setEditingEscalaId(null); setError(null); setEscalaFormModalOpen(true); }}>
-                    Nova escala
-                  </button>
+                  {podeEditarEscalas && (
+                    <button type="button" className="btn btn-primary" onClick={() => { setForm({ ...emptyForm, ...getDefaultScaleDates() }); setEditingEscalaId(null); setError(null); setEscalaFormModalOpen(true); }}>
+                      Nova escala
+                    </button>
+                  )}
                 </div>
               </div>
               <div className="overflow-y-auto flex-1 p-4">
         {loadingEscalas ? (
                   <p className="text-sm text-viva-700 font-serif">Carregando escalas...</p>
         ) : escalas.length === 0 ? (
-                  <p className="text-sm text-viva-700 font-serif">Nenhuma escala cadastrada. Clique em &quot;Nova escala&quot; para criar.</p>
+                  <p className="text-sm text-viva-700 font-serif">{podeEditarEscalas ? 'Nenhuma escala cadastrada. Clique em "Nova escala" para criar.' : 'Nenhuma escala cadastrada.'}</p>
         ) : (
           <div className="space-y-2">
             {escalas.map((escala) => (
@@ -2824,8 +2857,12 @@ const Escalas = () => {
                     </p>
                   </button>
                         <div className="flex gap-2 shrink-0">
-                          <button type="button" className="btn-sm btn-secondary" onClick={() => { startEdit(escala); setEscalaFormModalOpen(true); }}>Editar</button>
-                          <button type="button" className="btn-sm btn-secondary" onClick={() => deleteEscala(escala)}>Excluir</button>
+                          {podeEditarEscalas && (
+                            <>
+                              <button type="button" className="btn-sm btn-secondary" onClick={() => { startEdit(escala); setEscalaFormModalOpen(true); }}>Editar</button>
+                              <button type="button" className="btn-sm btn-secondary" onClick={() => deleteEscala(escala)}>Excluir</button>
+                            </>
+                          )}
                         </div>
                       </div>
                     ))}
@@ -3079,7 +3116,9 @@ const Escalas = () => {
                             />
                           </svg>
                         </span>
-                        <span className="font-semibold font-display text-sm text-viva-900">Escala publicada</span>
+                        <span className="font-semibold font-display text-sm text-viva-900">
+                          {!podeEditarEscalas ? 'Somente leitura' : 'Escala publicada'}
+                        </span>
                       </div>
                     </div>
                   )}
@@ -3117,15 +3156,17 @@ const Escalas = () => {
                   >
                     Imprimir
                   </button>
-                  <button
-                    type="button"
-                    className="btn btn-secondary text-sm"
-                    disabled={!selectedEscalaId || loadingAction || replicarMesSubmitting}
-                    onClick={abrirModalReplicarMes}
-                  >
-                    Replicar
-                  </button>
-                  {selectedEscala?.ativo && !gradeEdicaoLiberada && (
+                  {podeEditarEscalas && (
+                    <button
+                      type="button"
+                      className="btn btn-secondary text-sm"
+                      disabled={!selectedEscalaId || loadingAction || replicarMesSubmitting}
+                      onClick={abrirModalReplicarMes}
+                    >
+                      Replicar
+                    </button>
+                  )}
+                  {podeEditarEscalas && selectedEscala?.ativo && !gradeEdicaoLiberada && (
                     <button
                       type="button"
                       className="btn btn-secondary text-sm"
@@ -3137,7 +3178,7 @@ const Escalas = () => {
                       Editar escala
                     </button>
                   )}
-                  {selectedEscala?.ativo && gradeEdicaoLiberada && (
+                  {podeEditarEscalas && selectedEscala?.ativo && gradeEdicaoLiberada && (
                     <button
                       type="button"
                       className="btn btn-secondary text-sm"
@@ -3149,7 +3190,7 @@ const Escalas = () => {
                       Cancelar edição
                     </button>
                   )}
-                  {selectedEscala && (!selectedEscala.ativo || gradeEdicaoLiberada) && (
+                  {podeEditarEscalas && selectedEscala && (!selectedEscala.ativo || gradeEdicaoLiberada) && (
                     <button
                       type="button"
                       className="btn btn-primary text-sm"
@@ -3183,7 +3224,7 @@ const Escalas = () => {
         </div>
       </main>
 
-      {escalaFormModalOpen && (
+      {escalaFormModalOpen && podeEditarEscalas && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" onClick={() => resetForm()}>
           <div className="bg-white rounded-xl shadow-xl max-w-lg w-full p-6" onClick={(e) => e.stopPropagation()}>
             <h3 className="text-xs font-semibold uppercase tracking-wider text-viva-600 mb-4 font-display">{editingEscalaId ? 'Editar escala' : 'Nova escala'}</h3>
@@ -3208,7 +3249,7 @@ const Escalas = () => {
         </div>
       )}
 
-      {replicarMesModalOpen && selectedEscala && (
+      {replicarMesModalOpen && podeEditarEscalas && selectedEscala && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50"
           onClick={() => {
