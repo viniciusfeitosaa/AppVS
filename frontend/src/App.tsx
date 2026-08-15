@@ -26,6 +26,7 @@ import Medicos from './pages/Medicos';
 import FeaturePlaceholder from './pages/FeaturePlaceholder';
 import ContratosAtivos from './pages/ContratosAtivos';
 const Escalas = lazy(() => import('./pages/Escalas'));
+const PerfisEquipe = lazy(() => import('./pages/PerfisEquipe'));
 import SubgruposEquipes from './pages/SubgruposEquipes';
 import ValoresPlantao from './pages/ValoresPlantao';
 import ValoresPonto from './pages/ValoresPonto';
@@ -199,6 +200,16 @@ function AppRoutes() {
           element={
             <MasterOnly>
               <EnviarAvisoPush />
+            </MasterOnly>
+          }
+        />
+        <Route
+          path="/perfis-equipe"
+          element={
+            <MasterOnly>
+              <Suspense fallback={<PageLoadingScreen />}>
+                <PerfisEquipe />
+              </Suspense>
             </MasterOnly>
           }
         />

@@ -1,7 +1,64 @@
 import api from './api';
-import { ModuloSistema } from '../constants/modulos';
+import { ModuloSistema, NivelAcessoModulo } from '../constants/modulos';
 
 export type StatusJustificativaAusenciaAdmin = 'PENDENTE' | 'ACEITA' | 'RECUSADA';
+
+export interface PerfilAcessoModuloItem {
+  modulo: ModuloSistema;
+  nivel: NivelAcessoModulo;
+}
+
+export interface PerfilAcessoItem {
+  id: string;
+  tenantId: string;
+  nome: string;
+  descricao: string | null;
+  ativo: boolean;
+  createdAt: string;
+  updatedAt: string;
+  modulos: PerfilAcessoModuloItem[];
+  _count?: { usuarios: number };
+}
+
+export interface CreatePerfilAcessoPayload {
+  nome: string;
+  descricao?: string | null;
+  ativo?: boolean;
+  modulos: PerfilAcessoModuloItem[];
+}
+
+export interface UpdatePerfilAcessoPayload {
+  nome?: string;
+  descricao?: string | null;
+  ativo?: boolean;
+  modulos?: PerfilAcessoModuloItem[];
+}
+
+export interface UsuarioStaffItem {
+  id: string;
+  nome: string;
+  email: string;
+  ativo: boolean;
+  perfilAcessoId: string | null;
+  createdAt: string;
+  updatedAt: string;
+  perfilAcesso: { id: string; nome: string; ativo: boolean } | null;
+}
+
+export interface CreateUsuarioStaffPayload {
+  nome: string;
+  email: string;
+  senha: string;
+  perfilAcessoId: string;
+  ativo?: boolean;
+}
+
+export interface UpdateUsuarioStaffPayload {
+  nome?: string;
+  perfilAcessoId?: string | null;
+  ativo?: boolean;
+  senha?: string;
+}
 
 export interface JustificativaAusenciaAdminItem {
   id: string;
@@ -1056,6 +1113,48 @@ export const adminService = {
       message?: string;
       data: JustificativaAusenciaAdminItem;
     }>(`/admin/justificativas-ausencia/${id}/recusar`, payload ?? {});
+    return response.data;
+  },
+
+  listPerfisAcesso: async () => {
+    const response = await api.get<{ success: boolean; data: PerfilAcessoItem[] }>('/admin/perfis-acesso');
+    return response.data;
+  },
+
+  createPerfilAcesso: async (payload: CreatePerfilAcessoPayload) => {
+    const response = await api.post<{ success: boolean; data: PerfilAcessoItem }>(
+      '/admin/perfis-acesso',
+      payload
+    );
+    return response.data;
+  },
+
+  updatePerfilAcesso: async (id: string, payload: UpdatePerfilAcessoPayload) => {
+    const response = await api.put<{ success: boolean; data: PerfilAcessoItem }>(
+      `/admin/perfis-acesso/${id}`,
+      payload
+    );
+    return response.data;
+  },
+
+  listUsuariosStaff: async () => {
+    const response = await api.get<{ success: boolean; data: UsuarioStaffItem[] }>('/admin/usuarios-staff');
+    return response.data;
+  },
+
+  createUsuarioStaff: async (payload: CreateUsuarioStaffPayload) => {
+    const response = await api.post<{ success: boolean; data: UsuarioStaffItem }>(
+      '/admin/usuarios-staff',
+      payload
+    );
+    return response.data;
+  },
+
+  updateUsuarioStaff: async (id: string, payload: UpdateUsuarioStaffPayload) => {
+    const response = await api.put<{ success: boolean; data: UsuarioStaffItem }>(
+      `/admin/usuarios-staff/${id}`,
+      payload
+    );
     return response.data;
   },
 };

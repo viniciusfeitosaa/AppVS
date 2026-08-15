@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { NavLink, Outlet } from 'react-router-dom';
+import { NavLink, Navigate, Outlet, useLocation } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '../../context/AuthContext';
 import {
@@ -125,6 +125,7 @@ const getMobileIcon = (label: string) => {
 
 const AppShell = () => {
   const { user, logout } = useAuth();
+  const location = useLocation();
   const isMaster = user?.role === 'MASTER';
   const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
   const [openDesktopGroup, setOpenDesktopGroup] = useState<string | null>(null);
@@ -258,7 +259,11 @@ const AppShell = () => {
   const menuGroups: MenuGroup[] = menuGroupsBase
     .map((group) => ({
       ...group,
-      items: group.items.filter((item) => hasAccess(moduloByRoute[item.to])),
+      items: group.items.filter((item) => {
+        // Rota só admin pleno — sem módulo em moduloByRoute
+        if (item.to === '/perfis-equipe') return isAdminPleno;
+        return hasAccess(moduloByRoute[item.to]);
+      }),
     }))
     .filter((group) => group.items.length > 0);
 
@@ -356,7 +361,11 @@ const AppShell = () => {
       </header>
 
       <main className="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 py-8 pb-28 lg:pb-10">
-        <Outlet />
+        {location.pathname === '/perfis-equipe' && modulosAcessoResp && !isAdminPleno ? (
+          <Navigate to="/acesso-negado" replace />
+        ) : (
+          <Outlet />
+        )}
       </main>
 
       <nav className="lg:hidden fixed bottom-0 inset-x-0 z-30 bg-white/90 backdrop-blur-md border-t border-[var(--app-border)] rounded-t-2xl shadow-[0_-8px_30px_rgba(8,50,20,0.08)]">
