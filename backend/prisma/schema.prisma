@@ -71,6 +71,12 @@ enum ModuloSistema {
   CONTEUDOS
 }
 
+enum NivelAcessoModulo {
+  OFF
+  VER
+  EDITAR
+}
+
 enum StatusInteresseVaga {
   PENDENTE
   ACEITO
@@ -121,6 +127,7 @@ model Tenant {
   conteudoEventos         ConteudoEvento[]
   conteudoParticipantes   ConteudoParticipante[]
   justificativasAusenciaPonto JustificativaAusenciaPonto[]
+  perfisAcesso                PerfilAcesso[]
 
   @@map("tenants")
   @@index([slug])
@@ -179,10 +186,12 @@ model UsuarioMaster {
   senhaHash String   @map("senha_hash") @db.VarChar(255)
   role      UserRole @default(MASTER)
   ativo     Boolean  @default(true)
+  perfilAcessoId String? @map("perfil_acesso_id")
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
   tenant       Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  perfilAcesso PerfilAcesso? @relation(fields: [perfilAcessoId], references: [id], onDelete: SetNull)
   sessoes      SessaoMaster[]
   auditoriaLog Auditoria[]   @relation("auditoria_master")
   blogPosts    BlogPost[]
@@ -371,6 +380,39 @@ model AcessoModuloPerfil {
   @@index([tenantId])
   @@index([perfil])
   @@index([modulo])
+}
+
+model PerfilAcesso {
+  id        String   @id @default(uuid())
+  tenantId  String   @map("tenant_id")
+  nome      String   @db.VarChar(120)
+  descricao String?  @db.Text
+  ativo     Boolean  @default(true)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  tenant  Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  modulos PerfilAcessoModulo[]
+  usuarios UsuarioMaster[]
+
+  @@map("perfis_acesso")
+  @@unique([tenantId, nome])
+  @@index([tenantId])
+}
+
+model PerfilAcessoModulo {
+  id             String            @id @default(uuid())
+  perfilAcessoId String            @map("perfil_acesso_id")
+  modulo         ModuloSistema
+  nivel          NivelAcessoModulo @default(OFF)
+  createdAt      DateTime          @default(now()) @map("created_at")
+  updatedAt      DateTime          @updatedAt @map("updated_at")
+
+  perfil PerfilAcesso @relation(fields: [perfilAcessoId], references: [id], onDelete: Cascade)
+
+  @@map("perfis_acesso_modulos")
+  @@unique([perfilAcessoId, modulo])
+  @@index([perfilAcessoId])
 }
 
 model Escala {
