@@ -21,7 +21,7 @@ O **Viva Saúde** está em produção na VPS (`sejavivasaude.com.br`). Auth, esc
 | Médicos | ✅ | ✅ | Convites, status cadastro; ATIVO via convite **ou** precadastro aceito |
 | Contratos | ✅ | ✅ | |
 | Escalas / plantões | ✅ | ✅ | Trocas; **multi-escala no mesmo mês** (médico); **1 escala por equipe** — `06` |
-| Valores plantão/ponto | ✅ | ✅ | Por contrato/escala |
+| Valores plantão/ponto | ✅ | ✅ | Por contrato/escala; UI com **margem %** (só front) — `06`/`07` |
 | Ponto eletrônico | ✅ | ✅ | Geo, foto, histórico; seletor de escala; **justificativa ausência** (`JUSTIFICADO_SEM_PONTO`) — `07` |
 | Vagas | ✅ | ✅ | Wizard de anúncio |
 | Documentos | ✅ | ✅ | DocuSeal opcional |
@@ -85,6 +85,7 @@ Arquivos de referência: `schema.prisma` (`Escala`, `EscalaMedico`, `EscalaPlant
 
 | Data | Entrega |
 |------|---------|
+| 2026-08-14 | **Margem de lucro na UI** — Repasse + % + Cobrança em ValoresPonto e ValoresPlantao (sem coluna no DB) — `06`/`07` |
 | 2026-08-14 | **Perfis de acesso staff** — `PerfilAcesso` OFF/VER/EDITAR; `/perfis-equipe`; Escalas read-only se VER; migration `20260814210000` — `04` |
 | 2026-08-14 | **Tipos de plantão** movidos para Escalas (aba Tipos); ValoresPlantao só aponta link — `06` |
 | 2026-08-14 | **1 escala por equipe** — UI `SubgruposEquipes` + API 409 ao vincular segunda; excluir libera nova — `06` |

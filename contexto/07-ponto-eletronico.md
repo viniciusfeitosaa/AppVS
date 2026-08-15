@@ -105,7 +105,7 @@ Service: `justificativa-ausencia-ponto.service.ts` + `justificativa-ausencia-pon
 |---------|--------|
 | `PontoEletronico.tsx` | Tela principal |
 | `HistoricoPontos.tsx` | Histórico |
-| `ValoresPonto.tsx` | Valores admin |
+| `ValoresPonto.tsx` | Valores admin (repasse + **margem %** + cobrança por dia; margem só na UI) |
 | `RelatoriosPontoEletronico.tsx` | Relatórios |
 | `JustificarAusenciaPonto.tsx` | Médico: pedir justificativa de ausência |
 | `JustificativasPontoAdmin.tsx` | Master: fila aceitar/recusar justificativas |
@@ -123,13 +123,39 @@ Service: `justificativa-ausencia-ponto.service.ts` + `justificativa-ausencia-pon
 
 ## Changelog
 
+### 2026-08-14 — Margem de lucro na UI de valores (ponto)
+- Em `ValoresPonto`, grade semanal com Repasse + Margem (%) + Cobrança; fórmula `cobrança = repasse ÷ (1 − margem/100)` (ex.: 100 e 25% → 133,33)
+- Margem não é persistida — só repasse/cobrança absolutos na API
+- Helper: `frontend/src/utils/margemLucro.ts`
+
+### 2026-08-14 — Alerta de justificativas no Dashboard Master
+- Card âmbar abaixo do acesso rápido quando há pedidos `PENDENTE`, com preview e link para `/justificativas-ponto`
+- Arquivo: `Dashboard.tsx`
+
+### 2026-08-13 — Status de ponto batido nos elegíveis
+- `GET …/eligiveis` inclui `situacaoPonto` (`NENHUM` | `SO_ENTRADA`) + `checkInAt`
+- UI: abas Todos / Nenhum ponto / Só entrada + coluna “Ponto batido”
+- Spec: `docs/superpowers/specs/2026-08-13-elegiveis-status-ponto-design.md`
+- Arquivos: `justificativa-ausencia-ponto.service.ts`, `JustificarAusenciaPonto.tsx`
+
 ### 2026-08-13 — Justificativa de ausência de ponto (v1)
 - Pedido `JustificativaAusenciaPonto` → Master aceita/recusa → `RegistroPonto` `JUSTIFICADO_SEM_PONTO` com valor cheio
 - Elegível: sem ponto fechado (inclui “só check-in”); bloqueia check-in pós-aceite; aceite cancela ponto aberto sem repasse
 - Notificação in-app + push no aceite/recusa
+- Seeds UAT: `seed-justificativas-ponto-demo.ts` (fila PENDENTE) e `seed-plantao-sem-justificativa-demo.ts` (elegível sem pedido)
 - Migration: `20260813200000_justificativa_ausencia_ponto`
 - Spec: `docs/superpowers/specs/2026-08-13-justificativa-ausencia-ponto-design.md`
 - Arquivos: `justificativa-ausencia-ponto.service.ts`, rotas ponto/admin, `JustificarAusenciaPonto.tsx`, `JustificativasPontoAdmin.tsx`, `SituacaoRegistroPonto.tsx`
+
+## Seeds locais (UAT manual)
+
+```bash
+cd backend
+# Fila Master com 3 PENDENTE
+npx ts-node --transpile-only scripts/seed-justificativas-ponto-demo.ts
+# Plantão elegível SEM justificativa (médico ainda não pediu) — fluxo médico → Master
+npx ts-node --transpile-only scripts/seed-plantao-sem-justificativa-demo.ts
+```
 
 ## Pendências
 

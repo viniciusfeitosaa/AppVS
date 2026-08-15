@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type Dispatch, type SetStateAction } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../context/AuthContext';
@@ -6,6 +6,11 @@ import { useMasterEscopo } from '../context/MasterEscopoContext';
 import { PontoEnderecoMapaBlock } from '../components/PontoEnderecoMapaBlock';
 import { usePontoEnderecoMapa } from '../hooks/usePontoEnderecoMapa';
 import { adminService, ConfigPontoEletronico, TipoPlantaoConfig, ValorPlantaoConfig } from '../services/admin.service';
+import {
+  cobrancaFromMargem,
+  formatMargemNumber,
+  margemFromCobranca,
+} from '../utils/margemLucro';
 
 function formatValor(valor: string | number | null | undefined): string {
   if (valor == null || valor === '') return '';
@@ -77,6 +82,9 @@ const ValoresPlantao = ({
   const [success, setSuccess] = useState<string | null>(null);
   const [draft, setDraft] = useState<Record<string, string>>({});
   const [draftValorHoraPorDia, setDraftValorHoraPorDia] = useState<
+    Record<string, Partial<Record<(typeof DIAS_SEMANA)[number]['key'], string>>>
+  >({});
+  const [draftMargemPorDia, setDraftMargemPorDia] = useState<
     Record<string, Partial<Record<(typeof DIAS_SEMANA)[number]['key'], string>>>
   >({});
   const [draftValorHoraCobrancaPorDia, setDraftValorHoraCobrancaPorDia] = useState<
@@ -230,7 +238,6 @@ const ValoresPlantao = ({
   };
 
   const getValorCobrancaForGrade = (gradeId: string): string => {
-    // Por enquanto, não temos um draft global de cobrança separado; usa o que vier do backend.
     const row = valores.find((v: ValorPlantaoConfig) => v.gradeId === gradeId);
     if (row?.valorHoraCobranca != null) return formatValor(row.valorHoraCobranca);
     return '';
@@ -246,36 +253,102 @@ const ValoresPlantao = ({
     return getValorCobrancaForGrade(gradeId);
   };
 
-  const replicarRepasseSegParaSemana = (gradeId: string) => {
-    const segVal = getValorHoraForGradeDia(gradeId, 'seg');
-    setDraftValorHoraPorDia((prev) => ({
+  const getMargemForGradeDia = (gradeId: string, diaKey: DiaKey): string => {
+    const byGrade = draftMargemPorDia[gradeId];
+    const v = byGrade?.[diaKey];
+    if (v !== undefined) return v;
+    const rep = parseValorInput(getValorHoraForGradeDia(gradeId, diaKey));
+    const cob = parseValorInput(getValorHoraCobrancaForGradeDia(gradeId, diaKey));
+    if (rep == null || cob == null || rep <= 0 || cob <= 0) return '';
+    const m = margemFromCobranca(rep, cob);
+    return m != null ? formatMargemNumber(m) : '';
+  };
+
+  const patchDraftDia = (
+    setter: Dispatch<SetStateAction<Record<string, Partial<Record<DiaKey, string>>>>>,
+    gradeId: string,
+    diaKey: DiaKey,
+    value: string
+  ) => {
+    setter((prev) => ({
       ...prev,
       [gradeId]: {
         ...(prev[gradeId] ?? {}),
-        ter: segVal,
-        qua: segVal,
-        qui: segVal,
-        sex: segVal,
-        sab: segVal,
-        dom: segVal,
+        [diaKey]: value,
       },
     }));
   };
 
-  const replicarCobrancaSegParaSemana = (gradeId: string) => {
-    const segVal = getValorHoraCobrancaForGradeDia(gradeId, 'seg');
-    setDraftValorHoraCobrancaPorDia((prev) => ({
-      ...prev,
-      [gradeId]: {
-        ...(prev[gradeId] ?? {}),
-        ter: segVal,
-        qua: segVal,
-        qui: segVal,
-        sex: segVal,
-        sab: segVal,
-        dom: segVal,
-      },
-    }));
+  const onRepasseGradeDiaChange = (gradeId: string, diaKey: DiaKey, raw: string) => {
+    patchDraftDia(setDraftValorHoraPorDia, gradeId, diaKey, raw);
+    const rep = parseValorInput(raw);
+    const margemStr = draftMargemPorDia[gradeId]?.[diaKey] ?? getMargemForGradeDia(gradeId, diaKey);
+    const margem = parseValorInput(margemStr);
+    if (rep != null && margem != null && margemStr.trim() !== '') {
+      const cob = cobrancaFromMargem(rep, margem);
+      if (cob != null) {
+        patchDraftDia(setDraftValorHoraCobrancaPorDia, gradeId, diaKey, formatValor(cob));
+        if (draftMargemPorDia[gradeId]?.[diaKey] === undefined) {
+          patchDraftDia(setDraftMargemPorDia, gradeId, diaKey, margemStr);
+        }
+        return;
+      }
+    }
+    const cobStr =
+      draftValorHoraCobrancaPorDia[gradeId]?.[diaKey] ?? getValorHoraCobrancaForGradeDia(gradeId, diaKey);
+    const cob = parseValorInput(cobStr);
+    if (rep != null && cob != null && cobStr.trim() !== '') {
+      const m = margemFromCobranca(rep, cob);
+      patchDraftDia(setDraftMargemPorDia, gradeId, diaKey, m != null ? formatMargemNumber(m) : '');
+    }
+  };
+
+  const onMargemGradeDiaChange = (gradeId: string, diaKey: DiaKey, raw: string) => {
+    patchDraftDia(setDraftMargemPorDia, gradeId, diaKey, raw);
+    const margem = parseValorInput(raw);
+    const rep = parseValorInput(getValorHoraForGradeDia(gradeId, diaKey));
+    if (rep == null || margem == null || raw.trim() === '') return;
+    const cob = cobrancaFromMargem(rep, margem);
+    if (cob != null) {
+      patchDraftDia(setDraftValorHoraCobrancaPorDia, gradeId, diaKey, formatValor(cob));
+    }
+  };
+
+  const onCobrancaGradeDiaChange = (gradeId: string, diaKey: DiaKey, raw: string) => {
+    patchDraftDia(setDraftValorHoraCobrancaPorDia, gradeId, diaKey, raw);
+    const cob = parseValorInput(raw);
+    const rep = parseValorInput(getValorHoraForGradeDia(gradeId, diaKey));
+    if (rep == null || cob == null || raw.trim() === '') return;
+    const m = margemFromCobranca(rep, cob);
+    patchDraftDia(setDraftMargemPorDia, gradeId, diaKey, m != null ? formatMargemNumber(m) : '');
+  };
+
+  const replicarSegParaRestanteSemana = (gradeId: string) => {
+    const repSeg = getValorHoraForGradeDia(gradeId, 'seg');
+    const marSeg = getMargemForGradeDia(gradeId, 'seg');
+    const repN = parseValorInput(repSeg);
+    const marN = parseValorInput(marSeg);
+    let cobSeg = getValorHoraCobrancaForGradeDia(gradeId, 'seg');
+    if (repN != null && marN != null && marSeg.trim() !== '') {
+      const cob = cobrancaFromMargem(repN, marN);
+      if (cob != null) cobSeg = formatValor(cob);
+    }
+    const dias: DiaKey[] = ['ter', 'qua', 'qui', 'sex', 'sab', 'dom'];
+    setDraftValorHoraPorDia((prev) => {
+      const g = { ...(prev[gradeId] ?? {}), seg: repSeg };
+      for (const k of dias) g[k] = repSeg;
+      return { ...prev, [gradeId]: g };
+    });
+    setDraftMargemPorDia((prev) => {
+      const g = { ...(prev[gradeId] ?? {}), seg: marSeg };
+      for (const k of dias) g[k] = marSeg;
+      return { ...prev, [gradeId]: g };
+    });
+    setDraftValorHoraCobrancaPorDia((prev) => {
+      const g = { ...(prev[gradeId] ?? {}), seg: cobSeg };
+      for (const k of dias) g[k] = cobSeg;
+      return { ...prev, [gradeId]: g };
+    });
   };
 
   const handleSaveSemana = async (grade: { id: string; nome: string }) => {
@@ -322,6 +395,12 @@ const ValoresPlantao = ({
         delete next[grade.id];
         return next;
       });
+      setDraftMargemPorDia((prev) => {
+        if (!prev[grade.id]) return prev;
+        const next = { ...prev };
+        delete next[grade.id];
+        return next;
+      });
       setSuccess(`Valores da semana (seg–dom) de ${grade.nome} salvos.`);
     } catch (err: any) {
       setError(err.response?.data?.error || 'Erro ao salvar valor');
@@ -338,6 +417,7 @@ const ValoresPlantao = ({
     setContratoId(id);
     setDraft({});
     setDraftValorHoraPorDia({});
+    setDraftMargemPorDia({});
     setDraftValorHoraCobrancaPorDia({});
     limparRascunhosGeo();
   };
@@ -346,6 +426,7 @@ const ValoresPlantao = ({
     setSubgrupoId(id);
     setDraft({});
     setDraftValorHoraPorDia({});
+    setDraftMargemPorDia({});
     setDraftValorHoraCobrancaPorDia({});
     limparRascunhosGeo();
   };
@@ -496,6 +577,7 @@ const ValoresPlantao = ({
                   setEquipeId(e.target.value);
                   setDraft({});
                   setDraftValorHoraPorDia({});
+                  setDraftMargemPorDia({});
                   setDraftValorHoraCobrancaPorDia({});
                   limparRascunhosGeo();
                 }}
@@ -559,7 +641,8 @@ const ValoresPlantao = ({
                       </span>
                     </p>
                     <p className="text-xs text-gray-600 mt-1">
-                      Use → na segunda para copiar o valor para ter–dom. Um único salvar grava repasse e cobrança da semana (seg–dom).
+                      Margem de lucro sobre a cobrança. Ex.: repasse 100 e margem 25% → cobrança 133,33. Editar a
+                      cobrança recalcula a margem. Use → na segunda para copiar repasse + margem para ter–dom.
                     </p>
                   </div>
 
@@ -567,85 +650,56 @@ const ValoresPlantao = ({
                     {DIAS_SEMANA.map(({ key, label }) => (
                       <div
                         key={key}
-                        className="flex flex-wrap items-end gap-2 p-4 rounded-xl border border-viva-200 bg-viva-50/30"
+                        className="flex flex-col gap-2 p-4 rounded-xl border border-viva-200 bg-viva-50/30"
                       >
-                        <div className="min-w-[200px] flex-1">
-                          <label className="block text-sm font-semibold text-viva-800 mb-1">
-                            {label} <span className="font-normal text-viva-600">(Repasse R$/h)</span>
-                          </label>
-                          <input
-                            type="text"
-                            inputMode="decimal"
-                            className="input w-full max-w-[180px]"
-                            placeholder="Ex: 150,00"
-                            value={getValorHoraForGradeDia(grade.id, key)}
-                            onChange={(e) =>
-                              setDraftValorHoraPorDia((prev) => ({
-                                ...prev,
-                                [grade.id]: {
-                                  ...(prev[grade.id] ?? {}),
-                                  [key]: e.target.value,
-                                },
-                              }))
-                            }
-                          />
-                        </div>
-                        {key === 'seg' && (
-                          <button
-                            type="button"
-                            className="btn btn-secondary shrink-0 px-2 min-w-[2.25rem]"
-                            title="Replicar valor da segunda para ter–dom"
-                            onClick={() => replicarRepasseSegParaSemana(grade.id)}
-                          >
-                            →
-                          </button>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-
-                  <div className="pt-2">
-                    <p className="text-sm font-semibold text-viva-800 mb-2">Cobrança (R$/h)</p>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-                      {DIAS_SEMANA.map(({ key, label }) => (
-                        <div
-                          key={key}
-                          className="flex flex-wrap items-end gap-2 p-4 rounded-xl border border-viva-200 bg-viva-50/30"
-                        >
-                          <div className="min-w-[200px] flex-1">
-                            <label className="block text-sm font-semibold text-viva-800 mb-1">
-                              {label} <span className="font-normal text-viva-600">(Cobrança R$/h)</span>
-                            </label>
-                            <input
-                              type="text"
-                              inputMode="decimal"
-                              className="input w-full max-w-[180px]"
-                              placeholder="Ex: 150,00"
-                              value={getValorHoraCobrancaForGradeDia(grade.id, key)}
-                              onChange={(e) =>
-                                setDraftValorHoraCobrancaPorDia((prev) => ({
-                                  ...prev,
-                                  [grade.id]: {
-                                    ...(prev[grade.id] ?? {}),
-                                    [key]: e.target.value,
-                                  },
-                                }))
-                              }
-                            />
-                          </div>
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="text-sm font-semibold text-viva-900">{label}</p>
                           {key === 'seg' && (
                             <button
                               type="button"
                               className="btn btn-secondary shrink-0 px-2 min-w-[2.25rem]"
-                              title="Replicar valor da segunda para ter–dom"
-                              onClick={() => replicarCobrancaSegParaSemana(grade.id)}
+                              title="Replicar repasse, margem e cobrança da segunda para ter–dom"
+                              onClick={() => replicarSegParaRestanteSemana(grade.id)}
                             >
                               →
                             </button>
                           )}
                         </div>
-                      ))}
-                    </div>
+                        <div>
+                          <label className="block text-xs font-semibold text-viva-800 mb-1">Repasse (R$/h)</label>
+                          <input
+                            type="text"
+                            inputMode="decimal"
+                            className="input w-full"
+                            placeholder="Ex: 100,00"
+                            value={getValorHoraForGradeDia(grade.id, key)}
+                            onChange={(e) => onRepasseGradeDiaChange(grade.id, key, e.target.value)}
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-semibold text-viva-800 mb-1">Margem (%)</label>
+                          <input
+                            type="text"
+                            inputMode="decimal"
+                            className="input w-full"
+                            placeholder="Ex: 25"
+                            value={getMargemForGradeDia(grade.id, key)}
+                            onChange={(e) => onMargemGradeDiaChange(grade.id, key, e.target.value)}
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-semibold text-viva-800 mb-1">Cobrança (R$/h)</label>
+                          <input
+                            type="text"
+                            inputMode="decimal"
+                            className="input w-full"
+                            placeholder="Ex: 133,33"
+                            value={getValorHoraCobrancaForGradeDia(grade.id, key)}
+                            onChange={(e) => onCobrancaGradeDiaChange(grade.id, key, e.target.value)}
+                          />
+                        </div>
+                      </div>
+                    ))}
                   </div>
 
                   <div className="flex justify-end pt-2">
