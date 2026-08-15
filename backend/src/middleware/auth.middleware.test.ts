@@ -138,4 +138,62 @@ describe('auth middleware niveis', () => {
       expect(next).toHaveBeenCalled();
     });
   });
+
+  describe('gate Task10 — cenário 3 (ESCALAS VER)', () => {
+    it('requireModuleAccess(ESCALAS) next(); requireModuleWrite(ESCALAS) 403', async () => {
+      mockPossuiAcesso.mockResolvedValue(true);
+      mockPossuiEscrita.mockResolvedValue(false);
+      const req = mockReq({ id: userId, role: UserRole.MASTER, tenantId });
+
+      const resAccess = mockRes();
+      await requireModuleAccess(ModuloSistema.ESCALAS)(req, resAccess, next);
+      expect(next).toHaveBeenCalledTimes(1);
+      expect(resAccess.status).not.toHaveBeenCalled();
+
+      const resWrite = mockRes();
+      const nextWrite = jest.fn();
+      await requireModuleWrite(ModuloSistema.ESCALAS)(req, resWrite, nextWrite);
+      expect(resWrite.status).toHaveBeenCalledWith(403);
+      expect(resWrite.json).toHaveBeenCalledWith({
+        success: false,
+        error: 'Sem permissão de edição neste módulo',
+      });
+      expect(nextWrite).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('gate Task10 — cenário 4 (ESCALAS EDITAR middleware)', () => {
+    it('requireModuleAccess + requireModuleWrite ESCALAS ambos next() quando EDITAR', async () => {
+      mockPossuiAcesso.mockResolvedValue(true);
+      mockPossuiEscrita.mockResolvedValue(true);
+      const req = mockReq({ id: userId, role: UserRole.MASTER, tenantId });
+
+      const resAccess = mockRes();
+      await requireModuleAccess(ModuloSistema.ESCALAS)(req, resAccess, next);
+      expect(next).toHaveBeenCalledTimes(1);
+
+      const resWrite = mockRes();
+      const nextWrite = jest.fn();
+      await requireModuleWrite(ModuloSistema.ESCALAS)(req, resWrite, nextWrite);
+      expect(nextWrite).toHaveBeenCalledTimes(1);
+      expect(resWrite.status).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('gate Task10 — cenário 5 (perfis/equipe)', () => {
+    it('staff: requireAdminPleno bloqueia gestão de perfis (403)', async () => {
+      mockGetNiveis.mockResolvedValue({ isAdminPleno: false, map: {} });
+      const res = mockRes();
+      const req = mockReq({ id: userId, role: UserRole.MASTER, tenantId });
+
+      await requireAdminPleno()(req, res, next);
+
+      expect(res.status).toHaveBeenCalledWith(403);
+      expect(res.json).toHaveBeenCalledWith({
+        success: false,
+        error: expect.stringMatching(/perfis|equipe|admin(?:istrador)? pleno/i),
+      });
+      expect(next).not.toHaveBeenCalled();
+    });
+  });
 });
