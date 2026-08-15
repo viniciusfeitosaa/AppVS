@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../context/AuthContext';
 import { useMasterEscopo } from '../context/MasterEscopoContext';
@@ -83,15 +84,6 @@ const ValoresPlantao = ({
   >({});
   const [savingGeo, setSavingGeo] = useState(false);
   const [savedGeo, setSavedGeo] = useState(false);
-  const [novoTipoNome, setNovoTipoNome] = useState('');
-  const [novoTipoHi, setNovoTipoHi] = useState('08:00');
-  const [novoTipoHf, setNovoTipoHf] = useState('20:00');
-  const [novoTipoCruza, setNovoTipoCruza] = useState(false);
-  const [criandoTipo, setCriandoTipo] = useState(false);
-  const [excluindoTipoId, setExcluindoTipoId] = useState<string | null>(null);
-  const [excluirTipoModal, setExcluirTipoModal] = useState<{ id: string; nome: string } | null>(null);
-  const [editarTipoModal, setEditarTipoModal] = useState<TipoPlantaoConfig | null>(null);
-  const [salvandoEdicaoTipo, setSalvandoEdicaoTipo] = useState(false);
 
   const { data: opcoesResp, isLoading: loadingOpcoes, isError: erroOpcoes } = useQuery({
     queryKey: ['admin', 'valores-plantao', 'opcoes'],
@@ -348,10 +340,6 @@ const ValoresPlantao = ({
     setDraftValorHoraPorDia({});
     setDraftValorHoraCobrancaPorDia({});
     limparRascunhosGeo();
-    setNovoTipoNome('');
-    setNovoTipoHi('08:00');
-    setNovoTipoHf('20:00');
-    setNovoTipoCruza(false);
   };
 
   const onSubgrupoChange = (id: string) => {
@@ -527,125 +515,24 @@ const ValoresPlantao = ({
         )}
       </div>
 
-      {temEscopoCompleto && exibirLocalizacaoPonto && (
-        <div className="card">
-          <h3 className="text-lg font-bold text-viva-900 mb-4">Tipos de plantão (contrato)</h3>
-          <p className="text-sm text-viva-700 mb-4">
-            Cada tipo tem nome e faixa de horário (usada na grade, calendário, troca e ponto). O horário define-se ao
-            criar o tipo; depois só o <span className="font-semibold text-viva-800">nome</span> pode ser alterado. A
-            lista ordena-se automaticamente pelo <span className="font-semibold text-viva-800">início</span> do
-            plantão. Os padrões MT/SN são criados na primeira carga.
+      {temEscopoCompleto && (
+        <div className="card border-l-4 border-viva-400">
+          <h3 className="text-lg font-bold text-viva-900 mb-2">Tipos de plantão</h3>
+          <p className="text-sm text-viva-700 font-serif mb-3">
+            Os tipos (MT, SN, horários da grade) são gerenciados na página{' '}
+            <Link to="/escalas" className="font-semibold text-viva-800 underline hover:text-viva-600">
+              Escalas
+            </Link>
+            : abra uma equipe e use a aba <span className="font-semibold">Tipos</span>.
           </p>
           {loadingTipos ? (
-            <p className="text-sm text-gray-600">Carregando tipos...</p>
+            <p className="text-sm text-gray-600">Carregando tipos do contrato…</p>
+          ) : tiposPlantao.length === 0 ? (
+            <p className="text-sm text-amber-800">Nenhum tipo neste contrato ainda — cadastre em Escalas → Tipos.</p>
           ) : (
-            <>
-              <div className="space-y-3 mb-6">
-                {tiposPlantao.map((t) => (
-                  <div
-                    key={t.id}
-                    className="flex flex-wrap items-center justify-between gap-3 p-3 rounded-lg border border-viva-200 bg-white"
-                  >
-                    <div>
-                      <p className="text-sm font-semibold text-viva-900">{t.nome}</p>
-                      <p className="text-xs text-viva-600">
-                        {t.horaInicio.slice(0, 5)} – {t.horaFim.slice(0, 5)}
-                        {t.cruzaMeiaNoite ? ' (cruza meia-noite)' : ''}
-                      </p>
-                    </div>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <button
-                        type="button"
-                        className="btn btn-secondary text-sm py-1.5 px-3"
-                        disabled={excluindoTipoId === t.id || salvandoEdicaoTipo}
-                        onClick={() => setEditarTipoModal({ ...t })}
-                      >
-                        Editar
-                      </button>
-                      <button
-                        type="button"
-                        className="btn btn-secondary text-sm py-1.5 px-3"
-                        disabled={excluindoTipoId === t.id || salvandoEdicaoTipo}
-                        onClick={() => setExcluirTipoModal({ id: t.id, nome: t.nome })}
-                      >
-                        {excluindoTipoId === t.id ? '…' : 'Excluir'}
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-              <div className="p-4 rounded-xl border border-dashed border-viva-300 bg-viva-50/40 space-y-3">
-                <p className="text-sm font-semibold text-viva-800">Novo tipo</p>
-                <div className="flex flex-wrap gap-3 items-end">
-                  <div className="min-w-[200px] flex-1">
-                    <label className="block text-xs font-semibold text-viva-800 mb-1">Nome</label>
-                    <input
-                      className="input w-full"
-                      placeholder="Ex.: Plantão vespertino"
-                      value={novoTipoNome}
-                      onChange={(e) => setNovoTipoNome(e.target.value)}
-                    />
-                  </div>
-                  <div className="min-w-[8.75rem]">
-                    <label className="block text-xs font-semibold text-viva-800 mb-1">Início</label>
-                    <input
-                      type="time"
-                      step={60}
-                      className="input-time"
-                      value={novoTipoHi}
-                      onChange={(e) => setNovoTipoHi(e.target.value)}
-                    />
-                  </div>
-                  <div className="min-w-[8.75rem]">
-                    <label className="block text-xs font-semibold text-viva-800 mb-1">Fim</label>
-                    <input
-                      type="time"
-                      step={60}
-                      className="input-time"
-                      value={novoTipoHf}
-                      onChange={(e) => setNovoTipoHf(e.target.value)}
-                    />
-                  </div>
-                  <label className="flex items-center gap-2 text-sm text-viva-800 cursor-pointer pb-1">
-                    <input
-                      type="checkbox"
-                      checked={novoTipoCruza}
-                      onChange={(e) => setNovoTipoCruza(e.target.checked)}
-                    />
-                    Cruza meia-noite
-                  </label>
-                  <button
-                    type="button"
-                    className="btn btn-primary"
-                    disabled={criandoTipo || !novoTipoNome.trim()}
-                    onClick={async () => {
-                      setCriandoTipo(true);
-                      setError(null);
-                      setSuccess(null);
-                      try {
-                        await adminService.createTipoPlantao({
-                          contratoAtivoId: contratoId,
-                          nome: novoTipoNome.trim(),
-                          horaInicio: novoTipoHi.length === 5 ? novoTipoHi : `${novoTipoHi}:00`.slice(0, 5),
-                          horaFim: novoTipoHf.length === 5 ? novoTipoHf : `${novoTipoHf}:00`.slice(0, 5),
-                          cruzaMeiaNoite: novoTipoCruza,
-                        });
-                        setNovoTipoNome('');
-                        setNovoTipoCruza(false);
-                        await queryClient.invalidateQueries({ queryKey: ['admin', 'tipos-plantao'] });
-                        setSuccess('Tipo de plantão criado.');
-                      } catch (err: any) {
-                        setError(err.response?.data?.error || 'Erro ao criar tipo');
-                      } finally {
-                        setCriandoTipo(false);
-                      }
-                    }}
-                  >
-                    {criandoTipo ? 'Salvando...' : 'Adicionar tipo'}
-                  </button>
-                </div>
-              </div>
-            </>
+            <p className="text-sm text-viva-600">
+              {tiposPlantao.length} tipo(s) neste contrato: {tiposPlantao.map((t) => t.nome).join(', ')}.
+            </p>
           )}
         </div>
       )}
@@ -656,7 +543,7 @@ const ValoresPlantao = ({
           {loadingValores ? (
             <p className="text-sm text-gray-600">Carregando valores...</p>
           ) : tiposPlantao.length === 0 ? (
-            <p className="text-sm text-viva-700">Carregue os tipos do contrato acima.</p>
+            <p className="text-sm text-viva-700">Nenhum tipo neste contrato. Cadastre em Escalas → aba Tipos.</p>
           ) : (
             <div className="space-y-6">
               {tiposPlantao.map((grade) => (
@@ -778,7 +665,7 @@ const ValoresPlantao = ({
         </div>
       )}
 
-      {temEscopoCompleto && (
+      {temEscopoCompleto && exibirLocalizacaoPonto && (
         <div className="card">
           <h3 className="text-lg font-bold text-viva-900 mb-4">Localização do ponto (opcional)</h3>
           {loadingConfigPonto ? (
@@ -820,145 +707,6 @@ const ValoresPlantao = ({
               </div>
             </>
           )}
-        </div>
-      )}
-
-      {editarTipoModal && (
-        <div
-          className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/50"
-          role="presentation"
-          onClick={() => !salvandoEdicaoTipo && setEditarTipoModal(null)}
-        >
-          <div
-            className="bg-white rounded-2xl shadow-xl max-w-md w-full p-6 flex flex-col gap-4 border border-viva-200"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="editar-tipo-titulo"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h3 id="editar-tipo-titulo" className="text-lg font-bold text-viva-900 font-display">
-              Editar tipo de plantão
-            </h3>
-            <p className="text-xs text-viva-600">
-              O identificador na escala (ligação aos plantões) não muda. Só o nome de exibição é editável; horários
-              permanecem os definidos na criação do tipo.
-            </p>
-            <div className="space-y-3">
-              <div>
-                <label className="block text-xs font-semibold text-viva-800 mb-1">Nome</label>
-                <input
-                  className="input w-full"
-                  value={editarTipoModal.nome}
-                  onChange={(e) => setEditarTipoModal((m) => (m ? { ...m, nome: e.target.value } : m))}
-                />
-              </div>
-              <div className="rounded-lg border border-viva-200 bg-viva-50/50 px-3 py-2.5">
-                <p className="text-[11px] font-semibold uppercase tracking-wide text-viva-600 mb-1">Horário (fixo)</p>
-                <p className="text-sm text-viva-900">
-                  {editarTipoModal.horaInicio.slice(0, 5)} – {editarTipoModal.horaFim.slice(0, 5)}
-                  {editarTipoModal.cruzaMeiaNoite ? ' (cruza meia-noite)' : ''}
-                </p>
-                <p className="text-[11px] text-viva-600 mt-1">
-                  Para mudar início/fim ou “cruza meia-noite”, exclua este tipo e crie outro (sem plantões na escala
-                  usando este tipo).
-                </p>
-              </div>
-            </div>
-            <div className="flex flex-wrap justify-end gap-3 pt-2">
-              <button
-                type="button"
-                className="btn btn-secondary"
-                disabled={salvandoEdicaoTipo}
-                onClick={() => setEditarTipoModal(null)}
-              >
-                Cancelar
-              </button>
-              <button
-                type="button"
-                className="btn btn-primary"
-                disabled={salvandoEdicaoTipo || !editarTipoModal.nome.trim()}
-                onClick={async () => {
-                  const m = editarTipoModal;
-                  setSalvandoEdicaoTipo(true);
-                  setError(null);
-                  setSuccess(null);
-                  try {
-                    await adminService.updateTipoPlantao(m.id, {
-                      nome: m.nome.trim(),
-                    });
-                    await queryClient.invalidateQueries({ queryKey: ['admin', 'tipos-plantao'] });
-                    setEditarTipoModal(null);
-                    setSuccess('Tipo atualizado.');
-                  } catch (err: any) {
-                    setError(err.response?.data?.error || 'Não foi possível salvar');
-                  } finally {
-                    setSalvandoEdicaoTipo(false);
-                  }
-                }}
-              >
-                {salvandoEdicaoTipo ? 'Salvando…' : 'Salvar'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {excluirTipoModal && (
-        <div
-          className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/50"
-          role="presentation"
-          onClick={() => !excluindoTipoId && setExcluirTipoModal(null)}
-        >
-          <div
-            className="bg-white rounded-2xl shadow-xl max-w-md w-full p-6 flex flex-col gap-4 border border-viva-200"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="excluir-tipo-titulo"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h3 id="excluir-tipo-titulo" className="text-lg font-bold text-viva-900 font-display">
-              Excluir tipo de plantão?
-            </h3>
-            <p className="text-sm text-viva-700 leading-relaxed">
-              O tipo <span className="font-semibold text-viva-900">{excluirTipoModal.nome}</span> será removido
-              permanentemente. Valores por subgrupo e adicionais por data deste tipo serão apagados junto. A exclusão
-              só é bloqueada se ainda existir <span className="font-semibold">plantão agendado na escala</span> usando
-              este tipo.
-            </p>
-            <div className="flex flex-wrap justify-end gap-3 pt-2">
-              <button
-                type="button"
-                className="btn btn-secondary"
-                disabled={!!excluindoTipoId}
-                onClick={() => setExcluirTipoModal(null)}
-              >
-                Cancelar
-              </button>
-              <button
-                type="button"
-                className="rounded-lg px-4 py-2 text-sm font-semibold text-white bg-red-600 hover:bg-red-700 border border-red-700 disabled:opacity-60"
-                disabled={!!excluindoTipoId}
-                onClick={async () => {
-                  const id = excluirTipoModal.id;
-                  setExcluindoTipoId(id);
-                  setError(null);
-                  try {
-                    await adminService.deleteTipoPlantao(id);
-                    await queryClient.invalidateQueries({ queryKey: ['admin', 'tipos-plantao'] });
-                    await queryClient.invalidateQueries({ queryKey: ['admin', 'valores-plantao', contratoId] });
-                    setSuccess('Tipo removido.');
-                    setExcluirTipoModal(null);
-                  } catch (err: any) {
-                    setError(err.response?.data?.error || 'Não foi possível excluir');
-                  } finally {
-                    setExcluindoTipoId(null);
-                  }
-                }}
-              >
-                {excluindoTipoId ? 'Excluindo…' : 'Excluir'}
-              </button>
-            </div>
-          </div>
         </div>
       )}
     </div>
