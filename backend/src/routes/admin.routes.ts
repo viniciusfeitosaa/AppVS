@@ -125,6 +125,11 @@ import {
   listPerfisAcessoController,
   updatePerfilAcessoController,
 } from '../controllers/perfil-acesso.controller';
+import {
+  createUsuarioStaffController,
+  listUsuariosStaffController,
+  updateUsuarioStaffController,
+} from '../controllers/usuario-staff.controller';
 import blogAdminRoutes from './blog-admin.routes';
 import conteudoAdminRoutes from './conteudo-admin.routes';
 
@@ -375,6 +380,14 @@ router.put(
   validateUUIDParam('id'),
   validateUpdatePerfilAcesso,
   updatePerfilAcessoController
+);
+router.get('/usuarios-staff', requireAdminPleno(), listUsuariosStaffController);
+router.post('/usuarios-staff', requireAdminPleno(), createUsuarioStaffController);
+router.put(
+  '/usuarios-staff/:id',
+  requireAdminPleno(),
+  validateUUIDParam('id'),
+  updateUsuarioStaffController
 );
 router.get('/subgrupos', requireModuleAccess(ModuloSistema.MEDICOS), listSubgruposController);
 router.post('/subgrupos', requireModuleAccess(ModuloSistema.MEDICOS), createSubgrupoController);

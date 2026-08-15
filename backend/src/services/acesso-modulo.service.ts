@@ -63,15 +63,6 @@ export const getAcessosModuloPerfilService = async (tenantId: string, perfil: Us
   }));
 };
 
-export const getMinhaPermissaoModulosService = async (tenantId: string, perfil: UserRole) => {
-  const items = await getAcessosModuloPerfilService(tenantId, perfil);
-  return {
-    perfil,
-    items,
-    map: Object.fromEntries(items.map((i) => [i.modulo, i.permitido])) as Record<ModuloSistema, boolean>,
-  };
-};
-
 export const getMatrizAcessosModulosService = async (tenantId: string) => {
   const [master, medico] = await Promise.all([
     getAcessosModuloPerfilService(tenantId, UserRole.MASTER),
@@ -121,15 +112,6 @@ export const salvarMatrizAcessosModulosService = async (
   });
 
   return getMatrizAcessosModulosService(tenantId);
-};
-
-export const possuiAcessoModuloService = async (
-  tenantId: string,
-  perfil: UserRole,
-  modulo: ModuloSistema
-) => {
-  const permissao = await getMinhaPermissaoModulosService(tenantId, perfil);
-  return permissao.map[modulo] ?? false;
 };
 
 export const getNiveisModuloUsuarioService = async (
@@ -190,6 +172,40 @@ export const getNiveisModuloUsuarioService = async (
   map[ModuloSistema.PERFIL] = maxNivel(map[ModuloSistema.PERFIL], NivelAcessoModulo.VER);
 
   return { isAdminPleno: false, map };
+};
+
+export const getMinhaPermissaoModulosService = async (
+  tenantId: string,
+  perfil: UserRole,
+  userId?: string
+) => {
+  if (userId) {
+    const { isAdminPleno, map: mapNiveis } = await getNiveisModuloUsuarioService(
+      tenantId,
+      userId,
+      perfil
+    );
+    const map = Object.fromEntries(
+      MODULOS_SISTEMA.map((m) => [m, mapNiveis[m] !== NivelAcessoModulo.OFF])
+    ) as Record<ModuloSistema, boolean>;
+    return { isAdminPleno, mapNiveis, map, perfil };
+  }
+
+  const items = await getAcessosModuloPerfilService(tenantId, perfil);
+  return {
+    perfil,
+    items,
+    map: Object.fromEntries(items.map((i) => [i.modulo, i.permitido])) as Record<ModuloSistema, boolean>,
+  };
+};
+
+export const possuiAcessoModuloService = async (
+  tenantId: string,
+  perfil: UserRole,
+  modulo: ModuloSistema
+) => {
+  const permissao = await getMinhaPermissaoModulosService(tenantId, perfil);
+  return permissao.map[modulo] ?? false;
 };
 
 export const possuiAcessoModuloUsuarioService = async (
