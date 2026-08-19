@@ -1,7 +1,7 @@
 # 05 — Médicos e contratos
 
 **Status:** ✅ Implementado  
-**Última atualização:** 2026-05-28
+**Última atualização:** 2026-08-19
 
 ## Médicos
 
@@ -15,7 +15,8 @@
 
 ### Frontend
 
-- `pages/Medicos.tsx` — listagem/gestão
+- `pages/Medicos.tsx` — listagem/gestão; banner do selecionado com **Dados do profissional**, **Histórico de pontos** e **WhatsApp** (`wa.me` no telefone cadastrado)
+- `pages/Avaliacao.tsx` — fila de cadastros pendentes; botão **Busca médicos (CFM)** abre o portal (sem pré-preenchimento)
 - `pages/Perfil.tsx` — perfil do usuário logado
 - `pages/AcceptInvite.tsx` — ativação de conta
 
@@ -51,4 +52,21 @@ Vinculam subgrupos e equipes ao contrato institucional.
 
 ## Pendências
 
-- [ ] Documentar regras de negócio de aprovação de cadastro pendente (se houver UI específica)
+- [x] Documentar regras de negócio de aprovação de cadastro pendente (se houver UI específica)
+
+Fila Master em `/avaliacao`: pendentes de `/cadastro` público. **Aprovar** → `ATIVO`; **Rejeitar** → `REJEITADO`. Botão **Busca médicos (CFM)** abre `portal.cfm.org.br/busca-medicos` (consulta manual).
+
+## Changelog
+
+### 2026-08-19 — Avaliação: CFM só abre o portal
+- Removidos pré-preenchimento, página intermediária `cfm-prefill` e atalho/userscript. O botão **Busca médicos (CFM)** só abre o site oficial.
+- Arquivos: `frontend/src/pages/Avaliacao.tsx`
+
+### 2026-08-19 — WhatsApp do profissional selecionado
+- Banner em `Medicos.tsx`: botão **WhatsApp** abre `wa.me` com DDI 55 a partir do telefone cadastrado; desabilitado se o número for inválido ou ausente
+- Arquivos: `frontend/src/pages/Medicos.tsx`, `frontend/src/utils/whatsapp.ts`
+
+### 2026-08-19 — Dados do profissional selecionado
+- Banner em `Medicos.tsx`: botão **Dados do profissional** abre ficha completa (contato, endereço, bancários, termos, equipes, documentos com download)
+- API: `GET /api/admin/medicos/:id` e download de documento de perfil
+- Arquivos: `Medicos.tsx`, `admin.service.ts`, `admin.controller.ts`, `admin.routes.ts`

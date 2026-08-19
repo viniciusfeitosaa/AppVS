@@ -36,6 +36,8 @@ import {
   salvarMatrizAcessosModulosController,
   listContratosAtivosController,
   listMedicosController,
+  getMedicoDetalheAdminController,
+  downloadMedicoDocumentoPerfilAdminController,
   listDocusealPendentesController,
   docusealResumoPorEmailsController,
   docusealResendSubmitterController,
@@ -140,6 +142,19 @@ router.use(authenticateToken);
 router.use(requireRole([UserRole.MASTER]));
 
 router.get('/medicos', requireModuleAccess(ModuloSistema.MEDICOS), listMedicosController);
+router.get(
+  '/medicos/:id',
+  requireModuleAccess(ModuloSistema.MEDICOS),
+  validateUUIDParam('id'),
+  getMedicoDetalheAdminController
+);
+router.get(
+  '/medicos/:id/documentos/:documentoId/download',
+  requireModuleAccess(ModuloSistema.MEDICOS),
+  validateUUIDParam('id'),
+  validateUUIDParam('documentoId'),
+  downloadMedicoDocumentoPerfilAdminController
+);
 // Relatório de procedimentos (Lançamentos do mês): persistência por mês no backend.
 // Mantemos apenas autenticação + role MASTER (sem gate por módulo) para evitar "parece que salvou mas some" em outros PCs.
 router.get('/relatorios/procedimentos/:mesRef', getRelatorioProcedimentosMesController);

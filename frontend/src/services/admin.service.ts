@@ -152,6 +152,28 @@ export interface AdminMedico {
   equipes?: MedicoEquipeResumo[];
 }
 
+export interface AdminMedicoDocumentoPerfil {
+  id: string;
+  tipo: string;
+  nomeArquivo: string;
+  mimeType: string;
+  tamanhoBytes: number;
+  updatedAt: string;
+}
+
+export interface AdminMedicoDetalhe extends AdminMedico {
+  estadoCivil: string | null;
+  enderecoResidencial: string | null;
+  dadosBancarios: string | null;
+  chavePix: string | null;
+  statusCadastro: string;
+  termosCadastroAceitosEm: string | null;
+  termosCadastroVersao: string | null;
+  inviteAcceptedAt: string | null;
+  documentos: AdminMedicoDocumentoPerfil[];
+  subgrupos: { id: string; nome: string; ativo: boolean }[];
+}
+
 export interface ContratoAtivo {
   id: string;
   nome: string;
@@ -508,6 +530,23 @@ export const adminService = {
       params,
     });
     return response.data;
+  },
+
+  getMedicoDetalhe: async (medicoId: string) => {
+    const response = await api.get<{ success: boolean; data: AdminMedicoDetalhe }>('/admin/medicos/' + medicoId);
+    return response.data;
+  },
+
+  openMedicoDocumentoPerfil: async (medicoId: string, documentoId: string) => {
+    const response = await api.get(`/admin/medicos/${medicoId}/documentos/${documentoId}/download`, {
+      responseType: 'blob',
+    });
+    const blob = new Blob([response.data], {
+      type: response.headers['content-type'] || 'application/octet-stream',
+    });
+    const url = URL.createObjectURL(blob);
+    window.open(url, '_blank', 'noopener,noreferrer');
+    window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
   },
 
   getRelatorioProcedimentosMes: async (mesRef: string): Promise<RelatorioProcedimentosMesApiResponse> => {

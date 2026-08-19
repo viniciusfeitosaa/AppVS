@@ -220,7 +220,7 @@ const Avaliacao = () => {
                     type="button"
                     className="btn btn-secondary text-sm py-2 px-4 rounded-lg shrink-0 border-viva-300 text-viva-900 hover:bg-viva-50"
                     onClick={() => {
-                      window.open('https://portal.cfm.org.br/busca-medicos', '_blank');
+                      window.open('https://portal.cfm.org.br/busca-medicos', '_blank', 'noopener,noreferrer');
                     }}
                   >
                     Busca médicos (CFM)

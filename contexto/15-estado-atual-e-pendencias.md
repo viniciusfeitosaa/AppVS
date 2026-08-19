@@ -32,7 +32,7 @@ O **Viva Saúde** está em produção na VPS (`sejavivasaude.com.br`). Auth, esc
 | Mobile / Capacitor | ✅ | ✅ | Push FCM na VPS (Firebase ok); falta AAB/IPA + teste — `12` |
 | Configurações / módulos | ✅ | ✅ | Matriz de acesso MASTER/MEDICO |
 | Perfis staff / escalista | ✅ | ✅ | `PerfilAcesso` OFF/VER/EDITAR; `/perfis-equipe`; Escalas v1 — `04` |
-| Avaliação (master) | ✅ | ✅ | Só cadastro público `/cadastro` (não precadastro aceito) |
+| Avaliação (master) | ✅ | ✅ | Só cadastro público `/cadastro` (não precadastro aceito); CFM abre o portal sem pré-preenchimento |
 | Atendimentos | — | ⏳ Placeholder | `FeaturePlaceholder` |
 | Landing | ✅ | ✅ | + pasta `landing/` |
 
@@ -85,6 +85,7 @@ Arquivos de referência: `schema.prisma` (`Escala`, `EscalaMedico`, `EscalaPlant
 
 | Data | Entrega |
 |------|---------|
+| 2026-08-19 | **Avaliação → CFM** — botão só abre o portal (sem pré-preenchimento nem tela intermediária) — `05`/`11` |
 | 2026-08-19 | **UAT faturamento misto** — seed + HTML com 2 escalas (ponto 120/h e só-escala 100/h, margem 25%) e 2 médicos teste — `10` |
 | 2026-08-18 | **Fechamento só-escala** — relatório financeiro por plantão alocado; painel de ponto filtra escalas sem `usaPonto`; ValoresPonto oculta subgrupo só-escala; menu Somente escala → `VALORES_PLANTAO` — `06`/`07`/`10` |
 | 2026-08-14 | **Margem de lucro na UI** — Repasse + % + Cobrança em ValoresPonto e ValoresPlantao (sem coluna no DB) — `06`/`07` |

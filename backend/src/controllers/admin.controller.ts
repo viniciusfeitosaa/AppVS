@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { prisma } from '../config/database';
 import { getFotoCheckinRegistroForAdmin } from '../services/ponto.service';
+import { getMedicoDocumentoPerfilForDownload } from '../services/medico.service';
 import {
   createTipoPlantaoService,
   deleteTipoPlantaoService,
@@ -35,6 +36,7 @@ import {
   listRegistrosPontoAdminService,
   listContratosAtivosService,
   listMedicosService,
+  getMedicoDetalheAdminService,
   removerEscalaPlantaoService,
   removerMedicoEscalaService,
   removeContratoEquipeService,
@@ -105,6 +107,44 @@ export const listMedicosController = async (req: Request, res: Response) => {
     return res.status(error.statusCode || 500).json({
       success: false,
       error: error.message || 'Erro ao listar médicos',
+    });
+  }
+};
+
+export const getMedicoDetalheAdminController = async (req: Request, res: Response) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ success: false, error: 'Não autenticado' });
+    }
+    const data = await getMedicoDetalheAdminService(req.user.tenantId, String(req.params.id));
+    return res.status(200).json({ success: true, data });
+  } catch (error: any) {
+    return res.status(error.statusCode || 500).json({
+      success: false,
+      error: error.message || 'Erro ao carregar dados do profissional',
+    });
+  }
+};
+
+export const downloadMedicoDocumentoPerfilAdminController = async (req: Request, res: Response) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ success: false, error: 'Não autenticado' });
+    }
+    const medicoId = String(req.params.id);
+    const documentoId = String(req.params.documentoId);
+    const { path: filePath, nomeArquivo, mimeType } = await getMedicoDocumentoPerfilForDownload(
+      medicoId,
+      req.user.tenantId,
+      documentoId
+    );
+    res.setHeader('Content-Type', mimeType);
+    res.setHeader('Content-Disposition', `inline; filename="${nomeArquivo.replace(/"/g, '\\"')}"`);
+    return res.sendFile(filePath);
+  } catch (error: any) {
+    return res.status(error.statusCode || 500).json({
+      success: false,
+      error: error.message || 'Erro ao baixar documento',
     });
   }
 };
