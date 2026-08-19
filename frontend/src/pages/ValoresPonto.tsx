@@ -126,7 +126,8 @@ const ValoresPonto = () => {
     if (!contratoId) return [];
     return subgrupos
       .filter((s) => s.ativo !== false)
-      .filter((s) => allowedSubgrupoIds.has(s.id));
+      .filter((s) => allowedSubgrupoIds.has(s.id))
+      .filter((s) => !(s.usaEscala && !s.usaPonto));
   }, [allowedSubgrupoIds, contratoId, subgrupos]);
 
   const contratoIdsSoPonto = useMemo(() => {

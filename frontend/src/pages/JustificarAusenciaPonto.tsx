@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useMemo, useState } from 'react';
+import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { notify } from '../lib/notificationEmitter';
 import {
@@ -34,6 +34,16 @@ const formatDateTime = (iso: string | null | undefined) => {
   });
 };
 
+const formatTime = (iso: string | null | undefined) => {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '—';
+  return d.toLocaleTimeString('pt-BR', {
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+};
+
 const toDatetimeLocalValue = (iso: string | null | undefined) => {
   if (!iso) return '';
   const d = new Date(iso);
@@ -58,7 +68,9 @@ const statusClass: Record<StatusJustificativaAusencia, string> = {
 
 const JustificarAusenciaPonto = () => {
   const queryClient = useQueryClient();
+  const formRef = useRef<HTMLFormElement>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [filtroSituacao, setFiltroSituacao] = useState<'TODOS' | 'NENHUM' | 'SO_ENTRADA'>('TODOS');
   const [entrada, setEntrada] = useState('');
   const [saida, setSaida] = useState('');
   const [motivo, setMotivo] = useState('');
@@ -80,6 +92,21 @@ const JustificarAusenciaPonto = () => {
 
   const elegiveis = elegiveisQuery.data?.data ?? [];
   const minhas = minhasQuery.data?.data ?? [];
+
+  const contagemSituacao = useMemo(() => {
+    let nenhum = 0;
+    let soEntrada = 0;
+    for (const p of elegiveis) {
+      if (p.situacaoPonto === 'SO_ENTRADA') soEntrada += 1;
+      else nenhum += 1;
+    }
+    return { todos: elegiveis.length, nenhum, soEntrada };
+  }, [elegiveis]);
+
+  const elegiveisFiltrados = useMemo(() => {
+    if (filtroSituacao === 'TODOS') return elegiveis;
+    return elegiveis.filter((p) => (p.situacaoPonto ?? 'NENHUM') === filtroSituacao);
+  }, [elegiveis, filtroSituacao]);
 
   const escalaNomeById = useMemo(() => {
     const map = new Map<string, string>();
@@ -114,6 +141,14 @@ const JustificarAusenciaPonto = () => {
     setSaida(toDatetimeLocalValue(selected.horarioOficialFim));
     setMotivo('');
   }, [selected]);
+
+  useEffect(() => {
+    if (!selectedId) return;
+    const id = window.requestAnimationFrame(() => {
+      formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+    return () => window.cancelAnimationFrame(id);
+  }, [selectedId]);
 
   const criarMutation = useMutation({
     mutationFn: () =>
@@ -184,6 +219,22 @@ const JustificarAusenciaPonto = () => {
 
   const nomeEscala = (escalaId: string) => escalaNomeById.get(escalaId) ?? 'Escala';
 
+  const labelPontoBatido = (p: PlantaoElegivelJustificativa) => {
+    if (p.situacaoPonto === 'SO_ENTRADA' && p.checkInAt) {
+      return `Entrada ${formatTime(p.checkInAt)} · sem saída`;
+    }
+    if (p.situacaoPonto === 'SO_ENTRADA') {
+      return 'Só entrada · sem saída';
+    }
+    return 'Nenhum';
+  };
+
+  const abas: Array<{ id: typeof filtroSituacao; label: string; count: number }> = [
+    { id: 'TODOS', label: 'Todos', count: contagemSituacao.todos },
+    { id: 'NENHUM', label: 'Nenhum ponto', count: contagemSituacao.nenhum },
+    { id: 'SO_ENTRADA', label: 'Só entrada', count: contagemSituacao.soEntrada },
+  ];
+
   return (
     <div className="space-y-6">
       <div className="card dashboard-hero py-8 md:py-10">
@@ -215,46 +266,96 @@ const JustificarAusenciaPonto = () => {
         ) : elegiveis.length === 0 ? (
           <p className="text-sm text-viva-700">Nenhum plantão elegível no momento.</p>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="min-w-full text-sm">
-              <thead>
-                <tr className="text-left text-viva-700 border-b">
-                  <th className="py-2 pr-4">Data</th>
-                  <th className="py-2 pr-4">Escala</th>
-                  <th className="py-2 pr-4">Horário oficial</th>
-                  <th className="py-2 pr-4">Ação</th>
-                </tr>
-              </thead>
-              <tbody>
-                {elegiveis.map((p) => {
-                  const active = p.id === selectedId;
-                  return (
-                    <tr key={p.id} className={`border-b last:border-b-0 ${active ? 'bg-viva-50/80' : ''}`}>
-                      <td className="py-2 pr-4 text-viva-900 font-medium">{formatDate(p.data)}</td>
-                      <td className="py-2 pr-4 text-viva-900">{nomeEscala(p.escalaId)}</td>
-                      <td className="py-2 pr-4 text-viva-900">
-                        {formatDateTime(p.horarioOficialInicio)} — {formatDateTime(p.horarioOficialFim)}
-                      </td>
-                      <td className="py-2 pr-4">
-                        <button
-                          type="button"
-                          className={`btn text-sm ${active ? 'btn-primary' : 'border border-viva-300 bg-white text-viva-800'}`}
-                          onClick={() => setSelectedId(p.id)}
-                        >
-                          {active ? 'Selecionado' : 'Justificar'}
-                        </button>
-                      </td>
+          <>
+            <div className="mb-3 flex flex-wrap gap-2" role="tablist" aria-label="Filtrar por ponto batido">
+              {abas.map((aba) => {
+                const active = filtroSituacao === aba.id;
+                return (
+                  <button
+                    key={aba.id}
+                    type="button"
+                    role="tab"
+                    aria-selected={active}
+                    className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
+                      active
+                        ? 'bg-viva-800 text-white'
+                        : 'border border-viva-200 bg-white text-viva-800 hover:bg-viva-50'
+                    }`}
+                    onClick={() => setFiltroSituacao(aba.id)}
+                  >
+                    {aba.label}
+                    <span className={`ml-1.5 tabular-nums ${active ? 'text-viva-100' : 'text-viva-500'}`}>
+                      {aba.count}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+
+            {elegiveisFiltrados.length === 0 ? (
+              <p className="text-sm text-viva-700">Nenhum plantão neste filtro.</p>
+            ) : (
+              <div className="max-h-[min(40vh,320px)] overflow-y-auto overflow-x-auto rounded-lg border border-viva-100">
+                <table className="min-w-full text-sm">
+                  <thead className="sticky top-0 z-10 bg-white">
+                    <tr className="text-left text-viva-700 border-b">
+                      <th className="py-2 px-3">Data</th>
+                      <th className="py-2 px-3">Escala</th>
+                      <th className="py-2 px-3">Horário oficial</th>
+                      <th className="py-2 px-3">Ponto batido</th>
+                      <th className="py-2 px-3">Ação</th>
                     </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+                  </thead>
+                  <tbody>
+                    {elegiveisFiltrados.map((p) => {
+                      const active = p.id === selectedId;
+                      return (
+                        <tr
+                          key={p.id}
+                          className={`border-b last:border-b-0 ${active ? 'bg-viva-50/80' : ''}`}
+                        >
+                          <td className="py-2 px-3 text-viva-900 font-medium">{formatDate(p.data)}</td>
+                          <td className="py-2 px-3 text-viva-900">{nomeEscala(p.escalaId)}</td>
+                          <td className="py-2 px-3 text-viva-900">
+                            {formatDateTime(p.horarioOficialInicio)} — {formatDateTime(p.horarioOficialFim)}
+                          </td>
+                          <td className="py-2 px-3 text-viva-900">
+                            <span
+                              className={
+                                p.situacaoPonto === 'SO_ENTRADA'
+                                  ? 'text-amber-800'
+                                  : 'text-viva-700'
+                              }
+                            >
+                              {labelPontoBatido(p)}
+                            </span>
+                          </td>
+                          <td className="py-2 px-3">
+                            <button
+                              type="button"
+                              className={`btn text-sm ${active ? 'btn-primary' : 'border border-viva-300 bg-white text-viva-800'}`}
+                              onClick={() => setSelectedId(p.id)}
+                            >
+                              {active ? 'Selecionado' : 'Justificar'}
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </>
         )}
       </div>
 
       {selected && (
-        <form className="card space-y-4" onSubmit={handleSubmit}>
+        <form
+          ref={formRef}
+          className="card space-y-4 scroll-mt-4 lg:scroll-mt-6"
+          onSubmit={handleSubmit}
+        >
           <div>
             <h2 className="text-lg font-bold text-viva-900">Formulário da justificativa</h2>
             <p className="text-xs text-viva-600 mt-1">

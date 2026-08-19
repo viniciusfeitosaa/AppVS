@@ -740,7 +740,7 @@ export const adminService = {
     success: boolean;
     data: {
       contratos: { id: string; nome: string }[];
-      subgrupos: { id: string; nome: string; ativo: boolean }[];
+      subgrupos: { id: string; nome: string; ativo: boolean; usaEscala?: boolean; usaPonto?: boolean }[];
       equipes: { id: string; nome: string; ativo: boolean; subgrupoId: string | null }[];
       contratoSubgrupos: { contratoAtivoId: string; subgrupoId: string }[];
       contratoEquipes: { contratoAtivoId: string; equipeId: string }[];
@@ -821,7 +821,7 @@ export const adminService = {
     success: boolean;
     data: {
       contratos: { id: string; nome: string }[];
-      subgrupos: { id: string; nome: string; ativo: boolean }[];
+      subgrupos: { id: string; nome: string; ativo: boolean; usaEscala?: boolean; usaPonto?: boolean }[];
       equipes: { id: string; nome: string; ativo: boolean; subgrupoId: string | null }[];
       contratoSubgrupos: { contratoAtivoId: string; subgrupoId: string }[];
     };
@@ -879,6 +879,17 @@ export const adminService = {
     dataFim?: string;
   }) => {
     const response = await api.get('/admin/registros-ponto', { params });
+    return response.data;
+  },
+
+  listPlantoesSomenteEscalaRelatorio: async (params?: {
+    contratoAtivoId?: string;
+    subgrupoId?: string;
+    equipeId?: string;
+    dataInicio?: string;
+    dataFim?: string;
+  }) => {
+    const response = await api.get('/admin/relatorio-plantoes-somente-escala', { params });
     return response.data;
   },
 

@@ -253,7 +253,7 @@ const AppShell = () => {
     '/conteudos': 'CONTEUDOS',
     '/vagas': 'VAGAS',
     '/avaliacao': 'AVALIACAO',
-    '/modulo-escala-master': 'CONFIGURACOES',
+    '/modulo-escala-master': 'VALORES_PLANTAO',
   };
 
   const menuGroups: MenuGroup[] = menuGroupsBase

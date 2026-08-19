@@ -1,7 +1,7 @@
 # 11 — Frontend e UX
 
 **Status:** ✅ Implementado  
-**Última atualização:** 2026-05-28
+**Última atualização:** 2026-08-18
 
 ## Stack
 
@@ -39,7 +39,7 @@ Ver `App.tsx` — dashboard, médicos, escalas, ponto, vagas, relatórios, contr
 
 **Placeholder:** `/atendimentos` → `FeaturePlaceholder`
 
-**Só MASTER:** `/avaliacao`, `/modulo-escala-master`
+**Só MASTER:** `/avaliacao`, `/modulo-escala-master` (menu gated por `VALORES_PLANTAO`)
 
 ## Padrões UX
 

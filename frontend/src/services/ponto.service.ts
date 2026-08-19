@@ -245,6 +245,8 @@ export interface PlantaoElegivelJustificativa {
   gradeId: string;
   horarioOficialInicio: string;
   horarioOficialFim: string;
+  situacaoPonto: 'NENHUM' | 'SO_ENTRADA';
+  checkInAt: string | null;
 }
 
 export interface CriarJustificativaAusenciaPayload {

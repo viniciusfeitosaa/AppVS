@@ -432,6 +432,17 @@ export async function addEquipeToEscalaService(
   if (existingV) {
     return existingV;
   }
+  // Regra: 1 equipe → no máximo 1 escala (pode excluir e criar de novo).
+  const outraEscala = await prisma.escalaEquipe.findFirst({
+    where: { tenantId, equipeId, NOT: { escalaId } },
+    include: { escala: { select: { nome: true } } },
+  });
+  if (outraEscala) {
+    throw {
+      statusCode: 409,
+      message: `Esta equipe já possui a escala "${outraEscala.escala.nome}". Exclua-a para criar ou vincular outra.`,
+    };
+  }
   const row = await prisma.escalaEquipe.create({
     data: { tenantId, escalaId, equipeId },
   });

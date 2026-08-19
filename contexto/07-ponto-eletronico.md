@@ -1,7 +1,7 @@
 # 07 — Ponto eletrônico
 
 **Status:** ✅ Implementado (+ justificativa de ausência v1)  
-**Última atualização:** 2026-08-13
+**Última atualização:** 2026-08-18
 
 ## Funcionalidades
 
@@ -162,3 +162,10 @@ npx ts-node --transpile-only scripts/seed-plantao-sem-justificativa-demo.ts
 - [ ] **VPS:** `prisma migrate deploy` (`20260813200000_justificativa_ausencia_ponto`) + restart backend
 - [ ] **Teste E2E manual:** médico pede → Master aceita → badge no histórico/relatório + bloqueio de check-in duplicado
 - [ ] Validar regras de geo em produção por tenant
+
+## Changelog
+
+### 2026-08-18 — Painel de ponto esconde escala só-escala
+- `listMinhasEscalas` (tela de ponto) remove escalas em que **nenhuma** equipe tem `usaPonto`
+- `ValoresPonto` oculta subgrupos só-escala (valores ficam em Valores Plantão)
+- Arquivos: `ponto.service.ts`, `ValoresPonto.tsx`

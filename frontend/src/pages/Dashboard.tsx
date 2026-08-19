@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../context/AuthContext';
 import { notify } from '../lib/notificationEmitter';
+import { adminService } from '../services/admin.service';
 import { medicoService } from '../services/medico.service';
 import { PONTO_SEM_ESCALA_ESCALA_ID } from '../constants/ponto';
 import { pontoService } from '../services/ponto.service';
@@ -417,6 +418,17 @@ const Dashboard = () => {
   });
   const meusPlantoesAceiteList = meusPlantoesAceiteResp?.data ?? [];
 
+  const { data: justificativasPendentesMaster = [] } = useQuery({
+    queryKey: ['admin', 'justificativas-ausencia', 'PENDENTE', 'dashboard'],
+    queryFn: async () => {
+      const r = await adminService.listJustificativasAusencia({ status: 'PENDENTE' });
+      return r.data ?? [];
+    },
+    enabled: !!user && isMaster,
+    staleTime: 30 * 1000,
+  });
+  const justificativasPendentesPreview = justificativasPendentesMaster.slice(0, 1);
+
   const aceitarTrocaMutation = useMutation({
     mutationFn: (p: { id: string; plantaoContrapartidaId?: string }) =>
       pontoService.aceitarTrocaPlantao(
@@ -478,10 +490,19 @@ const Dashboard = () => {
       {/* Hero */}
       <div className="card dashboard-hero col-span-full stagger-1 py-8 md:py-10">
         <p className="text-xs font-semibold uppercase tracking-widest text-viva-600 mb-2 font-display">
-          {isMaster ? 'Acesso Master' : 'Acesso Profissional'}
+          {isMaster ? 'Acesso Administrador' : 'Acesso Profissional'}
         </p>
         <h1 className="text-xl md:text-2xl font-bold text-viva-900 font-display leading-tight mb-2">
-          Bem-vindo, {fixMojibake(primeiroSegundoNome(displayUser?.nomeCompleto))}!
+          Bem-vindo,{' '}
+          {isMaster
+            ? fixMojibake(
+                (displayUser?.nomeCompleto ?? 'Administrador')
+                  .replace(/\bMaster\b/gi, '')
+                  .replace(/\s{2,}/g, ' ')
+                  .trim() || 'Administrador'
+              )
+            : fixMojibake(primeiroSegundoNome(displayUser?.nomeCompleto))}
+          !
         </h1>
         <p className="text-viva-700 font-serif text-base">
           Sistema de gestão Viva Saúde
@@ -1127,6 +1148,61 @@ const Dashboard = () => {
         </div>
       )}
 
+      {/* Alerta Master: justificativas de ponto pendentes */}
+      {isMaster && justificativasPendentesMaster.length > 0 && (
+        <div className="card col-span-full stagger-2 border-l-4 border-l-amber-500 bg-gradient-to-r from-amber-50 to-orange-50/40">
+          <div className="flex flex-wrap items-start justify-between gap-3 mb-3">
+            <div>
+              <h3 className="text-sm font-semibold text-amber-900 font-display">
+                Justificativas de ponto pendentes
+              </h3>
+              <p className="text-xs text-amber-800/90 mt-0.5 font-serif">
+                {justificativasPendentesMaster.length === 1
+                  ? '1 pedido aguardando análise.'
+                  : `${justificativasPendentesMaster.length} pedidos aguardando análise.`}
+              </p>
+            </div>
+            <Link to="/justificativas-ponto" className="btn-sm btn-primary shrink-0">
+              Revisar fila
+            </Link>
+          </div>
+          <ul className="space-y-2">
+            {justificativasPendentesPreview.map((j) => {
+              const dataPlantao = j.escalaPlantao?.data
+                ? formatDataCurta(String(j.escalaPlantao.data).slice(0, 10))
+                : '—';
+              const nome = fixMojibake(j.medico?.nomeCompleto?.trim() || 'Profissional');
+              const escala = fixMojibake(j.escala?.nome?.trim() || 'Escala');
+              return (
+                <li
+                  key={j.id}
+                  className="rounded-xl border border-amber-200 bg-amber-50/40 px-3 py-2.5 flex flex-wrap items-center justify-between gap-2"
+                >
+                  <p className="text-sm text-amber-950">
+                    <strong>{nome}</strong>
+                    <span className="text-amber-800/80"> · </span>
+                    {dataPlantao}
+                    <span className="text-amber-800/80"> · </span>
+                    {escala}
+                  </p>
+                  <Link
+                    to="/justificativas-ponto"
+                    className="text-xs font-semibold text-amber-900 hover:text-amber-950 underline-offset-2 hover:underline"
+                  >
+                    Analisar
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+          {justificativasPendentesMaster.length > justificativasPendentesPreview.length && (
+            <p className="text-xs text-amber-800 mt-2 font-serif">
+              +{justificativasPendentesMaster.length - justificativasPendentesPreview.length} na fila
+            </p>
+          )}
+        </div>
+      )}
+
       {/* Card de Informações */}
       <div className="card stagger-3">
         <h3 className="text-xs font-semibold uppercase tracking-wider text-viva-600 mb-4 font-display">
@@ -1185,7 +1261,7 @@ const Dashboard = () => {
             <>
               <div className="rounded-xl bg-viva-100/80 border border-viva-200/60 p-4">
                 <p className="text-[10px] font-semibold uppercase tracking-wider text-viva-600 font-display">Perfil</p>
-                <p className="text-sm font-semibold text-viva-900 mt-1 font-display">Administrador Master</p>
+                <p className="text-sm font-semibold text-viva-900 mt-1 font-display">Administrador</p>
               </div>
               {displayUser?.email && (
                 <div className="rounded-xl bg-viva-50/80 border border-viva-200/50 p-4">
@@ -1228,7 +1304,7 @@ const Dashboard = () => {
                 Documentos enviados para você
               </h3>
               <p className="text-xs text-viva-600 mt-1 font-serif max-w-xl">
-                Acesse Documentos para registar ciência depois de ler (visível para o Master em Envio de Documentos).
+                Acesse Documentos para registar ciência depois de ler (visível para o Administrador em Envio de Documentos).
               </p>
             </div>
             <Link

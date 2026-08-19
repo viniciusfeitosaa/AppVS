@@ -179,15 +179,15 @@ export async function listPlantoesElegiveisJustificativa(tenantId: string, medic
   const gte = new Date(Math.min(...dias.map((d) => d.gte.getTime())));
   const lte = new Date(Math.max(...dias.map((d) => d.lte.getTime())));
 
-  const pontosFechados = await prisma.registroPonto.findMany({
+  const pontosNoPeriodo = await prisma.registroPonto.findMany({
     where: {
       tenantId,
       medicoId,
       escalaId: { in: [...new Set(candidatos.map((p) => p.escalaId))] },
-      checkOutAt: { not: null },
       checkInAt: { gte, lte },
     },
-    select: { escalaId: true, checkInAt: true },
+    select: { escalaId: true, checkInAt: true, checkOutAt: true },
+    orderBy: { checkInAt: 'desc' },
   });
 
   const contratoIds = [
@@ -221,12 +221,17 @@ export async function listPlantoesElegiveisJustificativa(tenantId: string, medic
     if (bloqueadosPorJust.has(p.id)) continue;
 
     const dia = intervaloDiaCivilPlantao(p.data);
-    const temFechado = pontosFechados.some((r) => {
+    const pontosDoDia = pontosNoPeriodo.filter((r) => {
       if (r.escalaId !== p.escalaId) return false;
       const t = r.checkInAt.getTime();
       return t >= dia.gte.getTime() && t <= dia.lte.getTime();
     });
+
+    const temFechado = pontosDoDia.some((r) => r.checkOutAt != null);
     if (temFechado) continue;
+
+    const aberto = pontosDoDia.find((r) => r.checkOutAt == null);
+    const situacaoPonto = aberto ? ('SO_ENTRADA' as const) : ('NENHUM' as const);
 
     const schedule = await resolveScheduleForPlantao(tenantId, p, tiposByContrato);
     const oficial = horarioOficialFromSchedule(p, schedule);
@@ -235,6 +240,8 @@ export async function listPlantoesElegiveisJustificativa(tenantId: string, medic
       escalaId: p.escalaId,
       data: p.data,
       gradeId: p.gradeId,
+      situacaoPonto,
+      checkInAt: aberto?.checkInAt ?? null,
       ...oficial,
     });
   }

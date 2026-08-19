@@ -6,6 +6,7 @@ import { resolverValorCheioPlantao } from './justificativa-ausencia-ponto.valor'
 import {
   aceitarJustificativa,
   criarJustificativaAusenciaPonto,
+  listJustificativasAdmin,
   listMinhasJustificativas,
   listPlantoesElegiveisJustificativa,
   recusarJustificativa,
@@ -203,7 +204,6 @@ describe('listPlantoesElegiveisJustificativa', () => {
     mockRegistroFindFirst.mockResolvedValue(null);
     mockJustificativaFindFirst.mockResolvedValue(null);
     mockTipoFindMany.mockResolvedValue([]);
-    // findMany de registros fechados / justificativas bloqueantes via queries batch
     (prisma.registroPonto.findMany as jest.Mock).mockResolvedValue([]);
     mockJustificativaFindMany.mockResolvedValue([]);
 
@@ -211,8 +211,29 @@ describe('listPlantoesElegiveisJustificativa', () => {
 
     expect(list).toHaveLength(1);
     expect(list[0].id).toBe(escalaPlantaoId);
+    expect(list[0].situacaoPonto).toBe('NENHUM');
+    expect(list[0].checkInAt).toBeNull();
     expect(list[0].horarioOficialInicio).toBeInstanceOf(Date);
     expect(list[0].horarioOficialFim).toBeInstanceOf(Date);
+  });
+
+  it('marca SO_ENTRADA quando há check-in aberto no dia', async () => {
+    const checkInAt = new Date('2026-08-10T07:05:00');
+    mockPlantaoFindMany.mockResolvedValue([plantaoRow()]);
+    mockBatchProducao.mockResolvedValue(
+      new Map([[escalaId, { allowPonto: true, requireJanelaPlantao: true }]])
+    );
+    (prisma.registroPonto.findMany as jest.Mock).mockResolvedValue([
+      { escalaId, checkInAt, checkOutAt: null },
+    ]);
+    mockJustificativaFindMany.mockResolvedValue([]);
+    mockTipoFindMany.mockResolvedValue([]);
+
+    const list = await listPlantoesElegiveisJustificativa(tenantId, medicoId);
+
+    expect(list).toHaveLength(1);
+    expect(list[0].situacaoPonto).toBe('SO_ENTRADA');
+    expect(list[0].checkInAt).toEqual(checkInAt);
   });
 
   it('exclui plantão com ponto fechado no dia', async () => {
@@ -472,6 +493,190 @@ describe('recusarJustificativa', () => {
 
     const created = await criarJustificativaAusenciaPonto(tenantId, medicoId, inputBase());
     expect(created.status).toBe('PENDENTE');
+  });
+
+  it('rejeita com 409 se já foi ACEITA (não reabre)', async () => {
+    mockJustificativaFindFirst.mockResolvedValue(justificativaPendente({ status: 'ACEITA' }));
+
+    await expect(recusarJustificativa(tenantId, masterId, justId, 'tarde demais')).rejects.toMatchObject({
+      statusCode: 409,
+      message: expect.stringMatching(/pendente/i),
+    });
+    expect(mockJustificativaUpdate).not.toHaveBeenCalled();
+  });
+
+  it('permite recusa sem comentário (comentarioMaster null)', async () => {
+    const updated = await recusarJustificativa(tenantId, masterId, justId);
+
+    expect(updated.status).toBe('RECUSADA');
+    expect(mockJustificativaUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          status: 'RECUSADA',
+          comentarioMaster: null,
+        }),
+      })
+    );
+  });
+});
+
+/**
+ * Cases do fluxo Master: deixar em aberto (PENDENTE), aceitar ou recusar.
+ * Cobre decisões da fila administrativa sem fechar o pedido automaticamente.
+ */
+describe('fluxo Master — PENDENTE / ACEITA / RECUSADA', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockResolverValor.mockResolvedValue(900);
+    mockCriarNotif.mockResolvedValue({ id: 'notif-x' });
+    mockRegistroDeleteMany.mockResolvedValue({ count: 0 });
+    mockRegistroCreate.mockResolvedValue({
+      id: 'reg-just',
+      origem: 'JUSTIFICADO_SEM_PONTO',
+      repasseValorCongelado: 900,
+    });
+    mockJustificativaUpdateMany.mockResolvedValue({ count: 1 });
+    mockJustificativaUpdate.mockImplementation(async ({ data }: { data: Record<string, unknown> }) => ({
+      ...justificativaPendente(),
+      ...data,
+    }));
+    mockTransaction.mockImplementation(async (fn: (tx: typeof prisma) => Promise<unknown>) => fn(prisma));
+    mockJustificativaFindFirst.mockResolvedValue(justificativaPendente());
+    mockRegistroFindFirst.mockResolvedValue(null);
+  });
+
+  it('deixar em aberto: fila admin lista só PENDENTE quando filtrada', async () => {
+    mockJustificativaFindMany.mockResolvedValue([justificativaPendente()]);
+
+    const rows = await listJustificativasAdmin(tenantId, 'PENDENTE');
+
+    expect(rows).toHaveLength(1);
+    expect(rows[0].status).toBe('PENDENTE');
+    expect(mockJustificativaFindMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { tenantId, status: 'PENDENTE' },
+      })
+    );
+  });
+
+  it('deixar em aberto: sem filtro lista todos os status (pendente permanece até decisão)', async () => {
+    mockJustificativaFindMany.mockResolvedValue([
+      justificativaPendente(),
+      justificativaPendente({ id: 'j-aceita', status: 'ACEITA' }),
+      justificativaPendente({ id: 'j-rec', status: 'RECUSADA' }),
+    ]);
+
+    const rows = await listJustificativasAdmin(tenantId);
+
+    expect(rows.map((r) => r.status)).toEqual(['PENDENTE', 'ACEITA', 'RECUSADA']);
+    expect(mockJustificativaFindMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { tenantId },
+      })
+    );
+  });
+
+  it('aceitar: Master pode editar horários alegados antes do aceite (valor continua cheio)', async () => {
+    const novaEntrada = new Date('2026-08-10T08:00:00');
+    const novaSaida = new Date('2026-08-10T20:00:00');
+
+    const updated = await aceitarJustificativa(tenantId, masterId, justId, {
+      horarioAlegadoEntrada: novaEntrada,
+      horarioAlegadoSaida: novaSaida,
+    });
+
+    expect(mockRegistroCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          checkInAt: novaEntrada,
+          checkOutAt: novaSaida,
+          duracaoMinutos: 12 * 60,
+          repasseValorCongelado: 900,
+          origem: 'JUSTIFICADO_SEM_PONTO',
+        }),
+      })
+    );
+    expect(mockJustificativaUpdateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          status: 'ACEITA',
+          horarioAlegadoEntrada: novaEntrada,
+          horarioAlegadoSaida: novaSaida,
+        }),
+      })
+    );
+    expect(updated.status).toBe('ACEITA');
+  });
+
+  it('aceitar: rejeita se pedido já não está PENDENTE (já ACEITA)', async () => {
+    mockJustificativaFindFirst.mockResolvedValue(justificativaPendente({ status: 'ACEITA' }));
+
+    await expect(aceitarJustificativa(tenantId, masterId, justId)).rejects.toMatchObject({
+      statusCode: 409,
+      message: expect.stringMatching(/pendente/i),
+    });
+    expect(mockRegistroCreate).not.toHaveBeenCalled();
+  });
+
+  it('aceitar: rejeita se pedido já foi RECUSADA', async () => {
+    mockJustificativaFindFirst.mockResolvedValue(justificativaPendente({ status: 'RECUSADA' }));
+
+    await expect(aceitarJustificativa(tenantId, masterId, justId)).rejects.toMatchObject({
+      statusCode: 409,
+      message: expect.stringMatching(/pendente/i),
+    });
+  });
+
+  it('aceitar: rejeita horários inválidos editados pelo Master (saída <= entrada)', async () => {
+    await expect(
+      aceitarJustificativa(tenantId, masterId, justId, {
+        horarioAlegadoEntrada: new Date('2026-08-10T19:00:00'),
+        horarioAlegadoSaida: new Date('2026-08-10T07:00:00'),
+      })
+    ).rejects.toMatchObject({
+      statusCode: 400,
+      message: expect.stringMatching(/saída|posterior/i),
+    });
+    expect(mockRegistroCreate).not.toHaveBeenCalled();
+  });
+
+  it('recusar: fecha o pedido em aberto sem criar JUSTIFICADO_SEM_PONTO', async () => {
+    const updated = await recusarJustificativa(tenantId, masterId, justId, 'Documentação insuficiente');
+
+    expect(updated.status).toBe('RECUSADA');
+    expect(mockRegistroCreate).not.toHaveBeenCalled();
+    expect(mockRegistroDeleteMany).not.toHaveBeenCalled();
+    expect(mockCriarNotif).toHaveBeenCalledWith(
+      expect.objectContaining({
+        tipo: TIPO_NOTIFICACAO.JUSTIFICATIVA_PONTO_RECUSADA,
+        corpo: expect.stringContaining('Documentação insuficiente'),
+      })
+    );
+  });
+
+  it('ciclo: PENDENTE → ACEITA notifica e não permite nova decisão', async () => {
+    const aceita = await aceitarJustificativa(tenantId, masterId, justId);
+    expect(aceita.status).toBe('ACEITA');
+
+    mockJustificativaFindFirst.mockResolvedValue(justificativaPendente({ status: 'ACEITA' }));
+
+    await expect(aceitarJustificativa(tenantId, masterId, justId)).rejects.toMatchObject({
+      statusCode: 409,
+    });
+    await expect(recusarJustificativa(tenantId, masterId, justId)).rejects.toMatchObject({
+      statusCode: 409,
+    });
+  });
+
+  it('ciclo: PENDENTE permanece listável até Master decidir (não auto-aceita)', async () => {
+    mockJustificativaFindMany.mockResolvedValue([justificativaPendente()]);
+
+    const pendentes = await listJustificativasAdmin(tenantId, 'PENDENTE');
+    expect(pendentes.every((j) => j.status === 'PENDENTE')).toBe(true);
+
+    // Sem chamar aceitar/recusar — pedido continua PENDENTE (sem update)
+    expect(mockJustificativaUpdate).not.toHaveBeenCalled();
+    expect(mockJustificativaUpdateMany).not.toHaveBeenCalled();
   });
 });
 

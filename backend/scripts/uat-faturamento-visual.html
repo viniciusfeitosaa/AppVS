@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>UAT Faturamento misto — valores esperados</title>
+  <style>
+    :root { color-scheme: light; }
+    body { font-family: ui-sans-serif, system-ui, Segoe UI, sans-serif; margin: 32px; background: #f6f7f4; color: #14261a; }
+    h1 { font-size: 1.5rem; margin: 0 0 8px; }
+    p, li { line-height: 1.5; }
+    .card { background: #fff; border-radius: 12px; padding: 20px 24px; margin: 16px 0; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
+    table { border-collapse: collapse; width: 100%; }
+    th, td { text-align: left; padding: 10px 8px; border-bottom: 1px solid #e5e7eb; }
+    th { font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: #3d6b4a; }
+    .num { font-variant-numeric: tabular-nums; font-weight: 600; }
+    code { background: #eef4ef; padding: 1px 6px; border-radius: 4px; }
+    .hint { font-size: 14px; color: #445c4c; }
+  </style>
+</head>
+<body>
+  <h1>UAT Faturamento misto</h1>
+  <p class="hint">Contrato <strong>UAT Faturamento misto</strong> · período <code>2026-08-01</code> a <code>2026-08-31</code> · 2 plantões de 12h cada · margem 25% (cobrança = repasse ÷ 0,75).</p>
+  <div class="card">
+    <h2>Como conferir</h2>
+    <ol>
+      <li>Master: Relatório financeiro → contrato <strong>UAT Faturamento misto</strong> → agosto/2026.</li>
+      <li>Filtre o subgrupo <strong>UAT Escala + Ponto</strong> (ponto) e depois <strong>UAT Somente Escala</strong> (só escala).</li>
+      <li>Login médico (senha <code>Uat@2026</code>): <code>uat.ponto@vivasaude.test</code> / <code>uat.escala@vivasaude.test</code>.</li>
+    </ol>
+  </div>
+  <div class="card">
+    <h2>Valores cadastrados (R$/h)</h2>
+    <table>
+      <thead><tr><th>Modalidade</th><th>Cobrança/h</th><th>Margem</th><th>Repasse/h</th></tr></thead>
+      <tbody>
+        <tr><td>Escala + ponto</td><td class="num">R$ 120.00</td><td>25%</td><td class="num">R$ 90.00</td></tr>
+        <tr><td>Somente escala</td><td class="num">R$ 100.00</td><td>25%</td><td class="num">R$ 75.00</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="card">
+    <h2>Totais esperados no relatório</h2>
+    <table>
+      <thead><tr><th>Profissional</th><th>Plantões</th><th>Horas</th><th>Repasse</th><th>Cobrança</th></tr></thead>
+      <tbody>
+        <tr>
+          <td>Dr. Teste Ponto<br/><span class="hint">UAT Escala com ponto</span></td>
+          <td class="num">2</td>
+          <td class="num">24h</td>
+          <td class="num">R$ 2.160,00</td>
+          <td class="num">R$ 2.880,00</td>
+        </tr>
+        <tr>
+          <td>Dr. Teste Escala<br/><span class="hint">UAT Escala sem ponto</span></td>
+          <td class="num">2</td>
+          <td class="num">24h</td>
+          <td class="num">R$ 1.800,00</td>
+          <td class="num">R$ 2.400,00</td>
+        </tr>
+        <tr>
+          <td><strong>Contrato (os dois)</strong></td>
+          <td class="num">4</td>
+          <td class="num">48h</td>
+          <td class="num">R$ 3.960,00</td>
+          <td class="num">R$ 5.280,00</td>
+        </tr>
+      </tbody>
+    </table>
+    <p class="hint">Fórmula: 12 h × R$/h × 2 plantões (2026-08-17 e 2026-08-18). Sem adicional.</p>
+  </div>
+</body>
+</html>

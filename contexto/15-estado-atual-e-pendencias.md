@@ -1,7 +1,7 @@
 ﻿# 15 — Estado atual e pendências
 
-**Snapshot:** 2026-08-14  
-**Branch:** `feat/perfis-acesso-staff` (perfis staff entregue; merge pendente) — `main` com push FCM + Firebase na VPS ok; falta builds store + teste no aparelho
+**Snapshot:** 2026-08-19  
+**Branch:** `feat/perfis-acesso-staff` (perfis staff + fechamento só-escala nesta branch; merge pendente) — `main` com push FCM + Firebase na VPS ok; falta builds store + teste no aparelho
 
 > Este arquivo deve ser o **primeiro** atualizado após entregas relevantes.  
 > É o **mapa de bordo** do projeto (o que está pronto, o que falta, histórico recente).
@@ -25,7 +25,7 @@ O **Viva Saúde** está em produção na VPS (`sejavivasaude.com.br`). Auth, esc
 | Ponto eletrônico | ✅ | ✅ | Geo, foto, histórico; seletor de escala; **justificativa ausência** (`JUSTIFICADO_SEM_PONTO`) — `07` |
 | Vagas | ✅ | ✅ | Wizard de anúncio |
 | Documentos | ✅ | ✅ | DocuSeal opcional |
-| Relatórios | ✅ | ✅ | Procedimentos + ponto; PDF com logo VS |
+| Relatórios | ✅ | ✅ | Procedimentos + ponto + **plantões só-escala** no hub financeiro — `10` |
 | Painel de E-mail | ✅ | ✅ | NF / demonstrativos com PDF anexo + 2 tipos de competência |
 | WhatsApp (Evolution GO) | ✅ | — | Menu atendimento; pausar/retomar (equipe) |
 | Conteúdos / eventos | ✅ | ✅ | Anúncio, frequência, **avaliação custom por evento**, precadastro→aceite→corpo clínico — `17-conteudos-eventos.md` |
@@ -85,6 +85,8 @@ Arquivos de referência: `schema.prisma` (`Escala`, `EscalaMedico`, `EscalaPlant
 
 | Data | Entrega |
 |------|---------|
+| 2026-08-19 | **UAT faturamento misto** — seed + HTML com 2 escalas (ponto 120/h e só-escala 100/h, margem 25%) e 2 médicos teste — `10` |
+| 2026-08-18 | **Fechamento só-escala** — relatório financeiro por plantão alocado; painel de ponto filtra escalas sem `usaPonto`; ValoresPonto oculta subgrupo só-escala; menu Somente escala → `VALORES_PLANTAO` — `06`/`07`/`10` |
 | 2026-08-14 | **Margem de lucro na UI** — Repasse + % + Cobrança em ValoresPonto e ValoresPlantao (sem coluna no DB) — `06`/`07` |
 | 2026-08-14 | **Perfis de acesso staff** — `PerfilAcesso` OFF/VER/EDITAR; `/perfis-equipe`; Escalas read-only se VER; migration `20260814210000` — `04` |
 | 2026-08-14 | **Tipos de plantão** movidos para Escalas (aba Tipos); ValoresPlantao só aponta link — `06` |

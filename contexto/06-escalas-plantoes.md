@@ -1,7 +1,7 @@
 # 06 — Escalas e plantões
 
 **Status:** ✅ Implementado (evolução contínua)  
-**Última atualização:** 2026-08-14
+**Última atualização:** 2026-08-18
 
 ## Modelo
 
@@ -33,7 +33,7 @@ Migrations recentes (2026-04): troca de plantão — status, contrapartida, broa
 | `SubgruposEquipes.tsx` | Fluxo contrato → subgrupo → equipe → **1 escala por equipe** |
 | `MeuCalendarioPlantoes.tsx` | Visão médico |
 | `ValoresPlantao.tsx` | Configuração de valores |
-| `ModuloEscalaMaster.tsx` | Ferramentas master (só `MASTER`) |
+| `ModuloEscalaMaster.tsx` | Ferramentas master (menu gated por `VALORES_PLANTAO`) |
 
 ## Regras importantes
 
@@ -42,6 +42,12 @@ Migrations recentes (2026-04): troca de plantão — status, contrapartida, broa
 - Troca de plantão: estados persistidos em `SolicitacaoTrocaPlantao` (ver migration `troca_plantao_status`)
 
 ## Changelog
+
+### 2026-08-18 — Fechamento financeiro só-escala + menu
+- Relatório financeiro passa a somar **plantões alocados** quando o subgrupo é `usaEscala && !usaPonto` (sem `RegistroPonto`)
+- Menu `/modulo-escala-master` gated por `VALORES_PLANTAO` (antes `CONFIGURACOES`)
+- Arquivos: `relatorio-plantoes-somente-escala.service.ts`, `valor-plantao-dia.util.ts`, `Relatorios.tsx`, `AppShell.tsx`
+- Sem migration
 
 ### 2026-08-14 — Margem de lucro na UI de valores (plantão)
 - Em `ValoresPlantao`, por tipo de plantão: Repasse + Margem (%) + Cobrança por dia (mesma fórmula do ponto)

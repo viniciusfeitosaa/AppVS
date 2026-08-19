@@ -30,6 +30,7 @@ import {
   listEquipeEscalasController,
   listEscalasController,
   listRegistrosPontoAdminController,
+  listPlantoesSomenteEscalaRelatorioController,
   downloadRegistroPontoFotoAdminController,
   getMatrizAcessosModulosController,
   salvarMatrizAcessosModulosController,
@@ -317,6 +318,11 @@ router.post(
 );
 
 router.get('/registros-ponto', requireModuleAccess(ModuloSistema.RELATORIOS), listRegistrosPontoAdminController);
+router.get(
+  '/relatorio-plantoes-somente-escala',
+  requireModuleAccess(ModuloSistema.RELATORIOS),
+  listPlantoesSomenteEscalaRelatorioController
+);
 router.get(
   '/registros-ponto/:id/foto-checkin',
   requireModuleAccess(ModuloSistema.RELATORIOS),

@@ -79,7 +79,7 @@ const Login = () => {
                 type="email"
                 {...register('email')}
                 className="input"
-                placeholder="seuemail@dominio.com"
+                placeholder="voce@email.com"
                 autoComplete="email"
               />
               {errors.email && (

@@ -4,7 +4,7 @@ const ModuloEscalaMaster = () => (
   <ValoresPlantao
     modo="somente_escala"
     titulo="Módulo Escala"
-    descricao="Escolha contrato, subgrupo e equipe do estilo Somente escala. Configure os tipos de plantão e os valores por tipo (repasse/cobrança por dia) para uso no relatório financeiro."
+    descricao="Escolha contrato, subgrupo e equipe do estilo Somente escala. Defina valores por tipo (repasse/cobrança por dia). Os tipos de plantão (horários) são cadastrados em Escalas → aba Tipos."
     exibirLocalizacaoPonto={false}
   />
 );

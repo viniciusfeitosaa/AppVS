@@ -64,8 +64,20 @@ type AgrupamentoHoras = {
   valorRepasse?: number;
   /** Contrato só ponto: total cobrança (valor hora cobrança × horas) */
   valorCobranca?: number;
-  /** Passo a passo por batida de ponto (contrato escala + ponto) */
+  /** Passo a passo por batida de ponto ou plantão alocado (somente escala) */
   calculoPorRegistro?: DetalheCalculoRegistroPonto[];
+};
+
+type PlantaoSomenteEscalaRelatorio = {
+  id: string;
+  data: string;
+  duracaoMinutos: number;
+  medico: { id: string; nomeCompleto: string };
+  escala: { id: string; nome: string };
+  valorHoraRepasse: number | null;
+  valorRepasse: number | null;
+  valorCobranca: number | null;
+  resumo: string;
 };
 
 const formatDuration = (minutes: number) => {
@@ -295,7 +307,7 @@ const Relatorios = () => {
         ? equipesList.filter((e: any) => e.equipe?.subgrupo?.id === subgrupoId || e.equipe?.subgrupoId === subgrupoId)
         : equipesList;
 
-  const { data: registrosResp, isLoading } = useQuery({
+  const { data: registrosResp, isLoading: loadingRegistros } = useQuery({
     queryKey: ['admin', 'registros-ponto', { contratoId, subgrupoId, equipeId, dataInicio, dataFim }],
     queryFn: () =>
       adminService.listRegistrosPonto({
@@ -307,6 +319,21 @@ const Relatorios = () => {
       }),
     enabled: isMaster && Boolean(dataInicio && dataFim),
   });
+
+  const { data: plantoesSeResp, isLoading: loadingPlantoesSe } = useQuery({
+    queryKey: ['admin', 'relatorio-plantoes-somente-escala', { contratoId, subgrupoId, equipeId, dataInicio, dataFim }],
+    queryFn: () =>
+      adminService.listPlantoesSomenteEscalaRelatorio({
+        contratoAtivoId: contratoId || undefined,
+        subgrupoId: subgrupoId || undefined,
+        equipeId: equipeId || undefined,
+        dataInicio,
+        dataFim,
+      }),
+    enabled: isMaster && Boolean(dataInicio && dataFim),
+  });
+
+  const isLoading = loadingRegistros || loadingPlantoesSe;
 
   const contratoSelecionado = useMemo(
     () => (contratoId ? contratos.find((c: any) => c.id === contratoId) : null),
@@ -462,6 +489,10 @@ const Relatorios = () => {
       valorPlantao12hPorRegistroPontoId,
       gradeIdPlantaoPorRegistroPontoId,
     } = registrosDerived;
+    const plantoesSe = (Array.isArray(plantoesSeResp?.data?.itens)
+      ? plantoesSeResp.data.itens
+      : []) as PlantaoSomenteEscalaRelatorio[];
+    const incluirDetalhe = (usaEscalaEPonto || usaSomenteEscala) && mostrarDetalheCalculo;
     const map = new Map<string, AgrupamentoHoras>();
     let somaMinutos = 0;
 
@@ -608,7 +639,7 @@ const Relatorios = () => {
         if (escNome && escNome !== 'Escala não identificada' && prev.escalaNome === 'Escala não identificada') {
           prev.escalaNome = escNome;
         }
-        if (usaEscalaEPonto && mostrarDetalheCalculo) {
+        if (incluirDetalhe) {
           if (!prev.calculoPorRegistro) prev.calculoPorRegistro = [];
           prev.calculoPorRegistro.push(detalheLinha);
         }
@@ -624,11 +655,56 @@ const Relatorios = () => {
           valorHora: temValorHoraAlocacao ? valorHoraAlocacao : undefined,
           valorRepasse: repasseComAdicional != null ? round2(repasseComAdicional) : undefined,
           valorCobranca: cobrancaComAdicional != null ? round2(cobrancaComAdicional) : undefined,
-          calculoPorRegistro:
-            usaEscalaEPonto && mostrarDetalheCalculo ? [detalheLinha] : undefined,
+          calculoPorRegistro: incluirDetalhe ? [detalheLinha] : undefined,
         });
       }
 
+      somaMinutos += minutos;
+    }
+
+    for (const p of plantoesSe) {
+      const minutos = p.duracaoMinutos || 0;
+      const medId = p.medico?.id || 'sem-medico';
+      const escId = p.escala?.id || 'sem-escala';
+      const medNome = fixMojibake(p.medico?.nomeCompleto || 'Médico não identificado');
+      const escNome = fixMojibake(p.escala?.nome || 'Escala não identificada');
+      const key = `${medId}::${escId}`;
+      const detalheLinha: DetalheCalculoRegistroPonto = {
+        registroId: p.id,
+        checkInAt: p.data ? `${p.data}T00:00:00.000Z` : '',
+        duracaoMinutos: minutos,
+        origem: 'PLANTAO_SOMENTE_ESCALA',
+        valorRepasseAplicado: p.valorRepasse,
+        valorCobrancaAplicado: p.valorCobranca,
+        metodo: p.valorRepasse != null ? 'VALOR_HORA_PLANTAO' : 'SEM_VALOR',
+        resumo: p.resumo,
+      };
+      const prev = map.get(key);
+      if (prev) {
+        prev.totalMinutos += minutos;
+        prev.totalRegistros += 1;
+        if (p.valorRepasse != null) prev.valorRepasse = round2((prev.valorRepasse ?? 0) + p.valorRepasse);
+        if (p.valorCobranca != null) prev.valorCobranca = round2((prev.valorCobranca ?? 0) + p.valorCobranca);
+        if (p.valorHoraRepasse != null && p.valorHoraRepasse > 0) prev.valorHora = p.valorHoraRepasse;
+        if (incluirDetalhe) {
+          if (!prev.calculoPorRegistro) prev.calculoPorRegistro = [];
+          prev.calculoPorRegistro.push(detalheLinha);
+        }
+      } else {
+        map.set(key, {
+          key,
+          medicoId: medId,
+          medicoNome: medNome,
+          escalaId: escId,
+          escalaNome: escNome,
+          totalMinutos: minutos,
+          totalRegistros: 1,
+          valorHora: p.valorHoraRepasse != null && p.valorHoraRepasse > 0 ? p.valorHoraRepasse : undefined,
+          valorRepasse: p.valorRepasse != null ? round2(p.valorRepasse) : undefined,
+          valorCobranca: p.valorCobranca != null ? round2(p.valorCobranca) : undefined,
+          calculoPorRegistro: incluirDetalhe ? [detalheLinha] : undefined,
+        });
+      }
       somaMinutos += minutos;
     }
 
@@ -703,11 +779,13 @@ const Relatorios = () => {
     return {
       agrupado: rows,
       totalMinutos: somaMinutos,
-      totalRegistros: registros.length,
+      totalRegistros: registros.length + plantoesSe.length,
     };
   }, [
     registrosDerived,
+    plantoesSeResp?.data?.itens,
     usaEscalaEPonto,
+    usaSomenteEscala,
     usaEscalaComValoresPlantao,
     valoresPlantaoPorGrade,
     apenasPonto,
@@ -736,6 +814,8 @@ const Relatorios = () => {
       cobranca: temCob ? round2(cob) : null,
     };
   }, [agrupado, mostrarRepasseECobranca]);
+
+  const incluirDetalheTabela = (usaEscalaEPonto || usaSomenteEscala) && mostrarDetalheCalculo;
 
   if (!isMaster) {
     return (
@@ -868,7 +948,9 @@ const Relatorios = () => {
           <p className="text-2xl font-bold text-viva-900 mt-1">{formatDuration(totalMinutos)}</p>
         </div>
         <div className="card">
-          <p className="text-xs uppercase tracking-wide text-viva-600">Total de registros</p>
+          <p className="text-xs uppercase tracking-wide text-viva-600">
+            {usaSomenteEscala ? 'Total de plantões' : 'Total de lançamentos'}
+          </p>
           <p className="text-2xl font-bold text-viva-900 mt-1">{totalRegistros}</p>
         </div>
         <div className="card">
@@ -898,10 +980,20 @@ const Relatorios = () => {
           <div>
             <h3 className="text-lg font-bold text-viva-900">Horas por médico e escala</h3>
             <p className="text-xs text-gray-600 mt-1 max-w-3xl leading-relaxed">
-              Registros já fechados usam o <strong>valor congelado no checkout</strong> (repasse). Sem congelado, o
-              cálculo usa <strong>valor/h × horas</strong> (alocação médico–escala ou valores de plantão por dia).
+              {usaSomenteEscala ? (
+                <>
+                  Modalidade <strong>somente escala</strong>: o valor vem do <strong>plantão alocado</strong>{' '}
+                  (horas do turno × R$/h do cadastro ou da alocação médico–escala), sem batida de ponto.
+                </>
+              ) : (
+                <>
+                  Registros já fechados usam o <strong>valor congelado no checkout</strong> (repasse). Sem congelado, o
+                  cálculo usa <strong>valor/h × horas</strong> (alocação médico–escala ou valores de plantão por dia).
+                  Plantões de subgrupos <strong>somente escala</strong> entram pelo plantão alocado.
+                </>
+              )}
             </p>
-            {usaEscalaEPonto && (
+            {(usaEscalaEPonto || usaSomenteEscala) && (
               <label className="mt-3 flex cursor-pointer items-center gap-2 text-sm text-viva-800">
                 <input
                   type="checkbox"
@@ -909,7 +1001,9 @@ const Relatorios = () => {
                   checked={mostrarDetalheCalculo}
                   onChange={(e) => setMostrarDetalheCalculo(e.target.checked)}
                 />
-                Mostrar detalhe do cálculo (cada registro de ponto)
+                {usaSomenteEscala
+                  ? 'Mostrar detalhe do cálculo (cada plantão alocado)'
+                  : 'Mostrar detalhe do cálculo (cada registro de ponto)'}
               </label>
             )}
           </div>
@@ -935,7 +1029,7 @@ const Relatorios = () => {
         {isLoading ? (
           <p className="text-sm text-gray-600">Carregando relatório...</p>
         ) : agrupado.length === 0 ? (
-          <p className="text-sm text-gray-600">Nenhum registro encontrado para os filtros informados.</p>
+          <p className="text-sm text-gray-600">Nenhum lançamento encontrado para os filtros informados.</p>
         ) : (
           <div className="overflow-x-auto">
             <table className="min-w-full text-sm">
@@ -943,7 +1037,7 @@ const Relatorios = () => {
                 <tr className="text-left text-viva-700 border-b">
                   <th className="py-2 pr-4">Médico</th>
                   <th className="py-2 pr-4">Escala</th>
-                  <th className="py-2 pr-4">Registros</th>
+                  <th className="py-2 pr-4">{usaSomenteEscala ? 'Plantões' : 'Registros'}</th>
                   <th className="py-2 pr-4">Total de horas</th>
                   {mostrarRepasseECobranca ? (
                     <>
@@ -980,8 +1074,7 @@ const Relatorios = () => {
                           </td>
                         )}
                       </tr>
-                      {usaEscalaEPonto &&
-                        mostrarDetalheCalculo &&
+                      {incluirDetalheTabela &&
                         item.calculoPorRegistro &&
                         item.calculoPorRegistro.length > 0 && (
                           <tr key={`${item.key}-det`} className="border-b bg-viva-50/80 last:border-b-0">
@@ -1000,7 +1093,9 @@ const Relatorios = () => {
                                     </span>{' '}
                                     {d.checkInAt ? (
                                       <span className="text-gray-500">
-                                        check-in {d.checkInAt.slice(0, 16).replace('T', ' ')} ·{' '}
+                                        {d.origem === 'PLANTAO_SOMENTE_ESCALA'
+                                          ? `plantão ${d.checkInAt.slice(0, 10)} · `
+                                          : `check-in ${d.checkInAt.slice(0, 16).replace('T', ' ')} · `}
                                       </span>
                                     ) : null}
                                     {formatDuration(d.duracaoMinutos)}

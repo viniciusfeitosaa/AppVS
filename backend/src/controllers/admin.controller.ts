@@ -74,6 +74,7 @@ import {
   getRelatorioProcedimentosMesService,
   upsertRelatorioProcedimentosMesService,
 } from '../services/relatorio-procedimentos.service';
+import { listPlantoesSomenteEscalaRelatorioService } from '../services/relatorio-plantoes-somente-escala.service';
 import { ModuloSistema, UserRole } from '@prisma/client';
 
 export const listMedicosController = async (req: Request, res: Response) => {
@@ -1344,6 +1345,29 @@ export const listRegistrosPontoAdminController = async (req: Request, res: Respo
     return res.status(error.statusCode || 500).json({
       success: false,
       error: error.message || 'Erro ao listar registros de ponto',
+    });
+  }
+};
+
+export const listPlantoesSomenteEscalaRelatorioController = async (req: Request, res: Response) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ success: false, error: 'Não autenticado' });
+    }
+
+    const data = await listPlantoesSomenteEscalaRelatorioService(req.user.tenantId, {
+      contratoAtivoId: req.query.contratoAtivoId ? String(req.query.contratoAtivoId) : undefined,
+      subgrupoId: req.query.subgrupoId ? String(req.query.subgrupoId) : undefined,
+      equipeId: req.query.equipeId ? String(req.query.equipeId) : undefined,
+      dataInicio: req.query.dataInicio ? String(req.query.dataInicio) : undefined,
+      dataFim: req.query.dataFim ? String(req.query.dataFim) : undefined,
+    });
+
+    return res.status(200).json({ success: true, data });
+  } catch (error: any) {
+    return res.status(error.statusCode || 500).json({
+      success: false,
+      error: error.message || 'Erro ao listar plantões de somente escala',
     });
   }
 };

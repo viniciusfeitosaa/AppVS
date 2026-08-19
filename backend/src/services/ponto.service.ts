@@ -1016,6 +1016,24 @@ export async function listMinhasEscalasService(tenantId: string, medicoId: strin
     }
   }
 
+  const escalaIdsCandidatos = Array.from(uniqueByEscala.keys());
+  if (escalaIdsCandidatos.length > 0) {
+    const flagsPonto = await prisma.escalaEquipe.findMany({
+      where: { tenantId, escalaId: { in: escalaIdsCandidatos } },
+      select: {
+        escalaId: true,
+        equipe: { select: { subgrupo: { select: { usaPonto: true } } } },
+      },
+    });
+    const usaPontoPorEscala = new Set<string>();
+    for (const row of flagsPonto) {
+      if (row.equipe?.subgrupo?.usaPonto) usaPontoPorEscala.add(row.escalaId);
+    }
+    for (const id of escalaIdsCandidatos) {
+      if (!usaPontoPorEscala.has(id)) uniqueByEscala.delete(id);
+    }
+  }
+
   const escalaIds = Array.from(uniqueByEscala.keys());
   const escalasMeta =
     escalaIds.length > 0
