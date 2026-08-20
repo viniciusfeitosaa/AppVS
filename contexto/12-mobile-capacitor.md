@@ -1,7 +1,7 @@
 # 12 — Mobile (Capacitor)
 
 **Status:** ✅ Código + VPS (migration/worker/Firebase JSON) ok; ⏳ builds store + teste no aparelho  
-**Última atualização:** 2026-08-13
+**Última atualização:** 2026-08-20
 
 ## O que existe
 
@@ -90,6 +90,12 @@ Registros marcados com `OrigemRegistroPonto.APP_MEDICO` no schema.
 - [ ] Testes E2E mobile (não há harness automatizado)
 
 ## Changelog
+
+### 2026-08-20 — Builds store 1.0.4 (eed32a7)
+- AAB: `Desktop/AppVS-1.0.4-release.aab` (versionCode 6)
+- IPA: upload ASC ok (MinimumOS 15.0, build 6); `Desktop/AppVS-1.0.4.ipa`
+- Base: `eed32a7`
+
 
 ### 2026-08-13 — Push FCM iOS/Android
 - Backend: `DevicePushToken`, fila BullMQ, FCM, broadcast Master
