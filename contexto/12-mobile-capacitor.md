@@ -91,6 +91,11 @@ Registros marcados com `OrigemRegistroPonto.APP_MEDICO` no schema.
 
 ## Changelog
 
+### 2026-08-20 — Android targetSdk 36 (Play)
+- `compileSdk`/`targetSdk` 35 → **36** (exigência Play a partir de 30/08/2026)
+- AAB `1.0.5` / versionCode **7** → `Desktop/AppVS-1.0.5-release.aab`
+
+
 ### 2026-08-20 — Builds store 1.0.4 (eed32a7)
 - AAB: `Desktop/AppVS-1.0.4-release.aab` (versionCode 6)
 - IPA: upload ASC ok (MinimumOS 15.0, build 6); `Desktop/AppVS-1.0.4.ipa`
