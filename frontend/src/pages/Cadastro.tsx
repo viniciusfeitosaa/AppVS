@@ -21,6 +21,7 @@ import {
   isDocumentoObrigatorioNoCadastro,
   type DocumentoPerfilField,
 } from '../constants/documentosPerfil';
+import { validateCPF, validateCRM } from '../utils/validation.util';
 
 function formatBytes(n: number): string {
   if (n < 1024) return `${n} B`;
@@ -116,7 +117,8 @@ const cadastroSchema = z
     cpf: z
       .string()
       .min(1, 'CPF é obrigatório')
-      .refine((v) => cpfSomenteDigitos(v).length === 11, 'CPF deve ter 11 dígitos'),
+      .refine((v) => cpfSomenteDigitos(v).length === 11, 'CPF deve ter 11 dígitos')
+      .refine((v) => validateCPF(v), 'CPF inválido'),
     telefone: z.string().min(8, 'Telefone é obrigatório'),
     profissao: z.string().min(2, 'Selecione a profissão'),
     crm: z.string().optional(),
@@ -163,10 +165,10 @@ const cadastroSchema = z
       return;
     }
     if (data.profissao === 'Médico') {
-      if (v.replace(/\s/g, '').length < 6) {
+      if (!validateCRM(v)) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
-          message: 'CRM inválido (use o formato número-UF, ex.: 12345-CE)',
+          message: 'CRM inválido. Use o formato número-UF (ex.: 12345-CE)',
           path: ['crm'],
         });
       }
@@ -397,7 +399,22 @@ const Cadastro = () => {
           : (['profissao'] as FieldPath<CadastroFormData>[])
         : fieldsByStep[step] || [];
     const ok = keys.length === 0 ? true : await trigger(keys, { shouldFocus: true });
-    if (!ok) return;
+    if (!ok) {
+      const values = getValues();
+      if (keys.includes('cpf') && values.cpf && !validateCPF(values.cpf)) {
+        setError('CPF inválido. Corrija antes de continuar.');
+      } else if (
+        keys.includes('crm') &&
+        getValues('profissao') === 'Médico' &&
+        (values.crm || '').trim() &&
+        !validateCRM(values.crm || '')
+      ) {
+        setError('CRM inválido. Use o formato número-UF (ex.: 12345-CE).');
+      } else {
+        setError('Corrija os campos destacados antes de continuar.');
+      }
+      return;
+    }
     if (step === 1 && isMedico && especialidadesSelecionadas.length === 0) {
       setError('Selecione ao menos uma especialidade.');
       return;

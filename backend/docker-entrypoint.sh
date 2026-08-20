@@ -13,6 +13,9 @@ fi
 
 echo "🚀 Iniciando aplicação..."
 
+# Volume montado em /app/uploads pode nascer vazio — garantir subpastas usadas pelo multer.
+mkdir -p uploads/medicos uploads/documentos-enviados uploads/ponto-checkin uploads/conteudos 2>/dev/null || true
+
 if [ "${SKIP_PRISMA_MIGRATE:-}" = "1" ]; then
   echo "⚠️  SKIP_PRISMA_MIGRATE=1 — a saltar migrate deploy (não usar em produção salvo exceção)."
 else

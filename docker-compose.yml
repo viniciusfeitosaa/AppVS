@@ -33,6 +33,8 @@ services:
       - FIREBASE_SERVICE_ACCOUNT_JSON=${FIREBASE_SERVICE_ACCOUNT_JSON:-}
       - PUSH_QUEUE_CONCURRENCY=${PUSH_QUEUE_CONCURRENCY:-4}
     volumes:
+      # Persistência de PDFs/fotos entre redeploys (sem isto, cadastros perdem anexos)
+      - ./backend/uploads:/app/uploads
       - ./backend/secrets:/app/secrets:ro
     networks:
       - app-network

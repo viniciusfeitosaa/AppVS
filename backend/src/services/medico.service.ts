@@ -2,7 +2,11 @@ import fs from 'fs';
 import type { Prisma } from '@prisma/client';
 import { prisma } from '../config/database';
 import { DOCUMENTO_TIPO_BY_FIELD, DOCUMENTOS_PERFIL_FIELDS } from '../constants/documentos.const';
-import { fileExistsSafe, resolveStoredFileToAbsolute } from '../utils/upload-path.util';
+import {
+  fileExistsSafe,
+  resolveStoredFileToAbsolute,
+  toStoredUploadPath,
+} from '../utils/upload-path.util';
 import { comparePassword } from '../utils/password.util';
 import { createAuditLog } from './auditoria.service';
 
@@ -47,7 +51,7 @@ export async function upsertMedicoDocumentosFromMulter(
         },
         update: {
           nomeArquivo: file.originalname,
-          caminhoArquivo: file.path.replace(/\\/g, '/'),
+          caminhoArquivo: toStoredUploadPath(file.path),
           mimeType: file.mimetype,
           tamanhoBytes: file.size,
         },
@@ -56,7 +60,7 @@ export async function upsertMedicoDocumentosFromMulter(
           medicoId,
           tipo: DOCUMENTO_TIPO_BY_FIELD[fieldName],
           nomeArquivo: file.originalname,
-          caminhoArquivo: file.path.replace(/\\/g, '/'),
+          caminhoArquivo: toStoredUploadPath(file.path),
           mimeType: file.mimetype,
           tamanhoBytes: file.size,
         },

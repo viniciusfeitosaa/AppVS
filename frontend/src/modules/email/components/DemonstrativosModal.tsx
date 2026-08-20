@@ -305,6 +305,23 @@ const DemonstrativosModal = ({ open, onClose, onConfirm }: Props) => {
               {parseTabela.destinatarios.length > 5 && (
                 <p className="text-viva-600">… e mais {parseTabela.destinatarios.length - 5}</p>
               )}
+              {parseTabela.ignorados.length > 0 && (
+                <div className="pt-1 border-t border-amber-200/80 space-y-1">
+                  <p className="font-medium text-amber-900">
+                    Ignorados (sem e-mail válido ou linha incompleta)
+                  </p>
+                  <ul className="max-h-36 overflow-y-auto space-y-0.5 text-amber-950/90">
+                    {parseTabela.ignorados.map((ig, idx) => (
+                      <li key={`${idx}-${ig.motivo}`}>
+                        <span className="font-medium">
+                          {ig.nome || 'Nome não identificado'}
+                        </span>
+                        <span className="text-amber-800"> — {ig.motivo}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
             </div>
           )}
 

@@ -15,6 +15,8 @@ export type DemonstrativoDestinatarioParsed = {
 export type DemonstrativoLinhaIgnorada = {
   linha: string;
   motivo: string;
+  /** Nome tentativamente extraído da linha (quando não há e-mail). */
+  nome?: string;
 };
 
 export type ParseDemonstrativoTabelaResult = {
@@ -27,6 +29,9 @@ const EMAIL_INVALIDO_REGEX = /e-?mail\s+n[aã]o\s+validado/i;
 const RS_REGEX = /R\$\s*[\d.,]+/gi;
 /** Valor BR: 1.234,56 ou 1234,56 / 48,00 */
 const NUM_MONEY_REGEX = /\d{1,3}(?:\.\d{3})+,\d{2}|\d+,\d{2}/g;
+/** Tokens típicos de local/plantão — cortam o nome. */
+const LOCAL_TOKEN_REGEX =
+  /^(UPA|UPINHA|FLEX|PS|PA|PRONTO|PRONTO-SOCORRO|SAMU|UBS|CAPS|HOSP|HOSPITAL|PLANTAO|PLANTÃO)/i;
 
 function normalizarValorStr(raw: string): string {
   const t = raw.trim();
@@ -39,6 +44,41 @@ function normalizarValorStr(raw: string): string {
 
 function arredondar2(n: number): number {
   return Math.round(n * 100) / 100;
+}
+
+/**
+ * Tenta obter o nome da pessoa em linhas sem e-mail (ex.: "João Silva UPA X R$ 100,00").
+ */
+export function extrairNomeDeLinhaSemEmail(linha: string): string | undefined {
+  const semEmailInvalido = linha.replace(EMAIL_INVALIDO_REGEX, ' ').trim();
+  const cutMoney = semEmailInvalido.search(/R\$|\d{1,3}(?:\.\d{3})+,\d{2}|\d+,\d{2}/i);
+  let head = (cutMoney >= 0 ? semEmailInvalido.slice(0, cutMoney) : semEmailInvalido)
+    .replace(/[\t|]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (!head || head.length < 3) return undefined;
+
+  const words = head.split(' ').filter(Boolean);
+  const nameWords: string[] = [];
+  for (const w of words) {
+    if (LOCAL_TOKEN_REGEX.test(w)) break;
+    if (/^\d/.test(w)) break;
+    if (!/[A-Za-zÀ-ÿ]/.test(w)) break;
+    nameWords.push(w);
+    if (nameWords.length >= 6) break;
+  }
+  const nome = nameWords.join(' ').trim();
+  return nome.length >= 3 ? nome : undefined;
+}
+
+function pushIgnorado(
+  ignorados: DemonstrativoLinhaIgnorada[],
+  linha: string,
+  motivo: string,
+  nomeHint?: string
+) {
+  const nome = nomeHint || extrairNomeDeLinhaSemEmail(linha);
+  ignorados.push(nome ? { linha, motivo, nome } : { linha, motivo });
 }
 
 /** Remove horas no final do trecho de local (ex.: "Flex* 48,00" → "Flex*"). */
@@ -104,7 +144,7 @@ export function parseDemonstrativoTabela(texto: string): ParseDemonstrativoTabel
 
     if (EMAIL_INVALIDO_REGEX.test(linha)) {
       pendente = null;
-      ignorados.push({ linha, motivo: 'E-mail não validado' });
+      pushIgnorado(ignorados, linha, 'E-mail não validado');
       continue;
     }
 
@@ -121,9 +161,9 @@ export function parseDemonstrativoTabela(texto: string): ParseDemonstrativoTabel
     const emailMatch = linha.match(EMAIL_REGEX);
     if (!emailMatch) {
       if (/^R\$\s*[\d.,]+/i.test(linha)) {
-        ignorados.push({ linha, motivo: 'Valor sem profissional (e-mail) associado' });
+        pushIgnorado(ignorados, linha, 'Valor sem profissional (e-mail) associado');
       } else {
-        ignorados.push({ linha, motivo: 'E-mail não encontrado' });
+        pushIgnorado(ignorados, linha, 'E-mail não encontrado');
       }
       continue;
     }
@@ -132,13 +172,13 @@ export function parseDemonstrativoTabela(texto: string): ParseDemonstrativoTabel
     const emailIdx = linha.indexOf(emailMatch[0]);
     const nome = linha.slice(0, emailIdx).replace(/\s+/g, ' ').trim();
     if (!nome) {
-      ignorados.push({ linha, motivo: 'Nome não encontrado' });
+      pushIgnorado(ignorados, linha, 'Nome não encontrado');
       continue;
     }
 
     const depois = linha.slice(emailIdx + emailMatch[0].length).trim();
     if (!depois) {
-      ignorados.push({ linha, motivo: 'Local/valor não encontrados' });
+      pushIgnorado(ignorados, linha, 'Local/valor não encontrados', nome);
       continue;
     }
 
@@ -148,7 +188,7 @@ export function parseDemonstrativoTabela(texto: string): ParseDemonstrativoTabel
       if (localSo) {
         pendente = { email, nome, local: localSo };
       } else {
-        ignorados.push({ linha, motivo: 'Valor monetário não encontrado' });
+        pushIgnorado(ignorados, linha, 'Valor monetário não encontrado', nome);
       }
       continue;
     }
@@ -158,10 +198,12 @@ export function parseDemonstrativoTabela(texto: string): ParseDemonstrativoTabel
   }
 
   if (pendente) {
-    ignorados.push({
-      linha: `${pendente.nome} <${pendente.email}> ${pendente.local}`,
-      motivo: 'Produção sem valor (R$) na linha seguinte',
-    });
+    pushIgnorado(
+      ignorados,
+      `${pendente.nome} <${pendente.email}> ${pendente.local}`,
+      'Produção sem valor (R$) na linha seguinte',
+      pendente.nome
+    );
   }
 
   const destinatarios = [...porEmail.values()]

@@ -188,7 +188,7 @@ docker system prune -a
 ## 📝 Notas Importantes
 
 1. **Banco de dados**: Sempre externo ao Docker (segurança)
-2. **Volumes**: Não há volumes persistentes configurados (banco é externo)
+2. **Volumes**: Postgres/Redis em volumes nomeados; **uploads** do backend em bind `./backend/uploads` (PDFs de cadastro/perfil, fotos de ponto, etc.) — sem isto, anexos somem a cada rebuild do contentor.
 3. **SSL**: Configure SSL antes de colocar em produção
 4. **Firewall**: Configure o firewall da VPS para permitir apenas conexões necessárias
 5. **Backup**: Implemente backup automático do banco externo
