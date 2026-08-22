@@ -1,8 +1,10 @@
 # Design: Margem de lucro na grade Repasse / Cobrança
 
 **Data:** 2026-08-14  
-**Status:** aprovado (design conversacional); aguardando revisão do arquivo  
+**Status:** supersedido — direção do cálculo corrigida em [`2026-08-22-margem-cobranca-primeiro-design.md`](./2026-08-22-margem-cobranca-primeiro-design.md)  
 **Telas:** `ValoresPonto`, `ValoresPlantao`
+
+> Este doc descrevia o motor **repasse → cobrança** (ex.: 100 e 25% → 133,33). O produto passou a usar **cobrança → repasse** (ex.: 100 e 25% → 75).
 
 ## Problema
 
