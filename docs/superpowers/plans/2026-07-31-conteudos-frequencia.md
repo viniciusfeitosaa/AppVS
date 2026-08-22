@@ -66,5 +66,5 @@
 
 ### Task 4: Contexto
 
-- [ ] Atualizar `contexto/17-conteudos-eventos.md` e `15-estado-atual-e-pendencias.md`
+- [ ] Atualizar `contexto/17-conteudos-eventos.md` e `mapa-de-bordo.md`
 - [ ] Marcar spec como aprovada/implementada

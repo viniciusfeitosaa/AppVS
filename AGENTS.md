@@ -6,12 +6,12 @@ Antes de explorar o repositório inteiro ou refazer decisões já tomadas, **lei
 
 1. [`contexto/README.md`](./contexto/README.md) — regras do harness
 2. [`contexto/00-indice.md`](./contexto/00-indice.md) — mapa dos documentos
-3. [`contexto/15-estado-atual-e-pendencias.md`](./contexto/15-estado-atual-e-pendencias.md) — o que está pronto e o que falta
+3. [`contexto/mapa-de-bordo.md`](./contexto/mapa-de-bordo.md) — o que está pronto e o que falta
 4. O arquivo da **etapa** relacionada à sua tarefa (ex.: ponto → `07-ponto-eletronico.md`)
 
 ## Ao concluir uma tarefa
 
-Atualize o documento da etapa afetada e, se necessário, `15-estado-atual-e-pendencias.md`.  
+Atualize o documento da etapa afetada e, se necessário, `mapa-de-bordo.md`.  
 Siga o guia em [`contexto/16-como-atualizar.md`](./contexto/16-como-atualizar.md).
 
 ## Obsidian (humano no PC)

@@ -22,7 +22,7 @@ modulo:
 
 ## Notas de etapa a atualizar
 
-- [ ] [[15-estado-atual-e-pendencias]]
+- [ ] [[mapa-de-bordo]]
 - [ ] Nota da etapa: 
 
 ## Changelog (copiar para a etapa)

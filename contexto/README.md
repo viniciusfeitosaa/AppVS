@@ -31,7 +31,7 @@ Objetivo: evitar retrabalho — não redescobrir arquitetura, rotas, decisões e
 | [12-mobile-capacitor.md](./12-mobile-capacitor.md) | App Android/iOS |
 | [13-infra-deploy.md](./13-infra-deploy.md) | CI/CD, VPS, Nginx |
 | [14-convencoes-codigo.md](./14-convencoes-codigo.md) | Padrões backend/frontend |
-| [15-estado-atual-e-pendencias.md](./15-estado-atual-e-pendencias.md) | Snapshot vivo do projeto |
+| [mapa-de-bordo.md](./mapa-de-bordo.md) | **Mapa de bordo** — snapshot vivo do projeto |
 | [16-como-atualizar.md](./16-como-atualizar.md) | Ritual de manutenção do harness |
 | [17-conteudos-eventos.md](./17-conteudos-eventos.md) | Conteúdos / anúncio de aulas ao vivo |
 

@@ -397,7 +397,7 @@ const podeEditarEscalas = canEdit('ESCALAS');
 
 **Files:**
 - Modify: `contexto/04-autenticacao-acessos.md`
-- Modify: `contexto/15-estado-atual-e-pendencias.md`
+- Modify: `contexto/mapa-de-bordo.md`
 - Modify: `contexto/01-produto-e-visao.md` (persona Escalista/staff — 1 parágrafo)
 
 - [ ] **Step 1: Documentar modelos, rotas, regras, gate de qualidade**

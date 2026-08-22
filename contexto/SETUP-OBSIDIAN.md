@@ -118,7 +118,7 @@ Não são obrigatórios — o harness funciona só com Markdown.
 ## Fluxo após cada tarefa
 
 1. Editar a nota da etapa (ex. [[07-ponto-eletronico]])
-2. Atualizar [[15-estado-atual-e-pendencias]]
+2. Atualizar [[mapa-de-bordo]]
 3. Opcional: criar nota em `journal/AAAA-MM-DD-titulo.md` com template [[_templates/entrega]]
 4. `git add contexto && git commit && git push`
 

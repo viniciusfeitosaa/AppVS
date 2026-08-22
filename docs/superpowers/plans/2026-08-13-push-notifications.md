@@ -91,7 +91,7 @@
 
 ### Task 5: Docs + store notes
 
-- [x] Update `contexto/12-mobile-capacitor.md` and `15-estado-atual-e-pendencias.md`
+- [x] Update `contexto/12-mobile-capacitor.md` and `mapa-de-bordo.md`
 - [x] Document Firebase/APNs setup steps for human
 - [ ] Commit
 

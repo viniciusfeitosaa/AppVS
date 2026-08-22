@@ -134,7 +134,7 @@ Save: inalterado além de garantir cobrança draft sincronizada antes do parse (
 **Files:**
 - Modify: `contexto/07-ponto-eletronico.md` (seção valores hora / ponto sem escala) — 1 parágrafo
 - Modify: `contexto/06-escalas-plantoes.md` ou trecho de valores plantão se existir — 1 parágrafo
-- Modify: `contexto/15-estado-atual-e-pendencias.md` — linha no histórico se necessário
+- Modify: `contexto/mapa-de-bordo.md` — linha no histórico se necessário
 
 - [ ] **Step 1: Documentar fórmula + “% só na UI”**
 - [ ] **Step 2: Commit** (se pedido): `docs: margem de lucro na UI de valores`

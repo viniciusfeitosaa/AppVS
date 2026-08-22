@@ -9,7 +9,7 @@ Use este ritual **ao final de cada tarefa** (humano ou IA) para não perder cont
 - [ ] Liste o que foi **feito** (bullets objetivos)
 - [ ] Liste **arquivos tocados** (caminhos reais)
 - [ ] Atualize **Pendências** (marque `[x]` ou adicione novas)
-- [ ] Atualize [`15-estado-atual-e-pendencias.md`](./15-estado-atual-e-pendencias.md)
+- [ ] Atualize [`mapa-de-bordo.md`](./mapa-de-bordo.md)
 - [ ] Se nova etapa/módulo: crie `0X-novo-modulo.md` e linke em `00-indice.md`
 
 ## Template para entrada em etapa
@@ -45,7 +45,7 @@ Use este ritual **ao final de cada tarefa** (humano ou IA) para não perder cont
 ## Para agentes Cursor
 
 1. Ler `AGENTS.md` na raiz
-2. Ler `15-estado-atual-e-pendencias.md`
+2. Ler `mapa-de-bordo.md`
 3. Ler só o `0X` da tarefa
 4. Ao terminar, commitar código **e** atualização do `contexto/` na mesma PR quando possível
 
@@ -54,5 +54,5 @@ Use este ritual **ao final de cada tarefa** (humano ou IA) para não perder cont
 ```
 feat(ponto): tolerância configurável por escala
 
-- contexto: atualiza 07-ponto-eletronico.md e 15-estado-atual
+- contexto: atualiza 07-ponto-eletronico.md e mapa-de-bordo.md
 ```

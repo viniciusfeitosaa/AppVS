@@ -4,7 +4,7 @@
 
 ## Leitura rápida (agentes e devs)
 
-1. [[15-estado-atual-e-pendencias]] — o que está pronto agora
+1. [[mapa-de-bordo]] — o que está pronto agora
 2. [[02-arquitetura]] — stack e pastas
 3. Etapa do módulo que você vai mexer (índice abaixo)
 
@@ -26,7 +26,7 @@
 | 12 | [[12-mobile-capacitor]] | Mobile |
 | 13 | [[13-infra-deploy]] | Deploy |
 | 14 | [[14-convencoes-codigo]] | Convenções |
-| 15 | [[15-estado-atual-e-pendencias]] | Estado atual |
+| — | [[mapa-de-bordo]] | **Mapa de bordo** |
 | 16 | [[16-como-atualizar]] | Manutenção do harness |
 
 ## Diário / entregas

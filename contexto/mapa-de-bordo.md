@@ -1,10 +1,10 @@
-﻿# 15 — Estado atual e pendências
+﻿# Mapa de bordo
 
 **Snapshot:** 2026-08-19  
 **Branch:** `feat/perfis-acesso-staff` (perfis staff + fechamento só-escala nesta branch; merge pendente) — `main` com push FCM + Firebase na VPS ok; falta builds store + teste no aparelho
 
-> Este arquivo deve ser o **primeiro** atualizado após entregas relevantes.  
-> É o **mapa de bordo** do projeto (o que está pronto, o que falta, histórico recente).
+> Nome canónico: `contexto/mapa-de-bordo.md`.  
+> Este arquivo deve ser o **primeiro** atualizado após entregas relevantes (o que está pronto, o que falta, histórico recente).
 
 ## Resumo executivo
 

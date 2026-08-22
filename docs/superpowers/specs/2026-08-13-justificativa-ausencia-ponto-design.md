@@ -208,7 +208,7 @@ Autorização Master: módulo `PONTO_ELETRONICO` (primário); se o menu viver so
 - `backend/src/services/repasse-registro-ponto.service.ts` ou helper de “valor cheio”
 - Rotas/controllers ponto + admin
 - Frontend: página médico + fila Master + badge em `Relatorios.tsx` / histórico
-- `contexto/07-ponto-eletronico.md` + `15-estado-atual-e-pendencias.md` na entrega
+- `contexto/07-ponto-eletronico.md` + `mapa-de-bordo.md` na entrega
 
 ## Changelog da spec
 

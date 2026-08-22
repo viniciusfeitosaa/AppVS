@@ -107,7 +107,7 @@ docker-compose up -d
 
 ## 📝 Status do Projeto
 
-O status detalhado e por módulo está em **[`contexto/15-estado-atual-e-pendencias.md`](./contexto/15-estado-atual-e-pendencias.md)**.
+O status detalhado e por módulo está em **[`contexto/mapa-de-bordo.md`](./contexto/mapa-de-bordo.md)** (mapa de bordo).
 
 Resumo: sistema em operação (auth, escalas, ponto, vagas, documentos, relatórios, mobile, deploy). Pendência principal: módulo **Atendimentos** (placeholder no frontend).
 

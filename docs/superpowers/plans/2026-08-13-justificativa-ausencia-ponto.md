@@ -330,7 +330,7 @@ Validações: saída > entrada; motivo length; revalidar elegibilidade; `status:
 
 **Files:**
 - Modify: `contexto/07-ponto-eletronico.md`
-- Modify: `contexto/15-estado-atual-e-pendencias.md`
+- Modify: `contexto/mapa-de-bordo.md`
 
 - [ ] Documentar fluxo, API, elegibilidade (matriz), origem nova
 - [ ] Pendência: migration na VPS + teste E2E manual
