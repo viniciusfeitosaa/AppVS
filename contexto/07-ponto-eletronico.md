@@ -1,7 +1,7 @@
 # 07 — Ponto eletrônico
 
 **Status:** ✅ Implementado (+ justificativa de ausência v1)  
-**Última atualização:** 2026-08-18
+**Última atualização:** 2026-08-23
 
 ## Funcionalidades
 
@@ -123,8 +123,13 @@ Service: `justificativa-ausencia-ponto.service.ts` + `justificativa-ausencia-pon
 
 ## Changelog
 
+### 2026-08-23 — Margem: spec cobrança → repasse (pendente código)
+- Decisão: `repasse = cobrança × (1 − margem/100)`; UI Cobrança → Margem → Repasse (não markup)
+- Spec: `docs/superpowers/specs/2026-08-22-margem-cobranca-primeiro-design.md`
+- Entrega 2026-08-14 (repasse → cobrança) será substituída na UI; R$ gravados no DB não mudam
+
 ### 2026-08-14 — Margem de lucro na UI de valores (ponto)
-- Em `ValoresPonto`, grade semanal com Repasse + Margem (%) + Cobrança; fórmula `cobrança = repasse ÷ (1 − margem/100)` (ex.: 100 e 25% → 133,33)
+- Em `ValoresPonto`, grade semanal com Repasse + Margem (%) + Cobrança; motor **legado** `cobrança = repasse ÷ (1 − margem/100)` — **será invertido** (ver 2026-08-23)
 - Margem não é persistida — só repasse/cobrança absolutos na API
 - Helper: `frontend/src/utils/margemLucro.ts`
 
@@ -159,6 +164,7 @@ npx ts-node --transpile-only scripts/seed-plantao-sem-justificativa-demo.ts
 
 ## Pendências
 
+- [ ] **Margem UI:** implementar spec `2026-08-22-margem-cobranca-primeiro-design.md` em `ValoresPonto.tsx`
 - [ ] **VPS:** `prisma migrate deploy` (`20260813200000_justificativa_ausencia_ponto`) + restart backend
 - [ ] **Teste E2E manual:** médico pede → Master aceita → badge no histórico/relatório + bloqueio de check-in duplicado
 - [ ] Validar regras de geo em produção por tenant

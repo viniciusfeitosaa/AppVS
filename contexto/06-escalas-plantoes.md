@@ -1,7 +1,7 @@
 # 06 — Escalas e plantões
 
 **Status:** ✅ Implementado (evolução contínua)  
-**Última atualização:** 2026-08-18
+**Última atualização:** 2026-08-23
 
 ## Modelo
 
@@ -43,6 +43,10 @@ Migrations recentes (2026-04): troca de plantão — status, contrapartida, broa
 
 ## Changelog
 
+### 2026-08-23 — Margem: spec cobrança → repasse (pendente código)
+- Mesma decisão do ponto: `repasse = cobrança × (1 − %)` em `ValoresPlantao.tsx`
+- Spec: `docs/superpowers/specs/2026-08-22-margem-cobranca-primeiro-design.md`
+
 ### 2026-08-18 — Fechamento financeiro só-escala + menu
 - Relatório financeiro passa a somar **plantões alocados** quando o subgrupo é `usaEscala && !usaPonto` (sem `RegistroPonto`)
 - Menu `/modulo-escala-master` gated por `VALORES_PLANTAO` (antes `CONFIGURACOES`)
@@ -50,7 +54,7 @@ Migrations recentes (2026-04): troca de plantão — status, contrapartida, broa
 - Sem migration
 
 ### 2026-08-14 — Margem de lucro na UI de valores (plantão)
-- Em `ValoresPlantao`, por tipo de plantão: Repasse + Margem (%) + Cobrança por dia (mesma fórmula do ponto)
+- Em `ValoresPlantao`, por tipo de plantão: Repasse + Margem (%) + Cobrança por dia (motor **legado** repasse → cobrança — ver 2026-08-23)
 - Persistência inalterada (só R$/h absolutos); helper `margemLucro.ts`
 
 ### 2026-08-14 — Tipos de plantão na página Escalas
@@ -64,5 +68,6 @@ Migrations recentes (2026-04): troca de plantão — status, contrapartida, broa
 
 ## Pendências
 
+- [ ] **Margem UI:** implementar spec `2026-08-22-margem-cobranca-primeiro-design.md` em `ValoresPlantao.tsx`
 - [ ] Consolidar doc de estados da troca de plantão (enum/status) em tabela neste arquivo quando estabilizar
 - [ ] Opcional: unique DB `@@unique([tenantId, equipeId])` em `EscalaEquipe` (hoje só validação no service)

@@ -1,7 +1,7 @@
 # 10 — Relatórios
 
 **Status:** ✅ Implementado (procedimentos + ponto + plantões só-escala)  
-**Última atualização:** 2026-08-19
+**Última atualização:** 2026-08-23
 
 ## Relatórios de procedimentos
 
@@ -39,7 +39,7 @@ Arquivos: `relatorio-plantoes-somente-escala.service.ts`, `valor-plantao-dia.uti
 Seed: `npx ts-node --transpile-only scripts/seed-faturamento-uat-demo.ts` (em `backend/`).  
 Tabela para abrir no navegador: `backend/scripts/uat-faturamento-visual.html`.
 
-Contrato **UAT Faturamento misto**, margem **25%** (cobrança = repasse ÷ 0,75):
+Contrato **UAT Faturamento misto**, margem **25%** sobre a cobrança (repasse = cobrança × 0,75; equivalente a repasse ÷ 0,75):
 
 | Escala | Profissional | Login | Cobrança/h | Repasse/h | 2 plantões 12h |
 |--------|--------------|-------|------------|-----------|----------------|

@@ -1,7 +1,7 @@
 ﻿# Mapa de bordo
 
-**Snapshot:** 2026-08-19  
-**Branch:** `feat/perfis-acesso-staff` (perfis staff + fechamento só-escala nesta branch; merge pendente) — `main` com push FCM + Firebase na VPS ok; falta builds store + teste no aparelho
+**Snapshot:** 2026-08-23  
+**Branch:** `main` — alinhada com GitHub (`e3c574a`+); mobile **1.0.4** (build 6), Android targetSdk 36; VPS com FCM ok; falta AAB/IPA + teste no aparelho
 
 > Nome canónico: `contexto/mapa-de-bordo.md`.  
 > Este arquivo deve ser o **primeiro** atualizado após entregas relevantes (o que está pronto, o que falta, histórico recente).
@@ -21,7 +21,7 @@ O **Viva Saúde** está em produção na VPS (`sejavivasaude.com.br`). Auth, esc
 | Médicos | ✅ | ✅ | Convites, status cadastro; ATIVO via convite **ou** precadastro aceito |
 | Contratos | ✅ | ✅ | |
 | Escalas / plantões | ✅ | ✅ | Trocas; **multi-escala no mesmo mês** (médico); **1 escala por equipe** — `06` |
-| Valores plantão/ponto | ✅ | ✅ | Por contrato/escala; UI com **margem %** (só front) — `06`/`07` |
+| Valores plantão/ponto | ✅ | ⏳ | Por contrato/escala; UI com **margem %** (só front). **Pendente:** inverter motor — cobrança + % → repasse (spec `2026-08-22-margem-cobranca-primeiro-design.md`) — `06`/`07` |
 | Ponto eletrônico | ✅ | ✅ | Geo, foto, histórico; seletor de escala; **justificativa ausência** (`JUSTIFICADO_SEM_PONTO`) — `07` |
 | Vagas | ✅ | ✅ | Wizard de anúncio |
 | Documentos | ✅ | ✅ | DocuSeal opcional |
@@ -29,7 +29,7 @@ O **Viva Saúde** está em produção na VPS (`sejavivasaude.com.br`). Auth, esc
 | Painel de E-mail | ✅ | ✅ | NF / demonstrativos com PDF anexo + 2 tipos de competência |
 | WhatsApp (Evolution GO) | ✅ | — | Menu atendimento; pausar/retomar (equipe) |
 | Conteúdos / eventos | ✅ | ✅ | Anúncio, frequência, **avaliação custom por evento**, precadastro→aceite→corpo clínico — `17-conteudos-eventos.md` |
-| Mobile / Capacitor | ✅ | ✅ | Push FCM na VPS (Firebase ok); falta AAB/IPA + teste — `12` |
+| Mobile / Capacitor | ✅ | ✅ | **1.0.4** (build 6), targetSdk 36; FCM na VPS ok; falta AAB/IPA + teste — `12` |
 | Configurações / módulos | ✅ | ✅ | Matriz de acesso MASTER/MEDICO |
 | Perfis staff / escalista | ✅ | ✅ | `PerfilAcesso` OFF/VER/EDITAR; `/perfis-equipe`; Escalas v1 — `04` |
 | Avaliação (master) | ✅ | ✅ | Só cadastro público `/cadastro` (não precadastro aceito); CFM abre o portal sem pré-preenchimento |
@@ -70,8 +70,9 @@ Arquivos de referência: `schema.prisma` (`Escala`, `EscalaMedico`, `EscalaPlant
 3. **Push (VPS + store)** — copiar service account JSON; `FIREBASE_SERVICE_ACCOUNT_PATH` (ou `_JSON`); `prisma migrate deploy` (`device_push_tokens`); restart backend; novo AAB/IPA — ver checklist em `12-mobile-capacitor.md`
 4. **Atendimentos** — definir escopo e implementar (hoje só placeholder)
 5. **Sincronizar README/CHECKLIST** ou marcar como arquivados apontando para `contexto/`
-6. **Harness** — manter esta pasta após cada feature (ver `16-como-atualizar.md`)
-7. **WhatsApp** — health no `/health` do backend (ping Evolution GO); painel master opcional (QR/status)
+6. **Margem na UI (ValoresPonto / ValoresPlantao)** — implementar spec [`2026-08-22-margem-cobranca-primeiro-design.md`](../docs/superpowers/specs/2026-08-22-margem-cobranca-primeiro-design.md): ordem Cobrança → Margem → Repasse; `repasse = cobrança × (1 − %)` (não markup); sem migration
+7. **Harness** — manter esta pasta após cada feature (ver `16-como-atualizar.md`)
+8. **WhatsApp** — health no `/health` do backend (ping Evolution GO); painel master opcional (QR/status)
 
 ## Pendências menores
 
@@ -85,6 +86,8 @@ Arquivos de referência: `schema.prisma` (`Escala`, `EscalaMedico`, `EscalaPlant
 
 | Data | Entrega |
 |------|---------|
+| 2026-08-23 | **Margem (design)** — spec aprovado: cobrança + % → repasse (`× (1 − %)`); não é markup; UI invertida vs. entrega 2026-08-14 — spec `2026-08-22-margem-cobranca-primeiro-design.md` — **implementação pendente** |
+| 2026-08-22 | **Mobile 1.0.4** + targetSdk 36; uploads persistentes; validação CPF/CRM no cadastro; nomes no demonstrativo — `12` |
 | 2026-08-19 | **Avaliação → CFM** — botão só abre o portal (sem pré-preenchimento nem tela intermediária) — `05`/`11` |
 | 2026-08-19 | **UAT faturamento misto** — seed + HTML com 2 escalas (ponto 120/h e só-escala 100/h, margem 25%) e 2 médicos teste — `10` |
 | 2026-08-18 | **Fechamento só-escala** — relatório financeiro por plantão alocado; painel de ponto filtra escalas sem `usaPonto`; ValoresPonto oculta subgrupo só-escala; menu Somente escala → `VALORES_PLANTAO` — `06`/`07`/`10` |
@@ -111,6 +114,24 @@ Arquivos de referência: `schema.prisma` (`Escala`, `EscalaMedico`, `EscalaPlant
 | 2026-07 | Painel e-mail, Evolution GO |
 | 2026-04 | Trocas de plantão |
 | 2026-03 | Módulo vagas, valores plantão |
+
+### Detalhe — Margem na UI: cobrança como ponto de partida (2026-08-23)
+
+**Problema:** a entrega de 2026-08-14 partia do **repasse** e calculava cobrança (`÷ (1 − %)` → ex.: 100 e 25% → **133,33**). A operação pensa ao contrário: define **cobrança** + margem; o repasse é o que sobra. Não é markup (`× 1,25` → 125).
+
+**Decisão (spec aprovado):**
+
+| Tema | Valor |
+|------|--------|
+| Fórmula | `repasse = cobrança × (1 − margem/100)` |
+| Exemplo | Cobrança **100**, margem **25%** → repasse **75** |
+| UI | Ordem: **Cobrança → Margem (%) → Repasse**; editar cobrança/margem recalcula repasse |
+| Persistência | Inalterada — só R$/h absolutos na API/DB; % só no draft |
+| Escopo | `ValoresPonto.tsx`, `ValoresPlantao.tsx`, `margemLucro.ts` |
+
+**Status:** spec em [`docs/superpowers/specs/2026-08-22-margem-cobranca-primeiro-design.md`](../docs/superpowers/specs/2026-08-22-margem-cobranca-primeiro-design.md) — **implementação pendente**.
+
+**UAT faturamento:** valores absolutos (ex.: cob. 120 / rep. 90) continuam válidos; a relação 25% de margem é a mesma.
 
 ### Detalhe — Justificativa de ausência de ponto (2026-08-13)
 
