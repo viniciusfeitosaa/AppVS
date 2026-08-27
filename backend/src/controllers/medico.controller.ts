@@ -26,6 +26,8 @@ import {
   removerInteresseVaga,
 } from '../services/vaga.service';
 import { getDashboardMedicoService } from '../services/dashboard-medico.service';
+import { docusealDocumentosPainelPorMedicoService } from '../services/docuseal.service';
+import { prisma } from '../config/database';
 
 export const getPerfilController = async (req: Request, res: Response) => {
   try {
@@ -73,6 +75,32 @@ export const deleteSelfAccountController = async (req: Request, res: Response) =
     return res.status(error.statusCode || 500).json({
       success: false,
       error: error.message || 'Erro ao excluir conta',
+    });
+  }
+};
+
+export const getMeuDocusealDocumentosController = async (req: Request, res: Response) => {
+  try {
+    const medicoId = req.user?.id;
+    const tenantId = req.user?.tenantId;
+    if (!medicoId || !tenantId) {
+      return res.status(401).json({ success: false, error: 'Não autenticado' });
+    }
+
+    const medico = await prisma.medico.findFirst({
+      where: { id: medicoId, tenantId },
+      select: { email: true, nomeCompleto: true },
+    });
+    if (!medico) {
+      return res.status(404).json({ success: false, error: 'Profissional não encontrado' });
+    }
+
+    const data = await docusealDocumentosPainelPorMedicoService(medico.email || '', medico.nomeCompleto);
+    return res.status(200).json({ success: true, data });
+  } catch (error: any) {
+    return res.status(error.statusCode || 500).json({
+      success: false,
+      error: error.message || 'Erro ao listar documentos assinados',
     });
   }
 };

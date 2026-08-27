@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../context/AuthContext';
-import { adminService, type AdminMedico, type AdminMedicoDetalhe, type Equipe } from '../services/admin.service';
+import { adminService, type AdminMedico, type AdminMedicoDetalhe, type DocusealDocumentoPainelItem, type Equipe } from '../services/admin.service';
 import { notify } from '../lib/notificationEmitter';
 import { formatCRM, formatCPF, fixMojibake } from '../utils/validation.util';
 import { DOCUMENTO_LABEL_BY_TIPO } from '../constants/documentosPerfil';
@@ -13,6 +13,39 @@ function emailChaveDocuseal(email: string | null | undefined): string {
   let t = (email || '').trim().toLowerCase();
   t = t.replace(/@gmail?$/i, '@gmail.com');
   return t;
+}
+
+function DocusealDocDownloadLinks({ doc }: { doc: DocusealDocumentoPainelItem }) {
+  if (doc.status !== 'concluido') return null;
+  return (
+    <>
+      {doc.signedDocumentUrl ? (
+        <a
+          href={doc.signedDocumentUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="btn-sm btn-secondary inline-flex"
+        >
+          Baixar PDF assinado
+        </a>
+      ) : null}
+      {doc.auditLogUrl ? (
+        <a
+          href={doc.auditLogUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="btn-sm btn-ghost inline-flex text-viva-700"
+        >
+          Log de auditoria
+        </a>
+      ) : null}
+      {doc.completedAt ? (
+        <span className="text-[10px] text-viva-500 w-full sm:w-auto">
+          Concluído em {new Date(doc.completedAt).toLocaleString('pt-BR')}
+        </span>
+      ) : null}
+    </>
+  );
 }
 
 const PAGE_SIZE = 20;
@@ -193,6 +226,12 @@ const Medicos = () => {
     enabled: !!user && isMaster && !!docusealModalMedico?.id,
   });
 
+  const { data: dadosDocusealResp, isLoading: loadingDadosDocuseal } = useQuery({
+    queryKey: ['admin', 'medico-docuseal-docs', user?.id, selectedMedico?.id, 'dados-modal'],
+    queryFn: () => adminService.getMedicoDocusealDocumentos(selectedMedico!.id),
+    enabled: !!user && isMaster && dadosModalOpen && !!selectedMedico?.id,
+  });
+
   const enviarDocusealTplMutation = useMutation({
     mutationFn: ({ medicoId, templateId }: { medicoId: string; templateId: number }) =>
       adminService.enviarDocusealTemplateMedico(medicoId, templateId),
@@ -206,6 +245,7 @@ const Medicos = () => {
         notify({ kind: 'info', title: 'DocuSeal', message: 'Sem novas submissões (verifique a resposta).' });
       }
       queryClient.invalidateQueries({ queryKey: ['admin', 'medico-docuseal-docs', user?.id, vars.medicoId] });
+      queryClient.invalidateQueries({ queryKey: ['admin', 'medico-docuseal-docs', user?.id, vars.medicoId, 'dados-modal'] });
       queryClient.invalidateQueries({ queryKey: ['admin', 'docuseal-resumo-emails'] });
     },
     onError: (err: unknown) => {
@@ -980,6 +1020,7 @@ const Medicos = () => {
                                     : 'Reenviar e-mail'}
                                 </button>
                               ) : null}
+                              <DocusealDocDownloadLinks doc={doc} />
                             </div>
                           </li>
                         ))}
@@ -1159,6 +1200,62 @@ const Medicos = () => {
                           }
                         />
                       </div>
+                    </section>
+                    <section>
+                      <h4 className="text-xs font-semibold uppercase tracking-wider text-viva-700 font-display mb-2">
+                        Documentos assinados (DocuSeal)
+                      </h4>
+                      {loadingDadosDocuseal ? (
+                        <p className="text-sm text-viva-600 font-serif">A carregar documentos de assinatura…</p>
+                      ) : !dadosDocusealResp?.data?.configured ? (
+                        <p className="text-sm text-viva-600 font-serif">DocuSeal não configurado neste ambiente.</p>
+                      ) : dadosDocusealResp.data.error ? (
+                        <p className="text-sm text-amber-800 font-serif">{dadosDocusealResp.data.error}</p>
+                      ) : (dadosDocusealResp.data.documentos?.length ?? 0) === 0 ? (
+                        <p className="text-sm text-viva-600 font-serif">Nenhum modelo de assinatura configurado.</p>
+                      ) : (
+                        <ul className="space-y-2">
+                          {dadosDocusealResp.data.documentos.map((doc) => (
+                            <li
+                              key={doc.templateId}
+                              className="rounded-lg border border-viva-100 bg-viva-50/40 px-3 py-2.5 text-sm"
+                            >
+                              <div className="flex flex-wrap items-start justify-between gap-2">
+                                <p className="font-semibold text-viva-900">{doc.templateName}</p>
+                                <span
+                                  className={`text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full shrink-0 ${
+                                    doc.status === 'concluido'
+                                      ? 'bg-green-100 text-green-900'
+                                      : doc.status === 'nao_enviado'
+                                        ? 'bg-slate-200 text-slate-800'
+                                        : 'bg-amber-100 text-amber-900'
+                                  }`}
+                                >
+                                  {docusealStatusLabel(doc.status)}
+                                </span>
+                              </div>
+                              <div className="mt-2 flex flex-wrap gap-2 items-center">
+                                <DocusealDocDownloadLinks doc={doc} />
+                                {doc.status === 'nao_enviado' ? (
+                                  <button
+                                    type="button"
+                                    className="btn-sm btn-primary"
+                                    onClick={() => {
+                                      setDocusealModalMedico({
+                                        id: detalhe.id,
+                                        nomeCompleto: detalhe.nomeCompleto,
+                                        email: detalhe.email,
+                                      });
+                                    }}
+                                  >
+                                    Enviar ao profissional
+                                  </button>
+                                ) : null}
+                              </div>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
                     </section>
                     <section>
                       <h4 className="text-xs font-semibold uppercase tracking-wider text-viva-700 font-display mb-2">

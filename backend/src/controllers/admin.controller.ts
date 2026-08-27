@@ -76,6 +76,10 @@ import {
   getRelatorioProcedimentosMesService,
   upsertRelatorioProcedimentosMesService,
 } from '../services/relatorio-procedimentos.service';
+import {
+  getProcedimentosBaseService,
+  upsertProcedimentosBaseService,
+} from '../services/procedimentos-base.service';
 import { listPlantoesSomenteEscalaRelatorioService } from '../services/relatorio-plantoes-somente-escala.service';
 import { ModuloSistema, UserRole } from '@prisma/client';
 
@@ -362,6 +366,36 @@ export const upsertRelatorioProcedimentosMesController = async (req: Request, re
     return res.status(error.statusCode || 500).json({
       success: false,
       error: error.message || 'Erro ao salvar relatório de procedimentos',
+    });
+  }
+};
+
+export const getProcedimentosBaseController = async (req: Request, res: Response) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ success: false, error: 'Não autenticado' });
+    }
+    const procedimentos = await getProcedimentosBaseService(req.user.tenantId);
+    return res.status(200).json({ success: true, data: procedimentos });
+  } catch (error: any) {
+    return res.status(error.statusCode || 500).json({
+      success: false,
+      error: error.message || 'Erro ao buscar base de procedimentos',
+    });
+  }
+};
+
+export const upsertProcedimentosBaseController = async (req: Request, res: Response) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ success: false, error: 'Não autenticado' });
+    }
+    const procedimentos = await upsertProcedimentosBaseService(req.user.tenantId, req.body?.procedimentos);
+    return res.status(200).json({ success: true, data: procedimentos });
+  } catch (error: any) {
+    return res.status(error.statusCode || 500).json({
+      success: false,
+      error: error.message || 'Erro ao salvar base de procedimentos',
     });
   }
 };

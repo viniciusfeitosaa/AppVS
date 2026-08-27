@@ -421,6 +421,9 @@ export interface DocusealDocumentoPainelItem {
   submitterId: number | null;
   signUrl: string | null;
   signerStatus: string | null;
+  signedDocumentUrl: string | null;
+  auditLogUrl: string | null;
+  completedAt: string | null;
 }
 
 export interface DocusealDocumentosPainelResponse {
@@ -524,6 +527,22 @@ export interface RelatorioProcedimentosMesApiResponse {
   data: Record<string, unknown> | null;
 }
 
+export type ProcedimentoBaseItem = {
+  id: string;
+  instrumento: string;
+  codigo1: string;
+  nome1: string;
+  valor1: number;
+  codigo2: string;
+  nome2: string;
+  valor2: number;
+};
+
+export interface ProcedimentosBaseApiResponse {
+  success: boolean;
+  data: ProcedimentoBaseItem[] | null;
+}
+
 export const adminService = {
   listMedicos: async (params?: { page?: number; limit?: number; search?: string; ativo?: boolean }) => {
     const response = await api.get<ListMedicosResponse>('/admin/medicos', {
@@ -556,6 +575,16 @@ export const adminService = {
 
   saveRelatorioProcedimentosMes: async (mesRef: string, dados: Record<string, unknown>) => {
     const response = await api.put<{ success: boolean }>(`/admin/relatorios/procedimentos/${mesRef}`, { dados });
+    return response.data;
+  },
+
+  getProcedimentosBase: async (): Promise<ProcedimentosBaseApiResponse> => {
+    const response = await api.get<ProcedimentosBaseApiResponse>('/admin/procedimentos-base');
+    return response.data;
+  },
+
+  saveProcedimentosBase: async (procedimentos: ProcedimentoBaseItem[]): Promise<ProcedimentosBaseApiResponse> => {
+    const response = await api.put<ProcedimentosBaseApiResponse>('/admin/procedimentos-base', { procedimentos });
     return response.data;
   },
 

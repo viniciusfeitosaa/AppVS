@@ -8,6 +8,7 @@ import {
   downloadMedicoDocumentoPerfilController,
   downloadDocumentoEnviadoController,
   confirmarCienciaDocumentoEnviadoController,
+  getMeuDocusealDocumentosController,
   listNotificacoesMedicoController,
   marcarNotificacaoLidaMedicoController,
   marcarTodasNotificacoesLidasMedicoController,
@@ -88,6 +89,11 @@ router.post(
   requireModuleAccess(ModuloSistema.PERFIL),
   validateUUIDParam('id'),
   confirmarCienciaDocumentoEnviadoController
+);
+router.get(
+  '/docuseal/documentos',
+  requireModuleAccess(ModuloSistema.PERFIL),
+  getMeuDocusealDocumentosController
 );
 
 router.get('/notificacoes', requireRole([UserRole.MEDICO]), listNotificacoesMedicoController);

@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
 import { useAuth } from '../context/AuthContext';
-import { adminService, type AdminMedico } from '../services/admin.service';
+import { adminService, type AdminMedico, type ProcedimentoBaseItem } from '../services/admin.service';
 import { authService } from '../services/auth.service';
-import procedimentosBase from '../data/procedimentosBase.json';
+import procedimentosBaseSeed from '../data/procedimentosBase.json';
 import { addPdfBrandHeader } from '../utils/pdf-branding';
 import EnviarDemonstrativoProducaoModal from '../modules/email/components/EnviarDemonstrativoProducaoModal';
 import {
@@ -164,7 +164,7 @@ const textoSeguroPdf = (s: string) =>
     .replace(/\u00a0/g, ' ')
     .replace(/\u2013|\u2014|\u2212/g, '-');
 
-type ProcedimentoBase = (typeof procedimentosBase)[number];
+type ProcedimentoBase = ProcedimentoBaseItem;
 
 type RascunhoProfsT = {
   profissional1Nome: string;
@@ -233,6 +233,46 @@ const criarId = () => globalThis.crypto?.randomUUID?.() ?? `p-${Date.now()}`;
 const numBrl = (n: number) => n.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 const chaveDeBase = (p: ProcedimentoBase) => `${p.instrumento} | ${p.codigo1} | ${p.nome1}`;
+
+const SEED_PROCEDIMENTOS_BASE = procedimentosBaseSeed as ProcedimentoBase[];
+
+const gerarIdProcedimentoBase = (p: Pick<ProcedimentoBase, 'instrumento' | 'codigo1' | 'codigo2' | 'nome1'>) => {
+  const slug = `${p.instrumento}-${p.codigo1}-${p.codigo2}-${p.nome1}`
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '')
+    .slice(0, 80);
+  return slug || criarId();
+};
+
+const novoProcedimentoBase = (): ProcedimentoBase => ({
+  id: criarId(),
+  instrumento: '',
+  codigo1: '',
+  nome1: '',
+  valor1: 0,
+  codigo2: '',
+  nome2: '',
+  valor2: 0,
+});
+
+const normalizarProcedimentosBaseSalvar = (lista: ProcedimentoBase[]): ProcedimentoBase[] =>
+  lista.map((p) => {
+    const id = p.id?.trim() || gerarIdProcedimentoBase(p);
+    return {
+      ...p,
+      id,
+      instrumento: p.instrumento.trim(),
+      codigo1: p.codigo1.trim(),
+      nome1: p.nome1.trim(),
+      codigo2: p.codigo2.trim(),
+      nome2: p.nome2.trim(),
+      valor1: Number(p.valor1) || 0,
+      valor2: Number(p.valor2) || 0,
+    };
+  });
 
 const fromBase = (b: ProcedimentoBase): LinhaProcedimento => ({
   id: criarId(),
@@ -430,18 +470,23 @@ const normalizarCodigoProcedImport = (s: string) =>
     .replace(/,/g, '.')
     .toUpperCase();
 
-const findProcedimentoBaseImport = (ins: string, c1: string, c2: string): ProcedimentoBase | undefined => {
+const findProcedimentoBaseImport = (
+  base: ProcedimentoBase[],
+  ins: string,
+  c1: string,
+  c2: string
+): ProcedimentoBase | undefined => {
   const insN = ins.trim().toUpperCase();
   const n1 = normalizarCodigoProcedImport(c1);
   const n2 = normalizarCodigoProcedImport(c2);
   return (
-    procedimentosBase.find(
+    base.find(
       (b) =>
         b.instrumento.trim().toUpperCase() === insN &&
         normalizarCodigoProcedImport(b.codigo1) === n1 &&
         normalizarCodigoProcedImport(b.codigo2) === n2
     ) ??
-    procedimentosBase.find(
+    base.find(
       (b) =>
         normalizarCodigoProcedImport(b.codigo1) === n1 && normalizarCodigoProcedImport(b.codigo2) === n2
     )
@@ -562,9 +607,10 @@ const escolherUnicoPorScore = (
 };
 
 const findProcedimentoBasePorOverlapTokensGlobal = (
+  base: ProcedimentoBase[],
   term: string
 ): { ok: ProcedimentoBase } | { err: 'notfound' | 'ambiguous' } => {
-  const scored = procedimentosBase.map((b) => ({
+  const scored = base.map((b) => ({
     b,
     s: Math.max(scoreOverlapProced(term, b.nome1), scoreOverlapProced(term, b.nome2)),
   }));
@@ -599,6 +645,7 @@ const splitNomesProcedimentoPlanilha = (raw: string): string[] =>
  * Casa par 1.º+2.º na base pelos textos da planilha; o total de honorários desambigua quando há vários pares.
  */
 const findProcedimentoBasePorParNomes = (
+  base: ProcedimentoBase[],
   nome1Text: string,
   nome2Text: string,
   totalHonorarios?: number
@@ -610,7 +657,7 @@ const findProcedimentoBasePorParNomes = (
     return (s1 + s2) / 2;
   };
 
-  let ranked = procedimentosBase
+  let ranked = base
     .map((b) => ({ b, s: scorePar(b) }))
     .filter((x) => x.s >= 0)
     .sort((a, z) => z.s - a.s);
@@ -619,7 +666,7 @@ const findProcedimentoBasePorParNomes = (
     const n1 = normalizarNucleoProcedimento(nome1Text);
     const n2 = normalizarNucleoProcedimento(nome2Text);
     if (!n1 || !n2) return { err: 'notfound' };
-    ranked = procedimentosBase
+    ranked = base
       .filter((b) => {
         const bn1 = normalizarNucleoProcedimento(b.nome1);
         const bn2 = normalizarNucleoProcedimento(b.nome2);
@@ -632,7 +679,7 @@ const findProcedimentoBasePorParNomes = (
   if (totalHonorarios != null && Number.isFinite(totalHonorarios) && totalHonorarios > 0) {
     const u = unicoParPorTotalHonorarios(list, totalHonorarios);
     if (u) return { ok: u };
-    const sumHit = findProcedimentoBasePorSomaValoresUnica(totalHonorarios);
+    const sumHit = findProcedimentoBasePorSomaValoresUnica(base, totalHonorarios);
     if (!('err' in sumHit)) {
       if (list.length === 0) return { ok: sumHit.ok };
       if (list.some((b) => b === sumHit.ok)) return { ok: sumHit.ok };
@@ -647,11 +694,12 @@ const findProcedimentoBasePorParNomes = (
 
 /** Único registo na base cuja soma TUSS (valor1+valor2) coincide com o total importado (±R$0,02). */
 const findProcedimentoBasePorSomaValoresUnica = (
+  base: ProcedimentoBase[],
   total: number
 ): { ok: ProcedimentoBase } | { err: 'notfound' | 'ambiguous' } => {
   if (!Number.isFinite(total) || total <= 0) return { err: 'notfound' };
   const tol = 0.02;
-  const hits = procedimentosBase.filter((b) => Math.abs(somaValoresBase(b) - total) <= tol);
+  const hits = base.filter((b) => Math.abs(somaValoresBase(b) - total) <= tol);
   if (hits.length === 0) return { err: 'notfound' };
   if (hits.length === 1) return { ok: hits[0] };
   return { err: 'ambiguous' };
@@ -659,15 +707,16 @@ const findProcedimentoBasePorSomaValoresUnica = (
 
 /** Localiza na base pelo nome do 1.º (ou 2.º) procedimento — texto da coluna Cirurgia/Procedimento vs. nomes TUSS. */
 const findProcedimentoBasePorNomeProcedimento = (
+  base: ProcedimentoBase[],
   term: string,
   totalHonorarios?: number
 ): { ok: ProcedimentoBase } | { err: 'notfound' | 'ambiguous' } => {
   const partes = splitNomesProcedimentoPlanilha(term);
   if (partes.length >= 2) {
-    const parHit = findProcedimentoBasePorParNomes(partes[0]!, partes.slice(1).join(' / '), totalHonorarios);
+    const parHit = findProcedimentoBasePorParNomes(base, partes[0]!, partes.slice(1).join(' / '), totalHonorarios);
     if (!('err' in parHit)) return parHit;
     if (totalHonorarios != null && Number.isFinite(totalHonorarios) && totalHonorarios > 0) {
-      const sumHit = findProcedimentoBasePorSomaValoresUnica(totalHonorarios);
+      const sumHit = findProcedimentoBasePorSomaValoresUnica(base, totalHonorarios);
       if (!('err' in sumHit)) return sumHit;
     }
     if (parHit.err === 'ambiguous') return parHit;
@@ -684,17 +733,17 @@ const findProcedimentoBasePorNomeProcedimento = (
     return escolherUnicoPorScore(term, cands, campo);
   };
 
-  const exact1 = procedimentosBase.filter((b) => normalizarNucleoProcedimento(b.nome1) === t);
+  const exact1 = base.filter((b) => normalizarNucleoProcedimento(b.nome1) === t);
   const r1 = resolveMulti(exact1, 'nome1');
   if (r1) return { ok: r1 };
   if (exact1.length > 1) return { err: 'ambiguous' };
 
-  const exact2 = procedimentosBase.filter((b) => normalizarNucleoProcedimento(b.nome2) === t);
+  const exact2 = base.filter((b) => normalizarNucleoProcedimento(b.nome2) === t);
   const r2 = resolveMulti(exact2, 'nome2');
   if (r2) return { ok: r2 };
   if (exact2.length > 1) return { err: 'ambiguous' };
 
-  const sub1 = procedimentosBase.filter((b) => {
+  const sub1 = base.filter((b) => {
     const n1 = normalizarNucleoProcedimento(b.nome1);
     return n1.includes(t) || t.includes(n1);
   });
@@ -702,7 +751,7 @@ const findProcedimentoBasePorNomeProcedimento = (
   if (r3) return { ok: r3 };
   if (sub1.length > 1) return { err: 'ambiguous' };
 
-  const sub2 = procedimentosBase.filter((b) => {
+  const sub2 = base.filter((b) => {
     const n2 = normalizarNucleoProcedimento(b.nome2);
     return n2.includes(t) || t.includes(n2);
   });
@@ -710,7 +759,7 @@ const findProcedimentoBasePorNomeProcedimento = (
   if (r4) return { ok: r4 };
   if (sub2.length > 1) return { err: 'ambiguous' };
 
-  return findProcedimentoBasePorOverlapTokensGlobal(term);
+  return findProcedimentoBasePorOverlapTokensGlobal(base, term);
 };
 
 type XlsxCell = { t?: string; v?: unknown; w?: string; z?: string };
@@ -1580,6 +1629,7 @@ const MODELO_LANC_HEADERS = [
 
 const parsePlanilhaLancamentos = (
   aoa: unknown[][],
+  baseProcedimentos: ProcedimentoBase[],
   sheet?: XLSX.WorkSheet,
   sheetRowOffset = 0,
   mesReferencia?: string
@@ -1709,17 +1759,17 @@ const parsePlanilhaLancamentos = (
 
     let base: ProcedimentoBase | undefined;
     if (temTriploCompleto) {
-      base = findProcedimentoBaseImport(instrumento, codigo1, codigo2);
+      base = findProcedimentoBaseImport(baseProcedimentos, instrumento, codigo1, codigo2);
       if (!base) {
         pushErroLinha(`procedimento não encontrado na base (${instrumento} | ${codigo1} | ${codigo2}).`);
       }
     } else if (nomeProc) {
       const honorDisamb = temHonorParaId ? honorT0Raw : undefined;
-      const hit = findProcedimentoBasePorNomeProcedimento(nomeProc, honorDisamb);
+      const hit = findProcedimentoBasePorNomeProcedimento(baseProcedimentos, nomeProc, honorDisamb);
       if (!('err' in hit)) {
         base = hit.ok;
       } else if (temHonorParaId) {
-        const sumHit = findProcedimentoBasePorSomaValoresUnica(honorT0Raw);
+        const sumHit = findProcedimentoBasePorSomaValoresUnica(baseProcedimentos, honorT0Raw);
         if (!('err' in sumHit)) {
           base = sumHit.ok;
         } else if (hit.err === 'ambiguous') {
@@ -1743,7 +1793,7 @@ const parsePlanilhaLancamentos = (
         }
       }
     } else if (temHonorParaId && nomeProc.trim()) {
-      const sumHit = findProcedimentoBasePorSomaValoresUnica(honorT0Raw);
+      const sumHit = findProcedimentoBasePorSomaValoresUnica(baseProcedimentos, honorT0Raw);
       if (!('err' in sumHit)) {
         base = sumHit.ok;
       } else {
@@ -1986,6 +2036,7 @@ const enriquecerLinhasComQuemRepasseAusente = (d: DadosMes): { dados: DadosMes; 
 
 const RelatoriosProcedimentos = () => {
   const { user } = useAuth();
+  const queryClient = useQueryClient();
   const isMaster = user?.role === 'MASTER';
   const hoje = new Date();
   const [ano, setAno] = useState(hoje.getFullYear());
@@ -2007,6 +2058,8 @@ const RelatoriosProcedimentos = () => {
 
   const [modalParams, setModalParams] = useState(false);
   const [modalBaseProcedimentos, setModalBaseProcedimentos] = useState(false);
+  const [rascunhoBaseProcedimentos, setRascunhoBaseProcedimentos] = useState<ProcedimentoBase[]>([]);
+  const [salvandoBaseProcedimentos, setSalvandoBaseProcedimentos] = useState(false);
   const [rascunho, setRascunho] = useState<DadosMes>(() => defaultDadosMes());
   const [rascunhoProfs, setRascunhoProfs] = useState<RascunhoProfsT>(() => pickRascunhoProfs(defaultDadosMes()));
   const [linhaPendente, setLinhaPendente] = useState<LinhaProcedimento | null>(null);
@@ -2087,6 +2140,45 @@ const RelatoriosProcedimentos = () => {
     staleTime: 0,
     refetchOnWindowFocus: false,
     retry: 1,
+  });
+
+  const { data: remotoBaseResp } = useQuery({
+    queryKey: ['admin', 'procedimentos-base'],
+    queryFn: () => adminService.getProcedimentosBase(),
+    enabled: isMaster,
+    staleTime: 60_000,
+    refetchOnWindowFocus: false,
+    retry: 1,
+  });
+
+  const baseProcedimentos = useMemo(
+    () => remotoBaseResp?.data ?? SEED_PROCEDIMENTOS_BASE,
+    [remotoBaseResp?.data]
+  );
+  const baseProcedimentosRef = useRef(baseProcedimentos);
+  useEffect(() => {
+    baseProcedimentosRef.current = baseProcedimentos;
+  }, [baseProcedimentos]);
+
+  const salvarBaseProcedimentosMutation = useMutation({
+    mutationFn: (lista: ProcedimentoBase[]) => adminService.saveProcedimentosBase(lista),
+    onSuccess: (resp) => {
+      queryClient.setQueryData(['admin', 'procedimentos-base'], resp);
+      notify({
+        kind: 'success',
+        title: 'Base salva',
+        message: 'Procedimentos atualizados. Já pode usá-los nos lançamentos.',
+        source: 'relatorio-procedimentos',
+      });
+    },
+    onError: (err: unknown) => {
+      notify({
+        kind: 'error',
+        title: 'Erro ao salvar base',
+        message: err instanceof Error ? err.message : 'Não foi possível gravar a base de procedimentos.',
+        source: 'relatorio-procedimentos',
+      });
+    },
   });
 
   useEffect(() => {
@@ -2254,6 +2346,7 @@ const RelatoriosProcedimentos = () => {
           );
           const { linhas, errors, avisos, layoutHospital } = parsePlanilhaLancamentos(
             aoa,
+            baseProcedimentosRef.current,
             picked.sheet,
             sheetRowOffset,
             mesChave
@@ -2334,7 +2427,13 @@ const RelatoriosProcedimentos = () => {
             aoa[headerRow] ?? [],
             resolveLancImportColumns(aoa[headerRow] ?? [])
           );
-          const { linhas, errors, avisos, layoutHospital } = parsePlanilhaLancamentos(aoa, undefined, 0, mesChave);
+          const { linhas, errors, avisos, layoutHospital } = parsePlanilhaLancamentos(
+            aoa,
+            baseProcedimentosRef.current,
+            undefined,
+            0,
+            mesChave
+          );
           const ui = estadoUIMaposParseImportacao(linhas, errors, avisos, layoutHospital, colMap, mesChave);
           setImportPreview(ui.preview);
           setImportMsg(ui.msg);
@@ -2407,7 +2506,7 @@ const RelatoriosProcedimentos = () => {
   useEffect(() => {
     if (!modalBaseProcedimentos) return;
     const f = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setModalBaseProcedimentos(false);
+      if (e.key === 'Escape') fecharModalBaseProcedimentos();
     };
     window.addEventListener('keydown', f);
     return () => window.removeEventListener('keydown', f);
@@ -2416,7 +2515,7 @@ const RelatoriosProcedimentos = () => {
   const sugestoes = useMemo(() => {
     const q = busca.toLowerCase().trim();
     if (q.length < 2) return [];
-    return procedimentosBase
+    return baseProcedimentos
       .filter(
         (b) =>
           chaveDeBase(b).toLowerCase().includes(q) ||
@@ -2426,7 +2525,7 @@ const RelatoriosProcedimentos = () => {
           b.nome2.toLowerCase().includes(q)
       )
       .slice(0, 12);
-  }, [busca]);
+  }, [busca, baseProcedimentos]);
 
   const sugestoesMedicos1 = useMemo(() => {
     const t = medBusca1.toLowerCase().trim();
@@ -2694,6 +2793,65 @@ const RelatoriosProcedimentos = () => {
     });
     setBusca('');
     setAbrirSugestoes(false);
+  };
+
+  const abrirModalBaseProcedimentos = () => {
+    setRascunhoBaseProcedimentos(baseProcedimentos.map((p) => ({ ...p })));
+    setModalBaseProcedimentos(true);
+  };
+
+  const fecharModalBaseProcedimentos = () => {
+    setModalBaseProcedimentos(false);
+  };
+
+  const atualizarRascunhoBase = (id: string, patch: Partial<ProcedimentoBase>) => {
+    setRascunhoBaseProcedimentos((prev) => prev.map((p) => (p.id === id ? { ...p, ...patch } : p)));
+  };
+
+  const removerRascunhoBase = (id: string) => {
+    setRascunhoBaseProcedimentos((prev) => prev.filter((p) => p.id !== id));
+  };
+
+  const adicionarRascunhoBase = () => {
+    setRascunhoBaseProcedimentos((prev) => [...prev, novoProcedimentoBase()]);
+  };
+
+  const salvarRascunhoBaseProcedimentos = async () => {
+    const lista = normalizarProcedimentosBaseSalvar(rascunhoBaseProcedimentos);
+    if (lista.length === 0) {
+      notify({
+        kind: 'error',
+        title: 'Base vazia',
+        message: 'Inclua ao menos um procedimento ou cancele.',
+        source: 'relatorio-procedimentos',
+      });
+      return;
+    }
+    if (lista.some((p) => !p.nome1.trim())) {
+      notify({
+        kind: 'error',
+        title: 'Campos obrigatórios',
+        message: 'Preencha o nome do 1.º procedimento em todas as linhas.',
+        source: 'relatorio-procedimentos',
+      });
+      return;
+    }
+    setSalvandoBaseProcedimentos(true);
+    try {
+      const resp = await salvarBaseProcedimentosMutation.mutateAsync(lista);
+      setRascunhoBaseProcedimentos(resp.data ?? lista);
+    } finally {
+      setSalvandoBaseProcedimentos(false);
+    }
+  };
+
+  const usarProcedimentoDaBase = (b: ProcedimentoBase) => {
+    selecionarProcedimentoBase(b);
+    fecharModalBaseProcedimentos();
+    setBusca(chaveDeBase(b));
+    requestAnimationFrame(() => {
+      document.getElementById('entrada-manual-lanc')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
   };
 
   const salvarLinhaPendente = useCallback(() => {
@@ -3916,9 +4074,9 @@ const RelatoriosProcedimentos = () => {
           <button
             type="button"
             className="btn btn-secondary btn-sm font-display shrink-0"
-            onClick={() => setModalBaseProcedimentos(true)}
+            onClick={abrirModalBaseProcedimentos}
           >
-            Ver base de procedimentos
+            Gerir base de procedimentos
           </button>
         </div>
         <div className="relative">
@@ -4820,27 +4978,41 @@ const RelatoriosProcedimentos = () => {
           <button
             type="button"
             className="absolute inset-0 bg-viva-950/50 backdrop-blur-sm"
-            onClick={() => setModalBaseProcedimentos(false)}
+            onClick={fecharModalBaseProcedimentos}
             aria-label="Fechar"
           />
           <div className="relative z-10 flex h-[min(90dvh,800px)] w-full max-w-6xl flex-col sm:rounded-2xl sm:border sm:border-viva-200/70 sm:shadow-2xl sm:mt-0 mt-8 bg-white">
-            <div className="flex items-center justify-between gap-2 border-b border-viva-200/60 px-4 py-3 sm:px-5">
-              <h2
-                id="titulo-base-procedimentos"
-                className="text-lg font-bold text-viva-900 font-display"
-              >
-                Base de procedimentos
-              </h2>
-              <button
-                type="button"
-                className="btn btn-secondary btn-sm"
-                onClick={() => setModalBaseProcedimentos(false)}
-              >
-                Fechar
-              </button>
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-viva-200/60 px-4 py-3 sm:px-5">
+              <div>
+                <h2
+                  id="titulo-base-procedimentos"
+                  className="text-lg font-bold text-viva-900 font-display"
+                >
+                  Base de procedimentos
+                </h2>
+                <p className="text-xs text-viva-600 mt-0.5">
+                  Edite, inclua novos pares TUSS e salve para usar nos lançamentos e importações.
+                </p>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <button type="button" className="btn btn-secondary btn-sm" onClick={adicionarRascunhoBase}>
+                  Novo procedimento
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-primary btn-sm"
+                  onClick={() => void salvarRascunhoBaseProcedimentos()}
+                  disabled={salvandoBaseProcedimentos}
+                >
+                  {salvandoBaseProcedimentos ? 'Salvando…' : 'Salvar base'}
+                </button>
+                <button type="button" className="btn btn-secondary btn-sm" onClick={fecharModalBaseProcedimentos}>
+                  Fechar
+                </button>
+              </div>
             </div>
             <div className="min-h-0 flex-1 overflow-auto px-3 sm:px-4 pb-4">
-              <table className="w-full min-w-[880px] border-collapse text-left text-xs text-viva-800">
+              <table className="w-full min-w-[980px] border-collapse text-left text-xs text-viva-800">
                 <thead className="sticky top-0 z-[1] bg-slate-800/95 text-[10px] font-display font-semibold uppercase text-white sm:text-xs">
                   <tr>
                     <th className="px-2 py-2.5 sm:px-3">Instrumento</th>
@@ -4850,31 +5022,96 @@ const RelatoriosProcedimentos = () => {
                     <th className="px-2 py-2.5 sm:px-3">Código 2</th>
                     <th className="px-2 py-2.5 sm:px-3 min-w-[12rem]">2 Procedimento</th>
                     <th className="px-2 py-2.5 sm:px-3 text-right">Valor 2 (R$)</th>
-                    <th className="px-2 py-2.5 sm:px-3 min-w-[14rem]">Chave Busca</th>
+                    <th className="px-2 py-2.5 sm:px-3 min-w-[10rem]">Ações</th>
                   </tr>
                 </thead>
                 <tbody className="font-serif text-[11px] sm:text-sm">
-                  {procedimentosBase.map((b, idx) => (
+                  {rascunhoBaseProcedimentos.map((b, idx) => (
                     <tr
                       key={b.id}
                       className={idx % 2 ? 'bg-viva-50/30' : 'bg-white border-t border-slate-100/90'}
                     >
-                      <td className="px-2 py-1.5 sm:px-3 align-top font-mono font-medium text-amber-900/90">
-                        {b.instrumento}
+                      <td className="px-1 py-1 sm:px-2 align-top">
+                        <input
+                          className="input w-full min-w-[3rem] h-9 py-1.5 px-2 text-xs font-mono text-amber-900/90"
+                          value={b.instrumento}
+                          onChange={(e) => atualizarRascunhoBase(b.id, { instrumento: e.target.value })}
+                          placeholder="8C"
+                        />
                       </td>
-                      <td className="px-2 py-1.5 sm:px-3 align-top font-mono [overflow-wrap:anywhere]">{b.codigo1}</td>
-                      <td className="px-2 py-1.5 sm:px-3 align-top [overflow-wrap:anywhere]">{b.nome1}</td>
-                      <td className="px-2 py-1.5 sm:px-3 text-right font-mono tabular-nums">{BRL.format(b.valor1)}</td>
-                      <td className="px-2 py-1.5 sm:px-3 align-top font-mono [overflow-wrap:anywhere]">{b.codigo2}</td>
-                      <td className="px-2 py-1.5 sm:px-3 align-top [overflow-wrap:anywhere]">{b.nome2}</td>
-                      <td className="px-2 py-1.5 sm:px-3 text-right font-mono tabular-nums">{BRL.format(b.valor2)}</td>
-                      <td className="px-2 py-1.5 sm:px-3 text-[10px] sm:text-xs text-viva-600 [overflow-wrap:anywhere]">
-                        {chaveDeBase(b)}
+                      <td className="px-1 py-1 sm:px-2 align-top">
+                        <input
+                          className="input w-full min-w-[7rem] h-9 py-1.5 px-2 text-xs font-mono"
+                          value={b.codigo1}
+                          onChange={(e) => atualizarRascunhoBase(b.id, { codigo1: e.target.value })}
+                          placeholder="04.08.01.010-0"
+                        />
+                      </td>
+                      <td className="px-1 py-1 sm:px-2 align-top">
+                        <input
+                          className="input w-full min-w-[12rem] h-9 py-1.5 px-2 text-xs"
+                          value={b.nome1}
+                          onChange={(e) => atualizarRascunhoBase(b.id, { nome1: e.target.value })}
+                          placeholder="Nome do 1.º procedimento"
+                        />
+                      </td>
+                      <td className="px-1 py-1 sm:px-2 align-top">
+                        <input
+                          className="input w-full min-w-[5.5rem] h-9 py-1.5 px-2 text-xs text-right font-mono tabular-nums"
+                          value={numBrl(b.valor1)}
+                          onChange={(e) => atualizarRascunhoBase(b.id, { valor1: parseBrl(e.target.value) })}
+                        />
+                      </td>
+                      <td className="px-1 py-1 sm:px-2 align-top">
+                        <input
+                          className="input w-full min-w-[7rem] h-9 py-1.5 px-2 text-xs font-mono"
+                          value={b.codigo2}
+                          onChange={(e) => atualizarRascunhoBase(b.id, { codigo2: e.target.value })}
+                          placeholder="04.08.01.015-0"
+                        />
+                      </td>
+                      <td className="px-1 py-1 sm:px-2 align-top">
+                        <input
+                          className="input w-full min-w-[12rem] h-9 py-1.5 px-2 text-xs"
+                          value={b.nome2}
+                          onChange={(e) => atualizarRascunhoBase(b.id, { nome2: e.target.value })}
+                          placeholder="Nome do 2.º procedimento"
+                        />
+                      </td>
+                      <td className="px-1 py-1 sm:px-2 align-top">
+                        <input
+                          className="input w-full min-w-[5.5rem] h-9 py-1.5 px-2 text-xs text-right font-mono tabular-nums"
+                          value={numBrl(b.valor2)}
+                          onChange={(e) => atualizarRascunhoBase(b.id, { valor2: parseBrl(e.target.value) })}
+                        />
+                      </td>
+                      <td className="px-1 py-1 sm:px-2 align-top">
+                        <div className="flex flex-col gap-1 min-w-[7rem]">
+                          <button
+                            type="button"
+                            className="btn btn-primary btn-sm text-xs py-1"
+                            onClick={() => usarProcedimentoDaBase(b)}
+                          >
+                            Usar
+                          </button>
+                          <button
+                            type="button"
+                            className="btn btn-secondary btn-sm text-xs py-1 text-red-700"
+                            onClick={() => removerRascunhoBase(b.id)}
+                          >
+                            Excluir
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
+              {rascunhoBaseProcedimentos.length === 0 && (
+                <p className="py-8 text-center text-sm text-viva-600">
+                  Nenhum procedimento na base. Clique em «Novo procedimento» para começar.
+                </p>
+              )}
             </div>
           </div>
         </div>

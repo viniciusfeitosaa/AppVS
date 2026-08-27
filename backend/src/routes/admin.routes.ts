@@ -9,6 +9,8 @@ import {
   replicarEscalaPlantoesMesController,
   createMedicoController,
   getRelatorioProcedimentosMesController,
+  getProcedimentosBaseController,
+  upsertProcedimentosBaseController,
   deleteEscalaController,
   deleteContratoAtivoController,
   listAdicionaisPlantaoController,
@@ -159,6 +161,8 @@ router.get(
 // Mantemos apenas autenticação + role MASTER (sem gate por módulo) para evitar "parece que salvou mas some" em outros PCs.
 router.get('/relatorios/procedimentos/:mesRef', getRelatorioProcedimentosMesController);
 router.put('/relatorios/procedimentos/:mesRef', upsertRelatorioProcedimentosMesController);
+router.get('/procedimentos-base', getProcedimentosBaseController);
+router.put('/procedimentos-base', upsertProcedimentosBaseController);
 router.get(
   '/integrations/docuseal/pending-submissions',
   requireModuleAccess(ModuloSistema.MEDICOS),

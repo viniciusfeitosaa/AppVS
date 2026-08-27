@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../context/AuthContext';
 import { medicoService } from '../services/medico.service';
+import type { DocusealDocumentoPainelItem } from '../services/admin.service';
 import { fixMojibake } from '../utils/validation.util';
 
 function formatBytes(n: number): string {
@@ -35,6 +36,16 @@ const MeusDocumentos = () => {
     queryFn: () => medicoService.listDocumentosEnviados(),
     enabled: !!user && !isMaster,
   });
+
+  const { data: docusealResp, isLoading: loadingDocuseal } = useQuery({
+    queryKey: ['medico', 'docuseal-documentos', user?.id],
+    queryFn: () => medicoService.getDocusealDocumentos(),
+    enabled: !!user && !isMaster,
+  });
+
+  const documentosAssinados = (docusealResp?.data?.documentos ?? []).filter(
+    (d: DocusealDocumentoPainelItem) => d.status === 'concluido' && d.signedDocumentUrl
+  );
 
   const confirmarCienciaMutation = useMutation({
     mutationFn: (id: string) => medicoService.confirmarCienciaDocumentoEnviado(id),
@@ -151,6 +162,60 @@ const MeusDocumentos = () => {
                       {confirmarCienciaMutation.isPending ? 'A registar…' : 'Registar ciência'}
                     </button>
                   )}
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+
+      <div className="card stagger-3 border-l-4 border-l-emerald-500 bg-gradient-to-br from-white to-emerald-50/20">
+        <h2 className="text-lg font-bold text-viva-900 font-display mb-1">Contratos e termos assinados</h2>
+        <p className="text-sm text-viva-700 font-serif mb-4">
+          Documentos concluídos via assinatura eletrónica (DocuSeal), com todas as partes.
+        </p>
+        {loadingDocuseal ? (
+          <p className="text-sm text-viva-600 font-serif">A carregar…</p>
+        ) : !docusealResp?.data?.configured ? null : documentosAssinados.length === 0 ? (
+          <p className="text-sm text-viva-600 font-serif">
+            Ainda não há documentos assinados disponíveis para download.
+          </p>
+        ) : (
+          <ul className="space-y-2">
+            {documentosAssinados.map((doc) => (
+              <li
+                key={doc.templateId}
+                className="flex flex-col sm:flex-row sm:items-center gap-2 p-4 rounded-xl bg-white/80 border border-viva-200/40"
+              >
+                <div className="min-w-0 flex-1">
+                  <p className="font-semibold text-viva-900 text-sm">{doc.templateName}</p>
+                  {doc.completedAt ? (
+                    <p className="text-[10px] text-viva-600 mt-1">
+                      Concluído em {formatDate(doc.completedAt)}
+                    </p>
+                  ) : null}
+                </div>
+                <div className="flex flex-wrap gap-2 shrink-0">
+                  {doc.signedDocumentUrl ? (
+                    <a
+                      href={doc.signedDocumentUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="btn-sm btn-primary inline-flex"
+                    >
+                      Baixar PDF
+                    </a>
+                  ) : null}
+                  {doc.auditLogUrl ? (
+                    <a
+                      href={doc.auditLogUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="btn-sm btn-secondary inline-flex"
+                    >
+                      Log de auditoria
+                    </a>
+                  ) : null}
                 </div>
               </li>
             ))}

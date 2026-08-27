@@ -778,7 +778,116 @@ export type DocusealDocumentoPainelItem = {
   submitterId: number | null;
   signUrl: string | null;
   signerStatus: string | null;
+  /** PDF assinado (disponível quando status = concluido). */
+  signedDocumentUrl: string | null;
+  /** Log de auditoria DocuSeal (opcional). */
+  auditLogUrl: string | null;
+  completedAt: string | null;
 };
+
+const DOCUSEAL_PAINEL_ASSINADO_FIELDS = {
+  signedDocumentUrl: null,
+  auditLogUrl: null,
+  completedAt: null,
+} as const;
+
+function pickFirstDocumentUrl(docsRaw: unknown): string | null {
+  if (!Array.isArray(docsRaw)) return null;
+  for (const d of docsRaw) {
+    if (!d || typeof d !== 'object') continue;
+    const url = readKey(d as Record<string, unknown>, 'url', 'Url');
+    if (typeof url === 'string' && url.trim()) return url.trim();
+  }
+  return null;
+}
+
+/** Obtém URLs do PDF assinado e log de auditoria a partir da submissão DocuSeal. */
+async function fetchSubmissionSignedFiles(
+  apiBase: string,
+  token: string,
+  submissionId: number,
+  emailNorm: string | null
+): Promise<Pick<DocusealDocumentoPainelItem, 'signedDocumentUrl' | 'auditLogUrl' | 'completedAt'>> {
+  const empty = { signedDocumentUrl: null, auditLogUrl: null, completedAt: null };
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 20000);
+  try {
+    const resp = await fetchWithTimeout(`${apiBase}/submissions/${submissionId}`, {
+      method: 'GET',
+      headers: { 'X-Auth-Token': token },
+      signal: ctrl.signal,
+    });
+    if (!resp.ok) return empty;
+    const row = (await resp.json()) as Record<string, unknown>;
+
+    const combinedRaw = readKey(row, 'combined_document_url', 'combinedDocumentUrl');
+    let signedDocumentUrl =
+      typeof combinedRaw === 'string' && combinedRaw.trim() ? combinedRaw.trim() : null;
+
+    const auditRaw = readKey(row, 'audit_log_url', 'auditLogUrl');
+    const auditLogUrl = typeof auditRaw === 'string' && auditRaw.trim() ? auditRaw.trim() : null;
+
+    const completedRaw = readKey(row, 'completed_at', 'completedAt');
+    const completedAt = typeof completedRaw === 'string' && completedRaw.trim() ? completedRaw.trim() : null;
+
+    if (!signedDocumentUrl) {
+      const docResp = await fetchWithTimeout(`${apiBase}/submissions/${submissionId}/documents`, {
+        method: 'GET',
+        headers: { 'X-Auth-Token': token },
+        signal: ctrl.signal,
+      });
+      if (docResp.ok) {
+        const docJson = (await docResp.json()) as Record<string, unknown>;
+        signedDocumentUrl =
+          pickFirstDocumentUrl(docJson.documents) ??
+          pickFirstDocumentUrl(readKey(docJson, 'data', 'Data'));
+      }
+    }
+
+    if (!signedDocumentUrl && emailNorm) {
+      const medSub = findMedicoSubmitterRecord(row, emailNorm);
+      if (medSub) {
+        signedDocumentUrl = pickFirstDocumentUrl(readKey(medSub, 'documents', 'Documents'));
+      }
+    }
+
+    if (!signedDocumentUrl) {
+      const submittersRaw = readKey(row, 'submitters', 'Submitters');
+      if (Array.isArray(submittersRaw)) {
+        for (const su of submittersRaw) {
+          if (!su || typeof su !== 'object') continue;
+          signedDocumentUrl = pickFirstDocumentUrl(readKey(su as Record<string, unknown>, 'documents', 'Documents'));
+          if (signedDocumentUrl) break;
+        }
+      }
+    }
+
+    return { signedDocumentUrl, auditLogUrl, completedAt };
+  } catch {
+    return empty;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function enrichDocumentosPainelComAssinados(
+  documentos: DocusealDocumentoPainelItem[],
+  apiBase: string,
+  token: string,
+  emailNorm: string
+): Promise<void> {
+  const concluidos = documentos.filter((d) => d.status === 'concluido' && d.submissionId != null && d.submissionId > 0);
+  if (concluidos.length === 0) return;
+
+  await Promise.all(
+    concluidos.map(async (doc) => {
+      const files = await fetchSubmissionSignedFiles(apiBase, token, doc.submissionId!, emailNorm);
+      doc.signedDocumentUrl = files.signedDocumentUrl;
+      doc.auditLogUrl = files.auditLogUrl;
+      doc.completedAt = files.completedAt;
+    })
+  );
+}
 
 /**
  * Monta a lista de modelos obrigatórios e estados a partir de submissões já obtidas (ex.: ?q=email).
@@ -817,6 +926,7 @@ function documentosPainelFromRaw(
         submitterId: null,
         signUrl: null,
         signerStatus: null,
+        ...DOCUSEAL_PAINEL_ASSINADO_FIELDS,
       };
     }
     const cl = classificarEstadoDocParaMedico(hit.row, emailNorm, webBase);
@@ -834,6 +944,7 @@ function documentosPainelFromRaw(
       submitterId: cl.submitterId,
       signUrl: cl.signUrl,
       signerStatus: cl.signerStatus,
+      ...DOCUSEAL_PAINEL_ASSINADO_FIELDS,
     };
   });
 }
@@ -896,6 +1007,7 @@ export async function docusealDocumentosPainelPorMedicoService(
   try {
     const raw = await fetchSubmissionsPaginated(c.apiBase, c.token, { q: emailNorm });
     const documentos = documentosPainelFromRaw(raw, emailNorm, c.webBase, requiredTemplates);
+    await enrichDocumentosPainelComAssinados(documentos, c.apiBase, c.token, emailNorm);
 
     return {
       configured: true,

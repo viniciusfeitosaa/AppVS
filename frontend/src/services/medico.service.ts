@@ -111,6 +111,13 @@ export const medicoService = {
     return response.data;
   },
 
+  getDocusealDocumentos: async () => {
+    const response = await api.get<import('./admin.service').DocusealDocumentosPainelResponse>(
+      '/medico/docuseal/documentos'
+    );
+    return response.data;
+  },
+
   openDocumentoPerfil: async (docId: string, nomeArquivo?: string): Promise<void> => {
     const response = await api.get(`/medico/perfil/documentos/${docId}/download`, {
       responseType: 'blob',
