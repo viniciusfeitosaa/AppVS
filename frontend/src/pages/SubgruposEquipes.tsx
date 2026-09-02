@@ -33,6 +33,8 @@ const SubgruposEquipes = () => {
   const [confirmExcluir, setConfirmExcluir] = useState<{ tipo: 'subgrupo' | 'equipe' | 'escala'; id: string; nome: string } | null>(null);
   const [editEscala, setEditEscala] = useState<{ id: string; nome: string } | null>(null);
   const [editEscalaNome, setEditEscalaNome] = useState('');
+  const [editEquipe, setEditEquipe] = useState<{ id: string; nome: string } | null>(null);
+  const [editEquipeNome, setEditEquipeNome] = useState('');
   const [producaoSubgrupoDraft, setProducaoSubgrupoDraft] = useState<{ usaEscala: boolean; usaPonto: boolean }>({
     usaEscala: true,
     usaPonto: true,
@@ -338,6 +340,39 @@ const SubgruposEquipes = () => {
     setEditEscala(null);
     setEditEscalaNome('');
   };
+  const openEditEquipe = (e: React.MouseEvent, id: string, nome: string) => {
+    e.stopPropagation();
+    setEditEquipe({ id, nome });
+    setEditEquipeNome(nome);
+  };
+  const closeEditEquipe = () => {
+    setEditEquipe(null);
+    setEditEquipeNome('');
+  };
+  const salvarEdicaoEquipe = async () => {
+    if (!editEquipe) return;
+    const nome = editEquipeNome.trim();
+    if (!nome || nome === editEquipe.nome) {
+      closeEditEquipe();
+      return;
+    }
+    setLoadingAction(true);
+    try {
+      await adminService.updateEquipe(editEquipe.id, { nome });
+      notify({ kind: 'success', title: 'Equipe atualizada', message: 'Nome da equipe salvo com sucesso.', source: 'equipe' });
+      await invalidateEquipes();
+      closeEditEquipe();
+    } catch (err: any) {
+      notify({
+        kind: 'error',
+        title: 'Erro ao editar equipe',
+        message: err.response?.data?.error || err.message || 'Tente novamente.',
+        source: 'equipe',
+      });
+    } finally {
+      setLoadingAction(false);
+    }
+  };
   const salvarEdicaoEscala = async () => {
     if (!editEscala) return;
     const nome = editEscalaNome.trim();
@@ -603,7 +638,24 @@ const SubgruposEquipes = () => {
                       </div>
                     </button>
                     {podeEditarEscalas && (
-                      <button type="button" className="btn btn-secondary shrink-0 self-center text-xs" onClick={(e) => openConfirmExcluirEquipe(e, equipe.id, equipe.nome)} disabled={loadingAction}>Excluir</button>
+                      <div className="flex items-center gap-2 shrink-0 self-center">
+                        <button
+                          type="button"
+                          className="btn btn-secondary text-xs"
+                          onClick={(e) => openEditEquipe(e, equipe.id, equipe.nome)}
+                          disabled={loadingAction}
+                        >
+                          Editar
+                        </button>
+                        <button
+                          type="button"
+                          className="btn btn-secondary text-xs"
+                          onClick={(e) => openConfirmExcluirEquipe(e, equipe.id, equipe.nome)}
+                          disabled={loadingAction}
+                        >
+                          Excluir
+                        </button>
+                      </div>
                     )}
                   </div>
                   );
@@ -851,6 +903,30 @@ const SubgruposEquipes = () => {
               </button>
               <button type="button" className="btn btn-primary bg-red-600 hover:bg-red-700" onClick={executarExcluir} disabled={loadingAction}>
                 {loadingAction ? 'Excluindo...' : 'Excluir'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {editEquipe && podeEditarEscalas && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" onClick={closeEditEquipe}>
+          <div className="bg-white rounded-xl shadow-xl max-w-sm w-full p-6" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-lg font-bold text-viva-900 mb-2">Editar equipe</h3>
+            <p className="text-sm text-gray-600 mb-3">Atualize o nome da equipe selecionada.</p>
+            <input
+              type="text"
+              className="input w-full"
+              value={editEquipeNome}
+              onChange={(e) => setEditEquipeNome(e.target.value)}
+              placeholder="Nome da equipe"
+              autoFocus
+            />
+            <div className="flex gap-2 justify-end mt-4">
+              <button type="button" className="btn btn-secondary" onClick={closeEditEquipe} disabled={loadingAction}>
+                Cancelar
+              </button>
+              <button type="button" className="btn btn-primary" onClick={salvarEdicaoEquipe} disabled={loadingAction}>
+                {loadingAction ? 'Salvando...' : 'Salvar'}
               </button>
             </div>
           </div>

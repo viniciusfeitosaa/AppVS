@@ -34,6 +34,115 @@ interface ListMedicosParams {
   limit?: number;
   search?: string;
   ativo?: boolean;
+  semEquipe?: boolean;
+  equipeId?: string;
+  profissao?: string;
+  /** Cadastros com createdAt nos últimos N dias (atalho; preferir cadastroInicio/cadastroFim). */
+  cadastroDesdeDias?: number;
+  /** Data inicial do cadastro (YYYY-MM-DD, inclusiva). */
+  cadastroInicio?: string;
+  /** Data final do cadastro (YYYY-MM-DD, inclusiva). */
+  cadastroFim?: string;
+  orderBy?: 'nome_asc' | 'createdAt_desc';
+}
+
+export type MedicosFiltrosResumo = {
+  total: number;
+  ativos: number;
+  inativos: number;
+  semEquipe: number;
+  novos30d: number;
+  novos7d: number;
+};
+
+function medicoSearchFilters(search?: string): Prisma.MedicoWhereInput[] {
+  const t = search?.trim();
+  if (!t) return [];
+  const cpfSearch = t.replace(/\D/g, '');
+  const insensitive = { mode: 'insensitive' as const };
+  return [
+    { nomeCompleto: { contains: t, ...insensitive } },
+    { crm: { contains: t, ...insensitive } },
+    ...(cpfSearch ? [{ cpf: { contains: cpfSearch, ...insensitive } }] : []),
+  ];
+}
+
+function parseCadastroYmdStart(ymd: string): Date | undefined {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(ymd.trim());
+  if (!m) return undefined;
+  const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]), 0, 0, 0, 0);
+  return Number.isNaN(d.getTime()) ? undefined : d;
+}
+
+function parseCadastroYmdEnd(ymd: string): Date | undefined {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(ymd.trim());
+  if (!m) return undefined;
+  const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]), 23, 59, 59, 999);
+  return Number.isNaN(d.getTime()) ? undefined : d;
+}
+
+function medicoCadastroCreatedAtFilter(
+  opts: Pick<ListMedicosParams, 'cadastroDesdeDias' | 'cadastroInicio' | 'cadastroFim'>
+): Prisma.DateTimeFilter | undefined {
+  const inicio = opts.cadastroInicio?.trim();
+  const fim = opts.cadastroFim?.trim();
+  if (inicio || fim) {
+    const createdAt: Prisma.DateTimeFilter = {};
+    const gte = inicio ? parseCadastroYmdStart(inicio) : undefined;
+    const lte = fim ? parseCadastroYmdEnd(fim) : undefined;
+    if (gte) createdAt.gte = gte;
+    if (lte) createdAt.lte = lte;
+    if (Object.keys(createdAt).length) return createdAt;
+    return undefined;
+  }
+  const dias = opts.cadastroDesdeDias;
+  if (dias != null && dias > 0) {
+    return { gte: new Date(Date.now() - dias * 86_400_000) };
+  }
+  return undefined;
+}
+
+function buildMedicoListWhere(
+  tenantId: string,
+  opts: Pick<
+    ListMedicosParams,
+    'search' | 'ativo' | 'semEquipe' | 'equipeId' | 'profissao' | 'cadastroDesdeDias' | 'cadastroInicio' | 'cadastroFim'
+  >
+): Prisma.MedicoWhereInput {
+  const searchFilters = medicoSearchFilters(opts.search);
+  const prof = opts.profissao?.trim();
+  const createdAt = medicoCadastroCreatedAtFilter(opts);
+  return {
+    tenantId,
+    statusCadastro: { not: StatusCadastroMedico.PENDENTE_ANALISE },
+    ...(searchFilters.length ? { OR: searchFilters } : {}),
+    ...(opts.ativo !== undefined ? { ativo: opts.ativo } : {}),
+    ...(opts.semEquipe ? { equipeMedicos: { none: {} } } : {}),
+    ...(opts.equipeId ? { equipeMedicos: { some: { equipeId: opts.equipeId } } } : {}),
+    ...(prof ? { profissao: { contains: prof, mode: 'insensitive' as const } } : {}),
+    ...(createdAt ? { createdAt } : {}),
+  };
+}
+
+export async function listMedicosFiltrosResumoService(
+  tenantId: string,
+  search?: string
+): Promise<MedicosFiltrosResumo> {
+  const base = buildMedicoListWhere(tenantId, { search });
+  const now = Date.now();
+  const gte30 = new Date(now - 30 * 86_400_000);
+  const gte7 = new Date(now - 7 * 86_400_000);
+
+  const [total, ativos, inativos, semEquipe, novos30d, novos7d] = await Promise.all([
+    prisma.medico.count({ where: base }),
+    prisma.medico.count({ where: { ...base, ativo: true } }),
+    prisma.medico.count({ where: { ...base, ativo: false } }),
+    prisma.medico.count({ where: { ...base, equipeMedicos: { none: {} } } }),
+    prisma.medico.count({ where: { ...base, createdAt: { gte: gte30 } } }),
+    prisma.medico.count({ where: { ...base, createdAt: { gte: gte7 } } }),
+  ]);
+
+  return { total, ativos, inativos, semEquipe, novos30d, novos7d };
 }
 
 interface CreateMedicoInput {
@@ -140,25 +249,12 @@ export async function listMedicosService(params: ListMedicosParams) {
   const page = Math.max(params.page || 1, 1);
   const limit = Math.min(Math.max(params.limit || 10, 1), 2000);
   const skip = (page - 1) * limit;
-  const search = params.search?.trim();
 
-  const cpfSearch = search?.replace(/\D/g, '');
-  const searchFilters = search
-    ? [
-        { nomeCompleto: { contains: search, mode: 'insensitive' as const } },
-        { crm: { contains: search, mode: 'insensitive' as const } },
-        ...(cpfSearch
-          ? [{ cpf: { contains: cpfSearch, mode: 'insensitive' as const } }]
-          : []),
-      ]
-    : [];
-
-  const where: Prisma.MedicoWhereInput = {
-    tenantId: params.tenantId,
-    statusCadastro: { not: StatusCadastroMedico.PENDENTE_ANALISE },
-    ...(searchFilters.length ? { OR: searchFilters } : {}),
-    ...(params.ativo !== undefined ? { ativo: params.ativo } : {}),
-  };
+  const where = buildMedicoListWhere(params.tenantId, params);
+  const orderBy =
+    params.orderBy === 'createdAt_desc'
+      ? ({ createdAt: 'desc' } as const)
+      : ({ nomeCompleto: 'asc' } as const);
 
   // Sequencial (evita 2 queries paralelas competindo por 1 conexão no pooler Supabase Session)
   const total = await prisma.medico.count({ where });
@@ -178,7 +274,7 @@ export async function listMedicosService(params: ListMedicosParams) {
       createdAt: true,
       updatedAt: true,
     },
-    orderBy: { nomeCompleto: 'asc' },
+    orderBy,
     skip,
     take: limit,
   });

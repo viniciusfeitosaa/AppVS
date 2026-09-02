@@ -1,6 +1,6 @@
 ﻿# Mapa de bordo
 
-**Snapshot:** 2026-08-23  
+**Snapshot:** 2026-09-01  
 **Branch:** `main` — alinhada com GitHub (`e3c574a`+); mobile **1.0.4** (build 6), Android targetSdk 36; VPS com FCM ok; falta AAB/IPA + teste no aparelho
 
 > Nome canónico: `contexto/mapa-de-bordo.md`.  
@@ -73,6 +73,7 @@ Arquivos de referência: `schema.prisma` (`Escala`, `EscalaMedico`, `EscalaPlant
 6. **Margem na UI (ValoresPonto / ValoresPlantao)** — implementar spec [`2026-08-22-margem-cobranca-primeiro-design.md`](../docs/superpowers/specs/2026-08-22-margem-cobranca-primeiro-design.md): ordem Cobrança → Margem → Repasse; `repasse = cobrança × (1 − %)` (não markup); sem migration
 7. **Harness** — manter esta pasta após cada feature (ver `16-como-atualizar.md`)
 8. **WhatsApp** — health no `/health` do backend (ping Evolution GO); painel master opcional (QR/status)
+9. **Webhook Evolution GO — limite de payload** — revisão de logs 2026-09-01: `PayloadTooLargeError` (~65× em 72 h) quando o webhook recebe mídia grande (ex.: vídeo ~15 MB); Express em `10mb` (`app.ts`); Evolution esgota retries com HTTP 500. **Ação:** aumentar `express.json` / `urlencoded` e `client_max_body_size` no NPM no host da API; testar com anexo grande no atendimento WhatsApp. **Status:** anotado, não implementado.
 
 ## Pendências menores
 
@@ -86,6 +87,9 @@ Arquivos de referência: `schema.prisma` (`Escala`, `EscalaMedico`, `EscalaPlant
 
 | Data | Entrega |
 |------|---------|
+| 2026-09-01 | **Revisão de logs VPS** — produção estável (containers healthy, e-mail/SMTP ok, 0 falhas na fila); pendência registrada: limite de payload no webhook WhatsApp (mídia grande) — item 9 abaixo |
+| 2026-08-28 | **DocuSeal 2.ª parte** — botão «Assinar (2.ª parte)» no painel Médicos; OTP desativado para Viva Saúde (`require_email_2fa: false` explícito); script `fix-docuseal-second-party-2fa.sh` |
+| 2026-08-28 | **E-mail Maddy** — certificado TLS renovado/sync; cron diário de certificados; falhas antigas por cert expirado resolvidas |
 | 2026-08-23 | **Margem (design)** — spec aprovado: cobrança + % → repasse (`× (1 − %)`); não é markup; UI invertida vs. entrega 2026-08-14 — spec `2026-08-22-margem-cobranca-primeiro-design.md` — **implementação pendente** |
 | 2026-08-22 | **Mobile 1.0.4** + targetSdk 36; uploads persistentes; validação CPF/CRM no cadastro; nomes no demonstrativo — `12` |
 | 2026-08-19 | **Avaliação → CFM** — botão só abre o portal (sem pré-preenchimento nem tela intermediária) — `05`/`11` |

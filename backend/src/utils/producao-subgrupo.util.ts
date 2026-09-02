@@ -30,7 +30,15 @@ export async function resolveProducaoMedicoNaEscala(
     }),
     prisma.equipeMedico.findMany({
       where: { tenantId, medicoId },
-      select: { equipeId: true },
+      select: {
+        equipeId: true,
+        equipe: {
+          select: {
+            subgrupoId: true,
+            subgrupo: { select: { usaEscala: true, usaPonto: true } },
+          },
+        },
+      },
     }),
   ]);
   const meu = new Set(meuRows.map((r) => r.equipeId));
@@ -43,6 +51,28 @@ export async function resolveProducaoMedicoNaEscala(
     if (sg.usaPonto) allowPonto = true;
     if (sg.usaPonto && sg.usaEscala) requireJanelaPlantao = true;
   }
+
+  const subgrupoLinks = await prisma.escalaSubgrupo.findMany({
+    where: { tenantId, escalaId },
+    select: {
+      subgrupoId: true,
+      subgrupo: { select: { usaEscala: true, usaPonto: true } },
+    },
+  });
+  const subgrupoIds = new Set(subgrupoLinks.map((r) => r.subgrupoId));
+  for (const row of subgrupoLinks) {
+    const sg = row.subgrupo;
+    if (sg.usaPonto) allowPonto = true;
+    if (sg.usaPonto && sg.usaEscala) requireJanelaPlantao = true;
+  }
+  for (const em of meuRows) {
+    const sgId = em.equipe.subgrupoId;
+    const sg = em.equipe.subgrupo;
+    if (!sgId || !sg || !subgrupoIds.has(sgId)) continue;
+    if (sg.usaPonto) allowPonto = true;
+    if (sg.usaPonto && sg.usaEscala) requireJanelaPlantao = true;
+  }
+
   return { allowPonto, requireJanelaPlantao };
 }
 
@@ -61,7 +91,15 @@ export async function batchResolveProducaoMedicoNasEscalas(
 
   const meuRows = await prisma.equipeMedico.findMany({
     where: { tenantId, medicoId },
-    select: { equipeId: true },
+    select: {
+      equipeId: true,
+      equipe: {
+        select: {
+          subgrupoId: true,
+          subgrupo: { select: { usaEscala: true, usaPonto: true } },
+        },
+      },
+    },
   });
   const meu = new Set(meuRows.map((r) => r.equipeId));
 
@@ -87,5 +125,41 @@ export async function batchResolveProducaoMedicoNasEscalas(
     if (sg.usaPonto) cur.allowPonto = true;
     if (sg.usaPonto && sg.usaEscala) cur.requireJanelaPlantao = true;
   }
+
+  // Fallback: médico em equipe do subgrupo vinculado à escala via escala_subgrupos
+  // (cobre alocação na grade sem interseção direta em escala_equipes).
+  const subgrupoLinks = await prisma.escalaSubgrupo.findMany({
+    where: { tenantId, escalaId: { in: uniq } },
+    select: {
+      escalaId: true,
+      subgrupoId: true,
+      subgrupo: { select: { usaEscala: true, usaPonto: true } },
+    },
+  });
+  const subgruposPorEscala = new Map<string, Set<string>>();
+  for (const row of subgrupoLinks) {
+    const set = subgruposPorEscala.get(row.escalaId) ?? new Set<string>();
+    set.add(row.subgrupoId);
+    subgruposPorEscala.set(row.escalaId, set);
+    const cur = out.get(row.escalaId);
+    if (!cur) continue;
+    const sg = row.subgrupo;
+    if (sg.usaPonto) cur.allowPonto = true;
+    if (sg.usaPonto && sg.usaEscala) cur.requireJanelaPlantao = true;
+  }
+
+  for (const em of meuRows) {
+    const sgId = em.equipe.subgrupoId;
+    const sg = em.equipe.subgrupo;
+    if (!sgId || !sg) continue;
+    for (const [escalaId, subIds] of subgruposPorEscala) {
+      if (!subIds.has(sgId)) continue;
+      const cur = out.get(escalaId);
+      if (!cur) continue;
+      if (sg.usaPonto) cur.allowPonto = true;
+      if (sg.usaPonto && sg.usaEscala) cur.requireJanelaPlantao = true;
+    }
+  }
+
   return out;
 }

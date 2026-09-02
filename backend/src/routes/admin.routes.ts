@@ -38,6 +38,7 @@ import {
   salvarMatrizAcessosModulosController,
   listContratosAtivosController,
   listMedicosController,
+  listMedicosFiltrosResumoController,
   getMedicoDetalheAdminController,
   downloadMedicoDocumentoPerfilAdminController,
   listDocusealPendentesController,
@@ -116,11 +117,14 @@ import {
   validateListJustificativasAdminQuery,
   validateAceitarJustificativaAusenciaPonto,
   validateRecusarJustificativaAusenciaPonto,
+  validateCriarJustificativaAusenciaPonto,
   validateCreatePerfilAcesso,
   validateUpdatePerfilAcesso,
 } from '../middleware/validation.middleware';
 import {
   listJustificativasAdminController,
+  listPlantoesSemPontoAdminController,
+  criarEAceitarJustificativaAdminController,
   aceitarJustificativaController,
   recusarJustificativaController,
 } from '../controllers/justificativa-ausencia-ponto.controller';
@@ -143,6 +147,7 @@ const router = Router();
 router.use(authenticateToken);
 router.use(requireRole([UserRole.MASTER]));
 
+router.get('/medicos/filtros-resumo', requireModuleAccess(ModuloSistema.MEDICOS), listMedicosFiltrosResumoController);
 router.get('/medicos', requireModuleAccess(ModuloSistema.MEDICOS), listMedicosController);
 router.get(
   '/medicos/:id',
@@ -315,6 +320,17 @@ router.get('/config-ponto/opcoes', requireModuleAccess(ModuloSistema.PONTO_ELETR
 router.get('/config-ponto', requireModuleAccess(ModuloSistema.PONTO_ELETRONICO), getConfigPontoController);
 router.put('/config-ponto', requireModuleAccess(ModuloSistema.PONTO_ELETRONICO), validateSetConfigPonto, setConfigPontoController);
 
+router.post(
+  '/justificativas-ausencia/criar-e-aceitar',
+  requireModuleAccess(ModuloSistema.PONTO_ELETRONICO),
+  validateCriarJustificativaAusenciaPonto,
+  criarEAceitarJustificativaAdminController
+);
+router.get(
+  '/justificativas-ausencia/plantoes-sem-ponto',
+  requireModuleAccess(ModuloSistema.PONTO_ELETRONICO),
+  listPlantoesSemPontoAdminController
+);
 router.get(
   '/justificativas-ausencia',
   requireModuleAccess(ModuloSistema.PONTO_ELETRONICO),

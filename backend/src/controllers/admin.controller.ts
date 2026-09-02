@@ -36,6 +36,7 @@ import {
   listRegistrosPontoAdminService,
   listContratosAtivosService,
   listMedicosService,
+  listMedicosFiltrosResumoService,
   getMedicoDetalheAdminService,
   removerEscalaPlantaoService,
   removerMedicoEscalaService,
@@ -83,6 +84,22 @@ import {
 import { listPlantoesSomenteEscalaRelatorioService } from '../services/relatorio-plantoes-somente-escala.service';
 import { ModuloSistema, UserRole } from '@prisma/client';
 
+export const listMedicosFiltrosResumoController = async (req: Request, res: Response) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ success: false, error: 'Não autenticado' });
+    }
+    const search = req.query.search ? String(req.query.search) : undefined;
+    const data = await listMedicosFiltrosResumoService(req.user.tenantId, search);
+    return res.status(200).json({ success: true, data });
+  } catch (error: any) {
+    return res.status(error.statusCode || 500).json({
+      success: false,
+      error: error.message || 'Erro ao carregar resumo de filtros',
+    });
+  }
+};
+
 export const listMedicosController = async (req: Request, res: Response) => {
   try {
     if (!req.user) {
@@ -93,6 +110,15 @@ export const listMedicosController = async (req: Request, res: Response) => {
     const limit = req.query.limit ? parseInt(String(req.query.limit), 10) : 10;
     const search = req.query.search ? String(req.query.search) : undefined;
     const ativo = req.query.ativo === 'true' ? true : req.query.ativo === 'false' ? false : undefined;
+    const semEquipe = req.query.semEquipe === 'true' ? true : undefined;
+    const equipeId = req.query.equipeId ? String(req.query.equipeId) : undefined;
+    const profissao = req.query.profissao ? String(req.query.profissao) : undefined;
+    const cadastroRaw = req.query.cadastroDesdeDias ? parseInt(String(req.query.cadastroDesdeDias), 10) : undefined;
+    const cadastroDesdeDias =
+      cadastroRaw != null && Number.isFinite(cadastroRaw) && cadastroRaw > 0 ? cadastroRaw : undefined;
+    const cadastroInicio = req.query.cadastroInicio ? String(req.query.cadastroInicio).trim() : undefined;
+    const cadastroFim = req.query.cadastroFim ? String(req.query.cadastroFim).trim() : undefined;
+    const orderBy = req.query.orderBy === 'createdAt_desc' ? 'createdAt_desc' : 'nome_asc';
 
     const result = await listMedicosService({
       tenantId: req.user.tenantId,
@@ -100,6 +126,13 @@ export const listMedicosController = async (req: Request, res: Response) => {
       limit,
       search,
       ativo,
+      semEquipe,
+      equipeId,
+      profissao,
+      cadastroDesdeDias,
+      cadastroInicio: cadastroInicio || undefined,
+      cadastroFim: cadastroFim || undefined,
+      orderBy,
     });
 
     return res.status(200).json({

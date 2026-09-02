@@ -13,6 +13,15 @@ import {
 import { intervaloDiaCivil } from './justificativa-ausencia-ponto.dia';
 import { resolverValorCheioPlantao } from './justificativa-ausencia-ponto.valor';
 import { criarNotificacaoComPush, TIPO_NOTIFICACAO } from './notificacao-medico.service';
+import {
+  batchEscalaRequerPontoPlantao,
+  plantaoExigePontoNoPlantao,
+} from '../utils/escala-requer-ponto.util';
+import {
+  dataCivilSaoPaulo,
+  inicioDiaCivilSaoPauloAsUtcDate,
+  subtractDiasFromYmd,
+} from '../utils/sao-paulo-data.util';
 
 type DbClient = Prisma.TransactionClient | typeof prisma;
 
@@ -122,7 +131,8 @@ async function assertPlantaoElegivelParaCriar(
   }
 
   const prod = await resolveProducaoMedicoNaEscala(tenantId, medicoId, plantao.escalaId);
-  if (!prod.allowPonto || !prod.requireJanelaPlantao) {
+  const escalaRequer = await batchEscalaRequerPontoPlantao(tenantId, [plantao.escalaId]);
+  if (!plantaoExigePontoNoPlantao(prod, escalaRequer.get(plantao.escalaId) === true, { alocadoNaGrade: true })) {
     throwHttp(403, 'Justificativa de ausência não está disponível para este vínculo de escala');
   }
 
@@ -156,11 +166,16 @@ export async function listPlantoesElegiveisJustificativa(tenantId: string, medic
   if (plantoes.length === 0) return [];
 
   const escalaIds = [...new Set(plantoes.map((p) => p.escalaId))];
-  const prodMap = await batchResolveProducaoMedicoNasEscalas(tenantId, medicoId, escalaIds);
+  const [prodMap, escalaRequerPonto] = await Promise.all([
+    batchResolveProducaoMedicoNasEscalas(tenantId, medicoId, escalaIds),
+    batchEscalaRequerPontoPlantao(tenantId, escalaIds),
+  ]);
 
   const candidatos = plantoes.filter((p) => {
     const prod = prodMap.get(p.escalaId);
-    return Boolean(prod?.allowPonto && prod?.requireJanelaPlantao);
+    return plantaoExigePontoNoPlantao(prod, escalaRequerPonto.get(p.escalaId) === true, {
+      alocadoNaGrade: true,
+    });
   });
   if (candidatos.length === 0) return [];
 
@@ -235,6 +250,8 @@ export async function listPlantoesElegiveisJustificativa(tenantId: string, medic
 
     const schedule = await resolveScheduleForPlantao(tenantId, p, tiposByContrato);
     const oficial = horarioOficialFromSchedule(p, schedule);
+    if (oficial.horarioOficialInicio.getTime() > Date.now()) continue;
+
     elegiveis.push({
       id: p.id,
       escalaId: p.escalaId,
@@ -247,6 +264,289 @@ export async function listPlantoesElegiveisJustificativa(tenantId: string, medic
   }
 
   return elegiveis;
+}
+
+export type PlantaoSemPontoAdminItem = {
+  escalaPlantaoId: string;
+  medicoId: string;
+  medicoNome: string;
+  medicoCrm: string | null;
+  escalaId: string;
+  escalaNome: string;
+  data: Date;
+  gradeId: string;
+  situacaoPonto: 'NENHUM' | 'SO_ENTRADA';
+  checkInAt: Date | null;
+  horarioOficialInicio: Date;
+  horarioOficialFim: Date;
+  justificativaPendenteId: string | null;
+  justificativaPendente: {
+    id: string;
+    horarioAlegadoEntrada: Date;
+    horarioAlegadoSaida: Date;
+    motivo: string;
+  } | null;
+};
+
+/**
+ * Plantões recentes sem ponto fechado (visão Master): quem não bateu ponto e em qual escala.
+ * Inclui quem já tem justificativa PENDENTE (flag); exclui ACEITA (já resolvido).
+ */
+export async function listPlantoesSemPontoAdmin(
+  tenantId: string,
+  opts: { dias?: number; escalaId?: string } = {}
+): Promise<PlantaoSemPontoAdminItem[]> {
+  const dias = Math.min(Math.max(opts.dias ?? 30, 1), 120);
+  const hojeYmd = dataCivilSaoPaulo();
+  const desdeYmd = subtractDiasFromYmd(hojeYmd, dias - 1);
+  const desde = inicioDiaCivilSaoPauloAsUtcDate(desdeYmd);
+  const ate = inicioDiaCivilSaoPauloAsUtcDate(hojeYmd);
+
+  const plantoes = await prisma.escalaPlantao.findMany({
+    where: {
+      tenantId,
+      data: { gte: desde, lte: ate },
+      ...(opts.escalaId ? { escalaId: opts.escalaId } : {}),
+    },
+    select: {
+      id: true,
+      tenantId: true,
+      escalaId: true,
+      medicoId: true,
+      data: true,
+      gradeId: true,
+      medico: { select: { id: true, nomeCompleto: true, crm: true } },
+      escala: { select: { id: true, nome: true, contratoAtivoId: true } },
+    },
+    orderBy: [{ data: 'desc' }, { gradeId: 'asc' }],
+  });
+
+  if (plantoes.length === 0) return [];
+
+  const escalaIds = [...new Set(plantoes.map((p) => p.escalaId))];
+  const escalaRequerPonto = await batchEscalaRequerPontoPlantao(tenantId, escalaIds);
+
+  const medicoIds = [...new Set(plantoes.map((p) => p.medicoId))];
+  const prodByMedicoEscala = new Map<string, { allowPonto: boolean; requireJanelaPlantao: boolean }>();
+  for (const mid of medicoIds) {
+    const escIds = [...new Set(plantoes.filter((p) => p.medicoId === mid).map((p) => p.escalaId))];
+    const prodMap = await batchResolveProducaoMedicoNasEscalas(tenantId, mid, escIds);
+    for (const [escalaId, prod] of prodMap) {
+      prodByMedicoEscala.set(`${mid}::${escalaId}`, prod);
+    }
+  }
+
+  const candidatos = plantoes.filter((p) => {
+    const prod = prodByMedicoEscala.get(`${p.medicoId}::${p.escalaId}`);
+    return plantaoExigePontoNoPlantao(prod, escalaRequerPonto.get(p.escalaId) === true, {
+      alocadoNaGrade: true,
+    });
+  });
+  if (candidatos.length === 0) return [];
+
+  const plantaoIds = candidatos.map((p) => p.id);
+  const justificativas = await prisma.justificativaAusenciaPonto.findMany({
+    where: {
+      escalaPlantaoId: { in: plantaoIds },
+      status: { in: ['PENDENTE', 'ACEITA'] },
+    },
+    select: {
+      id: true,
+      escalaPlantaoId: true,
+      status: true,
+      horarioAlegadoEntrada: true,
+      horarioAlegadoSaida: true,
+      motivo: true,
+    },
+  });
+  const justPendentePorPlantao = new Map<
+    string,
+    { id: string; horarioAlegadoEntrada: Date; horarioAlegadoSaida: Date; motivo: string }
+  >();
+  const aceitaPlantaoIds = new Set<string>();
+  for (const j of justificativas) {
+    if (j.status === 'ACEITA') aceitaPlantaoIds.add(j.escalaPlantaoId);
+    else if (j.status === 'PENDENTE') {
+      justPendentePorPlantao.set(j.escalaPlantaoId, {
+        id: j.id,
+        horarioAlegadoEntrada: j.horarioAlegadoEntrada,
+        horarioAlegadoSaida: j.horarioAlegadoSaida,
+        motivo: j.motivo,
+      });
+    }
+  }
+
+  const diasIntervalos = candidatos.map((p) => intervaloDiaCivilPlantao(p.data));
+  const gte = new Date(Math.min(...diasIntervalos.map((d) => d.gte.getTime())));
+  const lte = new Date(Math.max(...diasIntervalos.map((d) => d.lte.getTime())));
+
+  const pontosNoPeriodo = await prisma.registroPonto.findMany({
+    where: {
+      tenantId,
+      medicoId: { in: medicoIds },
+      escalaId: { in: [...new Set(candidatos.map((p) => p.escalaId))] },
+      checkInAt: { gte, lte },
+    },
+    select: { medicoId: true, escalaId: true, checkInAt: true, checkOutAt: true },
+    orderBy: { checkInAt: 'desc' },
+  });
+
+  const contratoIds = [
+    ...new Set(candidatos.map((p) => p.escala.contratoAtivoId).filter(Boolean) as string[]),
+  ];
+  const tiposRows =
+    contratoIds.length > 0
+      ? await prisma.tipoPlantao.findMany({
+          where: { tenantId, contratoAtivoId: { in: contratoIds } },
+          select: {
+            id: true,
+            contratoAtivoId: true,
+            horaInicio: true,
+            horaFim: true,
+            cruzaMeiaNoite: true,
+          },
+        })
+      : [];
+  const tiposByContrato = new Map<
+    string,
+    Array<{ id: string; horaInicio: string; horaFim: string; cruzaMeiaNoite: boolean }>
+  >();
+  for (const t of tiposRows) {
+    const list = tiposByContrato.get(t.contratoAtivoId) ?? [];
+    list.push(t);
+    tiposByContrato.set(t.contratoAtivoId, list);
+  }
+
+  const resultado: PlantaoSemPontoAdminItem[] = [];
+  for (const p of candidatos) {
+    if (aceitaPlantaoIds.has(p.id)) continue;
+
+    const dia = intervaloDiaCivilPlantao(p.data);
+    const pontosDoDia = pontosNoPeriodo.filter((r) => {
+      if (r.medicoId !== p.medicoId || r.escalaId !== p.escalaId) return false;
+      const t = r.checkInAt.getTime();
+      return t >= dia.gte.getTime() && t <= dia.lte.getTime();
+    });
+
+    const temFechado = pontosDoDia.some((r) => r.checkOutAt != null);
+    if (temFechado) continue;
+
+    const aberto = pontosDoDia.find((r) => r.checkOutAt == null);
+    const situacaoPonto = aberto ? ('SO_ENTRADA' as const) : ('NENHUM' as const);
+
+    const plantaoRow: PlantaoElegivelRow = {
+      id: p.id,
+      tenantId: p.tenantId,
+      escalaId: p.escalaId,
+      medicoId: p.medicoId,
+      data: p.data,
+      gradeId: p.gradeId,
+      escala: { contratoAtivoId: p.escala.contratoAtivoId },
+    };
+    const schedule = await resolveScheduleForPlantao(tenantId, plantaoRow, tiposByContrato);
+    const oficial = horarioOficialFromSchedule(p, schedule);
+    if (oficial.horarioOficialInicio.getTime() > Date.now()) continue;
+
+    const pendente = justPendentePorPlantao.get(p.id) ?? null;
+    resultado.push({
+      escalaPlantaoId: p.id,
+      medicoId: p.medicoId,
+      medicoNome: p.medico.nomeCompleto,
+      medicoCrm: p.medico.crm,
+      escalaId: p.escalaId,
+      escalaNome: p.escala.nome,
+      data: p.data,
+      gradeId: p.gradeId,
+      situacaoPonto,
+      checkInAt: aberto?.checkInAt ?? null,
+      horarioOficialInicio: oficial.horarioOficialInicio,
+      horarioOficialFim: oficial.horarioOficialFim,
+      justificativaPendenteId: pendente?.id ?? null,
+      justificativaPendente: pendente,
+    });
+  }
+
+  return resultado;
+}
+
+async function assertPlantaoElegivelParaAdmin(
+  tenantId: string,
+  plantao: PlantaoElegivelRow,
+  escalaRequerPonto: boolean
+): Promise<void> {
+  const prod = await resolveProducaoMedicoNaEscala(tenantId, plantao.medicoId, plantao.escalaId);
+  if (!plantaoExigePontoNoPlantao(prod, escalaRequerPonto, { alocadoNaGrade: true })) {
+    throwHttp(403, 'Justificativa de ausência não está disponível para este plantão');
+  }
+
+  if (await temPontoFechadoNoDia(tenantId, plantao.medicoId, plantao.escalaId, plantao.data)) {
+    throwHttp(409, 'Já existe ponto fechado para esta escala no dia do plantão');
+  }
+
+  if (await temJustificativaBloqueante(plantao.id)) {
+    throwHttp(409, 'Já existe justificativa pendente ou aceita para este plantão');
+  }
+}
+
+/** Master registra e aceita justificativa para plantão sem pedido do profissional. */
+export async function criarEAceitarJustificativaAdmin(
+  tenantId: string,
+  masterId: string,
+  input: CriarJustificativaAusenciaPontoInput
+) {
+  const motivo = String(input.motivo ?? '').trim();
+  if (motivo.length < 10) {
+    throwHttp(400, 'O motivo deve ter no mínimo 10 caracteres');
+  }
+
+  const entrada = new Date(input.horarioAlegadoEntrada);
+  const saida = new Date(input.horarioAlegadoSaida);
+  if (!(saida.getTime() > entrada.getTime())) {
+    throwHttp(400, 'Horário de saída deve ser posterior ao de entrada');
+  }
+
+  const plantao = (await prisma.escalaPlantao.findFirst({
+    where: { id: input.escalaPlantaoId, tenantId },
+    select: {
+      id: true,
+      tenantId: true,
+      escalaId: true,
+      medicoId: true,
+      data: true,
+      gradeId: true,
+      escala: { select: { contratoAtivoId: true } },
+    },
+  })) as PlantaoElegivelRow | null;
+
+  if (!plantao) {
+    throwHttp(404, 'Plantão não encontrado');
+  }
+
+  const escalaRequer = await batchEscalaRequerPontoPlantao(tenantId, [plantao.escalaId]);
+  await assertPlantaoElegivelParaAdmin(tenantId, plantao, escalaRequer.get(plantao.escalaId) === true);
+
+  const schedule = await resolveScheduleForPlantao(tenantId, plantao);
+  const { horarioOficialInicio, horarioOficialFim } = horarioOficialFromSchedule(plantao, schedule);
+
+  const criada = await prisma.justificativaAusenciaPonto.create({
+    data: {
+      tenantId,
+      medicoId: plantao.medicoId,
+      escalaId: plantao.escalaId,
+      escalaPlantaoId: plantao.id,
+      horarioOficialInicio,
+      horarioOficialFim,
+      horarioAlegadoEntrada: entrada,
+      horarioAlegadoSaida: saida,
+      motivo,
+      status: 'PENDENTE',
+    },
+  });
+
+  return aceitarJustificativa(tenantId, masterId, criada.id, {
+    horarioAlegadoEntrada: entrada,
+    horarioAlegadoSaida: saida,
+  });
 }
 
 export async function criarJustificativaAusenciaPonto(

@@ -1,10 +1,12 @@
 import { Request, Response } from 'express';
 import {
   aceitarJustificativa,
+  criarEAceitarJustificativaAdmin,
   criarJustificativaAusenciaPonto,
   listJustificativasAdmin,
   listMinhasJustificativas,
   listPlantoesElegiveisJustificativa,
+  listPlantoesSemPontoAdmin,
   recusarJustificativa,
 } from '../services/justificativa-ausencia-ponto.service';
 
@@ -78,6 +80,48 @@ export const listJustificativasAdminController = async (req: Request, res: Respo
     return res.status(error.statusCode || 500).json({
       success: false,
       error: error.message || 'Erro ao listar justificativas',
+    });
+  }
+};
+
+export const listPlantoesSemPontoAdminController = async (req: Request, res: Response) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ success: false, error: 'Não autenticado' });
+    }
+    const diasRaw = req.query.dias ? parseInt(String(req.query.dias), 10) : undefined;
+    const dias = diasRaw != null && Number.isFinite(diasRaw) ? diasRaw : undefined;
+    const escalaId = req.query.escalaId ? String(req.query.escalaId) : undefined;
+    const data = await listPlantoesSemPontoAdmin(req.user.tenantId, { dias, escalaId });
+    return res.status(200).json({ success: true, data });
+  } catch (error: any) {
+    return res.status(error.statusCode || 500).json({
+      success: false,
+      error: error.message || 'Erro ao listar plantões sem ponto',
+    });
+  }
+};
+
+export const criarEAceitarJustificativaAdminController = async (req: Request, res: Response) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ success: false, error: 'Não autenticado' });
+    }
+    const data = await criarEAceitarJustificativaAdmin(req.user.tenantId, req.user.id, {
+      escalaPlantaoId: String(req.body.escalaPlantaoId),
+      horarioAlegadoEntrada: new Date(req.body.horarioAlegadoEntrada),
+      horarioAlegadoSaida: new Date(req.body.horarioAlegadoSaida),
+      motivo: String(req.body.motivo),
+    });
+    return res.status(200).json({
+      success: true,
+      data,
+      message: 'Justificativa registrada e aceita com sucesso',
+    });
+  } catch (error: any) {
+    return res.status(error.statusCode || 500).json({
+      success: false,
+      error: error.message || 'Erro ao registrar justificativa',
     });
   }
 };

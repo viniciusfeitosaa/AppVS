@@ -89,6 +89,28 @@ export interface JustificativaAusenciaAdminItem {
   } | null;
 }
 
+export interface PlantaoSemPontoAdminItem {
+  escalaPlantaoId: string;
+  medicoId: string;
+  medicoNome: string;
+  medicoCrm: string | null;
+  escalaId: string;
+  escalaNome: string;
+  data: string;
+  gradeId: string;
+  situacaoPonto: 'NENHUM' | 'SO_ENTRADA';
+  checkInAt: string | null;
+  horarioOficialInicio: string;
+  horarioOficialFim: string;
+  justificativaPendenteId: string | null;
+  justificativaPendente: {
+    id: string;
+    horarioAlegadoEntrada: string;
+    horarioAlegadoSaida: string;
+    motivo: string;
+  } | null;
+}
+
 export interface CadastroPendenteListItem {
   id: string;
   nomeCompleto: string;
@@ -420,6 +442,8 @@ export interface DocusealDocumentoPainelItem {
   submissionId: number | null;
   submitterId: number | null;
   signUrl: string | null;
+  secondSubmitterId: number | null;
+  secondSignUrl: string | null;
   signerStatus: string | null;
   signedDocumentUrl: string | null;
   auditLogUrl: string | null;
@@ -466,6 +490,31 @@ interface ListMedicosResponse {
     total: number;
     totalPages: number;
   };
+}
+
+export type MedicosListOrderBy = 'nome_asc' | 'createdAt_desc';
+
+export interface MedicosFiltrosResumo {
+  total: number;
+  ativos: number;
+  inativos: number;
+  semEquipe: number;
+  novos30d: number;
+  novos7d: number;
+}
+
+export interface ListMedicosQuery {
+  page?: number;
+  limit?: number;
+  search?: string;
+  ativo?: boolean;
+  semEquipe?: boolean;
+  equipeId?: string;
+  profissao?: string;
+  cadastroDesdeDias?: number;
+  cadastroInicio?: string;
+  cadastroFim?: string;
+  orderBy?: MedicosListOrderBy;
 }
 
 interface ListContratosAtivosResponse {
@@ -544,10 +593,18 @@ export interface ProcedimentosBaseApiResponse {
 }
 
 export const adminService = {
-  listMedicos: async (params?: { page?: number; limit?: number; search?: string; ativo?: boolean }) => {
+  listMedicos: async (params?: ListMedicosQuery) => {
     const response = await api.get<ListMedicosResponse>('/admin/medicos', {
       params,
     });
+    return response.data;
+  },
+
+  listMedicosFiltrosResumo: async (search?: string) => {
+    const response = await api.get<{ success: boolean; data: MedicosFiltrosResumo }>(
+      '/admin/medicos/filtros-resumo',
+      { params: search ? { search } : undefined }
+    );
     return response.data;
   },
 
@@ -1171,6 +1228,14 @@ export const adminService = {
     return response.data;
   },
 
+  listPlantoesSemPontoAdmin: async (params?: { dias?: number; escalaId?: string }) => {
+    const response = await api.get<{
+      success: boolean;
+      data: PlantaoSemPontoAdminItem[];
+    }>('/admin/justificativas-ausencia/plantoes-sem-ponto', { params });
+    return response.data;
+  },
+
   aceitarJustificativaAusencia: async (
     id: string,
     payload?: {
@@ -1192,6 +1257,20 @@ export const adminService = {
       message?: string;
       data: JustificativaAusenciaAdminItem;
     }>(`/admin/justificativas-ausencia/${id}/recusar`, payload ?? {});
+    return response.data;
+  },
+
+  criarEAceitarJustificativaAusencia: async (payload: {
+    escalaPlantaoId: string;
+    horarioAlegadoEntrada: string;
+    horarioAlegadoSaida: string;
+    motivo: string;
+  }) => {
+    const response = await api.post<{
+      success: boolean;
+      message?: string;
+      data: JustificativaAusenciaAdminItem;
+    }>('/admin/justificativas-ausencia/criar-e-aceitar', payload);
     return response.data;
   },
 

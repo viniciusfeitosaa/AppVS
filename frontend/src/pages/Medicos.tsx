@@ -48,7 +48,66 @@ function DocusealDocDownloadLinks({ doc }: { doc: DocusealDocumentoPainelItem })
   );
 }
 
+function DocusealSegundaParteActions({
+  doc,
+  resendPending,
+  resendSubmitterId,
+  onResend,
+}: {
+  doc: DocusealDocumentoPainelItem;
+  resendPending: boolean;
+  resendSubmitterId: number | null | undefined;
+  onResend: (submitterId: number) => void;
+}) {
+  if (doc.status !== 'pendente_outros') return null;
+  return (
+    <>
+      {doc.secondSignUrl ? (
+        <a
+          href={doc.secondSignUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="btn-sm btn-primary inline-flex"
+        >
+          Assinar (2.ª parte)
+        </a>
+      ) : null}
+      {doc.secondSubmitterId != null && doc.secondSubmitterId > 0 ? (
+        <button
+          type="button"
+          className="btn-sm btn-secondary"
+          disabled={resendPending}
+          onClick={() => onResend(doc.secondSubmitterId!)}
+        >
+          {resendPending && resendSubmitterId === doc.secondSubmitterId ? 'A enviar…' : 'Reenviar e-mail (2.ª parte)'}
+        </button>
+      ) : null}
+    </>
+  );
+}
+
 const PAGE_SIZE = 20;
+
+function toYmdLocal(d: Date): string {
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+function todayYmdLocal(): string {
+  return toYmdLocal(new Date());
+}
+
+function daysAgoYmdLocal(days: number): string {
+  const d = new Date();
+  d.setDate(d.getDate() - days);
+  return toYmdLocal(d);
+}
+
+function formatYmdBr(ymd: string): string {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(ymd);
+  if (!m) return ymd;
+  return `${m[3]}/${m[2]}/${m[1]}`;
+}
 
 /** Nomes de contratos ligados ao subgrupo e/ou à equipe (únicos, ordem de aparição). */
 function nomesContratosEquipe(eq: Equipe): string[] {
@@ -96,6 +155,8 @@ function formatBytes(n: number) {
 }
 
 type StatusFilter = 'all' | 'active' | 'inactive';
+type QuickChipId = 'all' | 'active' | 'inactive' | 'sem_equipe' | 'novos_30' | 'novos_7';
+type OrderByFilter = 'nome_asc' | 'createdAt_desc';
 
 const Medicos = () => {
   const { user } = useAuth();
@@ -105,6 +166,13 @@ const Medicos = () => {
   const [search, setSearch] = useState('');
   const [searchInput, setSearchInput] = useState('');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
+  const [semEquipe, setSemEquipe] = useState(false);
+  const [equipeIdFiltro, setEquipeIdFiltro] = useState('');
+  const [profissaoFiltro, setProfissaoFiltro] = useState('');
+  const [cadastroInicioFiltro, setCadastroInicioFiltro] = useState('');
+  const [cadastroFimFiltro, setCadastroFimFiltro] = useState('');
+  const [orderBy, setOrderBy] = useState<OrderByFilter>('nome_asc');
+  const [advancedOpen, setAdvancedOpen] = useState(false);
   const [selectedMedico, setSelectedMedico] = useState<AdminMedico | null>(null);
   const [pontoModalOpen, setPontoModalOpen] = useState(false);
   const [dadosModalOpen, setDadosModalOpen] = useState(false);
@@ -120,16 +188,61 @@ const Medicos = () => {
   const ativoParam =
     statusFilter === 'all' ? undefined : statusFilter === 'active';
 
+  const listQueryParams = useMemo(
+    () => ({
+      page,
+      limit: PAGE_SIZE,
+      search: search || undefined,
+      ativo: ativoParam,
+      semEquipe: semEquipe || undefined,
+      equipeId: equipeIdFiltro || undefined,
+      profissao: profissaoFiltro.trim() || undefined,
+      cadastroInicio: cadastroInicioFiltro || undefined,
+      cadastroFim: cadastroFimFiltro || undefined,
+      orderBy,
+    }),
+    [
+      page,
+      search,
+      ativoParam,
+      semEquipe,
+      equipeIdFiltro,
+      profissaoFiltro,
+      cadastroInicioFiltro,
+      cadastroFimFiltro,
+      orderBy,
+    ]
+  );
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      const trimmed = searchInput.trim();
+      setSearch((prev) => {
+        if (prev !== trimmed) setPage(1);
+        return trimmed;
+      });
+    }, 400);
+    return () => window.clearTimeout(timer);
+  }, [searchInput]);
+
   const { data, isLoading } = useQuery({
-    queryKey: ['admin', 'medicos', user?.id, page, search, statusFilter],
-    queryFn: () =>
-      adminService.listMedicos({
-        page,
-        limit: PAGE_SIZE,
-        search: search || undefined,
-        ativo: ativoParam,
-      }),
+    queryKey: ['admin', 'medicos', user?.id, listQueryParams],
+    queryFn: () => adminService.listMedicos(listQueryParams),
     enabled: !!user && isMaster,
+  });
+
+  const { data: filtrosResumoResp } = useQuery({
+    queryKey: ['admin', 'medicos-filtros-resumo', user?.id, search],
+    queryFn: () => adminService.listMedicosFiltrosResumo(search || undefined),
+    enabled: !!user && isMaster,
+    staleTime: 30 * 1000,
+  });
+
+  const { data: equipesFiltroResp } = useQuery({
+    queryKey: ['admin', 'equipes', 'filtro-medicos', user?.id],
+    queryFn: () => adminService.listEquipes(),
+    enabled: !!user && isMaster,
+    staleTime: 60 * 1000,
   });
 
   const medicos = useMemo(() => (data?.data || []) as AdminMedico[], [data?.data]);
@@ -213,12 +326,18 @@ const Medicos = () => {
   );
   const emailsPaginaKey = useMemo(() => [...emailsPagina].sort().join('|'), [emailsPagina]);
 
-  const { data: docusealResumoResp, isLoading: loadingDocusealResumo } = useQuery({
-    queryKey: ['admin', 'docuseal-resumo-emails', user?.id, page, search, statusFilter, emailsPaginaKey],
+  const { data: docusealResumoResp, isLoading: loadingDocusealResumo, refetch: refetchDocusealResumo } = useQuery({
+    queryKey: ['admin', 'docuseal-resumo-emails', user?.id, emailsPaginaKey],
     queryFn: () => adminService.docusealResumoPorEmails(emailsPagina),
     enabled: !!user && isMaster && !isLoading && emailsPagina.length > 0,
-    staleTime: 45 * 1000,
+    staleTime: 90 * 1000,
+    refetchOnWindowFocus: true,
   });
+
+  const closeDocusealModal = () => {
+    setDocusealModalMedico(null);
+    void refetchDocusealResumo();
+  };
 
   const { data: painelDocResp, isLoading: loadingPainelDoc } = useQuery({
     queryKey: ['admin', 'medico-docuseal-docs', user?.id, docusealModalMedico?.id],
@@ -277,14 +396,220 @@ const Medicos = () => {
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    setSearch(searchInput.trim());
+    const trimmed = searchInput.trim();
+    setSearch(trimmed);
     setPage(1);
   };
 
-  const handleStatusChange = (value: StatusFilter) => {
-    setStatusFilter(value);
+  const filtrosResumo = filtrosResumoResp?.data;
+
+  const equipesFiltroOrdenadas = useMemo(() => {
+    const raw = equipesFiltroResp?.data ?? [];
+    return [...raw].sort((a, b) => {
+      const sa = fixMojibake(a.subgrupo?.nome ?? '\uffff');
+      const sb = fixMojibake(b.subgrupo?.nome ?? '\uffff');
+      if (sa !== sb) return sa.localeCompare(sb, 'pt-BR', { sensitivity: 'base' });
+      return fixMojibake(a.nome).localeCompare(fixMojibake(b.nome), 'pt-BR', { sensitivity: 'base' });
+    });
+  }, [equipesFiltroResp?.data]);
+
+  const highlightedChip = useMemo((): QuickChipId | null => {
+    if (equipeIdFiltro || profissaoFiltro.trim()) return null;
+    const hoje = todayYmdLocal();
+    if (semEquipe && statusFilter === 'all' && !cadastroInicioFiltro && !cadastroFimFiltro && orderBy === 'nome_asc') return 'sem_equipe';
+    if (
+      cadastroInicioFiltro === daysAgoYmdLocal(30) &&
+      cadastroFimFiltro === hoje &&
+      statusFilter === 'all' &&
+      !semEquipe &&
+      orderBy === 'createdAt_desc'
+    ) {
+      return 'novos_30';
+    }
+    if (
+      cadastroInicioFiltro === daysAgoYmdLocal(7) &&
+      cadastroFimFiltro === hoje &&
+      statusFilter === 'all' &&
+      !semEquipe &&
+      orderBy === 'createdAt_desc'
+    ) {
+      return 'novos_7';
+    }
+    if (statusFilter === 'active' && !semEquipe && !cadastroInicioFiltro && !cadastroFimFiltro && orderBy === 'nome_asc') return 'active';
+    if (statusFilter === 'inactive' && !semEquipe && !cadastroInicioFiltro && !cadastroFimFiltro && orderBy === 'nome_asc') return 'inactive';
+    if (statusFilter === 'all' && !semEquipe && !cadastroInicioFiltro && !cadastroFimFiltro && orderBy === 'nome_asc') return 'all';
+    return null;
+  }, [statusFilter, semEquipe, equipeIdFiltro, profissaoFiltro, cadastroInicioFiltro, cadastroFimFiltro, orderBy]);
+
+  const hasActiveFilters =
+    !!search ||
+    statusFilter !== 'all' ||
+    semEquipe ||
+    !!equipeIdFiltro ||
+    !!profissaoFiltro.trim() ||
+    !!cadastroInicioFiltro ||
+    !!cadastroFimFiltro ||
+    orderBy !== 'nome_asc';
+
+  const applyCadastroRange = (inicio: string, fim: string) => {
+    setCadastroInicioFiltro(inicio);
+    setCadastroFimFiltro(fim);
+    if (inicio || fim) setOrderBy('createdAt_desc');
     setPage(1);
   };
+
+  const clearCadastroRange = () => {
+    setCadastroInicioFiltro('');
+    setCadastroFimFiltro('');
+    setPage(1);
+  };
+
+  const applyQuickChip = (id: QuickChipId) => {
+    setPage(1);
+    setEquipeIdFiltro('');
+    setProfissaoFiltro('');
+    switch (id) {
+      case 'all':
+        setStatusFilter('all');
+        setSemEquipe(false);
+        clearCadastroRange();
+        setOrderBy('nome_asc');
+        break;
+      case 'active':
+        setStatusFilter('active');
+        setSemEquipe(false);
+        clearCadastroRange();
+        setOrderBy('nome_asc');
+        break;
+      case 'inactive':
+        setStatusFilter('inactive');
+        setSemEquipe(false);
+        clearCadastroRange();
+        setOrderBy('nome_asc');
+        break;
+      case 'sem_equipe':
+        setStatusFilter('all');
+        setSemEquipe(true);
+        clearCadastroRange();
+        setOrderBy('nome_asc');
+        break;
+      case 'novos_30':
+        setStatusFilter('all');
+        setSemEquipe(false);
+        applyCadastroRange(daysAgoYmdLocal(30), todayYmdLocal());
+        break;
+      case 'novos_7':
+        setStatusFilter('all');
+        setSemEquipe(false);
+        applyCadastroRange(daysAgoYmdLocal(7), todayYmdLocal());
+        break;
+    }
+  };
+
+  const clearAllFilters = () => {
+    setSearchInput('');
+    setSearch('');
+    setStatusFilter('all');
+    setSemEquipe(false);
+    setEquipeIdFiltro('');
+    setProfissaoFiltro('');
+    setCadastroInicioFiltro('');
+    setCadastroFimFiltro('');
+    setOrderBy('nome_asc');
+    setPage(1);
+  };
+
+  const quickChips: Array<{ id: QuickChipId; label: string; count: number | undefined }> = [
+    { id: 'all', label: 'Todos', count: filtrosResumo?.total },
+    { id: 'active', label: 'Ativos', count: filtrosResumo?.ativos },
+    { id: 'inactive', label: 'Inativos', count: filtrosResumo?.inativos },
+    { id: 'sem_equipe', label: 'Sem equipe', count: filtrosResumo?.semEquipe },
+    { id: 'novos_30', label: 'Novos (30d)', count: filtrosResumo?.novos30d },
+    { id: 'novos_7', label: 'Novos (7d)', count: filtrosResumo?.novos7d },
+  ];
+
+  const equipeFiltroLabel = useMemo(() => {
+    if (!equipeIdFiltro) return '';
+    const eq = equipesFiltroOrdenadas.find((e) => e.id === equipeIdFiltro);
+    if (!eq) return equipeIdFiltro;
+    const sub = eq.subgrupo?.nome ? `${fixMojibake(eq.subgrupo.nome)} · ` : '';
+    return `${sub}${fixMojibake(eq.nome)}`;
+  }, [equipeIdFiltro, equipesFiltroOrdenadas]);
+
+  const activeFilterPills = useMemo(() => {
+    const pills: Array<{ key: string; label: string; onRemove: () => void }> = [];
+    if (statusFilter === 'active') {
+      pills.push({
+        key: 'status-active',
+        label: 'Status: Ativo',
+        onRemove: () => {
+          setStatusFilter('all');
+          setPage(1);
+        },
+      });
+    } else if (statusFilter === 'inactive') {
+      pills.push({
+        key: 'status-inactive',
+        label: 'Status: Inativo',
+        onRemove: () => {
+          setStatusFilter('all');
+          setPage(1);
+        },
+      });
+    }
+    if (semEquipe) {
+      pills.push({
+        key: 'sem-equipe',
+        label: 'Sem equipe',
+        onRemove: () => {
+          setSemEquipe(false);
+          setPage(1);
+        },
+      });
+    }
+    if (equipeIdFiltro) {
+      pills.push({
+        key: 'equipe',
+        label: `Equipe: ${equipeFiltroLabel}`,
+        onRemove: () => {
+          setEquipeIdFiltro('');
+          setPage(1);
+        },
+      });
+    }
+    if (profissaoFiltro.trim()) {
+      pills.push({
+        key: 'profissao',
+        label: `Profissão: ${profissaoFiltro.trim()}`,
+        onRemove: () => {
+          setProfissaoFiltro('');
+          setPage(1);
+        },
+      });
+    }
+    if (cadastroInicioFiltro || cadastroFimFiltro) {
+      const inicio = cadastroInicioFiltro ? formatYmdBr(cadastroInicioFiltro) : '…';
+      const fim = cadastroFimFiltro ? formatYmdBr(cadastroFimFiltro) : '…';
+      pills.push({
+        key: 'cadastro',
+        label: `Cadastro: ${inicio} — ${fim}`,
+        onRemove: () => {
+          clearCadastroRange();
+        },
+      });
+    }
+    if (orderBy === 'createdAt_desc') {
+      pills.push({
+        key: 'order',
+        label: 'Ordenação: mais recentes',
+        onRemove: () => {
+          setOrderBy('nome_asc');
+          setPage(1);
+        },
+      });
+    }
+    return pills;
+  }, [statusFilter, semEquipe, equipeIdFiltro, profissaoFiltro, cadastroInicioFiltro, cadastroFimFiltro, orderBy, equipeFiltroLabel]);
 
   const { data: registrosPontoResp, isLoading: loadingPontos } = useQuery({
     queryKey: ['admin', 'registros-ponto', selectedMedico?.id, pontoInicio, pontoFim],
@@ -354,60 +679,213 @@ const Medicos = () => {
       <h2 className="text-2xl font-bold text-viva-900 mb-1">Médicos</h2>
       <p className="text-gray-600 mb-6">Lista de profissionais vinculados ao seu tenant.</p>
 
-      <form
-        onSubmit={handleSearchSubmit}
-        className="mb-6 flex flex-wrap items-center gap-3"
-      >
-        <div className="flex-1 min-w-[200px] flex flex-wrap items-center gap-2">
-          <input
-            type="search"
-            className="input flex-1 min-w-[180px]"
-            placeholder="Pesquisar por nome, CRM ou CPF..."
-            value={searchInput}
-            onChange={(e) => setSearchInput(e.target.value)}
-            aria-label="Pesquisar médicos"
-          />
-          <button type="submit" className="btn btn-primary">
-            Pesquisar
-          </button>
-          {(search || statusFilter !== 'all') && (
-            <button
-              type="button"
-              className="btn btn-secondary"
-              onClick={() => {
-                setSearchInput('');
-                setSearch('');
-                setStatusFilter('all');
-                setPage(1);
-              }}
-            >
-              Limpar
+      <div className="card mb-6">
+        <h3 className="text-lg font-bold text-viva-900 mb-4">Filtros</h3>
+
+        <form onSubmit={handleSearchSubmit} className="mb-4 flex flex-wrap items-center gap-3">
+          <div className="flex-1 min-w-[200px] flex flex-wrap items-center gap-2">
+            <input
+              type="search"
+              className="input flex-1 min-w-[180px]"
+              placeholder="Pesquisar por nome, CRM ou CPF..."
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              aria-label="Pesquisar médicos"
+            />
+            <button type="submit" className="btn btn-primary">
+              Pesquisar
             </button>
-          )}
+            {hasActiveFilters && (
+              <button type="button" className="btn btn-secondary" onClick={clearAllFilters}>
+                Limpar tudo
+              </button>
+            )}
+          </div>
+        </form>
+
+        <div className="mb-4 flex flex-wrap gap-2" role="tablist" aria-label="Filtrar profissionais">
+          {quickChips.map((chip) => {
+            const active = highlightedChip === chip.id;
+            return (
+              <button
+                key={chip.id}
+                type="button"
+                role="tab"
+                aria-selected={active}
+                className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
+                  active
+                    ? 'bg-viva-800 text-white'
+                    : 'border border-viva-200 bg-white text-viva-800 hover:bg-viva-50'
+                }`}
+                onClick={() => applyQuickChip(chip.id)}
+              >
+                {chip.label}
+                {chip.count != null ? (
+                  <span className={`ml-1.5 tabular-nums ${active ? 'text-viva-100' : 'text-viva-500'}`}>
+                    {chip.count}
+                  </span>
+                ) : null}
+              </button>
+            );
+          })}
         </div>
-        <div className="flex items-center gap-2">
-          <label htmlFor="filter-status" className="text-sm font-medium text-viva-800 whitespace-nowrap">
-            Status:
-          </label>
-          <select
-            id="filter-status"
-            className="input w-auto"
-            value={statusFilter}
-            onChange={(e) => handleStatusChange(e.target.value as StatusFilter)}
+
+        {activeFilterPills.length > 0 ? (
+          <div className="mb-4 flex flex-wrap items-center gap-2">
+            <span className="text-xs font-semibold uppercase tracking-wider text-viva-600">Ativos:</span>
+            {activeFilterPills.map((pill) => (
+              <button
+                key={pill.key}
+                type="button"
+                className="inline-flex items-center gap-1 rounded-full border border-viva-200 bg-viva-50 px-2.5 py-1 text-xs font-medium text-viva-800 hover:bg-viva-100"
+                onClick={pill.onRemove}
+                title="Remover filtro"
+              >
+                {pill.label}
+                <span aria-hidden className="text-viva-500">
+                  ×
+                </span>
+              </button>
+            ))}
+          </div>
+        ) : null}
+
+        <div className="border-t border-viva-100 pt-4">
+          <button
+            type="button"
+            className="flex w-full items-center justify-between gap-2 text-left text-sm font-semibold text-viva-800 hover:text-viva-900"
+            aria-expanded={advancedOpen}
+            onClick={() => setAdvancedOpen((v) => !v)}
           >
-            <option value="all">Todos</option>
-            <option value="active">Ativo</option>
-            <option value="inactive">Inativo</option>
-          </select>
+            <span>Filtros avançados</span>
+            <span className="text-viva-500" aria-hidden>
+              {advancedOpen ? '▲' : '▼'}
+            </span>
+          </button>
+
+          {advancedOpen ? (
+            <div className="mt-4 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+              <div>
+                <label htmlFor="filtro-equipe" className="block text-sm font-semibold text-viva-800 mb-1">
+                  Equipe
+                </label>
+                <select
+                  id="filtro-equipe"
+                  className="input"
+                  value={equipeIdFiltro}
+                  onChange={(e) => {
+                    setEquipeIdFiltro(e.target.value);
+                    if (e.target.value) setSemEquipe(false);
+                    setPage(1);
+                  }}
+                >
+                  <option value="">Todas</option>
+                  {equipesFiltroOrdenadas.map((eq) => {
+                    const sub = eq.subgrupo?.nome ? `${fixMojibake(eq.subgrupo.nome)} · ` : '';
+                    return (
+                      <option key={eq.id} value={eq.id}>
+                        {sub}
+                        {fixMojibake(eq.nome)}
+                      </option>
+                    );
+                  })}
+                </select>
+              </div>
+
+              <div>
+                <label htmlFor="filtro-profissao" className="block text-sm font-semibold text-viva-800 mb-1">
+                  Profissão
+                </label>
+                <input
+                  id="filtro-profissao"
+                  type="text"
+                  className="input"
+                  placeholder="Ex.: Médico, Enfermeiro..."
+                  value={profissaoFiltro}
+                  onChange={(e) => {
+                    setProfissaoFiltro(e.target.value);
+                    setPage(1);
+                  }}
+                />
+              </div>
+
+              <div className="md:col-span-2">
+                <p className="block text-sm font-semibold text-viva-800 mb-1">Período de cadastro</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label htmlFor="filtro-cadastro-inicio" className="block text-xs text-viva-600 mb-1">
+                      Início
+                    </label>
+                    <input
+                      id="filtro-cadastro-inicio"
+                      type="date"
+                      className="input"
+                      value={cadastroInicioFiltro}
+                      max={cadastroFimFiltro || undefined}
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        setCadastroInicioFiltro(v);
+                        if (v || cadastroFimFiltro) setOrderBy('createdAt_desc');
+                        setPage(1);
+                      }}
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="filtro-cadastro-fim" className="block text-xs text-viva-600 mb-1">
+                      Fim
+                    </label>
+                    <input
+                      id="filtro-cadastro-fim"
+                      type="date"
+                      className="input"
+                      value={cadastroFimFiltro}
+                      min={cadastroInicioFiltro || undefined}
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        setCadastroFimFiltro(v);
+                        if (v || cadastroInicioFiltro) setOrderBy('createdAt_desc');
+                        setPage(1);
+                      }}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <label htmlFor="filtro-ordenacao" className="block text-sm font-semibold text-viva-800 mb-1">
+                  Ordenar por
+                </label>
+                <select
+                  id="filtro-ordenacao"
+                  className="input"
+                  value={orderBy}
+                  onChange={(e) => {
+                    setOrderBy(e.target.value as OrderByFilter);
+                    setPage(1);
+                  }}
+                >
+                  <option value="nome_asc">Nome (A–Z)</option>
+                  <option value="createdAt_desc">Cadastro (mais recentes)</option>
+                </select>
+              </div>
+            </div>
+          ) : null}
         </div>
-      </form>
+
+        {total > 0 ? (
+          <p className="mt-4 text-sm text-viva-600">
+            {total === 1 ? '1 profissional encontrado' : `${total} profissionais encontrados`}
+            {search ? ` para “${search}”` : ''}
+          </p>
+        ) : null}
+      </div>
 
       {isLoading ? (
         <p className="text-sm text-gray-600">Carregando médicos...</p>
       ) : medicos.length === 0 ? (
         <p className="text-sm text-gray-600">
-          {search || statusFilter !== 'all'
-            ? 'Nenhum médico encontrado com os filtros aplicados. Tente alterar a pesquisa ou o status.'
+          {hasActiveFilters
+            ? 'Nenhum médico encontrado com os filtros aplicados. Tente alterar a pesquisa ou os filtros.'
             : 'Nenhum médico cadastrado para este tenant.'}
         </p>
       ) : (
@@ -616,6 +1094,16 @@ const Medicos = () => {
                                 </button>
                               );
                             }
+                            return (
+                              <button
+                                type="button"
+                                onClick={open}
+                                title="Pedidos de assinatura concluídos nos documentos configurados, ou nada a tratar. Abra para rever o detalhe."
+                                className="text-xs font-semibold text-viva-700 bg-viva-100/90 border border-viva-200/80 rounded-full px-2.5 py-0.5 hover:bg-viva-100 transition"
+                              >
+                                Concluído
+                              </button>
+                            );
                           }
                           if (pend.length > 0) {
                             return (
@@ -879,7 +1367,7 @@ const Medicos = () => {
             role="dialog"
             aria-modal="true"
             aria-labelledby="docuseal-modal-title"
-            onClick={() => setDocusealModalMedico(null)}
+            onClick={closeDocusealModal}
           >
             <div
               className="card w-full max-w-lg border border-viva-200/70 shadow-2xl my-8"
@@ -896,7 +1384,7 @@ const Medicos = () => {
                 <button
                   type="button"
                   className="btn text-sm border border-viva-300 bg-white text-viva-800 shrink-0"
-                  onClick={() => setDocusealModalMedico(null)}
+                  onClick={closeDocusealModal}
                 >
                   Fechar
                 </button>
@@ -1020,6 +1508,12 @@ const Medicos = () => {
                                     : 'Reenviar e-mail'}
                                 </button>
                               ) : null}
+                              <DocusealSegundaParteActions
+                                doc={doc}
+                                resendPending={resendDocusealMutation.isPending}
+                                resendSubmitterId={resendDocusealMutation.variables}
+                                onResend={(submitterId) => resendDocusealMutation.mutate(submitterId)}
+                              />
                               <DocusealDocDownloadLinks doc={doc} />
                             </div>
                           </li>
@@ -1236,6 +1730,12 @@ const Medicos = () => {
                               </div>
                               <div className="mt-2 flex flex-wrap gap-2 items-center">
                                 <DocusealDocDownloadLinks doc={doc} />
+                                <DocusealSegundaParteActions
+                                  doc={doc}
+                                  resendPending={resendDocusealMutation.isPending}
+                                  resendSubmitterId={resendDocusealMutation.variables}
+                                  onResend={(submitterId) => resendDocusealMutation.mutate(submitterId)}
+                                />
                                 {doc.status === 'nao_enviado' ? (
                                   <button
                                     type="button"

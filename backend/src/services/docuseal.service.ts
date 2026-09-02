@@ -121,6 +121,51 @@ function submitterAindaDeveAssinar(s: Record<string, unknown>): boolean {
   return submitterPrecisaAssinar(typeof status === 'string' ? status : null);
 }
 
+function submissionEstaConcluida(row: Record<string, unknown>): boolean {
+  if (temTimestampPreenchido(readKey(row, 'completed_at', 'completedAt'))) return true;
+  const st = readKey(row, 'status', 'Status');
+  if (typeof st === 'string') {
+    const s = st.toLowerCase();
+    if (s === 'completed' || s === 'complete' || s === 'finished') return true;
+  }
+  return false;
+}
+
+/** Todos os signatários concluíram (lista pode vir incompleta no endpoint de pesquisa). */
+function allSubmittersConcluiram(row: Record<string, unknown>): boolean {
+  const submittersRaw = readKey(row, 'submitters', 'Submitters');
+  const arr = Array.isArray(submittersRaw) ? submittersRaw : [];
+  if (arr.length === 0) return false;
+  for (const su of arr) {
+    if (!su || typeof su !== 'object') continue;
+    if (submitterAindaDeveAssinar(su as Record<string, unknown>)) return false;
+  }
+  return true;
+}
+
+async function fetchSubmissionRowById(
+  apiBase: string,
+  token: string,
+  submissionId: number
+): Promise<Record<string, unknown> | null> {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 12000);
+  try {
+    const resp = await fetchWithTimeout(`${apiBase}/submissions/${submissionId}`, {
+      method: 'GET',
+      headers: { 'X-Auth-Token': token },
+      signal: ctrl.signal,
+    });
+    if (!resp.ok) return null;
+    const row = (await resp.json()) as Record<string, unknown>;
+    return row && typeof row === 'object' ? row : null;
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 function parsePaginationNext(raw: unknown): number | undefined {
   if (raw === null || raw === undefined || raw === '') return undefined;
   if (typeof raw === 'number' && Number.isFinite(raw)) return raw;
@@ -412,6 +457,13 @@ export type DocusealResumoPorEmailsResultado = {
   acoesPorEmail: Record<string, DocusealResumoAcaoPorEmail>;
 };
 
+const RESUMO_EMAILS_CACHE_TTL_MS = 45_000;
+const resumoEmailsCache = new Map<string, { at: number; data: DocusealResumoPorEmailsResultado }>();
+
+function resumoEmailsCacheKey(normEmails: string[]): string {
+  return normEmails.slice().sort().join('|');
+}
+
 /**
  * Agrupa documentos pendentes no DocuSeal pelos e-mails dos profissionais desta página.
  * Estratégia em duas camadas (como quando funcionava de forma fiável):
@@ -469,12 +521,21 @@ export async function docusealResumoPorEmailsService(emails: string[]): Promise<
   };
 
   try {
-    const rawPendingGlobal = await fetchTodasSubmissionsPendentes(c.apiBase, c.token);
-    mergePendingGlobalParaNormSet(rawPendingGlobal);
+    const cacheKey = resumoEmailsCacheKey([...normSet]);
+    const cached = resumoEmailsCache.get(cacheKey);
+    if (cached && Date.now() - cached.at < RESUMO_EMAILS_CACHE_TTL_MS) {
+      return cached.data;
+    }
+
+    // Com modelos obrigatórios, a pesquisa por e-mail (?q=) basta — evita varrer todas as pendentes globais.
+    if (!temPainelPorTemplates) {
+      const rawPendingGlobal = await fetchTodasSubmissionsPendentes(c.apiBase, c.token);
+      mergePendingGlobalParaNormSet(rawPendingGlobal);
+    }
 
     const lista = [...normSet];
     let cursor = 0;
-    const conc = Math.min(5, Math.max(1, lista.length));
+    const conc = Math.min(8, Math.max(1, lista.length));
 
     const worker = async () => {
       let wi: number;
@@ -482,7 +543,14 @@ export async function docusealResumoPorEmailsService(emails: string[]): Promise<
         const emailNorm = lista[wi];
         const raw = await fetchSubmissionsPaginated(c.apiBase, c.token, { q: emailNorm });
         if (temPainelPorTemplates) {
-          const docs = documentosPainelFromRaw(raw, emailNorm, c.webBase, requiredTemplates);
+          const docs = await documentosPainelParaEmail(
+            raw,
+            emailNorm,
+            c.webBase,
+            requiredTemplates,
+            c.apiBase,
+            c.token
+          );
           acoesPorEmail[emailNorm] = contarEstadosPainelDocumentos(docs);
         }
         for (const row of raw) {
@@ -496,7 +564,9 @@ export async function docusealResumoPorEmailsService(emails: string[]): Promise<
 
     await Promise.all(Array.from({ length: conc }, () => worker()));
 
-    return { configured: true, error: null, byEmail, acoesPorEmail };
+    const result = { configured: true, error: null, byEmail, acoesPorEmail };
+    resumoEmailsCache.set(cacheKey, { at: Date.now(), data: result });
+    return result;
   } catch (e: any) {
     const msg = e?.name === 'AbortError' ? 'Tempo esgotado ao contactar DocuSeal.' : e?.message || 'Falha na ligação ao DocuSeal.';
     return { configured: true, error: String(msg), byEmail: {}, acoesPorEmail: {} };
@@ -511,6 +581,8 @@ export async function docusealResendEmailSubmitterService(submitterId: number): 
   if (!Number.isFinite(submitterId) || submitterId <= 0) {
     throw { statusCode: 400, message: 'submitterId inválido' };
   }
+
+  resumoEmailsCache.clear();
 
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), 15000);
@@ -537,6 +609,77 @@ export async function docusealResendEmailSubmitterService(submitterId: number): 
   }
 }
 
+/** Garante que a 2.ª parte (Viva Saúde) não exige OTP em submissões já criadas. */
+async function ensureSecondPartyNo2fa(apiBase: string, token: string, submitterId: number): Promise<boolean> {
+  if (docusealRequireEmail2faSecondPart()) return true;
+
+  const got = await fetchDocusealSubmitter(apiBase, token, submitterId);
+  if (!got) return false;
+  if (got.requireEmail2fa !== true) return true;
+
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 10000);
+  try {
+    const resp = await fetchWithTimeout(`${apiBase}/submitters/${submitterId}`, {
+      method: 'PUT',
+      headers: {
+        'X-Auth-Token': token,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ require_email_2fa: false }),
+      signal: ctrl.signal,
+    });
+    if (!resp.ok) return false;
+    const updated = await fetchDocusealSubmitter(apiBase, token, submitterId);
+    return updated?.requireEmail2fa !== true;
+  } catch {
+    return false;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function fetchDocusealSubmitter(
+  apiBase: string,
+  token: string,
+  submitterId: number
+): Promise<{ requireEmail2fa: boolean | null; email: string | null } | null> {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 10000);
+  try {
+    const resp = await fetchWithTimeout(`${apiBase}/submitters/${submitterId}`, {
+      method: 'GET',
+      headers: { 'X-Auth-Token': token },
+      signal: ctrl.signal,
+    });
+    if (!resp.ok) return null;
+    const row = (await resp.json()) as Record<string, unknown>;
+    const prefs = readKey(row, 'preferences', 'Preferences');
+    const prefObj = prefs && typeof prefs === 'object' ? (prefs as Record<string, unknown>) : {};
+    const raw2fa = readKey(prefObj, 'require_email_2fa', 'requireEmail2fa');
+    const requireEmail2fa = typeof raw2fa === 'boolean' ? raw2fa : null;
+    const emailRaw = readKey(row, 'email', 'Email');
+    const email = typeof emailRaw === 'string' ? emailRaw : null;
+    return { requireEmail2fa, email };
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function syncSecondParty2faOnPanel(
+  documentos: DocusealDocumentoPainelItem[],
+  apiBase: string,
+  token: string
+): Promise<void> {
+  const ids = documentos
+    .filter((d) => d.status === 'pendente_outros' && d.secondSubmitterId != null && d.secondSubmitterId > 0)
+    .map((d) => d.secondSubmitterId as number);
+  if (ids.length === 0) return;
+  await Promise.all(ids.map((id) => ensureSecondPartyNo2fa(apiBase, token, id)));
+}
+
 /** Modelos obrigatórios no DocuSeal (JSON no env). */
 export type DocusealRequiredTemplate = {
   id: number;
@@ -555,8 +698,19 @@ function docusealRequireEmail2fa(): boolean {
   return !(v === 'false' || v === '0' || v === 'no');
 }
 
-function docuseal2faFlags(): { require_email_2fa?: true } {
-  return docusealRequireEmail2fa() ? { require_email_2fa: true } : {};
+/** 2FA para a 2.ª parte (Viva Saúde / cooperativa). Default: desativado. */
+function docusealRequireEmail2faSecondPart(): boolean {
+  const v = (process.env.DOCUSEAL_REQUIRE_EMAIL_2FA_SECOND_PART ?? 'false').trim().toLowerCase();
+  return v === 'true' || v === '1' || v === 'yes';
+}
+
+function docuseal2faFlagsForFirstPart(): { require_email_2fa: boolean } {
+  return { require_email_2fa: docusealRequireEmail2fa() };
+}
+
+/** DocuSeal só respeita 2FA desligado na 2.ª parte se `require_email_2fa: false` for explícito. */
+function docuseal2faFlagsForSecondPart(): { require_email_2fa: boolean } {
+  return { require_email_2fa: docusealRequireEmail2faSecondPart() };
 }
 
 export function parseRequiredTemplates(): DocusealRequiredTemplate[] {
@@ -650,12 +804,11 @@ function buildSubmittersForTemplate(
   medico: { nomeCompleto: string; email: string },
   emailMed: string
 ): Array<Record<string, unknown>> {
-  const twoFa = docuseal2faFlags();
   const first = {
     role: tpl.role || cfg.firstRole,
     name: medico.nomeCompleto.trim(),
     email: emailMed,
-    ...twoFa,
+    ...docuseal2faFlagsForFirstPart(),
   };
 
   if (tpl.singleSubmitter) return [first];
@@ -666,7 +819,7 @@ function buildSubmittersForTemplate(
       role: tpl.secondRole || cfg.secondRole,
       name: cfg.secondName,
       email: cfg.secondEmail,
-      ...twoFa,
+      ...docuseal2faFlagsForSecondPart(),
     },
   ];
 }
@@ -679,6 +832,23 @@ function findMedicoSubmitterRecord(row: Record<string, unknown>, emailNorm: stri
     const s = su as Record<string, unknown>;
     const em = normalizarEmailDocuseal(typeof readKey(s, 'email', 'Email') === 'string' ? (readKey(s, 'email', 'Email') as string) : null);
     if (em === emailNorm) return s;
+  }
+  return null;
+}
+
+/** Signatário pendente que não é o médico (ex.: Viva Saúde — 2.ª parte). */
+function findPendingSecondSubmitterRecord(
+  row: Record<string, unknown>,
+  emailNormMedico: string
+): Record<string, unknown> | null {
+  const submittersRaw = readKey(row, 'submitters', 'Submitters');
+  const arr = Array.isArray(submittersRaw) ? submittersRaw : [];
+  for (const su of arr) {
+    if (!su || typeof su !== 'object') continue;
+    const s = su as Record<string, unknown>;
+    const em = normalizarEmailDocuseal(typeof readKey(s, 'email', 'Email') === 'string' ? (readKey(s, 'email', 'Email') as string) : null);
+    if (em === emailNormMedico) continue;
+    if (submitterAindaDeveAssinar(s)) return s;
   }
   return null;
 }
@@ -698,6 +868,8 @@ function classificarEstadoDocParaMedico(
   submissionId: number;
   submitterId: number | null;
   signUrl: string | null;
+  secondSubmitterId: number | null;
+  secondSignUrl: string | null;
   signerStatus: string | null;
 } {
   const submissionId = numId(readKey(row, 'id', 'Id'));
@@ -707,11 +879,30 @@ function classificarEstadoDocParaMedico(
       submissionId: -1,
       submitterId: null,
       signUrl: null,
+      secondSubmitterId: null,
+      secondSignUrl: null,
       signerStatus: null,
     };
   }
 
+  if (submissionEstaConcluida(row) || allSubmittersConcluiram(row)) {
+    const medicoSub = findMedicoSubmitterRecord(row, emailNorm);
+    const stMed = medicoSub ? readKey(medicoSub, 'status', 'Status') : null;
+    return {
+      status: 'concluido',
+      submissionId,
+      submitterId: medicoSub ? numId(readKey(medicoSub, 'id', 'Id')) : null,
+      signUrl: null,
+      secondSubmitterId: null,
+      secondSignUrl: null,
+      signerStatus: typeof stMed === 'string' ? stMed : null,
+    };
+  }
+
   const medicoSub = findMedicoSubmitterRecord(row, emailNorm);
+  const secondSub = findPendingSecondSubmitterRecord(row, emailNorm);
+  const secondSubmitterId = secondSub ? numId(readKey(secondSub, 'id', 'Id')) : null;
+  const secondSignUrl = secondSub ? urlAssinaturaSubmitter(secondSub, webBase) : null;
   const submittersRaw = readKey(row, 'submitters', 'Submitters');
   const arr = Array.isArray(submittersRaw) ? submittersRaw : [];
 
@@ -734,6 +925,8 @@ function classificarEstadoDocParaMedico(
       submissionId,
       submitterId: null,
       signUrl: null,
+      secondSubmitterId,
+      secondSignUrl,
       signerStatus: null,
     };
   }
@@ -744,6 +937,8 @@ function classificarEstadoDocParaMedico(
       submissionId,
       submitterId: sidMed,
       signUrl: urlAssinaturaSubmitter(medicoSub, webBase),
+      secondSubmitterId,
+      secondSignUrl,
       signerStatus,
     };
   }
@@ -754,6 +949,8 @@ function classificarEstadoDocParaMedico(
       submissionId,
       submitterId: sidMed,
       signUrl: null,
+      secondSubmitterId,
+      secondSignUrl,
       signerStatus,
     };
   }
@@ -763,6 +960,8 @@ function classificarEstadoDocParaMedico(
     submissionId,
     submitterId: sidMed,
     signUrl: null,
+    secondSubmitterId: null,
+    secondSignUrl: null,
     signerStatus,
   };
 }
@@ -777,6 +976,9 @@ export type DocusealDocumentoPainelItem = {
   submissionId: number | null;
   submitterId: number | null;
   signUrl: string | null;
+  /** Link para a Viva Saúde / 2.ª parte assinar (quando status = pendente_outros). */
+  secondSubmitterId: number | null;
+  secondSignUrl: string | null;
   signerStatus: string | null;
   /** PDF assinado (disponível quando status = concluido). */
   signedDocumentUrl: string | null;
@@ -890,6 +1092,111 @@ async function enrichDocumentosPainelComAssinados(
 }
 
 /**
+ * Escolhe a submissão mais relevante por modelo: concluída tem prioridade sobre pendente;
+ * entre iguais, usa o id mais recente.
+ */
+function pickBestSubmissionRowPerTemplate(
+  raw: Record<string, unknown>[],
+  emailNorm: string,
+  webBase: string,
+  requiredIds: Set<number>
+): Map<number, Record<string, unknown>> {
+  type Rank = 0 | 1 | 2;
+  const rankOf = (status: 'pendente_medico' | 'pendente_outros' | 'concluido'): Rank => {
+    if (status === 'concluido') return 0;
+    if (status === 'pendente_outros') return 1;
+    return 2;
+  };
+
+  const best = new Map<number, { row: Record<string, unknown>; sid: number; rank: Rank }>();
+  for (const row of raw) {
+    if (!row || typeof row !== 'object') continue;
+    const r = row as Record<string, unknown>;
+    if (linhaSubmissionArquivada(r)) continue;
+    const tid = submissionTemplateIdFromRow(r);
+    if (tid == null || !requiredIds.has(tid)) continue;
+    if (!findMedicoSubmitterRecord(r, emailNorm)) continue;
+    const sid = numId(readKey(r, 'id', 'Id'));
+    if (sid == null) continue;
+    const rank = rankOf(classificarEstadoDocParaMedico(r, emailNorm, webBase).status);
+    const prev = best.get(tid);
+    if (!prev || rank < prev.rank || (rank === prev.rank && sid > prev.sid)) {
+      best.set(tid, { row: r, sid, rank });
+    }
+  }
+
+  return new Map([...best.entries()].map(([tid, v]) => [tid, v.row]));
+}
+
+function painelItemFromSubmissionRow(
+  tpl: DocusealRequiredTemplate,
+  row: Record<string, unknown>,
+  emailNorm: string,
+  webBase: string
+): DocusealDocumentoPainelItem {
+  const cl = classificarEstadoDocParaMedico(row, emailNorm, webBase);
+  const status: DocusealDocPainelStatus =
+    cl.status === 'pendente_medico'
+      ? 'pendente_medico'
+      : cl.status === 'pendente_outros'
+        ? 'pendente_outros'
+        : 'concluido';
+  return {
+    templateId: tpl.id,
+    templateName: tpl.name,
+    status,
+    submissionId: cl.submissionId > 0 ? cl.submissionId : null,
+    submitterId: cl.submitterId,
+    signUrl: cl.signUrl,
+    secondSubmitterId: cl.secondSubmitterId,
+    secondSignUrl: cl.secondSignUrl,
+    signerStatus: cl.signerStatus,
+    ...DOCUSEAL_PAINEL_ASSINADO_FIELDS,
+  };
+}
+
+async function refreshPendingDocumentosPainel(
+  docs: DocusealDocumentoPainelItem[],
+  emailNorm: string,
+  webBase: string,
+  apiBase: string,
+  token: string
+): Promise<void> {
+  const pending = docs.filter(
+    (d) => (d.status === 'pendente_medico' || d.status === 'pendente_outros') && d.submissionId != null && d.submissionId > 0
+  );
+  if (pending.length === 0) return;
+
+  await Promise.all(
+    pending.map(async (doc) => {
+      const fresh = await fetchSubmissionRowById(apiBase, token, doc.submissionId!);
+      if (!fresh) return;
+      const tpl = { id: doc.templateId, name: doc.templateName };
+      const updated = painelItemFromSubmissionRow(tpl, fresh, emailNorm, webBase);
+      doc.status = updated.status;
+      doc.submitterId = updated.submitterId;
+      doc.signUrl = updated.signUrl;
+      doc.secondSubmitterId = updated.secondSubmitterId;
+      doc.secondSignUrl = updated.secondSignUrl;
+      doc.signerStatus = updated.signerStatus;
+    })
+  );
+}
+
+async function documentosPainelParaEmail(
+  raw: Record<string, unknown>[],
+  emailNorm: string,
+  webBase: string,
+  requiredTemplates: DocusealRequiredTemplate[],
+  apiBase: string,
+  token: string
+): Promise<DocusealDocumentoPainelItem[]> {
+  const docs = documentosPainelFromRaw(raw, emailNorm, webBase, requiredTemplates);
+  await refreshPendingDocumentosPainel(docs, emailNorm, webBase, apiBase, token);
+  return docs;
+}
+
+/**
  * Monta a lista de modelos obrigatórios e estados a partir de submissões já obtidas (ex.: ?q=email).
  * Usado pelo painel do médico e pelo resumo da tabela para não duplicar chamadas à API.
  */
@@ -901,19 +1208,7 @@ function documentosPainelFromRaw(
 ): DocusealDocumentoPainelItem[] {
   if (requiredTemplates.length === 0) return [];
   const requiredIds = new Set(requiredTemplates.map((t) => t.id));
-  const latestByTemplate = new Map<number, { row: Record<string, unknown>; sid: number }>();
-  for (const row of raw) {
-    if (!row || typeof row !== 'object') continue;
-    const r = row as Record<string, unknown>;
-    if (linhaSubmissionArquivada(r)) continue;
-    const tid = submissionTemplateIdFromRow(r);
-    if (tid == null || !requiredIds.has(tid)) continue;
-    if (!findMedicoSubmitterRecord(r, emailNorm)) continue;
-    const sid = numId(readKey(r, 'id', 'Id'));
-    if (sid == null) continue;
-    const prev = latestByTemplate.get(tid);
-    if (!prev || sid > prev.sid) latestByTemplate.set(tid, { row: r, sid });
-  }
+  const latestByTemplate = pickBestSubmissionRowPerTemplate(raw, emailNorm, webBase, requiredIds);
 
   return requiredTemplates.map((tpl) => {
     const hit = latestByTemplate.get(tpl.id);
@@ -925,27 +1220,13 @@ function documentosPainelFromRaw(
         submissionId: null,
         submitterId: null,
         signUrl: null,
+        secondSubmitterId: null,
+        secondSignUrl: null,
         signerStatus: null,
         ...DOCUSEAL_PAINEL_ASSINADO_FIELDS,
       };
     }
-    const cl = classificarEstadoDocParaMedico(hit.row, emailNorm, webBase);
-    const status: DocusealDocPainelStatus =
-      cl.status === 'pendente_medico'
-        ? 'pendente_medico'
-        : cl.status === 'pendente_outros'
-          ? 'pendente_outros'
-          : 'concluido';
-    return {
-      templateId: tpl.id,
-      templateName: tpl.name,
-      status,
-      submissionId: cl.submissionId > 0 ? cl.submissionId : null,
-      submitterId: cl.submitterId,
-      signUrl: cl.signUrl,
-      signerStatus: cl.signerStatus,
-      ...DOCUSEAL_PAINEL_ASSINADO_FIELDS,
-    };
+    return painelItemFromSubmissionRow(tpl, hit, emailNorm, webBase);
   });
 }
 
@@ -1006,7 +1287,15 @@ export async function docusealDocumentosPainelPorMedicoService(
 
   try {
     const raw = await fetchSubmissionsPaginated(c.apiBase, c.token, { q: emailNorm });
-    const documentos = documentosPainelFromRaw(raw, emailNorm, c.webBase, requiredTemplates);
+    const documentos = await documentosPainelParaEmail(
+      raw,
+      emailNorm,
+      c.webBase,
+      requiredTemplates,
+      c.apiBase,
+      c.token
+    );
+    await syncSecondParty2faOnPanel(documentos, c.apiBase, c.token);
     await enrichDocumentosPainelComAssinados(documentos, c.apiBase, c.token, emailNorm);
 
     return {
@@ -1106,6 +1395,8 @@ export async function createDocusealSubmissionsForMedicoInvite(
   } finally {
     clearTimeout(timer);
   }
+
+  if (created > 0) resumoEmailsCache.clear();
 
   return { attempted: true, created, errors };
 }
