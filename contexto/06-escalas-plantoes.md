@@ -1,7 +1,7 @@
 # 06 — Escalas e plantões
 
 **Status:** ✅ Implementado (evolução contínua)  
-**Última atualização:** 2026-08-23
+**Última atualização:** 2026-09-04
 
 ## Modelo
 
@@ -30,18 +30,28 @@ Migrations recentes (2026-04): troca de plantão — status, contrapartida, broa
 |--------|--------|
 | `Escalas.tsx` | Gestão (lazy-loaded); **aba Tipos** = CRUD tipos de plantão do contrato |
 | `TiposPlantaoContratoPanel.tsx` | UI reutilizável de tipos (horários da grade) |
-| `SubgruposEquipes.tsx` | Fluxo contrato → subgrupo → equipe → **1 escala por equipe** |
+| `SubgruposEquipes.tsx` | Fluxo contrato → subgrupo → equipe → **1 escala por equipe** (**auto** ao criar equipe) |
 | `MeuCalendarioPlantoes.tsx` | Visão médico |
 | `ValoresPlantao.tsx` | Configuração de valores |
 | `ModuloEscalaMaster.tsx` | Ferramentas master (menu gated por `VALORES_PLANTAO`) |
 
 ## Regras importantes
 
-- **1 equipe → no máximo 1 escala** (criar uma vez; pode excluir e criar outra). UI em `SubgruposEquipes` esconde o formulário se já houver escala; API `addEquipeToEscala` retorna 409 se a equipe já estiver em outra escala.
+- **1 equipe → no máximo 1 escala.** Ao **criar equipe**, a escala é criada automaticamente com o **mesmo nome** (vinculada ao subgrupo/contrato; `ativo: false`). Seção 3 só edita/exclui/abre; formulário manual só se a equipe ainda não tiver escala. API `addEquipeToEscala` retorna 409 se a equipe já estiver em outra escala.
 - Valores plantão: unique por equipe/dia — migrations corrigiram índices legados (`20260331130000`, `20260331140000`)
 - Troca de plantão: estados persistidos em `SolicitacaoTrocaPlantao` (ver migration `troca_plantao_status`)
 
 ## Changelog
+
+### 2026-09-04 — Escala automática ao criar equipe
+- `Criar equipe` em Subgrupos e Equipes também cria a escala com o mesmo nome e vincula subgrupo + equipe
+- Formulário “3. Escala da equipe” só como fallback (equipes antigas sem escala)
+- Backend: POST/PUT/DELETE `/equipes` e add/remove médico na equipe aceitam módulo **ESCALAS** (além de MEDICOS)
+- Arquivos: `SubgruposEquipes.tsx`, `admin.routes.ts`
+
+### 2026-09-02 — Editar nome da equipe
+- Botão **Editar** na lista de equipes (Subgrupos e Equipes) + modal; `PUT /admin/equipes/:id`
+- Arquivo: `SubgruposEquipes.tsx`
 
 ### 2026-08-23 — Margem: spec cobrança → repasse (pendente código)
 - Mesma decisão do ponto: `repasse = cobrança × (1 − %)` em `ValoresPlantao.tsx`

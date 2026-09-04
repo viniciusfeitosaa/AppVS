@@ -611,7 +611,7 @@ export async function inviteMedicoService(
 
   const inviteUrl = `${getFrontendAppBaseUrl()}/ativar-conta/${rawToken}`;
 
-  const docuseal = await createDocusealSubmissionsForMedicoInvite({
+  const docuseal = await createDocusealSubmissionsForMedicoInvite(tenantId, {
     nomeCompleto: medico.nomeCompleto,
     email: medico.email,
   });
@@ -666,6 +666,7 @@ export async function enviarDocusealTemplateMedicoService(
   }
 
   const result = await createDocusealSubmissionsForMedicoInvite(
+    tenantId,
     { nomeCompleto: medico.nomeCompleto, email: medico.email },
     { onlyTemplateIds: [templateId] }
   );

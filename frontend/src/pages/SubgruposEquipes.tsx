@@ -201,19 +201,82 @@ const SubgruposEquipes = () => {
       setLoadingAction(false);
     }
   };
+  /** Cria escala já vinculada ao subgrupo/equipe (mesmo fluxo do formulário manual). */
+  const criarEscalaVinculada = async (opts: {
+    nome: string;
+    contratoAtivoId: string;
+    subgrupoId: string;
+    equipeId: string;
+  }) => {
+    const ano = new Date().getFullYear();
+    const res = await adminService.createEscala({
+      contratoAtivoId: opts.contratoAtivoId,
+      nome: opts.nome,
+      dataInicio: `${ano}-01-01`,
+      dataFim: `${ano + 1}-12-31`,
+      ativo: false,
+    });
+    const created = res as { data?: { id: string } };
+    if (!created?.data?.id) {
+      throw new Error('Escala criada sem id na resposta');
+    }
+    await adminService.addSubgrupoToEscala(created.data.id, opts.subgrupoId);
+    await adminService.addEquipeToEscala(created.data.id, opts.equipeId);
+    return created.data.id;
+  };
+
   const criarEquipe = async (e: React.FormEvent) => {
     e.preventDefault();
     const nome = equipeNome.trim();
     if (!nome || !selectedSubgrupoId) return;
     setLoadingAction(true);
     try {
-      await adminService.createEquipe({
+      const res = await adminService.createEquipe({
         nome,
         subgrupoId: selectedSubgrupoId,
       });
+      const created = res as { data?: { id: string } };
+      const equipeId = created?.data?.id;
       setEquipeNome('');
+      if (equipeId) setSelectedEquipeId(equipeId);
+
+      let escalaCriada = false;
+      if (equipeId && contratoEscalaDoSubgrupo && podeEditarEscalas) {
+        try {
+          await criarEscalaVinculada({
+            nome,
+            contratoAtivoId: contratoEscalaDoSubgrupo,
+            subgrupoId: selectedSubgrupoId,
+            equipeId,
+          });
+          escalaCriada = true;
+        } catch (escErr: any) {
+          notify({
+            kind: 'error',
+            title: 'Equipe criada, escala não',
+            message:
+              escErr.response?.data?.error ||
+              escErr.message ||
+              'Crie a escala manualmente na seção abaixo.',
+            source: 'escala',
+          });
+        }
+      }
+
       await invalidateEquipes();
-      notify({ kind: 'success', title: 'Equipe criada', message: 'Equipe vinculada ao subgrupo com sucesso.', source: 'equipe' });
+      await invalidateEscalas();
+      if (equipeId) {
+        await queryClient.invalidateQueries({ queryKey: ['admin', 'equipes', equipeId, 'escalas'] });
+        await queryClient.invalidateQueries({ queryKey: ['admin', 'equipes', equipeId, 'medicos'] });
+      }
+      notify({
+        kind: 'success',
+        title: 'Equipe criada',
+        message: escalaCriada
+          ? 'Equipe e escala criadas com o mesmo nome e já vinculadas.'
+          : 'Equipe vinculada ao subgrupo com sucesso.',
+        source: 'equipe',
+      });
     } catch (err: any) {
       notify({ kind: 'error', title: 'Erro ao criar equipe', message: err.response?.data?.error || err.message || 'Tente novamente.', source: 'equipe' });
     } finally {
@@ -235,22 +298,13 @@ const SubgruposEquipes = () => {
     }
     setLoadingAction(true);
     try {
-      const ano = new Date().getFullYear();
-      const dataInicio = `${ano}-01-01`;
-      const dataFim = `${ano + 1}-12-31`;
-      const res = await adminService.createEscala({
-        contratoAtivoId: contratoEscalaDoSubgrupo,
+      await criarEscalaVinculada({
         nome,
-        dataInicio,
-        dataFim,
-        ativo: false,
+        contratoAtivoId: contratoEscalaDoSubgrupo,
+        subgrupoId: selectedSubgrupoId,
+        equipeId: selectedEquipeId,
       });
-      const created = res as { data?: { id: string } };
-      if (created?.data?.id) {
-        await adminService.addSubgrupoToEscala(created.data.id, selectedSubgrupoId);
-        await adminService.addEquipeToEscala(created.data.id, selectedEquipeId);
-        setNovaEscalaNome('');
-      }
+      setNovaEscalaNome('');
       await invalidateEscalasDaEquipe();
       notify({ kind: 'success', title: 'Escala criada', message: 'Escala criada e vinculada à equipe.', source: 'escala' });
     } catch (err: any) {
@@ -597,7 +651,7 @@ const SubgruposEquipes = () => {
           <p className="text-sm text-viva-700 font-serif">Selecione um contrato e um subgrupo acima para criar equipes já vinculadas a esse subgrupo.</p>
         ) : (
           <>
-            <p className="text-sm text-viva-600 mb-3 font-serif">Subgrupo selecionado: <strong className="text-viva-900">{selectedSubgrupo?.nome}</strong>. {podeEditarEscalas ? 'Crie equipes já vinculadas a ele.' : 'Visualização somente leitura.'}</p>
+            <p className="text-sm text-viva-600 mb-3 font-serif">Subgrupo selecionado: <strong className="text-viva-900">{selectedSubgrupo?.nome}</strong>. {podeEditarEscalas ? 'Crie equipes já vinculadas a ele — a escala é criada automaticamente com o mesmo nome.' : 'Visualização somente leitura.'}</p>
             {podeEditarEscalas ? (
               <form onSubmit={criarEquipe} className="flex flex-wrap items-end gap-2 mb-4">
                 <div className="min-w-[200px] flex-1">
@@ -815,7 +869,7 @@ const SubgruposEquipes = () => {
               <strong className="text-viva-900">
                 {equipes.find((e: { id: string; nome: string }) => e.id === selectedEquipeId)?.nome}
               </strong>
-              . Cada equipe tem no máximo uma escala — depois de criada, só editar ou excluir (ao excluir, pode criar outra).
+              . Ao criar a equipe, a escala já nasce com o mesmo nome. Cada equipe tem no máximo uma escala — depois, só editar ou excluir (ao excluir, pode criar outra).
             </p>
             {equipeEscalas.length === 0 ? (
               podeEditarEscalas ? (
@@ -825,12 +879,15 @@ const SubgruposEquipes = () => {
                   <input
                     type="text"
                     className="input w-full"
-                    placeholder="Ex: UPA Bom Jardim - Chefe de Equipe"
+                    placeholder="Mesmo nome da equipe (ou outro)"
                     value={novaEscalaNome}
                     onChange={(e) => setNovaEscalaNome(e.target.value)}
                   />
                 </div>
                 <button type="submit" className="btn btn-primary" disabled={loadingAction}>Criar escala</button>
+                <p className="w-full text-xs text-viva-500 font-serif mt-1">
+                  Só necessário se a equipe ainda não tiver escala (ex.: criada antes desta regra).
+                </p>
               </form>
               ) : (
                 <p className="text-sm text-viva-600 font-serif">Somente leitura — sem permissão para criar escala.</p>

@@ -147,11 +147,19 @@ const router = Router();
 router.use(authenticateToken);
 router.use(requireRole([UserRole.MASTER]));
 
-router.get('/medicos/filtros-resumo', requireModuleAccess(ModuloSistema.MEDICOS), listMedicosFiltrosResumoController);
-router.get('/medicos', requireModuleAccess(ModuloSistema.MEDICOS), listMedicosController);
+router.get(
+  '/medicos/filtros-resumo',
+  requireAnyModuleAccess([ModuloSistema.MEDICOS, ModuloSistema.ESCALAS]),
+  listMedicosFiltrosResumoController
+);
+router.get(
+  '/medicos',
+  requireAnyModuleAccess([ModuloSistema.MEDICOS, ModuloSistema.ESCALAS]),
+  listMedicosController
+);
 router.get(
   '/medicos/:id',
-  requireModuleAccess(ModuloSistema.MEDICOS),
+  requireAnyModuleAccess([ModuloSistema.MEDICOS, ModuloSistema.ESCALAS]),
   validateUUIDParam('id'),
   getMedicoDetalheAdminController
 );
@@ -200,14 +208,26 @@ router.post(
   postMedicoDocusealEnviarTemplateController
 );
 
-router.get('/contratos-ativos', requireModuleAccess(ModuloSistema.CONTRATOS_ATIVOS), listContratosAtivosController);
+router.get(
+  '/contratos-ativos',
+  requireAnyModuleAccess([ModuloSistema.CONTRATOS_ATIVOS, ModuloSistema.ESCALAS]),
+  listContratosAtivosController
+);
 router.post('/contratos-ativos', requireModuleAccess(ModuloSistema.CONTRATOS_ATIVOS), createContratoAtivoController);
 router.put('/contratos-ativos/:id', requireModuleAccess(ModuloSistema.CONTRATOS_ATIVOS), updateContratoAtivoController);
 router.delete('/contratos-ativos/:id', requireModuleAccess(ModuloSistema.CONTRATOS_ATIVOS), deleteContratoAtivoController);
-router.get('/contratos-ativos/:id/subgrupos', requireModuleAccess(ModuloSistema.CONTRATOS_ATIVOS), listContratoSubgruposController);
+router.get(
+  '/contratos-ativos/:id/subgrupos',
+  requireAnyModuleAccess([ModuloSistema.CONTRATOS_ATIVOS, ModuloSistema.ESCALAS]),
+  listContratoSubgruposController
+);
 router.post('/contratos-ativos/:id/subgrupos', requireModuleAccess(ModuloSistema.CONTRATOS_ATIVOS), addContratoSubgrupoController);
 router.delete('/contratos-ativos/:id/subgrupos/:subgrupoId', requireModuleAccess(ModuloSistema.CONTRATOS_ATIVOS), removeContratoSubgrupoController);
-router.get('/contratos-ativos/:id/equipes', requireModuleAccess(ModuloSistema.CONTRATOS_ATIVOS), listContratoEquipesController);
+router.get(
+  '/contratos-ativos/:id/equipes',
+  requireAnyModuleAccess([ModuloSistema.CONTRATOS_ATIVOS, ModuloSistema.ESCALAS]),
+  listContratoEquipesController
+);
 router.post('/contratos-ativos/:id/equipes', requireModuleAccess(ModuloSistema.CONTRATOS_ATIVOS), addContratoEquipeController);
 router.delete('/contratos-ativos/:id/equipes/:equipeId', requireModuleAccess(ModuloSistema.CONTRATOS_ATIVOS), removeContratoEquipeController);
 
@@ -430,22 +450,58 @@ router.put(
   validateUUIDParam('id'),
   updateUsuarioStaffController
 );
-router.get('/subgrupos', requireModuleAccess(ModuloSistema.MEDICOS), listSubgruposController);
+router.get(
+  '/subgrupos',
+  requireAnyModuleAccess([ModuloSistema.MEDICOS, ModuloSistema.ESCALAS]),
+  listSubgruposController
+);
 router.post('/subgrupos', requireModuleAccess(ModuloSistema.MEDICOS), createSubgrupoController);
 router.put('/subgrupos/:id', requireModuleAccess(ModuloSistema.MEDICOS), updateSubgrupoController);
 router.delete('/subgrupos/:id', requireModuleAccess(ModuloSistema.MEDICOS), deleteSubgrupoController);
-router.get('/subgrupos/:id/medicos', requireModuleAccess(ModuloSistema.MEDICOS), listSubgrupoMedicosController);
+router.get(
+  '/subgrupos/:id/medicos',
+  requireAnyModuleAccess([ModuloSistema.MEDICOS, ModuloSistema.ESCALAS]),
+  listSubgrupoMedicosController
+);
 router.post('/subgrupos/:id/medicos', requireModuleAccess(ModuloSistema.MEDICOS), addMedicoToSubgrupoController);
 router.delete('/subgrupos/:id/medicos/:medicoId', requireModuleAccess(ModuloSistema.MEDICOS), removeMedicoFromSubgrupoController);
-router.get('/equipes', requireModuleAccess(ModuloSistema.MEDICOS), listEquipesController);
-router.post('/equipes', requireModuleAccess(ModuloSistema.MEDICOS), createEquipeController);
-router.put('/equipes/:id', requireModuleAccess(ModuloSistema.MEDICOS), updateEquipeController);
-router.delete('/equipes/:id', requireModuleAccess(ModuloSistema.MEDICOS), deleteEquipeController);
-router.get('/equipes/:id/medicos', requireModuleAccess(ModuloSistema.MEDICOS), listEquipeMedicosController);
+router.get(
+  '/equipes',
+  requireAnyModuleAccess([ModuloSistema.MEDICOS, ModuloSistema.ESCALAS]),
+  listEquipesController
+);
+router.post(
+  '/equipes',
+  requireAnyModuleAccess([ModuloSistema.MEDICOS, ModuloSistema.ESCALAS]),
+  createEquipeController
+);
+router.put(
+  '/equipes/:id',
+  requireAnyModuleAccess([ModuloSistema.MEDICOS, ModuloSistema.ESCALAS]),
+  updateEquipeController
+);
+router.delete(
+  '/equipes/:id',
+  requireAnyModuleAccess([ModuloSistema.MEDICOS, ModuloSistema.ESCALAS]),
+  deleteEquipeController
+);
+router.get(
+  '/equipes/:id/medicos',
+  requireAnyModuleAccess([ModuloSistema.MEDICOS, ModuloSistema.ESCALAS]),
+  listEquipeMedicosController
+);
 router.get('/equipes/:id/plantoes', requireModuleAccess(ModuloSistema.ESCALAS), listEquipePlantoesController);
 router.get('/equipes/:id/escalas', requireModuleAccess(ModuloSistema.ESCALAS), listEquipeEscalasController);
-router.post('/equipes/:id/medicos', requireModuleAccess(ModuloSistema.MEDICOS), addMedicoToEquipeController);
-router.delete('/equipes/:id/medicos/:medicoId', requireModuleAccess(ModuloSistema.MEDICOS), removeMedicoFromEquipeController);
+router.post(
+  '/equipes/:id/medicos',
+  requireAnyModuleAccess([ModuloSistema.MEDICOS, ModuloSistema.ESCALAS]),
+  addMedicoToEquipeController
+);
+router.delete(
+  '/equipes/:id/medicos/:medicoId',
+  requireAnyModuleAccess([ModuloSistema.MEDICOS, ModuloSistema.ESCALAS]),
+  removeMedicoFromEquipeController
+);
 router.get('/escalas/:id/subgrupos', requireModuleAccess(ModuloSistema.ESCALAS), listEscalaSubgruposController);
 router.post(
   '/escalas/:id/subgrupos',

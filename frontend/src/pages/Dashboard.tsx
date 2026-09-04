@@ -7,6 +7,9 @@ import { adminService } from '../services/admin.service';
 import { medicoService } from '../services/medico.service';
 import { PONTO_SEM_ESCALA_ESCALA_ID } from '../constants/ponto';
 import { pontoService } from '../services/ponto.service';
+import { useModuloNivel } from '../hooks/useModuloNivel';
+import { authService, hasAccess as hasModuloAccess } from '../services/auth.service';
+import type { ModuloSistema } from '../constants/modulos';
 import { formatCRM, fixMojibake } from '../utils/validation.util';
 import {
   faixaExibicaoPlantao,
@@ -96,6 +99,15 @@ const Dashboard = () => {
   const { user } = useAuth();
   const isMaster = user?.role === 'MASTER';
   const isMedico = user?.role === 'MEDICO';
+  const { data: modulosAcessoResp } = useQuery({
+    queryKey: ['auth', 'modulos-acesso', user?.id],
+    queryFn: () => authService.getModulosAcesso(),
+    enabled: !!user,
+  });
+  const perms = modulosAcessoResp?.data;
+  const canSee = (modulo: ModuloSistema) =>
+    !!modulosAcessoResp && hasModuloAccess(perms, modulo);
+  const { hasAccess: podePonto } = useModuloNivel('PONTO_ELETRONICO');
 
   const [forceLegacyQueries, setForceLegacyQueries] = useState(false);
 
@@ -424,7 +436,7 @@ const Dashboard = () => {
       const r = await adminService.listJustificativasAusencia({ status: 'PENDENTE' });
       return r.data ?? [];
     },
-    enabled: !!user && isMaster,
+    enabled: !!user && isMaster && podePonto,
     staleTime: 30 * 1000,
   });
   const justificativasPendentesPreview = justificativasPendentesMaster.slice(0, 1);
@@ -1134,22 +1146,28 @@ const Dashboard = () => {
         </div>
       )}
 
-      {/* Acesso rápido Master */}
-      {isMaster && (
+      {/* Acesso rápido Master — só módulos permitidos no perfil */}
+      {isMaster && (canSee('ESCALAS') || canSee('MEDICOS') || canSee('RELATORIOS')) && (
         <div className="card col-span-full stagger-2 flex flex-wrap items-center justify-between gap-4 border-l-4 border-l-viva-500 bg-gradient-to-r from-viva-50/60 to-transparent">
           <p className="text-viva-900 font-medium text-sm font-display">
             Acesso rápido às áreas de gestão
           </p>
           <div className="flex flex-wrap gap-2">
-            <Link to="/escalas" className="btn-sm btn-primary">Escalas</Link>
-            <Link to="/medicos" className="btn-sm btn-primary">Médicos</Link>
-            <Link to="/relatorios" className="btn-sm btn-primary">Relatórios</Link>
+            {canSee('ESCALAS') && (
+              <Link to="/escalas" className="btn-sm btn-primary">Escalas</Link>
+            )}
+            {canSee('MEDICOS') && (
+              <Link to="/medicos" className="btn-sm btn-primary">Médicos</Link>
+            )}
+            {canSee('RELATORIOS') && (
+              <Link to="/relatorios" className="btn-sm btn-primary">Relatórios</Link>
+            )}
           </div>
         </div>
       )}
 
       {/* Alerta Master: justificativas de ponto pendentes */}
-      {isMaster && justificativasPendentesMaster.length > 0 && (
+      {isMaster && podePonto && justificativasPendentesMaster.length > 0 && (
         <div className="card col-span-full stagger-2 border-l-4 border-l-amber-500 bg-gradient-to-r from-amber-50 to-orange-50/40">
           <div className="flex flex-wrap items-start justify-between gap-3 mb-3">
             <div>

@@ -172,6 +172,26 @@ export async function ensureCriticalPontoSchemaPatches(): Promise<void> {
     await prisma.$executeRawUnsafe(
       `ALTER TABLE "config_ponto_eletronico" ADD COLUMN IF NOT EXISTS "valor_hora_cobranca_por_dia" JSONB`
     );
+    await prisma.$executeRawUnsafe(`
+      CREATE TABLE IF NOT EXISTS "docuseal_documento_contadores" (
+        "id" TEXT NOT NULL,
+        "tenant_id" TEXT NOT NULL,
+        "chave" VARCHAR(80) NOT NULL,
+        "ano" INTEGER NOT NULL,
+        "ultimo_numero" INTEGER NOT NULL DEFAULT 0,
+        "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        "updated_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        CONSTRAINT "docuseal_documento_contadores_pkey" PRIMARY KEY ("id")
+      )
+    `);
+    await prisma.$executeRawUnsafe(`
+      CREATE UNIQUE INDEX IF NOT EXISTS "docuseal_documento_contadores_tenant_id_chave_ano_key"
+      ON "docuseal_documento_contadores"("tenant_id", "chave", "ano")
+    `);
+    await prisma.$executeRawUnsafe(`
+      CREATE INDEX IF NOT EXISTS "docuseal_documento_contadores_tenant_id_idx"
+      ON "docuseal_documento_contadores"("tenant_id")
+    `);
     if (process.env.NODE_ENV === 'development') {
       console.log('[DB] Colunas críticas ponto/repasse alinhadas ao schema.');
     }

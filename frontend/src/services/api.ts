@@ -92,7 +92,13 @@ api.interceptors.response.use(
     const isPontoRoute = requestUrl.includes('/ponto/');
     const status = error.response?.status;
     const isPontoError = isPontoRoute && (status === 403 || status === 404 || status === 409);
-    if (status === 403 && !requestUrl.includes('/acesso-negado') && !isPontoError) {
+    // 403 de módulo: páginas tratam “Acesso restrito”. Redirect global quebrava staff
+    // (ex.: Escalista no login → query otimista → 403 → /acesso-negado).
+    const isModuleDenied =
+      status === 403 &&
+      typeof error.response?.data?.error === 'string' &&
+      /módulo|modulo|permiss/i.test(error.response.data.error);
+    if (status === 403 && !requestUrl.includes('/acesso-negado') && !isPontoError && !isModuleDenied) {
       window.location.href = `${base}/acesso-negado`;
     }
 

@@ -12,7 +12,7 @@ import {
 /**
  * Nível de acesso ao módulo (`OFF` | `VER` | `EDITAR`), reutilizando a query
  * `['auth', 'modulos-acesso', userId]` do AppShell.
- * Enquanto carrega, assume EDITAR (mesmo padrão do menu: não fecha a UI).
+ * Enquanto carrega, assume OFF / sem acesso (evita chamar APIs proibidas e redirect 403).
  */
 export function useModuloNivel(modulo: ModuloSistema) {
   const { user } = useAuth();
@@ -24,13 +24,13 @@ export function useModuloNivel(modulo: ModuloSistema) {
 
   const perms = modulosAcessoResp?.data;
   const loaded = !!modulosAcessoResp;
-  const nivel: NivelAcessoModulo = !loaded ? 'EDITAR' : nivelDeModulo(perms, modulo);
+  const nivel: NivelAcessoModulo = !loaded ? 'OFF' : nivelDeModulo(perms, modulo);
 
   return {
     nivel,
-    canEdit: !loaded ? true : canEditPerm(perms, modulo),
-    hasAccess: !loaded ? true : hasAccessPerm(perms, modulo),
-    isAdminPleno: !loaded ? true : isAdminPlenoPerm(perms),
+    canEdit: loaded && canEditPerm(perms, modulo),
+    hasAccess: loaded && hasAccessPerm(perms, modulo),
+    isAdminPleno: loaded && isAdminPlenoPerm(perms),
     isLoading,
     loaded,
   };

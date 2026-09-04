@@ -1,7 +1,7 @@
 # 07 — Ponto eletrônico
 
-**Status:** ✅ Implementado (+ justificativa de ausência v1)  
-**Última atualização:** 2026-08-23
+**Status:** ✅ Implementado (+ justificativa Master “Sem ponto” + criar-e-aceitar)  
+**Última atualização:** 2026-09-04
 
 ## Funcionalidades
 
@@ -35,13 +35,16 @@
 ### Master
 
 1. Fila em **Justificativas de ponto** (módulo `PONTO_ELETRONICO`).
-2. Pode **editar horários alegados** antes de aceitar (auditoria; **não** alteram o valor).
-3. **Aceitar** (transação):
+2. Área **Sem ponto no plantão**: lista plantões recentes sem ponto fechado; botão **Decidir**.
+3. Com pedido pendente: Aceitar / Recusar (pode editar horários alegados; **não** alteram o valor).
+4. Sem pedido: **Justificar e aceitar** (`POST …/criar-e-aceitar`) — Master registra motivo + horários e aceita na hora.
+5. **Aceitar** (transação):
    - Revalida elegibilidade (ainda sem ponto **fechado** no dia/escala).
    - Se existir ponto **aberto** no mesmo dia/escala → **remove** (sem repasse).
    - Cria `RegistroPonto` `JUSTIFICADO_SEM_PONTO` com `repasseValorCongelado` = **valor cheio do plantão**.
    - Marca justificativa `ACEITA` + notificação in-app (+ push FCM se configurado).
-4. **Recusar** → `RECUSADA` + comentário opcional + notificação; ponto aberto (se houver) **permanece**.
+6. **Recusar** → `RECUSADA` + comentário opcional + notificação; ponto aberto (se houver) **permanece**.
+7. **Pré-requisito de valor:** sem valor cadastrado no plantão/contrato → 400 com mensagem orientando Valores de Plantão.
 
 ### Pós-aceite
 
@@ -118,10 +121,22 @@ Service: `justificativa-ausencia-ponto.service.ts` + `justificativa-ausencia-pon
 - `GET/PUT /api/admin/config-ponto`
 - `GET /api/admin/registros-ponto` (módulo `RELATORIOS`)
 - `GET /api/admin/justificativas-ausencia?status=` — fila Master (`PONTO_ELETRONICO`)
+- `GET /api/admin/justificativas-ausencia/plantoes-sem-ponto?dias=` — visão “Sem ponto no plantão”
+- `POST /api/admin/justificativas-ausencia/criar-e-aceitar` — Master justifica e aceita sem pedido do médico
 - `POST /api/admin/justificativas-ausencia/:id/aceitar` — body opcional: `horarioAlegadoEntrada`, `horarioAlegadoSaida`
 - `POST /api/admin/justificativas-ausencia/:id/recusar` — body opcional: `comentario`
 
 ## Changelog
+
+### 2026-09-04 — Criar-e-aceitar: valor obrigatório + sem PENDENTE órfã
+- Valida `resolverValorCheioPlantao` **antes** de criar justificativa; mensagem pede cadastro em Valores de Plantão
+- Se aceite falhar após create, remove PENDENTE
+- Arquivos: `justificativa-ausencia-ponto.service.ts`, `JustificativasPontoAdmin.tsx`
+
+### 2026-09-01 — Sem ponto no plantão (Master)
+- Lista plantões sem ponto fechado; Decidir / Justificar e aceitar; inclusão por escala que exige ponto (equipes/subgrupos/contrato)
+- Datas em fuso SP; só plantão já iniciado
+- Arquivos: `escala-requer-ponto.util.ts`, `sao-paulo-data.util.ts`, `JustificativasPontoAdmin.tsx`
 
 ### 2026-08-23 — Margem: spec cobrança → repasse (pendente código)
 - Decisão: `repasse = cobrança × (1 − margem/100)`; UI Cobrança → Margem → Repasse (não markup)

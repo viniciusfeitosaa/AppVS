@@ -1,7 +1,7 @@
 # 04 — Autenticação e acessos
 
 **Status:** ✅ Implementado  
-**Última atualização:** 2026-08-14
+**Última atualização:** 2026-09-04
 
 ## Escopo entregue
 
@@ -30,10 +30,10 @@ Arquivo: `backend/src/routes/auth.routes.ts`
 |---------|--------|
 | `frontend/src/context/AuthContext.tsx` | Estado global de auth |
 | `frontend/src/services/auth.service.ts` | Chamadas API; `hasAccess`, `canEdit`, `isAdminPleno` |
-| `frontend/src/services/api.ts` | Axios + interceptors (token) |
+| `frontend/src/services/api.ts` | Axios; 403 de módulo **não** redireciona a `/acesso-negado` |
 | `frontend/src/components/Layout/ProtectedRoute.tsx` | Rotas autenticadas |
-| `frontend/src/components/Layout/AppShell.tsx` | Menu filtrado por nível de módulo |
-| `frontend/src/hooks/useModuloNivel.ts` | Hook `canEdit` / `hasAccess` por módulo |
+| `frontend/src/components/Layout/AppShell.tsx` | Menu filtrado por nível (Off **oculto**) |
+| `frontend/src/hooks/useModuloNivel.ts` | Hook `canEdit` / `hasAccess`; **OFF até carregar** (não otimista) |
 | `frontend/src/pages/Login.tsx` | Tela de login (sem vídeo animado — removido em 2026) |
 | `frontend/src/pages/PerfisEquipe.tsx` | CRUD perfis e usuários staff (admin pleno) |
 
@@ -142,6 +142,18 @@ Endpoints admin (matriz histórica MASTER/MEDICO):
 
 ## Changelog
 
+### 2026-09-04 — Login Escalista sem acesso-negado + GETs Escalas
+- `useModuloNivel`: enquanto não carrega permissões → OFF / sem acesso (evita chamar APIs Off no Dashboard)
+- Interceptor: 403 com “módulo/permissão” não faz `window.location` para `/acesso-negado`
+- AppShell/Dashboard: menu e atalhos só VER/EDITAR (sem flash Off)
+- `requireAnyModuleAccess`: GETs de contratos-ativos, subgrupos, equipes, médicos aceitam **ESCALAS**; CRUD equipe + add/remove médico na equipe idem
+- Arquivos: `useModuloNivel.ts`, `api.ts`, `AppShell.tsx`, `Dashboard.tsx`, `admin.routes.ts`
+
+### 2026-09-04 — Menu oculta módulos Off
+- AppShell: não libera itens até carregar `modulos-acesso`; só VER/EDITAR no menu (desktop/mobile/Mais)
+- Dashboard: atalhos e alerta de justificativas filtrados pelo nível do perfil
+- Arquivos: `AppShell.tsx`, `Dashboard.tsx`
+
 ### 2026-08-14 — Perfis de acesso e equipe staff
 - `PerfilAcesso` + `NivelAcessoModulo` OFF/VER/EDITAR; `UsuarioMaster.perfilAcessoId` (null = pleno)
 - APIs `/admin/perfis-acesso`, `/admin/usuarios-staff` com `requireAdminPleno`
@@ -157,5 +169,5 @@ Endpoints admin (matriz histórica MASTER/MEDICO):
 
 - [ ] Estender `requireModuleWrite` aos demais módulos além de ESCALAS (v1.1)
 - [ ] Revisar se `CHECKLIST` de “Fase 2 Autenticação” pode ser arquivado
-- [ ] Migration `20260814210000_perfil_acesso_staff` na VPS + smoke test staff Escalista
+- [x] Migration `20260814210000_perfil_acesso_staff` na VPS + perfil Escalista (menu Off + login ok 2026-09-04); smoke VER vs EDITAR nas telas ainda útil
 - [ ] Migration `20260815223000_fix_modulo_vagas_enum` na VPS (repara VAGAS se ausente no enum)

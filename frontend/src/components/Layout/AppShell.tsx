@@ -136,11 +136,13 @@ const AppShell = () => {
   });
 
   const perms = modulosAcessoResp?.data;
+  const permsLoaded = !!modulosAcessoResp;
   const isAdminPleno = isAdminPlenoFromPerms(perms);
-  /** Cadastros pendentes / Avaliação: só Master. Enquanto carrega, mantém menu aberto (compat). */
-  const hasAccess = (modulo: ModuloSistema) => {
+  /** Cadastros pendentes / Avaliação: só Master. Enquanto permissões não carregam, não libera menu (evita flash de módulos OFF). */
+  const hasAccess = (modulo: ModuloSistema | undefined) => {
+    if (!modulo) return false;
     if (modulo === 'AVALIACAO' && !isMaster) return false;
-    if (!modulosAcessoResp) return true;
+    if (!permsLoaded) return false;
     return hasModuloAccess(perms, modulo);
   };
 
@@ -284,6 +286,7 @@ const AppShell = () => {
             </div>
 
             <nav className="hidden lg:flex items-center gap-1.5">
+              {hasAccess('DASHBOARD') && (
               <NavLink
                 to={dashboardItem.to}
                 onClick={() => setOpenDesktopGroup(null)}
@@ -293,6 +296,7 @@ const AppShell = () => {
               >
                 {dashboardItem.label}
               </NavLink>
+              )}
 
               {showVagasInNavbar && (
                 <NavLink
@@ -431,6 +435,7 @@ const AppShell = () => {
               </div>
 
               <nav className="mt-6 space-y-5">
+                {hasAccess('DASHBOARD') && (
                 <NavLink
                   to={dashboardItem.to}
                   onClick={() => setIsMoreMenuOpen(false)}
@@ -453,6 +458,7 @@ const AppShell = () => {
                     </>
                   )}
                 </NavLink>
+                )}
 
                 {menuGroups.map((group) => (
                   <div key={group.title}>

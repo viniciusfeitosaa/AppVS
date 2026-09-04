@@ -13,6 +13,10 @@
  */
 import { buildDocusealInviteEmailBody } from '../utils/email-branding.util';
 import { fetchWithTimeout } from '../utils/fetch-with-timeout';
+import {
+  alocarProximoNumeroDocumentoDocuseal,
+  DOCUSEAL_CONTADOR_TERMO_TRANSFERENCIA,
+} from '../utils/docuseal-documento-contador.util';
 
 const DOCUSEAL_DEFAULT_WEB = 'https://docuseal.com';
 
@@ -690,6 +694,8 @@ export type DocusealRequiredTemplate = {
   secondRole?: string;
   /** Só o cooperado assina (template com um signatário). */
   singleSubmitter?: boolean;
+  /** Preenche automaticamente o número do documento (termo de transferência). */
+  autoNumero?: boolean;
 };
 
 /** 2FA por e-mail antes de abrir o documento (assinatura avançada — Lei 14.063/2020). Default: ativo. */
@@ -732,6 +738,7 @@ export function parseRequiredTemplates(): DocusealRequiredTemplate[] {
       if (typeof roleRaw === 'string' && roleRaw.trim()) tpl.role = roleRaw.trim();
       if (typeof secondRoleRaw === 'string' && secondRoleRaw.trim()) tpl.secondRole = secondRoleRaw.trim();
       if (o.singleSubmitter === true) tpl.singleSubmitter = true;
+      if (o.autoNumero === true) tpl.autoNumero = true;
       out.push(tpl);
     }
     return out;
@@ -798,30 +805,81 @@ export type DocusealCriarSubmissoesOpcoes = {
   onlyTemplateIds?: number[];
 };
 
+/** Nome do campo no template DocuSeal (termo de transferência). */
+function docusealNumeroFieldName(): string {
+  return process.env.DOCUSEAL_NUMERO_FIELD_NAME?.trim() || 'Campo de Número 1';
+}
+
+/** Seed do contador na 1.ª emissão do ano (continua a numeração manual pré-existente). */
+function docusealTermoNumeroSeed(): number {
+  const n = parseInt(process.env.DOCUSEAL_TERMO_NUMERO_SEED || '592', 10);
+  return Number.isFinite(n) && n >= 0 ? n : 592;
+}
+
+function templateIdsComAutoNumeroEnv(): Set<number> {
+  const raw = process.env.DOCUSEAL_TERMO_TRANSFERENCIA_TEMPLATE_IDS?.trim();
+  if (!raw) return new Set();
+  return new Set(
+    raw
+      .split(',')
+      .map((s) => Number(s.trim()))
+      .filter((n) => Number.isFinite(n) && n > 0)
+  );
+}
+
+/** Termo de transferência: flag no JSON, ids no env, ou nome contendo "transfer". */
+export function templateUsaNumeroAutomatico(tpl: DocusealRequiredTemplate): boolean {
+  if (tpl.autoNumero === true) return true;
+  if (templateIdsComAutoNumeroEnv().has(tpl.id)) return true;
+  return /transfer/i.test(tpl.name);
+}
+
 function buildSubmittersForTemplate(
   tpl: DocusealRequiredTemplate,
   cfg: Extract<DocusealInviteCfg, { ok: true }>,
   medico: { nomeCompleto: string; email: string },
-  emailMed: string
+  emailMed: string,
+  opts?: { numeroDocumento?: string }
 ): Array<Record<string, unknown>> {
-  const first = {
+  const first: Record<string, unknown> = {
     role: tpl.role || cfg.firstRole,
     name: medico.nomeCompleto.trim(),
     email: emailMed,
     ...docuseal2faFlagsForFirstPart(),
   };
 
-  if (tpl.singleSubmitter) return [first];
+  if (tpl.singleSubmitter) {
+    if (opts?.numeroDocumento) {
+      first.fields = [
+        {
+          name: docusealNumeroFieldName(),
+          default_value: opts.numeroDocumento,
+          readonly: true,
+        },
+      ];
+    }
+    return [first];
+  }
 
-  return [
-    first,
-    {
-      role: tpl.secondRole || cfg.secondRole,
-      name: cfg.secondName,
-      email: cfg.secondEmail,
-      ...docuseal2faFlagsForSecondPart(),
-    },
-  ];
+  const second: Record<string, unknown> = {
+    role: tpl.secondRole || cfg.secondRole,
+    name: cfg.secondName,
+    email: cfg.secondEmail,
+    ...docuseal2faFlagsForSecondPart(),
+  };
+
+  // No template atual, "Campo de Número 1" pertence à Segunda Parte (Viva Saúde).
+  if (opts?.numeroDocumento) {
+    second.fields = [
+      {
+        name: docusealNumeroFieldName(),
+        default_value: opts.numeroDocumento,
+        readonly: true,
+      },
+    ];
+  }
+
+  return [first, second];
 }
 
 function findMedicoSubmitterRecord(row: Record<string, unknown>, emailNorm: string): Record<string, unknown> | null {
@@ -1317,6 +1375,7 @@ export async function docusealDocumentosPainelPorMedicoService(
  * Não falha o convite da app se o DocuSeal responder erro — devolve `errors` para auditoria/UI.
  */
 export async function createDocusealSubmissionsForMedicoInvite(
+  tenantId: string,
   medico: {
     nomeCompleto: string;
     email: string;
@@ -1353,7 +1412,26 @@ export async function createDocusealSubmissionsForMedicoInvite(
     for (const tpl of cfg.templates) {
       if (only != null && only.length > 0 && !only.includes(tpl.id)) continue;
 
-      const submitters = buildSubmittersForTemplate(tpl, cfg, medico, emailMed);
+      let numeroDocumento: string | undefined;
+      if (templateUsaNumeroAutomatico(tpl)) {
+        try {
+          const alocado = await alocarProximoNumeroDocumentoDocuseal(
+            tenantId,
+            DOCUSEAL_CONTADOR_TERMO_TRANSFERENCIA,
+            { seedInicial: docusealTermoNumeroSeed() }
+          );
+          numeroDocumento = alocado.formatado;
+        } catch (e: any) {
+          errors.push(
+            `Template ${tpl.id} (${tpl.name}): falha ao alocar número — ${String(e?.message || e)}`
+          );
+          continue;
+        }
+      }
+
+      const submitters = buildSubmittersForTemplate(tpl, cfg, medico, emailMed, {
+        numeroDocumento,
+      });
 
       const payload: Record<string, unknown> = {
         template_id: tpl.id,

@@ -1,7 +1,7 @@
 # 05 — Médicos e contratos
 
 **Status:** ✅ Implementado  
-**Última atualização:** 2026-08-19
+**Última atualização:** 2026-09-01
 
 ## Médicos
 
@@ -57,6 +57,11 @@ Vinculam subgrupos e equipes ao contrato institucional.
 Fila Master em `/avaliacao`: pendentes de `/cadastro` público. **Aprovar** → `ATIVO`; **Rejeitar** → `REJEITADO`. Botão **Busca médicos (CFM)** abre `portal.cfm.org.br/busca-medicos` (consulta manual).
 
 ## Changelog
+
+### 2026-09-01 — Filtros avançados no Corpo Clínico
+- Chips (Todos, Ativos, Inativos, Sem equipe, Novos 7d/30d) + avançado (equipe, profissão, período de cadastro)
+- API: `GET /admin/medicos/filtros-resumo`; query params em `listMedicos`
+- Arquivos: `Medicos.tsx`, `admin.service.ts` (front/back)
 
 ### 2026-08-19 — Avaliação: CFM só abre o portal
 - Removidos pré-preenchimento, página intermediária `cfm-prefill` e atalho/userscript. O botão **Busca médicos (CFM)** só abre o site oficial.

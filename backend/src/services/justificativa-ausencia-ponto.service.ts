@@ -525,6 +525,15 @@ export async function criarEAceitarJustificativaAdmin(
   const escalaRequer = await batchEscalaRequerPontoPlantao(tenantId, [plantao.escalaId]);
   await assertPlantaoElegivelParaAdmin(tenantId, plantao, escalaRequer.get(plantao.escalaId) === true);
 
+  // Valida valor antes de criar PENDENTE (evita justificativa órfã se aceitar falhar).
+  const valorCheioPre = await resolverValorCheioPlantao(tenantId, plantao.id);
+  if (valorCheioPre == null) {
+    throwHttp(
+      400,
+      'Sem valor de plantão cadastrado para este turno/contrato. Cadastre em Valores de Plantão (contrato + tipo de plantão) e tente de novo.'
+    );
+  }
+
   const schedule = await resolveScheduleForPlantao(tenantId, plantao);
   const { horarioOficialInicio, horarioOficialFim } = horarioOficialFromSchedule(plantao, schedule);
 
@@ -543,10 +552,18 @@ export async function criarEAceitarJustificativaAdmin(
     },
   });
 
-  return aceitarJustificativa(tenantId, masterId, criada.id, {
-    horarioAlegadoEntrada: entrada,
-    horarioAlegadoSaida: saida,
-  });
+  try {
+    return await aceitarJustificativa(tenantId, masterId, criada.id, {
+      horarioAlegadoEntrada: entrada,
+      horarioAlegadoSaida: saida,
+    });
+  } catch (err) {
+    // Se aceitar falhar após criar, remove o PENDENTE para não travar o plantão.
+    await prisma.justificativaAusenciaPonto.deleteMany({
+      where: { id: criada.id, status: 'PENDENTE' },
+    });
+    throw err;
+  }
 }
 
 export async function criarJustificativaAusenciaPonto(
@@ -725,7 +742,10 @@ export async function aceitarJustificativa(
 
   const valorCheio = await resolverValorCheioPlantao(tenantId, justificativa.escalaPlantaoId);
   if (valorCheio == null) {
-    throwHttp(400, 'Sem valor de plantão cadastrado');
+    throwHttp(
+      400,
+      'Sem valor de plantão cadastrado para este turno/contrato. Cadastre em Valores de Plantão (contrato + tipo de plantão) e tente de novo.'
+    );
   }
 
   const dia = intervaloDiaCivilPlantao(justificativa.escalaPlantao.data);

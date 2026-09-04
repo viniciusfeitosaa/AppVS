@@ -580,6 +580,12 @@ const JustificativasPontoAdmin = () => {
                   </div>
                 ) : null}
 
+                {actionError ? (
+                  <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2">
+                    <p className="text-xs text-red-700 font-medium">{actionError}</p>
+                  </div>
+                ) : null}
+
                 <div className="flex flex-col sm:flex-row gap-2 justify-end pt-2 border-t border-viva-100">
                   <button
                     type="button"
