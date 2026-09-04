@@ -153,6 +153,8 @@ const ConteudosAdminPage = () => {
     });
     setSelectedPalId(evento.palestranteId || '');
     setPalMode(evento.palestranteId ? 'existente' : 'novo');
+    // Só re-hidrata ao trocar de evento / updatedAt (não a cada refetch).
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- sync por id/updatedAt
   }, [evento?.id, evento?.updatedAt]);
 
   const invalidate = async () => {

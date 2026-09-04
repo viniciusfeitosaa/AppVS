@@ -90,7 +90,10 @@ const JustificarAusenciaPonto = () => {
     queryFn: () => pontoService.listMinhasJustificativas(),
   });
 
-  const elegiveis = elegiveisQuery.data?.data ?? [];
+  const elegiveis = useMemo(
+    () => elegiveisQuery.data?.data ?? [],
+    [elegiveisQuery.data?.data]
+  );
   const minhas = minhasQuery.data?.data ?? [];
 
   const contagemSituacao = useMemo(() => {

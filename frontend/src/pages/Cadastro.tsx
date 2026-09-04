@@ -183,6 +183,24 @@ const cadastroSchema = z
 
 type CadastroFormData = z.infer<typeof cadastroSchema>;
 
+const FIELDS_BY_STEP: Record<number, FieldPath<CadastroFormData>[]> = {
+  0: ['nomeCompleto', 'email', 'cpf', 'telefone'],
+  1: ['profissao'],
+  2: [
+    'estadoCivil',
+    'cep',
+    'enderecoLogradouro',
+    'enderecoNumero',
+    'enderecoBairro',
+    'enderecoCidade',
+    'enderecoUf',
+    'enderecoComplemento',
+  ],
+  3: ['dadosBancoConta', 'dadosBancoAgencia', 'dadosBancoNome', 'chavePix'],
+  4: [],
+  5: ['password', 'confirmPassword', 'aceitouTermos'],
+};
+
 const Cadastro = () => {
   const [step, setStep] = useState(0);
   const [done, setDone] = useState(false);
@@ -300,23 +318,7 @@ const Cadastro = () => {
     );
   };
 
-  const fieldsByStep: Record<number, FieldPath<CadastroFormData>[]> = {
-    0: ['nomeCompleto', 'email', 'cpf', 'telefone'],
-    1: ['profissao'],
-    2: [
-      'estadoCivil',
-      'cep',
-      'enderecoLogradouro',
-      'enderecoNumero',
-      'enderecoBairro',
-      'enderecoCidade',
-      'enderecoUf',
-      'enderecoComplemento',
-    ],
-    3: ['dadosBancoConta', 'dadosBancoAgencia', 'dadosBancoNome', 'chavePix'],
-    4: [],
-    5: ['password', 'confirmPassword', 'aceitouTermos'],
-  };
+  const fieldsByStep = FIELDS_BY_STEP;
 
   const fieldToStep = useMemo(() => {
     const map = new Map<string, number>();
@@ -326,7 +328,7 @@ const Cadastro = () => {
     });
     map.set('crm', 1);
     return map;
-  }, []);
+  }, [fieldsByStep]);
 
   const labelForField = (key: string): string => {
     const labels: Record<string, string> = {

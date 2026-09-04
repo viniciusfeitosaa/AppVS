@@ -113,7 +113,10 @@ const JustificativasPontoAdmin = () => {
 
   const pendentes = pendentesQuery.data ?? [];
   const historico = historicoQuery.data ?? [];
-  const semPontoLista = semPontoQuery.data ?? [];
+  const semPontoLista = useMemo(
+    () => semPontoQuery.data ?? [],
+    [semPontoQuery.data]
+  );
   const selected = pendentes.find((j) => j.id === selectedId) ?? null;
 
   const contagemSemPonto = useMemo(() => {

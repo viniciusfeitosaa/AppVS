@@ -176,7 +176,7 @@ const AvaliacaoEditorAdmin = ({
 
   useEffect(() => {
     setForm(initial ?? formVazioAvaliacao(metaSugerida));
-  }, [initial, metaSugerida?.tema, metaSugerida?.palestrante]);
+  }, [initial, metaSugerida]);
 
   const updatePergunta = (idx: number, patch: Partial<AvaliacaoPergunta>) => {
     setForm((f) => {

@@ -65,7 +65,7 @@ const PerfisEquipe = () => {
     enabled: pleno,
   });
 
-  const perfis = perfisQuery.data ?? [];
+  const perfis = useMemo(() => perfisQuery.data ?? [], [perfisQuery.data]);
   const usuarios = usuariosQuery.data ?? [];
 
   // --- Perfil form ---

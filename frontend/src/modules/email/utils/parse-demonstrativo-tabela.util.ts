@@ -52,7 +52,7 @@ function arredondar2(n: number): number {
 export function extrairNomeDeLinhaSemEmail(linha: string): string | undefined {
   const semEmailInvalido = linha.replace(EMAIL_INVALIDO_REGEX, ' ').trim();
   const cutMoney = semEmailInvalido.search(/R\$|\d{1,3}(?:\.\d{3})+,\d{2}|\d+,\d{2}/i);
-  let head = (cutMoney >= 0 ? semEmailInvalido.slice(0, cutMoney) : semEmailInvalido)
+  const head = (cutMoney >= 0 ? semEmailInvalido.slice(0, cutMoney) : semEmailInvalido)
     .replace(/[\t|]+/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
