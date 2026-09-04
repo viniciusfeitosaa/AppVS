@@ -16,6 +16,10 @@ import {
 jest.mock('../config/database', () => ({
   prisma: {
     escalaPlantao: { findFirst: jest.fn(), findMany: jest.fn() },
+    escalaEquipe: { findMany: jest.fn() },
+    escalaSubgrupo: { findMany: jest.fn() },
+    escala: { findMany: jest.fn() },
+    contratoSubgrupo: { findMany: jest.fn() },
     registroPonto: {
       findFirst: jest.fn(),
       findMany: jest.fn(),
@@ -65,10 +69,22 @@ const mockJustificativaUpdate = prisma.justificativaAusenciaPonto.update as jest
 const mockJustificativaUpdateMany = prisma.justificativaAusenciaPonto.updateMany as jest.Mock;
 const mockTipoFindMany = prisma.tipoPlantao.findMany as jest.Mock;
 const mockTransaction = prisma.$transaction as jest.Mock;
+const mockEscalaEquipeFindMany = prisma.escalaEquipe.findMany as jest.Mock;
+const mockEscalaSubgrupoFindMany = prisma.escalaSubgrupo.findMany as jest.Mock;
+const mockEscalaFindMany = prisma.escala.findMany as jest.Mock;
+const mockContratoSubgrupoFindMany = prisma.contratoSubgrupo.findMany as jest.Mock;
 const mockResolveProducao = resolveProducaoMedicoNaEscala as jest.Mock;
 const mockBatchProducao = batchResolveProducaoMedicoNasEscalas as jest.Mock;
 const mockResolverValor = resolverValorCheioPlantao as jest.Mock;
 const mockCriarNotif = criarNotificacaoComPush as jest.Mock;
+
+/** Defaults para `batchEscalaRequerPontoPlantao` (sem vínculo → depende de allowPonto do mock de produção). */
+function mockEscalaRequerPontoVazio() {
+  mockEscalaEquipeFindMany.mockResolvedValue([]);
+  mockEscalaSubgrupoFindMany.mockResolvedValue([]);
+  mockEscalaFindMany.mockResolvedValue([]);
+  mockContratoSubgrupoFindMany.mockResolvedValue([]);
+}
 
 const tenantId = 'tenant-1';
 const medicoId = 'medico-1';
@@ -103,6 +119,7 @@ function inputBase(overrides: Record<string, unknown> = {}) {
 describe('criarJustificativaAusenciaPonto', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockEscalaRequerPontoVazio();
     mockPlantaoFindFirst.mockResolvedValue(plantaoRow());
     mockResolveProducao.mockResolvedValue({ allowPonto: true, requireJanelaPlantao: true });
     mockRegistroFindFirst.mockResolvedValue(null);
@@ -194,6 +211,7 @@ describe('criarJustificativaAusenciaPonto', () => {
 describe('listPlantoesElegiveisJustificativa', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockEscalaRequerPontoVazio();
   });
 
   it('retorna plantão elegível sem ponto fechado', async () => {
@@ -450,6 +468,7 @@ describe('aceitarJustificativa', () => {
 describe('recusarJustificativa', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockEscalaRequerPontoVazio();
     mockCriarNotif.mockResolvedValue({ id: 'notif-2' });
     mockJustificativaFindFirst.mockResolvedValue(justificativaPendente());
     mockJustificativaUpdate.mockImplementation(async ({ data }: { data: Record<string, unknown> }) => ({
