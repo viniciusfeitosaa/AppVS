@@ -133,7 +133,7 @@ const EmailPainelPage = () => {
             <h2 className="font-semibold text-viva-900 mb-2">Como usar este módulo</h2>
             <ul className="text-sm text-gray-600 space-y-1 list-disc pl-5">
               <li><strong>Novo e-mail</strong> — compose, salve rascunho ou envie na hora.</li>
-              <li><strong>Histórico</strong> — acompanhe status (rascunho, enviado, falha).</li>
+              <li><strong>Histórico</strong> — acompanhe status (rascunho, enviado, falha) e use <strong>Ver</strong> para abrir o conteúdo do e-mail.</li>
               <li>Envio via <strong>Maddy</strong> — mesmo servidor usado em esqueci-senha e e-mails de cadastro.</li>
             </ul>
           </div>
