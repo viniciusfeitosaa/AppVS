@@ -1,7 +1,7 @@
 # 05 — Médicos e contratos
 
 **Status:** ✅ Implementado  
-**Última atualização:** 2026-09-01
+**Última atualização:** 2026-09-14
 
 ## Médicos
 
@@ -53,10 +53,19 @@ Vinculam subgrupos e equipes ao contrato institucional.
 ## Pendências
 
 - [x] Documentar regras de negócio de aprovação de cadastro pendente (se houver UI específica)
+- [ ] **Voltar (lista 22 / 2026-09-11):** campo RQE (não existe no schema); e-mail dos 3 novos (Mariana, Pedro Raphael, Luiz Eduardo); padronizar CRM (`/CE` vs `-CE`) e caixa do nome
+- [ ] Revisar outros placeholders/incompletos no corpo clínico (além dos CPF `9000000…` já zerados)
 
 Fila Master em `/avaliacao`: pendentes de `/cadastro` público. **Aprovar** → `ATIVO`; **Rejeitar** → `REJEITADO`. Botão **Busca médicos (CFM)** abre `portal.cfm.org.br/busca-medicos` (consulta manual).
 
 ## Changelog
+
+### 2026-09-11 — Conferência lista 22 médicos (produção)
+- Cruzamento por CPF: **16** já ok com nome completo
+- **Corrigidos:** THOMAZ (CPF/CRM placeholder), RAFAEL LIMA DA CUNHA (CPF placeholder), PIERRE → ANTONIO PIERRE AGUIAR JUNIOR
+- **Criados:** MARIANA ALMEIDA SALES, PEDRO RAPHAEL ROCHA DE SOUSA, LUIZ EDUARDO SAMPAIO DUARTE (senha temp `viva@2026`, sem e-mail)
+- Sem campo RQE no modelo `Medico` — não gravado
+- Operação via Prisma no container; conferência final 22/22
 
 ### 2026-09-01 — Filtros avançados no Corpo Clínico
 - Chips (Todos, Ativos, Inativos, Sem equipe, Novos 7d/30d) + avançado (equipe, profissão, período de cadastro)

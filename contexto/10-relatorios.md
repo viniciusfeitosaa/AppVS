@@ -1,7 +1,7 @@
 # 10 — Relatórios
 
 **Status:** ✅ Implementado (procedimentos + ponto + plantões só-escala)  
-**Última atualização:** 2026-08-23
+**Última atualização:** 2026-09-14
 
 ## Relatórios de procedimentos
 
@@ -51,13 +51,26 @@ Senha local dos dois: `Uat@2026`. Relatório: filtro do contrato + `2026-08-01`�
 ## Dependências front
 
 - `jspdf`, `jspdf-autotable` — PDF (topo com logo Viva Saúde via `utils/pdf-branding.ts` + `assets/logo-horizontal.png`)
-- Em **Produção por médico** com médico filtrado: botão **Enviar demonstrativo** abre prévia (assunto/corpo do painel de e-mail) e anexa o PDF da produção
+- Em **Produção por médico** (aba Resumo):
+  - Médico filtrado → **Enviar demonstrativo** (modal individual + PDF)
+  - Filtro **Todos** → **Enviar demonstrativos** (lote: um e-mail/PDF por profissional; e-mail editável)
+  - Clique na linha do resumo seleciona o médico
 - `xlsx` — Excel
 
 ## Módulo de acesso
 
 - `ModuloSistema.RELATORIOS` — necessário para rotas admin de registros
+- Botão de envio exige também módulo **ENVIO_EMAIL** (não Off)
 
 ## Pendências
 
 - [ ] `/atendimentos` ainda não tem relatórios — módulo ATENDIMENTOS é placeholder no UI
+
+## Changelog
+
+### 2026-09-14 — Demonstrativos: individual + lote + UX
+- Lote com “Todos os médicos”: `EnviarDemonstrativoProducaoLoteModal.tsx`
+- Individual: avisos se sem produção; e-mail obrigatório com erro visível no modal
+- Clique na linha do resumo filtra o médico
+- Backend: `express.json` / `urlencoded` limit **25mb** (PDF base64)
+- Arquivos: `RelatoriosProcedimentos.tsx`, `EnviarDemonstrativoProducaoModal.tsx`, `EnviarDemonstrativoProducaoLoteModal.tsx`, `app.ts`

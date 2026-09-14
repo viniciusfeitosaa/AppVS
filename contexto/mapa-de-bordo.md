@@ -1,6 +1,6 @@
 ﻿# Mapa de bordo
 
-**Snapshot:** 2026-09-04  
+**Snapshot:** 2026-09-14  
 **Branch:** `main` — alinhada com GitHub; mobile **1.0.4** (build 6), Android targetSdk 36; VPS com FCM ok; falta AAB/IPA + teste no aparelho
 
 > Nome canónico: `contexto/mapa-de-bordo.md`.  
@@ -14,7 +14,10 @@ O **Viva Saúde** está em produção na VPS (`sejavivasaude.com.br`). Auth, esc
 **Justificativas de ponto (Master):** lista “Sem ponto no plantão” + decidir/justificar na tabela; exige **valor de plantão** cadastrado.  
 **DocuSeal:** painel Médicos com status mais confiável; **número automático** no termo de transferência (`2026/000123`).  
 **Perfis staff:** módulos em **Off** **não aparecem no menu**; login Escalista **sem** redirect falso a `/acesso-negado`; Escalas lê contratos/subgrupos/equipes/médicos.  
-**Subgrupos e Equipes:** ao **criar equipe**, a **escala nasce automaticamente** com o mesmo nome (1 escala por equipe).
+**Subgrupos e Equipes:** ao **criar equipe**, a **escala nasce automaticamente** com o mesmo nome (1 escala por equipe).  
+**Painel de E-mail:** histórico com botão **Ver** (prévia do corpo).  
+**Relatórios → Procedimentos:** envio de demonstrativo (individual + **lote com “Todos os médicos”**); UX com avisos/e-mail editável; body API **25mb**.  
+**Corpo clínico (parcial):** conferência de lista 22 médicos (2026-09-11) — placeholders CPF `900…` corrigidos; 3 novos cadastrados. **Voltar:** RQE, e-mails dos novos, normalizar CRM/caixa — `05`.
 
 ## Módulos — status
 
@@ -22,15 +25,15 @@ O **Viva Saúde** está em produção na VPS (`sejavivasaude.com.br`). Auth, esc
 |--------|---------|----------|-------|
 | Auth / cadastro | ✅ | ✅ | 3 fluxos de login; `/cadastro` → Avaliação |
 | Dashboard | ✅ | ✅ | |
-| Médicos | ✅ | ✅ | Filtros avançados (chips + período cadastro); DocuSeal no painel; convites |
+| Médicos | ✅ | ✅ | Filtros; DocuSeal; limpeza lista 22 (placeholders/PIERRE) — pendente RQE/e-mail — `05` |
 | Contratos | ✅ | ✅ | |
 | Escalas / plantões | ✅ | ✅ | Trocas; multi-escala no mês; **1 escala/equipe** (auto ao criar equipe); editar nome equipe — `06` |
 | Valores plantão/ponto | ✅ | ⏳ | Por contrato/escala; UI com **margem %** (só front). **Pendente:** inverter motor — cobrança + % → repasse (spec `2026-08-22-margem-cobranca-primeiro-design.md`) — `06`/`07` |
 | Ponto eletrônico | ✅ | ✅ | Geo, foto, histórico; **justificativa** + área Master “Sem ponto no plantão” (decidir / criar-e-aceitar) — `07` |
 | Vagas | ✅ | ✅ | Wizard de anúncio |
 | Documentos | ✅ | ✅ | DocuSeal; **nº automático termo transferência**; 2.ª parte + OTP configurável — `09` |
-| Relatórios | ✅ | ✅ | Procedimentos + ponto + **plantões só-escala** no hub financeiro — `10` |
-| Painel de E-mail | ✅ | ✅ | NF / demonstrativos com PDF anexo + 2 tipos de competência |
+| Relatórios | ✅ | ✅ | Procedimentos: demonstrativo individual + **lote (Todos)**; ponto; plantões só-escala — `10` |
+| Painel de E-mail | ✅ | ✅ | NF / demonstrativos PDF; histórico **Ver** conteúdo; body API 25mb |
 | WhatsApp (Evolution GO) | ✅ | — | Menu atendimento; pausar/retomar (equipe) |
 | Conteúdos / eventos | ✅ | ✅ | Anúncio, frequência, **avaliação custom por evento**, precadastro→aceite→corpo clínico — `17-conteudos-eventos.md` |
 | Mobile / Capacitor | ✅ | ✅ | **1.0.4** (build 6), targetSdk 36; FCM na VPS ok; falta AAB/IPA + teste — `12` |
@@ -69,15 +72,16 @@ Arquivos de referência: `schema.prisma` (`Escala`, `EscalaMedico`, `EscalaPlant
 
 ## Pendências prioritárias
 
-1. **Perfis staff** — Escalista em uso (menu Off + login sem acesso-negado, 2026-09-04). Smoke residual: VER vs EDITAR nas telas — `04-autenticacao-acessos.md`
-2. **Justificativa de ponto** — fluxo Master “Sem ponto” + criar-e-aceitar **em produção**; cadastre **Valores de Plantão** nos contratos (ex.: Santa Quitéria) antes de justificar. E2E médico→Master ainda recomendado — `07-ponto-eletronico.md`
-3. **Push (VPS + store)** — copiar service account JSON; `FIREBASE_SERVICE_ACCOUNT_PATH` (ou `_JSON`); `prisma migrate deploy` (`device_push_tokens`); restart backend; novo AAB/IPA — ver checklist em `12-mobile-capacitor.md`
-4. **Atendimentos** — definir escopo e implementar (hoje só placeholder)
-5. **Sincronizar README/CHECKLIST** ou marcar como arquivados apontando para `contexto/`
-6. **Margem na UI (ValoresPonto / ValoresPlantao)** — implementar spec [`2026-08-22-margem-cobranca-primeiro-design.md`](../docs/superpowers/specs/2026-08-22-margem-cobranca-primeiro-design.md): ordem Cobrança → Margem → Repasse; `repasse = cobrança × (1 − %)` (não markup); sem migration
-7. **Harness** — manter esta pasta após cada feature (ver `16-como-atualizar.md`)
-8. **WhatsApp** — health no `/health` do backend (ping Evolution GO); painel master opcional (QR/status)
-9. **Webhook Evolution GO — limite de payload** — revisão de logs 2026-09-01: `PayloadTooLargeError` (~65× em 72 h) quando o webhook recebe mídia grande (ex.: vídeo ~15 MB); Express em `10mb` (`app.ts`); Evolution esgota retries com HTTP 500. **Ação:** aumentar `express.json` / `urlencoded` e `client_max_body_size` no NPM no host da API; testar com anexo grande no atendimento WhatsApp. **Status:** anotado, não implementado.
+1. **Corpo clínico (lista 22 / RQE)** — limpeza parcial feita (2026-09-11); **voltar** para RQE, e-mails dos 3 novos e padronizar CRM/caixa — `05-medicos-contratos.md`
+2. **Perfis staff** — Escalista em uso (menu Off + login sem acesso-negado, 2026-09-04). Smoke residual: VER vs EDITAR nas telas — `04-autenticacao-acessos.md`
+3. **Justificativa de ponto** — fluxo Master “Sem ponto” + criar-e-aceitar **em produção**; cadastre **Valores de Plantão** nos contratos (ex.: Santa Quitéria) antes de justificar. E2E médico→Master ainda recomendado — `07-ponto-eletronico.md`
+4. **Push (VPS + store)** — copiar service account JSON; `FIREBASE_SERVICE_ACCOUNT_PATH` (ou `_JSON`); `prisma migrate deploy` (`device_push_tokens`); restart backend; novo AAB/IPA — ver checklist em `12-mobile-capacitor.md`
+5. **Atendimentos** — definir escopo e implementar (hoje só placeholder)
+6. **Sincronizar README/CHECKLIST** ou marcar como arquivados apontando para `contexto/`
+7. **Margem na UI (ValoresPonto / ValoresPlantao)** — implementar spec [`2026-08-22-margem-cobranca-primeiro-design.md`](../docs/superpowers/specs/2026-08-22-margem-cobranca-primeiro-design.md): ordem Cobrança → Margem → Repasse; `repasse = cobrança × (1 − %)` (não markup); sem migration
+8. **Harness** — manter esta pasta após cada feature (ver `16-como-atualizar.md`)
+9. **WhatsApp** — health no `/health` do backend (ping Evolution GO); painel master opcional (QR/status)
+10. **Webhook Evolution GO — limite de payload** — revisão de logs 2026-09-01: `PayloadTooLargeError`; Express agora **25mb** (`app.ts`); ainda falta `client_max_body_size` no NPM no host da API se mídia WhatsApp > limite do proxy. **Status:** parcial.
 
 ## Pendências menores
 
@@ -91,6 +95,9 @@ Arquivos de referência: `schema.prisma` (`Escala`, `EscalaMedico`, `EscalaPlant
 
 | Data | Entrega |
 |------|---------|
+| 2026-09-14 | **Demonstrativos no relatório de procedimentos** — individual (médico filtrado) + **lote** com filtro “Todos”; prévia, e-mail editável, PDF por profissional; clique na linha seleciona; body API 25mb — `10` |
+| 2026-09-11 | **Corpo clínico lista 22** — 16 ok; corrigidos THOMAZ/RAFAEL CPF placeholder e PIERRE→ANTONIO PIERRE; criados MARIANA, PEDRO RAPHAEL, LUIZ EDUARDO. **Voltar:** RQE, e-mail dos novos, normalizar CRM — `05` |
+| 2026-09-10 | **Histórico e-mail Ver conteúdo** — modal com prévia HTML/texto no Painel de E-mail — (módulo email) |
 | 2026-09-04 | **Escala automática na equipe** — ao criar equipe em Subgrupos e Equipes, cria escala com o mesmo nome e vincula; Escalista pode CRUD equipe com módulo `ESCALAS` — `06` |
 | 2026-09-04 | **Login Escalista** — sem redirect a `/acesso-negado`; `useModuloNivel` assume OFF até carregar; 403 de módulo não redireciona; GETs de contratos/subgrupos/equipes/médicos aceitam `ESCALAS` — `04` |
 | 2026-09-04 | **Menu oculta módulos Off** — staff/perfil: AppShell e Dashboard só mostram Ver/Editar; sem flash de itens proibidos no carregamento — `04` |

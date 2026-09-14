@@ -73,8 +73,8 @@ app.use('/api', globalApiLimiter(rateWindowMs, rateMax));
 
 // Timeout HTTP + sanitização de body JSON
 app.use(requestTimeoutMiddleware(parseInt(env.HTTP_REQUEST_TIMEOUT_MS, 10) || 30000));
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+app.use(express.json({ limit: '25mb' }));
+app.use(express.urlencoded({ extended: true, limit: '25mb' }));
 app.use(sanitizeBodyMiddleware);
 // Arquivos em uploads/ não são mais servidos publicamente (ver rotas autenticadas em medico/ponto/admin).
 

@@ -60,12 +60,20 @@ const EnviarDemonstrativoProducaoModal = ({
 
   if (!open) return null;
 
-  const podeEnviar = !!email.trim() && !!assunto.trim() && !!corpoTexto.trim() && !!pdfBase64 && !busy;
+  const podeEnviar = !!assunto.trim() && !!corpoTexto.trim() && !!pdfBase64 && !busy;
 
   const handleEnviar = async () => {
     setError(null);
     if (!email.trim()) {
       setError('Informe o e-mail do destinatário.');
+      return;
+    }
+    if (!assunto.trim() || !corpoTexto.trim()) {
+      setError('Assunto e corpo do e-mail são obrigatórios.');
+      return;
+    }
+    if (!pdfBase64) {
+      setError('PDF do demonstrativo não foi gerado. Feche e tente de novo.');
       return;
     }
     setBusy(true);
@@ -87,8 +95,12 @@ const EnviarDemonstrativoProducaoModal = ({
     } catch (err: unknown) {
       let msg = '';
       if (axios.isAxiosError(err)) {
+        const status = err.response?.status;
         const data = err.response?.data as { error?: string; message?: string } | undefined;
         msg = data?.error || data?.message || err.message;
+        if (status === 413 || /payload|entity too large|request entity/i.test(msg || '')) {
+          msg = 'Arquivo do PDF excede o limite do servidor. Tente novamente ou use o Painel de E-mail.';
+        }
       } else if (err instanceof Error) {
         msg = err.message;
       }

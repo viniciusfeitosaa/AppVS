@@ -9,6 +9,9 @@ import { authService } from '../services/auth.service';
 import procedimentosBaseSeed from '../data/procedimentosBase.json';
 import { addPdfBrandHeader } from '../utils/pdf-branding';
 import EnviarDemonstrativoProducaoModal from '../modules/email/components/EnviarDemonstrativoProducaoModal';
+import EnviarDemonstrativoProducaoLoteModal, {
+  type DemoProducaoLoteItem,
+} from '../modules/email/components/EnviarDemonstrativoProducaoLoteModal';
 import {
   nomeProfissionalSemCrm,
   resolverEmailProfissional,
@@ -2083,6 +2086,8 @@ const RelatoriosProcedimentos = () => {
   const [demoProducaoOpen, setDemoProducaoOpen] = useState(false);
   const [demoProducaoPdf, setDemoProducaoPdf] = useState<{ base64: string; filename: string } | null>(null);
   const [demoProducaoBusy, setDemoProducaoBusy] = useState(false);
+  const [demoProducaoLoteOpen, setDemoProducaoLoteOpen] = useState(false);
+  const [demoProducaoLoteItems, setDemoProducaoLoteItems] = useState<DemoProducaoLoteItem[]>([]);
   const [modoEntradaLanc, setModoEntradaLanc] = useState<'upload' | 'manual'>('upload');
   const [importMsg, setImportMsg] = useState<{ tipo: 'ok' | 'aviso' | 'erro'; texto: string } | null>(null);
   const [importPreview, setImportPreview] = useState<ImportPreviewLanc | null>(null);
@@ -3205,18 +3210,56 @@ const RelatoriosProcedimentos = () => {
     totalDetalheMedicoFiltrado,
   ]);
 
-  const podeEnviarDemonstrativoProducao =
-    modoVisualLanc === 'resumo' &&
-    !!filtroMedicoResumo &&
-    detalheMedicoFiltrado.length > 0;
-
   const emailProfissionalSelecionado = useMemo(() => {
     if (!filtroMedicoResumo) return null;
     return resolverEmailProfissional(filtroMedicoResumo, medicosLista);
   }, [filtroMedicoResumo, medicosLista]);
 
   const abrirEnvioDemonstrativoProducao = useCallback(async () => {
-    if (!filtroMedicoResumo || detalheMedicoFiltrado.length === 0) return;
+    // Todos os médicos → lote
+    if (!filtroMedicoResumo) {
+      if (resumoMedicos.length === 0) {
+        notify({
+          kind: 'warning',
+          title: 'Sem produção',
+          message: 'Não há médicos com produção no mês selecionado.',
+          source: 'relatorio-procedimentos',
+        });
+        return;
+      }
+      const items: DemoProducaoLoteItem[] = resumoMedicos.map((r) => {
+        const linhas = detalheProducaoMedicos.filter((d) => d.medico === r.medico);
+        const total = round2(linhas.reduce((acc, l) => acc + l.valorReceber, 0));
+        const nome = nomeProfissionalSemCrm(r.medico);
+        return {
+          medicoRotulo: r.medico,
+          nome,
+          email: resolverEmailProfissional(r.medico, medicosLista) ?? '',
+          qtdProcedimentos: linhas.length,
+          total,
+          linhas: linhas.map((l) => ({
+            dataFmt: l.dataFmt,
+            medico: l.medico,
+            procedimento: l.procedimento,
+            posicao: l.posicao,
+            valorReceber: l.valorReceber,
+          })),
+        };
+      });
+      setDemoProducaoLoteItems(items);
+      setDemoProducaoLoteOpen(true);
+      return;
+    }
+
+    if (detalheMedicoFiltrado.length === 0) {
+      notify({
+        kind: 'warning',
+        title: 'Sem produção',
+        message: 'Este médico não tem procedimentos no mês selecionado.',
+        source: 'relatorio-procedimentos',
+      });
+      return;
+    }
     setDemoProducaoBusy(true);
     try {
       const pdf = await buildProducaoMedicoPdfBase64({
@@ -3242,6 +3285,9 @@ const RelatoriosProcedimentos = () => {
     detalheMedicoFiltrado,
     totalDetalheMedicoFiltrado,
     mesChave,
+    resumoMedicos,
+    detalheProducaoMedicos,
+    medicosLista,
   ]);
 
   if (!isMaster) {
@@ -4292,18 +4338,32 @@ const RelatoriosProcedimentos = () => {
                   <button
                     type="button"
                     className="btn btn-primary btn-sm font-display"
-                    disabled={!podeEnviarDemonstrativoProducao || demoProducaoBusy}
+                    disabled={demoProducaoBusy}
                     onClick={() => void abrirEnvioDemonstrativoProducao()}
                     title={
                       !filtroMedicoResumo
-                        ? 'Selecione um médico para enviar o demonstrativo'
+                        ? 'Enviar demonstrativo individual com PDF para todos os médicos do resumo'
                         : detalheMedicoFiltrado.length === 0
                           ? 'Sem produção para este médico'
                           : 'Prévia e envio do demonstrativo com PDF da produção'
                     }
                   >
-                    {demoProducaoBusy ? 'Preparando…' : 'Enviar demonstrativo'}
+                    {demoProducaoBusy
+                      ? 'Preparando…'
+                      : filtroMedicoResumo
+                        ? 'Enviar demonstrativo'
+                        : 'Enviar demonstrativos'}
                   </button>
+                )}
+                {modoVisualLanc === 'resumo' && podeUsarPainelEmail && !filtroMedicoResumo && (
+                  <span className="text-[11px] text-viva-600 font-serif max-w-[16rem] leading-snug">
+                    Com &quot;Todos&quot;: abre a lista para enviar um PDF por médico.
+                  </span>
+                )}
+                {modoVisualLanc === 'resumo' && modulosResp && !podeUsarPainelEmail && (
+                  <span className="text-[11px] text-amber-800 font-serif max-w-[14rem] leading-snug">
+                    Sem acesso ao módulo Envio de E-mail — peça liberação em Perfis.
+                  </span>
                 )}
               </div>
             </div>
@@ -4651,7 +4711,21 @@ const RelatoriosProcedimentos = () => {
                           resumoMedicosFiltrado.map((r, i) => (
                             <tr
                               key={r.medico}
-                              className={i % 2 ? 'bg-viva-50/25' : 'bg-white border-t border-slate-100/90'}
+                              role="button"
+                              tabIndex={0}
+                              onClick={() => setFiltroMedicoResumo(r.medico)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter' || e.key === ' ') {
+                                  e.preventDefault();
+                                  setFiltroMedicoResumo(r.medico);
+                                }
+                              }}
+                              className={[
+                                i % 2 ? 'bg-viva-50/25' : 'bg-white border-t border-slate-100/90',
+                                'cursor-pointer hover:bg-viva-100/50 transition-colors',
+                                filtroMedicoResumo === r.medico ? 'ring-2 ring-inset ring-viva-500/40' : '',
+                              ].join(' ')}
+                              title="Clique para filtrar este médico e enviar demonstrativo"
                             >
                               {colsResumo.medico ? (
                                 <td className="px-3 py-2 font-serif [overflow-wrap:anywhere]">{r.medico}</td>
@@ -5134,6 +5208,35 @@ const RelatoriosProcedimentos = () => {
             kind: 'success',
             title: 'Demonstrativo enviado',
             message: `E-mail enviado para ${nomeProfissionalSemCrm(filtroMedicoResumo)}.`,
+            source: 'relatorio-procedimentos',
+          });
+        }}
+      />
+
+      <EnviarDemonstrativoProducaoLoteModal
+        open={demoProducaoLoteOpen}
+        onClose={() => {
+          setDemoProducaoLoteOpen(false);
+          setDemoProducaoLoteItems([]);
+        }}
+        mes={Number(mesMM)}
+        ano={ano}
+        items={demoProducaoLoteItems}
+        gerarPdf={async (item) =>
+          buildProducaoMedicoPdfBase64({
+            mesChave,
+            medicoRotulo: item.medicoRotulo,
+            linhas: item.linhas as DetalheProducaoMedicoLinha[],
+            total: item.total,
+          })
+        }
+        onConcluido={({ enviados, falhas, semEmail }) => {
+          notify({
+            kind: falhas > 0 ? 'warning' : 'success',
+            title: 'Demonstrativos',
+            message: `Enviados: ${enviados}${falhas ? ` · Falhas: ${falhas}` : ''}${
+              semEmail ? ` · Sem e-mail (ignorados na marcação inicial): ${semEmail}` : ''
+            }.`,
             source: 'relatorio-procedimentos',
           });
         }}
