@@ -17,7 +17,7 @@ O **Viva Saúde** está em produção na VPS (`sejavivasaude.com.br`). Auth, esc
 **Subgrupos e Equipes:** ao **criar equipe**, a **escala nasce automaticamente** com o mesmo nome (1 escala por equipe).  
 **Painel de E-mail:** histórico com botão **Ver** (prévia do corpo).  
 **Relatórios → Procedimentos:** envio de demonstrativo (individual + **lote com “Todos os médicos”**); UX com avisos/e-mail editável; body API **25mb**.  
-**Corpo clínico (parcial):** conferência de lista 22 médicos (2026-09-11) — placeholders CPF `900…` corrigidos; 3 novos cadastrados. **Voltar:** RQE, e-mails dos novos, normalizar CRM/caixa — `05`.
+**Corpo clínico (parcial):** lista 22 (2026-09-11); em **2026-09-14** apelidos no relatório de procedimentos (`Dr Sayro`, etc.) sobrescritos pelo nome completo + CRM do cadastro. **Voltar:** RQE, e-mails dos 3 novos, normalizar CRM/caixa — `05` / `10`.
 
 ## Módulos — status
 
@@ -25,7 +25,7 @@ O **Viva Saúde** está em produção na VPS (`sejavivasaude.com.br`). Auth, esc
 |--------|---------|----------|-------|
 | Auth / cadastro | ✅ | ✅ | 3 fluxos de login; `/cadastro` → Avaliação |
 | Dashboard | ✅ | ✅ | |
-| Médicos | ✅ | ✅ | Filtros; DocuSeal; limpeza lista 22 (placeholders/PIERRE) — pendente RQE/e-mail — `05` |
+| Médicos | ✅ | ✅ | Filtros; DocuSeal; lista 22; apelidos `Dr X` no relatório → nome real — pendente RQE/e-mail — `05` |
 | Contratos | ✅ | ✅ | |
 | Escalas / plantões | ✅ | ✅ | Trocas; multi-escala no mês; **1 escala/equipe** (auto ao criar equipe); editar nome equipe — `06` |
 | Valores plantão/ponto | ✅ | ⏳ | Por contrato/escala; UI com **margem %** (só front). **Pendente:** inverter motor — cobrança + % → repasse (spec `2026-08-22-margem-cobranca-primeiro-design.md`) — `06`/`07` |
@@ -95,6 +95,7 @@ Arquivos de referência: `schema.prisma` (`Escala`, `EscalaMedico`, `EscalaPlant
 
 | Data | Entrega |
 |------|---------|
+| 2026-09-14 | **Apelidos → nome real no relatório** — em `relatorio_procedimentos_mes`, `Dr Sayro`/`Dr Yuri`/etc. e `PIERRE` sobrescritos pelo cadastro completo + CRM (55 ocorrências; meses 2026-01/02) — `05`/`10` |
 | 2026-09-14 | **Demonstrativos no relatório de procedimentos** — individual (médico filtrado) + **lote** com filtro “Todos”; prévia, e-mail editável, PDF por profissional; clique na linha seleciona; body API 25mb — `10` |
 | 2026-09-11 | **Corpo clínico lista 22** — 16 ok; corrigidos THOMAZ/RAFAEL CPF placeholder e PIERRE→ANTONIO PIERRE; criados MARIANA, PEDRO RAPHAEL, LUIZ EDUARDO. **Voltar:** RQE, e-mail dos novos, normalizar CRM — `05` |
 | 2026-09-10 | **Histórico e-mail Ver conteúdo** — modal com prévia HTML/texto no Painel de E-mail — (módulo email) |
@@ -138,6 +139,14 @@ Arquivos de referência: `schema.prisma` (`Escala`, `EscalaMedico`, `EscalaPlant
 | 2026-07 | Painel e-mail, Evolution GO |
 | 2026-04 | Trocas de plantão |
 | 2026-03 | Módulo vagas, valores plantão |
+
+### Detalhe — Apelidos `Dr X` → cadastro completo (2026-09-14)
+
+**Problema:** no relatório de procedimentos (sobretudo 2026-02) constavam nomes curtos (`Dr Sayro`, `Dra. Amanda`, `PIERRE`…) enquanto o corpo clínico já tinha o profissional completo com e-mail/CRM.
+
+**Solução (dados em produção):** reescrita do JSON em `relatorio_procedimentos_mes` — `profissional1/2Nome` (+ CRM vazio preenchido) mapeados para o cadastro real (ex.: `Dr Sayro` → `SAYRO COELHO ANDRADE DE SOUSA` / `021087/CE`). **55** substituições; residual de apelidos `Dr*` = 0.
+
+**Não é merge de linhas em `medicos`** — só normalização do relatório. Cadastros incompletos no corpo clínico, se ainda existirem, continuam na pendência de `05`.
 
 ### Detalhe — Demonstrativos no relatório de procedimentos (2026-09-14)
 

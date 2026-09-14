@@ -54,11 +54,17 @@ Vinculam subgrupos e equipes ao contrato institucional.
 
 - [x] Documentar regras de negócio de aprovação de cadastro pendente (se houver UI específica)
 - [ ] **Voltar (lista 22 / 2026-09-11):** campo RQE (não existe no schema); e-mail dos 3 novos (Mariana, Pedro Raphael, Luiz Eduardo); padronizar CRM (`/CE` vs `-CE`) e caixa do nome
+- [x] Apelidos `Dr X` / `PIERRE` no **relatório de procedimentos** → nome completo + CRM do cadastro (2026-09-14; ver `10`)
 - [ ] Revisar outros placeholders/incompletos no corpo clínico (além dos CPF `9000000…` já zerados)
 
 Fila Master em `/avaliacao`: pendentes de `/cadastro` público. **Aprovar** → `ATIVO`; **Rejeitar** → `REJEITADO`. Botão **Busca médicos (CFM)** abre `portal.cfm.org.br/busca-medicos` (consulta manual).
 
 ## Changelog
+
+### 2026-09-14 — Apelidos do relatório → nome real
+- Em produção: `relatorio_procedimentos_mes` (2026-01/02) — `Dr Sayro`, `Dr Yuri`, `Dra. Amanda`, `Dr. Tomaz`, `PIERRE`, etc. → nomes/CRM do corpo clínico
+- 55 substituições; sem residual `Dr*`/`Dra*` em `profissional*Nome`
+- Detalhe e mapa: `mapa-de-bordo.md`, `10-relatorios.md`
 
 ### 2026-09-11 — Conferência lista 22 médicos (produção)
 - Cruzamento por CPF: **16** já ok com nome completo

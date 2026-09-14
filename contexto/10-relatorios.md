@@ -74,3 +74,7 @@ Senha local dos dois: `Uat@2026`. Relatório: filtro do contrato + `2026-08-01`�
 - Clique na linha do resumo filtra o médico
 - Backend: `express.json` / `urlencoded` limit **25mb** (PDF base64)
 - Arquivos: `RelatoriosProcedimentos.tsx`, `EnviarDemonstrativoProducaoModal.tsx`, `EnviarDemonstrativoProducaoLoteModal.tsx`, `app.ts`
+
+### 2026-09-14 — Normalização de nomes no JSON do mês
+- Apelidos legados (`Dr Sayro`, `Dra. Amanda`, `PIERRE`…) em `quemRepasse.profissional*Nome` substituídos pelo nome completo + CRM do cadastro
+- Operação direta em `relatorio_procedimentos_mes` (produção); meses 2026-01 e 2026-02
