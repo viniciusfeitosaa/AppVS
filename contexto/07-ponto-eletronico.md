@@ -66,12 +66,13 @@
 
 ## Pagamento no aceite
 
-Valor **cheio do plantão** (horários alegados não entram na fórmula):
+Valor **cheio do plantão** (horários alegados/considerados não entram na fórmula):
 
 1. `EscalaPlantao.valorHora` > 0 → total do plantão
-2. Senão, `ValorPlantao` do contrato/grade (resolução equipe/subgrupo como hoje)
-3. Senão, `EscalaMedico.valorHora` × duração oficial do turno
-4. Senão → aceite falha (`Sem valor de plantão cadastrado`)
+2. Senão, `ValorPlantao` do contrato/grade (tela **Valores de Plantão**)
+3. Senão, **Configuração de Ponto** (`config_ponto_eletronico` — tela **Valores de Ponto**): R$/h da equipe do médico na escala × duração oficial do turno
+4. Senão, `EscalaMedico.valorHora` × duração oficial do turno
+5. Senão → aceite falha (`Sem valor de plantão cadastrado`)
 
 Helper: `justificativa-ausencia-ponto.valor.ts` (`resolverValorCheioPlantao`).
 
@@ -127,6 +128,11 @@ Service: `justificativa-ausencia-ponto.service.ts` + `justificativa-ausencia-pon
 - `POST /api/admin/justificativas-ausencia/:id/recusar` — body opcional: `comentario`
 
 ## Changelog
+
+### 2026-09-14 — Justificativa aceita Valores de Ponto
+- `resolverValorCheioPlantao` também lê `config_ponto_eletronico` (R$/h × horas do turno) quando não há linha em `valores_plantao`
+- Corrige 400 em contratos só-ponto (ex.: Santa Quitéria) que já tinham valores em **Valores de Ponto**
+- Arquivos: `justificativa-ausencia-ponto.valor.ts`
 
 ### 2026-09-14 — Alegado vs considerado + dia/hora corretos
 - `datetime-local` e labels de plantão usam face do relógio UTC (sem −3h no browser BR)

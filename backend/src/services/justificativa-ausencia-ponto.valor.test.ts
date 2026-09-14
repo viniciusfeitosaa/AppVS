@@ -9,6 +9,8 @@ jest.mock('../config/database', () => ({
     valorPlantao: { findMany: jest.fn() },
     escalaMedico: { findFirst: jest.fn() },
     tipoPlantao: { findMany: jest.fn() },
+    escalaEquipe: { findMany: jest.fn() },
+    configPontoEletronico: { findMany: jest.fn() },
   },
 }));
 
@@ -17,6 +19,8 @@ const mockFindFirstEscala = prisma.escala.findFirst as jest.Mock;
 const mockFindManyValorPlantao = prisma.valorPlantao.findMany as jest.Mock;
 const mockFindFirstEscalaMedico = prisma.escalaMedico.findFirst as jest.Mock;
 const mockFindManyTipoPlantao = prisma.tipoPlantao.findMany as jest.Mock;
+const mockFindManyEscalaEquipe = prisma.escalaEquipe.findMany as jest.Mock;
+const mockFindManyConfigPonto = prisma.configPontoEletronico.findMany as jest.Mock;
 
 const tenantId = 'tenant-1';
 const escalaPlantaoId = 'plantao-1';
@@ -39,6 +43,8 @@ function mockPlantaoBase(overrides: Record<string, unknown> = {}) {
     contratoAtivo: { id: contratoId },
   } as never);
   mockFindManyTipoPlantao.mockResolvedValue([]);
+  mockFindManyEscalaEquipe.mockResolvedValue([]);
+  mockFindManyConfigPonto.mockResolvedValue([]);
 }
 
 describe('intervaloDiaCivil', () => {
@@ -77,6 +83,36 @@ describe('resolverValorCheioPlantao', () => {
     ]);
 
     expect(await resolverValorCheioPlantao(tenantId, escalaPlantaoId)).toBe(950);
+    expect(mockFindFirstEscalaMedico).not.toHaveBeenCalled();
+  });
+
+  it('usa ConfigPonto R$/h × horas do turno (Valores de Ponto)', async () => {
+    mockPlantaoBase({
+      gradeId: 'tipo-uuid',
+      horasTurnoSnapshot: 8,
+      data: new Date('2026-09-14T00:00:00.000Z'), // segunda
+    });
+    mockFindManyValorPlantao.mockResolvedValue([]);
+    mockFindManyEscalaEquipe.mockResolvedValue([
+      { equipeId: 'eq-1', equipe: { subgrupoId: 'sg-1' } },
+    ]);
+    mockFindManyConfigPonto.mockResolvedValue([
+      {
+        equipeId: 'eq-1',
+        valorHora: 102.13,
+        valorHoraPorDia: {
+          seg: 102.13,
+          ter: 102.13,
+          qua: 102.13,
+          qui: 102.13,
+          sex: 102.13,
+          sab: 102.13,
+          dom: 102.13,
+        },
+      },
+    ]);
+
+    expect(await resolverValorCheioPlantao(tenantId, escalaPlantaoId)).toBe(817.04);
     expect(mockFindFirstEscalaMedico).not.toHaveBeenCalled();
   });
 
