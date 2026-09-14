@@ -56,6 +56,8 @@ type AgrupamentoHoras = {
   medicoNome: string;
   escalaId: string;
   escalaNome: string;
+  /** Preenchido quando o filtro de equipe é “Todas”. */
+  equipeNome?: string;
   totalMinutos: number;
   totalRegistros: number;
   /** Valor/h (R$) usado no cálculo quando aplicável */
@@ -142,12 +144,14 @@ const exportHorasExcel = (
   agrupado: AgrupamentoHoras[],
   dataInicio: string,
   dataFim: string,
-  mostrarRepasseECobranca: boolean
+  mostrarRepasseECobranca: boolean,
+  mostrarEquipe: boolean
 ) => {
   const rows = agrupado.map((item) =>
     mostrarRepasseECobranca
       ? {
           Medico: item.medicoNome,
+          ...(mostrarEquipe ? { Equipe: item.equipeNome ?? '' } : {}),
           Escala: item.escalaNome,
           Registros: item.totalRegistros,
           'Total (min)': item.totalMinutos,
@@ -157,6 +161,7 @@ const exportHorasExcel = (
         }
       : {
           Medico: item.medicoNome,
+          ...(mostrarEquipe ? { Equipe: item.equipeNome ?? '' } : {}),
           Escala: item.escalaNome,
           Registros: item.totalRegistros,
           'Total (min)': item.totalMinutos,
@@ -175,7 +180,8 @@ const exportHorasPdf = async (
   agrupado: AgrupamentoHoras[],
   dataInicio: string,
   dataFim: string,
-  mostrarRepasseECobranca: boolean
+  mostrarRepasseECobranca: boolean,
+  mostrarEquipe: boolean
 ) => {
   const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
   const y0 = await addPdfBrandHeader(doc, { marginLeft: 14 });
@@ -186,33 +192,33 @@ const exportHorasPdf = async (
   const cel = (s: string) => textoSeguroPdf(s);
   const celValor = (n: number | null | undefined) =>
     n != null && Number.isFinite(n) ? cel(formatValor(n)) : '-';
+
+  const headRepasse = [
+    cel('Médico'),
+    ...(mostrarEquipe ? [cel('Equipe')] : []),
+    cel('Escala'),
+    cel('Registros'),
+    cel('Total (horas)'),
+    cel('Repasse (R$)'),
+    cel('Cobrança (R$)'),
+  ];
+  const headSimples = [
+    cel('Médico'),
+    ...(mostrarEquipe ? [cel('Equipe')] : []),
+    cel('Escala'),
+    cel('Registros'),
+    cel('Total (horas)'),
+    cel('Valor (R$)'),
+  ];
+
   autoTable(doc, {
     startY: y0 + 12,
-    // Uma linha de cabeçalho = [[c1,c2,...]], sem array extra (evita 1 coluna só).
-    head: mostrarRepasseECobranca
-      ? [
-          [
-            cel('Médico'),
-            cel('Escala'),
-            cel('Registros'),
-            cel('Total (horas)'),
-            cel('Repasse (R$)'),
-            cel('Cobrança (R$)'),
-          ],
-        ]
-      : [
-          [
-            cel('Médico'),
-            cel('Escala'),
-            cel('Registros'),
-            cel('Total (horas)'),
-            cel('Valor (R$)'),
-          ],
-        ],
+    head: [mostrarRepasseECobranca ? headRepasse : headSimples],
     body: agrupado.map((item) =>
       mostrarRepasseECobranca
         ? [
             cel(item.medicoNome),
+            ...(mostrarEquipe ? [cel(item.equipeNome ?? '—')] : []),
             cel(item.escalaNome),
             String(item.totalRegistros),
             cel(formatDuration(item.totalMinutos)),
@@ -221,6 +227,7 @@ const exportHorasPdf = async (
           ]
         : [
             cel(item.medicoNome),
+            ...(mostrarEquipe ? [cel(item.equipeNome ?? '—')] : []),
             cel(item.escalaNome),
             String(item.totalRegistros),
             cel(formatDuration(item.totalMinutos)),
@@ -474,6 +481,9 @@ const Relatorios = () => {
       gradeIdPlantaoPorRegistroPontoId: (!Array.isArray(raw) && raw?.gradeIdPlantaoPorRegistroPontoId
         ? raw.gradeIdPlantaoPorRegistroPontoId
         : {}) as Record<string, string>,
+      equipeNomePorRegistroPontoId: (!Array.isArray(raw) && raw?.equipeNomePorRegistroPontoId
+        ? raw.equipeNomePorRegistroPontoId
+        : {}) as Record<string, string>,
     };
   }, [registrosResp?.data]);
 
@@ -488,6 +498,7 @@ const Relatorios = () => {
       plantoesValorHoraPorEscalaDataGrade,
       valorPlantao12hPorRegistroPontoId,
       gradeIdPlantaoPorRegistroPontoId,
+      equipeNomePorRegistroPontoId,
     } = registrosDerived;
     const plantoesSe = (Array.isArray(plantoesSeResp?.data?.itens)
       ? plantoesSeResp.data.itens
@@ -502,6 +513,10 @@ const Relatorios = () => {
       const escId = item.escala?.id ?? (item as any).escalaId ?? 'sem-escala';
       const medNome = fixMojibake(item.medico?.nomeCompleto || 'Médico não identificado');
       const escNome = fixMojibake(item.escala?.nome || 'Escala não identificada');
+      const eqNome =
+        item.id && equipeNomePorRegistroPontoId[item.id]
+          ? fixMojibake(equipeNomePorRegistroPontoId[item.id])
+          : undefined;
       const key = `${medId}::${escId}`;
       const valorHoraAlocacao =
         escId !== 'sem-escala' && medId !== 'sem-medico'
@@ -639,6 +654,9 @@ const Relatorios = () => {
         if (escNome && escNome !== 'Escala não identificada' && prev.escalaNome === 'Escala não identificada') {
           prev.escalaNome = escNome;
         }
+        if (eqNome && !prev.equipeNome) {
+          prev.equipeNome = eqNome;
+        }
         if (incluirDetalhe) {
           if (!prev.calculoPorRegistro) prev.calculoPorRegistro = [];
           prev.calculoPorRegistro.push(detalheLinha);
@@ -650,6 +668,7 @@ const Relatorios = () => {
           medicoNome: medNome,
           escalaId: escId,
           escalaNome: escNome,
+          equipeNome: eqNome,
           totalMinutos: minutos,
           totalRegistros: 1,
           valorHora: temValorHoraAlocacao ? valorHoraAlocacao : undefined,
@@ -815,6 +834,7 @@ const Relatorios = () => {
     };
   }, [agrupado, mostrarRepasseECobranca]);
 
+  const mostrarColunaEquipe = !equipeId;
   const incluirDetalheTabela = (usaEscalaEPonto || usaSomenteEscala) && mostrarDetalheCalculo;
 
   if (!isMaster) {
@@ -923,19 +943,25 @@ const Relatorios = () => {
               className="input"
               value={equipeId}
               onChange={(e) => setEquipeId(e.target.value)}
-              disabled={!subgrupoId}
+              disabled={!contratoId}
             >
               <option value="">Todas as equipes</option>
               {equipesFiltradas.map((item: any) => {
                 const id = item.equipe?.id ?? item.id ?? '';
                 const nome = item.equipe?.nome ?? item.nome ?? '';
+                if (!id) return null;
                 return (
                   <option key={id} value={id}>
-                    {fixMojibake(nome)}
+                    {fixMojibake(nome || id)}
                   </option>
                 );
               })}
             </select>
+            {contratoId && !equipeId ? (
+              <p className="mt-1 text-[11px] text-viva-600">
+                Todas as equipes do contrato — a tabela inclui a coluna Equipe.
+              </p>
+            ) : null}
           </div>
         </div>
       </div>
@@ -1011,7 +1037,9 @@ const Relatorios = () => {
             type="button"
             className="btn btn-secondary inline-flex items-center gap-2"
             disabled={isLoading || agrupado.length === 0}
-            onClick={() => exportHorasExcel(agrupado, dataInicio, dataFim, mostrarRepasseECobranca)}
+            onClick={() =>
+              exportHorasExcel(agrupado, dataInicio, dataFim, mostrarRepasseECobranca, mostrarColunaEquipe)
+            }
           >
             <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clipRule="evenodd" /></svg>
             Exportar Excel
@@ -1020,7 +1048,9 @@ const Relatorios = () => {
             type="button"
             className="btn btn-secondary inline-flex items-center gap-2"
             disabled={isLoading || agrupado.length === 0}
-            onClick={() => exportHorasPdf(agrupado, dataInicio, dataFim, mostrarRepasseECobranca)}
+            onClick={() =>
+              exportHorasPdf(agrupado, dataInicio, dataFim, mostrarRepasseECobranca, mostrarColunaEquipe)
+            }
           >
             <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z" clipRule="evenodd" /></svg>
             Exportar PDF
@@ -1036,6 +1066,7 @@ const Relatorios = () => {
               <thead>
                 <tr className="text-left text-viva-700 border-b">
                   <th className="py-2 pr-4">Médico</th>
+                  {mostrarColunaEquipe ? <th className="py-2 pr-4">Equipe</th> : null}
                   <th className="py-2 pr-4">Escala</th>
                   <th className="py-2 pr-4">{usaSomenteEscala ? 'Plantões' : 'Registros'}</th>
                   <th className="py-2 pr-4">Total de horas</th>
@@ -1051,11 +1082,15 @@ const Relatorios = () => {
               </thead>
               <tbody>
                 {agrupado.map((item) => {
-                  const colSpan = mostrarRepasseECobranca ? 6 : 5;
+                  const colSpan =
+                    (mostrarRepasseECobranca ? 6 : 5) + (mostrarColunaEquipe ? 1 : 0);
                   return (
                     <Fragment key={item.key}>
                       <tr className="border-b last:border-b-0">
                         <td className="py-2 pr-4 font-medium text-viva-900">{item.medicoNome}</td>
+                        {mostrarColunaEquipe ? (
+                          <td className="py-2 pr-4 text-gray-700">{item.equipeNome ?? '—'}</td>
+                        ) : null}
                         <td className="py-2 pr-4 text-gray-700">{item.escalaNome}</td>
                         <td className="py-2 pr-4 text-gray-700">{item.totalRegistros}</td>
                         <td className="py-2 pr-4 font-semibold text-viva-900">{formatDuration(item.totalMinutos)}</td>

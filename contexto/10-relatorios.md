@@ -34,6 +34,11 @@ Fórmula (alinhada ao relatório com ponto): `horasTurno × R$/h (ValorPlantao n
 
 Arquivos: `relatorio-plantoes-somente-escala.service.ts`, `valor-plantao-dia.util.ts`.
 
+### Filtro de equipes e cobrança (ponto + escala)
+
+- Filtro **Equipe** fica ativo com o **contrato** selecionado (não exige subgrupo); opção **Todas as equipes** consolida o contrato e mostra coluna **Equipe**.
+- Em contratos com escala + ponto (ex.: Santa Quitéria), **repasse e cobrança** vêm de `config_ponto_eletronico` (Valores de Ponto) por equipe do médico na escala, além de congelado/ValorPlantao quando existirem.
+
 ## UAT visual — contrato misto (agosto/2026)
 
 Seed: `npx ts-node --transpile-only scripts/seed-faturamento-uat-demo.ts` (em `backend/`).  
@@ -67,6 +72,11 @@ Senha local dos dois: `Uat@2026`. Relatório: filtro do contrato + `2026-08-01`�
 - [ ] `/atendimentos` ainda não tem relatórios — módulo ATENDIMENTOS é placeholder no UI
 
 ## Changelog
+
+### 2026-09-14 — Relatório financeiro: todas as equipes + cobrança
+- Filtro equipe liberado com contrato (opção Todas); coluna Equipe na tabela/Excel/PDF
+- Backend aplica Valores de Ponto (repasse + cobrança R$/h) também em registros **com escala**
+- Arquivos: `admin.service.ts` (`listRegistrosPontoAdmin`), `Relatorios.tsx`
 
 ### 2026-09-14 — Demonstrativos: individual + lote + UX
 - Lote com “Todos os médicos”: `EnviarDemonstrativoProducaoLoteModal.tsx`

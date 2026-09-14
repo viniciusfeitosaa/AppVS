@@ -1446,6 +1446,8 @@ export async function listRegistrosPontoAdminService(
   const valorHoraCobrancaPorMedico: Record<string, number> = {};
   const valorHoraPorRegistroPontoId: Record<string, number> = {};
   const valorHoraCobrancaPorRegistroPontoId: Record<string, number> = {};
+  /** Nome da equipe (config de ponto) usada no rateio — útil no relatório com “Todas as equipes”. */
+  const equipeNomePorRegistroPontoId: Record<string, string> = {};
 
   const diaKeyFromDate = (d: Date): 'seg' | 'ter' | 'qua' | 'qui' | 'sex' | 'sab' | 'dom' => {
     // JS: 0=dom,1=seg,...6=sab
@@ -1549,6 +1551,202 @@ export async function listRegistrosPontoAdminService(
       if (vhCobResolved != null && Number.isFinite(vhCobResolved) && vhCobResolved >= 0) {
         valorHoraCobrancaPorRegistroPontoId[r.id] = vhCobResolved;
       }
+    }
+  }
+
+  // Contratos com escala + ponto (ex.: Santa Quitéria): Valores de Ponto por equipe da escala.
+  const registrosComEscala = (registrosComEscalaNome as Array<{
+    id: string;
+    medicoId: string;
+    escalaId: string | null;
+    checkInAt: Date | string | null;
+  }>).filter((r) => r.escalaId != null && r.medicoId != null);
+
+  if (registrosComEscala.length > 0) {
+    const escalaIdsCfg = [...new Set(registrosComEscala.map((r) => r.escalaId!))];
+    const medicoIdsCfg = [...new Set(registrosComEscala.map((r) => r.medicoId))];
+
+    const [escalaEquipesRows, vinculosMedico, escalasMeta] = await Promise.all([
+      prisma.escalaEquipe.findMany({
+        where: { tenantId, escalaId: { in: escalaIdsCfg } },
+        select: {
+          escalaId: true,
+          equipeId: true,
+          equipe: { select: { id: true, nome: true, subgrupoId: true } },
+        },
+      }),
+      prisma.equipeMedico.findMany({
+        where: { tenantId, medicoId: { in: medicoIdsCfg } },
+        select: { medicoId: true, equipeId: true },
+      }),
+      prisma.escala.findMany({
+        where: { tenantId, id: { in: escalaIdsCfg } },
+        select: { id: true, contratoAtivoId: true },
+      }),
+    ]);
+
+    const contratoPorEscala = new Map(
+      escalasMeta.map((e) => [e.id, e.contratoAtivoId] as const)
+    );
+    const equipesPorEscala = new Map<string, Array<{ equipeId: string; nome: string; subgrupoId: string | null }>>();
+    for (const row of escalaEquipesRows) {
+      const list = equipesPorEscala.get(row.escalaId) ?? [];
+      list.push({
+        equipeId: row.equipeId,
+        nome: row.equipe?.nome ?? '',
+        subgrupoId: row.equipe?.subgrupoId ?? null,
+      });
+      equipesPorEscala.set(row.escalaId, list);
+    }
+    const equipesDoMedico = new Map<string, Set<string>>();
+    for (const v of vinculosMedico) {
+      const set = equipesDoMedico.get(v.medicoId) ?? new Set<string>();
+      set.add(v.equipeId);
+      equipesDoMedico.set(v.medicoId, set);
+    }
+
+    const contratoIdsCfg = [
+      ...new Set([...contratoPorEscala.values()].filter((id): id is string => Boolean(id))),
+    ];
+    const equipeIdsAll = [...new Set(escalaEquipesRows.map((r) => r.equipeId))];
+    const subgrupoIdsAll = [
+      ...new Set(
+        escalaEquipesRows
+          .map((r) => r.equipe?.subgrupoId)
+          .filter((id): id is string => Boolean(id))
+      ),
+    ];
+
+    type CfgPonto = {
+      contratoAtivoId: string;
+      equipeId: string | null;
+      subgrupoId: string;
+      valorHora: unknown;
+      valorHoraCobranca: unknown;
+      valorHoraPorDia?: unknown;
+      valorHoraCobrancaPorDia?: unknown;
+      equipe?: { nome: string } | null;
+    };
+
+    let configsPonto: CfgPonto[] = [];
+    if (contratoIdsCfg.length > 0 && (equipeIdsAll.length > 0 || subgrupoIdsAll.length > 0)) {
+      try {
+        configsPonto = (await prisma.configPontoEletronico.findMany({
+          where: {
+            tenantId,
+            contratoAtivoId: { in: contratoIdsCfg },
+            OR: [
+              ...(equipeIdsAll.length ? [{ equipeId: { in: equipeIdsAll } }] : []),
+              ...(subgrupoIdsAll.length
+                ? [{ subgrupoId: { in: subgrupoIdsAll }, equipeId: null }]
+                : []),
+            ],
+          },
+          select: {
+            contratoAtivoId: true,
+            equipeId: true,
+            subgrupoId: true,
+            valorHora: true,
+            valorHoraCobranca: true,
+            valorHoraPorDia: true,
+            valorHoraCobrancaPorDia: true,
+            equipe: { select: { nome: true } },
+          },
+        })) as CfgPonto[];
+      } catch (e) {
+        if (
+          isMissingDatabaseColumnError(e, 'valor_hora_por_dia') ||
+          isMissingDatabaseColumnError(e, 'valor_hora_cobranca_por_dia')
+        ) {
+          configsPonto = (await prisma.configPontoEletronico.findMany({
+            where: {
+              tenantId,
+              contratoAtivoId: { in: contratoIdsCfg },
+              OR: [
+                ...(equipeIdsAll.length ? [{ equipeId: { in: equipeIdsAll } }] : []),
+                ...(subgrupoIdsAll.length
+                  ? [{ subgrupoId: { in: subgrupoIdsAll }, equipeId: null }]
+                  : []),
+              ],
+            },
+            select: {
+              contratoAtivoId: true,
+              equipeId: true,
+              subgrupoId: true,
+              valorHora: true,
+              valorHoraCobranca: true,
+              equipe: { select: { nome: true } },
+            },
+          })) as CfgPonto[];
+        } else {
+          throw e;
+        }
+      }
+    }
+
+    const pickRate = (
+      porDia: unknown,
+      dia: ReturnType<typeof diaKeyFromDate>,
+      global: unknown
+    ): number | null => {
+      const raw = (porDia as Record<string, unknown> | null | undefined)?.[dia];
+      const n = raw != null && raw !== '' ? Number(raw) : NaN;
+      if (Number.isFinite(n) && n > 0) return n;
+      const g = global != null ? Number(global) : NaN;
+      if (Number.isFinite(g) && g > 0) return g;
+      return null;
+    };
+
+    for (const r of registrosComEscala) {
+      const escalaId = r.escalaId!;
+      const contratoId = contratoPorEscala.get(escalaId);
+      if (!contratoId) continue;
+      const minhas = equipesDoMedico.get(r.medicoId) ?? new Set<string>();
+      const candidatas = (equipesPorEscala.get(escalaId) ?? []).filter((e) =>
+        minhas.has(e.equipeId)
+      );
+      if (candidatas.length === 0) continue;
+
+      const preferredEquipeId =
+        filters.equipeId && candidatas.some((c) => c.equipeId === filters.equipeId)
+          ? filters.equipeId
+          : candidatas[0].equipeId;
+      const preferred = candidatas.find((c) => c.equipeId === preferredEquipeId) ?? candidatas[0];
+
+      const cfgEquipe = configsPonto.find(
+        (c) =>
+          c.contratoAtivoId === contratoId &&
+          c.equipeId === preferred.equipeId
+      );
+      const cfgSubgrupo = configsPonto.find(
+        (c) =>
+          c.contratoAtivoId === contratoId &&
+          c.equipeId == null &&
+          preferred.subgrupoId != null &&
+          c.subgrupoId === preferred.subgrupoId
+      );
+      const cfg = cfgEquipe ?? cfgSubgrupo;
+      if (!cfg) continue;
+
+      const dt = r.checkInAt
+        ? r.checkInAt instanceof Date
+          ? r.checkInAt
+          : new Date(r.checkInAt)
+        : null;
+      if (!dt || Number.isNaN(dt.getTime())) continue;
+      const dk = diaKeyFromDate(dt);
+
+      const vh = pickRate(cfg.valorHoraPorDia, dk, cfg.valorHora);
+      const vhCob = pickRate(cfg.valorHoraCobrancaPorDia, dk, cfg.valorHoraCobranca);
+
+      if (vh != null && valorHoraPorRegistroPontoId[r.id] == null) {
+        valorHoraPorRegistroPontoId[r.id] = vh;
+      }
+      if (vhCob != null && valorHoraCobrancaPorRegistroPontoId[r.id] == null) {
+        valorHoraCobrancaPorRegistroPontoId[r.id] = vhCob;
+      }
+      const nomeEq = cfgEquipe?.equipe?.nome?.trim() || preferred.nome?.trim();
+      if (nomeEq) equipeNomePorRegistroPontoId[r.id] = nomeEq;
     }
   }
 
@@ -1744,6 +1942,7 @@ export async function listRegistrosPontoAdminService(
       gradeIdPlantaoPorRegistroPontoId,
       horasTurnoPorRegistroPontoId,
       horasTurnoPorGradeId,
+      equipeNomePorRegistroPontoId,
     };
   }
 
@@ -1759,6 +1958,7 @@ export async function listRegistrosPontoAdminService(
     gradeIdPlantaoPorRegistroPontoId: {} as Record<string, string>,
     horasTurnoPorRegistroPontoId: {} as Record<string, number>,
     horasTurnoPorGradeId: {} as Record<string, number>,
+    equipeNomePorRegistroPontoId,
   };
 }
 

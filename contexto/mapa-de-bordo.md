@@ -95,6 +95,7 @@ Arquivos de referência: `schema.prisma` (`Escala`, `EscalaMedico`, `EscalaPlant
 
 | Data | Entrega |
 |------|---------|
+| 2026-09-14 | **Relatório financeiro** — filtro **Todas as equipes** (sem exigir subgrupo) + coluna Equipe; cobrança via Valores de Ponto em contratos com escala — `10` |
 | 2026-09-14 | **Justificativa lê Valores de Ponto** — 400 “sem valor” em Santa Quitéria: resolver passa a usar `config_ponto_eletronico` (R$/h × turno) — `07` |
 | 2026-09-14 | **Justificativa ponto: alegado × considerado** — dia/hora do plantão corretos no `datetime-local` (sem −3h); campos considerados + Replicar; aceite usa o considerado — `07` |
 | 2026-09-14 | **Apelidos → nome real no relatório** — em `relatorio_procedimentos_mes`, `Dr Sayro`/`Dr Yuri`/etc. e `PIERRE` sobrescritos pelo cadastro completo + CRM (55 ocorrências; meses 2026-01/02) — `05`/`10` |
