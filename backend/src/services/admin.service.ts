@@ -924,7 +924,7 @@ export async function listContratoEquipesService(tenantId: string, contratoAtivo
     return [];
   }
   try {
-    return await prisma.contratoEquipe.findMany({
+    const linked = await prisma.contratoEquipe.findMany({
       where: { tenantId, contratoAtivoId },
       include: {
         equipe: {
@@ -933,6 +933,32 @@ export async function listContratoEquipesService(tenantId: string, contratoAtivo
       },
       orderBy: { equipe: { nome: 'asc' } },
     });
+    if (linked.length > 0) return linked;
+
+    // Fallback: equipes das escalas do contrato (vínculo contrato_equipes ausente)
+    const fromEscalas = await prisma.escalaEquipe.findMany({
+      where: { tenantId, escala: { contratoAtivoId } },
+      include: {
+        equipe: {
+          select: { id: true, nome: true, ativo: true, subgrupoId: true, subgrupo: { select: { id: true, nome: true } } },
+        },
+      },
+    });
+    const byEquipe = new Map<string, (typeof linked)[0]>();
+    for (const row of fromEscalas) {
+      if (!row.equipeId || byEquipe.has(row.equipeId)) continue;
+      byEquipe.set(row.equipeId, {
+        id: row.id,
+        tenantId,
+        contratoAtivoId,
+        equipeId: row.equipeId,
+        createdAt: new Date(),
+        equipe: row.equipe,
+      } as (typeof linked)[0]);
+    }
+    return Array.from(byEquipe.values()).sort((a, b) =>
+      String(a.equipe?.nome ?? '').localeCompare(String(b.equipe?.nome ?? ''), 'pt-BR')
+    );
   } catch (e: any) {
     if (e?.code === 'P2021' || e?.message?.includes('contrato_equipes') || e?.message?.includes('ContratoEquipe')) {
       return [];
@@ -1296,6 +1322,7 @@ export async function listRegistrosPontoAdminService(
     medicoIdsFilter = rows.map((r) => r.medicoId);
     if (medicoIdsFilter.length === 0) medicoIdsFilter = [''];
   } else if (filters.contratoAtivoId) {
+    // 1) vínculo explícito contrato↔equipe (pode estar vazio em contratos legados)
     let equipeIds: string[] = (
       await prisma.contratoEquipe.findMany({
         where: { tenantId, contratoAtivoId: filters.contratoAtivoId },
@@ -1303,14 +1330,64 @@ export async function listRegistrosPontoAdminService(
       })
     ).map((e) => e.equipeId);
 
-    if (filters.subgrupoId && equipeIds.length > 0) {
-      const equipesDoSubgrupo = await prisma.equipe.findMany({
-        where: { id: { in: equipeIds }, subgrupoId: filters.subgrupoId },
-        select: { id: true },
+    // 2) fallback: equipes ligadas às escalas do contrato
+    if (equipeIds.length === 0) {
+      const fromEscalas = await prisma.escalaEquipe.findMany({
+        where: { tenantId, escala: { contratoAtivoId: filters.contratoAtivoId } },
+        select: { equipeId: true },
       });
-      equipeIds = equipesDoSubgrupo.map((e) => e.id);
+      equipeIds = [...new Set(fromEscalas.map((e) => e.equipeId))];
     }
 
+    // 3) fallback: equipes dos subgrupos do contrato
+    if (equipeIds.length === 0) {
+      const subIds = (
+        await prisma.contratoSubgrupo.findMany({
+          where: { tenantId, contratoAtivoId: filters.contratoAtivoId },
+          select: { subgrupoId: true },
+        })
+      ).map((s) => s.subgrupoId);
+      if (subIds.length > 0) {
+        const eqs = await prisma.equipe.findMany({
+          where: { tenantId, subgrupoId: { in: subIds } },
+          select: { id: true },
+        });
+        equipeIds = eqs.map((e) => e.id);
+      }
+    }
+
+    if (filters.subgrupoId) {
+      const eqsDoSubgrupo = await prisma.equipe.findMany({
+        where: { tenantId, subgrupoId: filters.subgrupoId },
+        select: { id: true },
+      });
+      const idsSg = new Set(eqsDoSubgrupo.map((e) => e.id));
+      if (equipeIds.length > 0) {
+        const inter = equipeIds.filter((id) => idsSg.has(id));
+        // Se contrato_equipes não cobre o subgrupo, usa as equipes do subgrupo
+        equipeIds = inter.length > 0 ? inter : [...idsSg];
+      } else {
+        equipeIds = [...idsSg];
+      }
+    }
+
+    if (equipeIds.length === 0) {
+      medicoIdsFilter = [''];
+    } else {
+      const rows = await prisma.equipeMedico.findMany({
+        where: { tenantId, equipeId: { in: equipeIds } },
+        select: { medicoId: true },
+      });
+      medicoIdsFilter = [...new Set(rows.map((r) => r.medicoId))];
+      if (medicoIdsFilter.length === 0) medicoIdsFilter = [''];
+    }
+  } else if (filters.subgrupoId) {
+    // Só subgrupo (sem contrato): médicos das equipes do subgrupo
+    const eqs = await prisma.equipe.findMany({
+      where: { tenantId, subgrupoId: filters.subgrupoId },
+      select: { id: true },
+    });
+    const equipeIds = eqs.map((e) => e.id);
     if (equipeIds.length === 0) {
       medicoIdsFilter = [''];
     } else {
@@ -1337,6 +1414,24 @@ export async function listRegistrosPontoAdminService(
         }
       : {}),
   };
+
+  // Com contrato: restringe a escalas desse contrato (registros com escala) + ponto sem escala dos médicos filtrados
+  if (filters.contratoAtivoId && !filters.escalaId) {
+    const medicoClause =
+      medicoIdsFilter !== undefined ? { medicoId: { in: medicoIdsFilter } } : {};
+    Object.keys(where).forEach((k) => {
+      if (k === 'medicoId') delete where[k];
+    });
+    where.AND = [
+      ...(where.AND ?? []),
+      {
+        OR: [
+          { escala: { contratoAtivoId: filters.contratoAtivoId }, ...medicoClause },
+          { escalaId: null, ...medicoClause },
+        ],
+      },
+    ];
+  }
 
   const registroSelectSemCongelado = {
     id: true,
