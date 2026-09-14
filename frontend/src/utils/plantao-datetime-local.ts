@@ -1,7 +1,7 @@
 /**
- * Horários oficiais/alegados de plantão no backend usam a convenção
- * “face do relógio civil = componentes UTC” (ex.: 09:00 do turno → …T09:00:00.000Z).
- * `datetime-local` e labels devem ler/gravar com getUTC*/Date.UTC para não
+ * Horarios oficiais/alegados de plantao no backend usam a convencao
+ * "face do relogio civil = componentes UTC" (ex.: 09:00 do turno -> ...T09:00:00.000Z).
+ * datetime-local e labels devem ler/gravar com getUTC* e Date.UTC para nao
  * deslocar 3h no fuso America/Sao_Paulo.
  */
 
