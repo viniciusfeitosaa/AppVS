@@ -36,8 +36,8 @@
 
 1. Fila em **Justificativas de ponto** (módulo `PONTO_ELETRONICO`).
 2. Área **Sem ponto no plantão**: lista plantões recentes sem ponto fechado; botão **Decidir**.
-3. Com pedido pendente: Aceitar / Recusar (pode editar horários alegados; **não** alteram o valor).
-4. Sem pedido: **Justificar e aceitar** (`POST …/criar-e-aceitar`) — Master registra motivo + horários e aceita na hora.
+3. Com pedido pendente: Aceitar / Recusar. **Entrada/saída alegada** (pedido ou horário do plantão, dia/hora corretos) + **entrada/saída consideradas** (o que vai para o ponto); botão **Replicar alegado → considerado**. Valor do plantão **não** muda com os horários.
+4. Sem pedido: **Justificar e aceitar** (`POST …/criar-e-aceitar`) — mesmo par alegado/considerado + motivo; aceite usa o **considerado**.
 5. **Aceitar** (transação):
    - Revalida elegibilidade (ainda sem ponto **fechado** no dia/escala).
    - Se existir ponto **aberto** no mesmo dia/escala → **remove** (sem repasse).
@@ -127,6 +127,12 @@ Service: `justificativa-ausencia-ponto.service.ts` + `justificativa-ausencia-pon
 - `POST /api/admin/justificativas-ausencia/:id/recusar` — body opcional: `comentario`
 
 ## Changelog
+
+### 2026-09-14 — Alegado vs considerado + dia/hora corretos
+- `datetime-local` e labels de plantão usam face do relógio UTC (sem −3h no browser BR)
+- UI Master: campos **considerados** + botão **Replicar alegado → considerado**; aceite grava o considerado no ponto
+- Backend: `inicioPlantaoAsDate` / `fimPlantaoAsDate` com `Date.UTC` (independente do TZ do Node)
+- Arquivos: `plantao-datetime-local.ts`, `JustificativasPontoAdmin.tsx`, `JustificarAusenciaPonto.tsx`, `plantao-horario.ts`
 
 ### 2026-09-04 — Criar-e-aceitar: valor obrigatório + sem PENDENTE órfã
 - Valida `resolverValorCheioPlantao` **antes** de criar justificativa; mensagem pede cadastro em Valores de Plantão

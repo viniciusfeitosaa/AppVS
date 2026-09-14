@@ -95,6 +95,7 @@ Arquivos de referência: `schema.prisma` (`Escala`, `EscalaMedico`, `EscalaPlant
 
 | Data | Entrega |
 |------|---------|
+| 2026-09-14 | **Justificativa ponto: alegado × considerado** — dia/hora do plantão corretos no `datetime-local` (sem −3h); campos considerados + Replicar; aceite usa o considerado — `07` |
 | 2026-09-14 | **Apelidos → nome real no relatório** — em `relatorio_procedimentos_mes`, `Dr Sayro`/`Dr Yuri`/etc. e `PIERRE` sobrescritos pelo cadastro completo + CRM (55 ocorrências; meses 2026-01/02) — `05`/`10` |
 | 2026-09-14 | **Demonstrativos no relatório de procedimentos** — individual (médico filtrado) + **lote** com filtro “Todos”; prévia, e-mail editável, PDF por profissional; clique na linha seleciona; body API 25mb — `10` |
 | 2026-09-11 | **Corpo clínico lista 22** — 16 ok; corrigidos THOMAZ/RAFAEL CPF placeholder e PIERRE→ANTONIO PIERRE; criados MARIANA, PEDRO RAPHAEL, LUIZ EDUARDO. **Voltar:** RQE, e-mail dos novos, normalizar CRM — `05` |
@@ -218,7 +219,7 @@ Incluído no detalhe **Escalista: login + Escalas** acima (AppShell/Dashboard).
 | Lista | `GET /admin/justificativas-ausencia/plantoes-sem-ponto?dias=` — plantões já iniciados, sem ponto fechado, sem justificativa ACEITA |
 | Inclusão | Escala exige ponto (`escala_equipes` / `escala_subgrupos` / fallback contrato) **ou** médico com `allowPonto` alocado na grade |
 | Datas | Intervalo em fuso **America/Sao_Paulo**; só plantão com horário oficial de início ≤ agora |
-| UI | Chips Todos / Nenhum / Só entrada; botão **Decidir** → Aceitar / Recusar / Justificar e aceitar |
+| UI | Chips Todos / Nenhum / Só entrada; **Decidir** → alegado (horário do plantão correto) + **considerado** + **Replicar**; Aceitar / Recusar / Justificar e aceitar |
 | API criar+aceitar | `POST /admin/justificativas-ausencia/criar-e-aceitar` |
 | Pré-requisito | Existe **valor de plantão** (slot, `valores_plantao` ou alocação); senão 400 com mensagem clara |
 | Proteção | Valida valor **antes** de criar PENDENTE; se aceite falhar, remove PENDENTE órfã |

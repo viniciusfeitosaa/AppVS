@@ -6,33 +6,15 @@ import {
   type PlantaoElegivelJustificativa,
   type StatusJustificativaAusencia,
 } from '../services/ponto.service';
+import {
+  formatPlantaoDate,
+  formatPlantaoDateTime,
+  fromPlantaoDatetimeLocalValue,
+  toPlantaoDatetimeLocalValue,
+} from '../utils/plantao-datetime-local';
 
 const DECLARACAO =
   'Você está declarando que não bateu o ponto corretamente neste plantão.';
-
-const formatDate = (iso: string | null | undefined) => {
-  if (!iso) return '—';
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return '—';
-  return d.toLocaleDateString('pt-BR', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-  });
-};
-
-const formatDateTime = (iso: string | null | undefined) => {
-  if (!iso) return '—';
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return '—';
-  return d.toLocaleString('pt-BR', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-};
 
 const formatTime = (iso: string | null | undefined) => {
   if (!iso) return '—';
@@ -44,15 +26,18 @@ const formatTime = (iso: string | null | undefined) => {
   });
 };
 
-const toDatetimeLocalValue = (iso: string | null | undefined) => {
-  if (!iso) return '';
+const formatDateTimeLocal = (iso: string | null | undefined) => {
+  if (!iso) return '—';
   const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return '';
-  const pad = (n: number) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  if (Number.isNaN(d.getTime())) return '—';
+  return d.toLocaleString('pt-BR', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
 };
-
-const fromDatetimeLocalValue = (local: string) => new Date(local).toISOString();
 
 const statusLabel: Record<StatusJustificativaAusencia, string> = {
   PENDENTE: 'Pendente',
@@ -140,8 +125,8 @@ const JustificarAusenciaPonto = () => {
       setSaida('');
       return;
     }
-    setEntrada(toDatetimeLocalValue(selected.horarioOficialInicio));
-    setSaida(toDatetimeLocalValue(selected.horarioOficialFim));
+    setEntrada(toPlantaoDatetimeLocalValue(selected.horarioOficialInicio));
+    setSaida(toPlantaoDatetimeLocalValue(selected.horarioOficialFim));
     setMotivo('');
   }, [selected]);
 
@@ -157,8 +142,8 @@ const JustificarAusenciaPonto = () => {
     mutationFn: () =>
       pontoService.criarJustificativaAusencia({
         escalaPlantaoId: selectedId!,
-        horarioAlegadoEntrada: fromDatetimeLocalValue(entrada),
-        horarioAlegadoSaida: fromDatetimeLocalValue(saida),
+        horarioAlegadoEntrada: fromPlantaoDatetimeLocalValue(entrada),
+        horarioAlegadoSaida: fromPlantaoDatetimeLocalValue(saida),
         motivo: motivo.trim(),
       }),
     onSuccess: (resp) => {
@@ -317,10 +302,10 @@ const JustificarAusenciaPonto = () => {
                           key={p.id}
                           className={`border-b last:border-b-0 ${active ? 'bg-viva-50/80' : ''}`}
                         >
-                          <td className="py-2 px-3 text-viva-900 font-medium">{formatDate(p.data)}</td>
+                          <td className="py-2 px-3 text-viva-900 font-medium">{formatPlantaoDate(p.data)}</td>
                           <td className="py-2 px-3 text-viva-900">{nomeEscala(p.escalaId)}</td>
                           <td className="py-2 px-3 text-viva-900">
-                            {formatDateTime(p.horarioOficialInicio)} — {formatDateTime(p.horarioOficialFim)}
+                            {formatPlantaoDateTime(p.horarioOficialInicio)} — {formatPlantaoDateTime(p.horarioOficialFim)}
                           </td>
                           <td className="py-2 px-3 text-viva-900">
                             <span
@@ -362,7 +347,7 @@ const JustificarAusenciaPonto = () => {
           <div>
             <h2 className="text-lg font-bold text-viva-900">Formulário da justificativa</h2>
             <p className="text-xs text-viva-600 mt-1">
-              {formatDate(selected.data)} · {nomeEscala(selected.escalaId)}
+              {formatPlantaoDate(selected.data)} · {nomeEscala(selected.escalaId)}
             </p>
           </div>
 
@@ -454,11 +439,11 @@ const JustificarAusenciaPonto = () => {
                 {minhas.map((j) => (
                   <tr key={j.id} className="border-b last:border-b-0 align-top">
                     <td className="py-2 pr-4 text-viva-900">
-                      {formatDate(j.escalaPlantao?.data ?? j.horarioOficialInicio)}
+                      {formatPlantaoDate(j.escalaPlantao?.data ?? j.horarioOficialInicio)}
                     </td>
                     <td className="py-2 pr-4 text-viva-900">{j.escala?.nome ?? nomeEscala(j.escalaId)}</td>
                     <td className="py-2 pr-4 text-viva-900">
-                      {formatDateTime(j.horarioAlegadoEntrada)} — {formatDateTime(j.horarioAlegadoSaida)}
+                      {formatPlantaoDateTime(j.horarioAlegadoEntrada)} — {formatPlantaoDateTime(j.horarioAlegadoSaida)}
                     </td>
                     <td className="py-2 pr-4">
                       <span
@@ -470,7 +455,7 @@ const JustificarAusenciaPonto = () => {
                         <p className="text-xs text-viva-600 mt-1 font-serif">{j.comentarioMaster}</p>
                       ) : null}
                     </td>
-                    <td className="py-2 pr-4 text-viva-900">{formatDateTime(j.createdAt)}</td>
+                    <td className="py-2 pr-4 text-viva-900">{formatDateTimeLocal(j.createdAt)}</td>
                   </tr>
                 ))}
               </tbody>

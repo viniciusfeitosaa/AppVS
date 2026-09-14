@@ -7,22 +7,18 @@ import {
   type PlantaoSemPontoAdminItem,
   type StatusJustificativaAusenciaAdmin,
 } from '../services/admin.service';
+import {
+  formatPlantaoDate,
+  formatPlantaoDateTime,
+  fromPlantaoDatetimeLocalValue,
+  toPlantaoDatetimeLocalValue,
+} from '../utils/plantao-datetime-local';
 
 type HistoricoFiltro = 'TODAS' | 'ACEITA' | 'RECUSADA';
 type SemPontoFiltro = 'TODOS' | 'NENHUM' | 'SO_ENTRADA';
 
-const formatDate = (iso: string | null | undefined) => {
-  if (!iso) return '—';
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return '—';
-  return d.toLocaleDateString('pt-BR', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-  });
-};
-
-const formatDateTime = (iso: string | null | undefined) => {
+/** Instantes reais (ex.: check-in GPS) — fuso do browser. */
+const formatDateTimeLocal = (iso: string | null | undefined) => {
   if (!iso) return '—';
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return '—';
@@ -35,22 +31,12 @@ const formatDateTime = (iso: string | null | undefined) => {
   });
 };
 
-const formatTime = (iso: string | null | undefined) => {
+const formatTimeLocal = (iso: string | null | undefined) => {
   if (!iso) return '—';
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return '—';
   return d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
 };
-
-const toDatetimeLocalValue = (iso: string | null | undefined) => {
-  if (!iso) return '';
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return '';
-  const pad = (n: number) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-};
-
-const fromDatetimeLocalValue = (local: string) => new Date(local).toISOString();
 
 const statusLabel: Record<StatusJustificativaAusenciaAdmin, string> = {
   PENDENTE: 'Pendente',
@@ -72,6 +58,8 @@ const JustificativasPontoAdmin = () => {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [entrada, setEntrada] = useState('');
   const [saida, setSaida] = useState('');
+  const [entradaConsiderada, setEntradaConsiderada] = useState('');
+  const [saidaConsiderada, setSaidaConsiderada] = useState('');
   const [comentario, setComentario] = useState('');
   const [historicoFiltro, setHistoricoFiltro] = useState<HistoricoFiltro>('TODAS');
   const [semPontoFiltro, setSemPontoFiltro] = useState<SemPontoFiltro>('TODOS');
@@ -79,6 +67,8 @@ const JustificativasPontoAdmin = () => {
   const [semPontoDecisaoPlantaoId, setSemPontoDecisaoPlantaoId] = useState<string | null>(null);
   const [semPontoEntrada, setSemPontoEntrada] = useState('');
   const [semPontoSaida, setSemPontoSaida] = useState('');
+  const [semPontoEntradaConsiderada, setSemPontoEntradaConsiderada] = useState('');
+  const [semPontoSaidaConsiderada, setSemPontoSaidaConsiderada] = useState('');
   const [semPontoMotivo, setSemPontoMotivo] = useState('');
   const [semPontoComentario, setSemPontoComentario] = useState('');
   const [actionError, setActionError] = useState<string | null>(null);
@@ -149,23 +139,32 @@ const JustificativasPontoAdmin = () => {
     if (!semPontoDecisaoPlantao) {
       setSemPontoEntrada('');
       setSemPontoSaida('');
+      setSemPontoEntradaConsiderada('');
+      setSemPontoSaidaConsiderada('');
       setSemPontoMotivo('');
       setSemPontoComentario('');
       return;
     }
     const pend = semPontoDecisaoPlantao.justificativaPendente;
     if (pend) {
-      setSemPontoEntrada(toDatetimeLocalValue(pend.horarioAlegadoEntrada));
-      setSemPontoSaida(toDatetimeLocalValue(pend.horarioAlegadoSaida));
+      setSemPontoEntrada(toPlantaoDatetimeLocalValue(pend.horarioAlegadoEntrada));
+      setSemPontoSaida(toPlantaoDatetimeLocalValue(pend.horarioAlegadoSaida));
       setSemPontoMotivo(pend.motivo);
     } else {
-      setSemPontoEntrada(toDatetimeLocalValue(semPontoDecisaoPlantao.horarioOficialInicio));
-      setSemPontoSaida(toDatetimeLocalValue(semPontoDecisaoPlantao.horarioOficialFim));
+      setSemPontoEntrada(toPlantaoDatetimeLocalValue(semPontoDecisaoPlantao.horarioOficialInicio));
+      setSemPontoSaida(toPlantaoDatetimeLocalValue(semPontoDecisaoPlantao.horarioOficialFim));
       setSemPontoMotivo('');
     }
+    setSemPontoEntradaConsiderada('');
+    setSemPontoSaidaConsiderada('');
     setSemPontoComentario('');
     setActionError(null);
   }, [semPontoDecisaoPlantao]);
+
+  const replicarAlegadoParaConsideradoSemPonto = () => {
+    setSemPontoEntradaConsiderada(semPontoEntrada);
+    setSemPontoSaidaConsiderada(semPontoSaida);
+  };
 
   const abrirDecisaoSemPonto = (plantao: PlantaoSemPontoAdminItem) => {
     setSemPontoDecisaoPlantaoId(plantao.escalaPlantaoId);
@@ -176,7 +175,7 @@ const JustificativasPontoAdmin = () => {
 
   const labelSituacaoPonto = (p: PlantaoSemPontoAdminItem) => {
     if (p.situacaoPonto === 'SO_ENTRADA' && p.checkInAt) {
-      return `Entrada ${formatTime(p.checkInAt)} · sem saída`;
+      return `Entrada ${formatTimeLocal(p.checkInAt)} · sem saída`;
     }
     if (p.situacaoPonto === 'SO_ENTRADA') return 'Só entrada · sem saída';
     return 'Nenhum ponto';
@@ -186,14 +185,23 @@ const JustificativasPontoAdmin = () => {
     if (!selected) {
       setEntrada('');
       setSaida('');
+      setEntradaConsiderada('');
+      setSaidaConsiderada('');
       setComentario('');
       return;
     }
-    setEntrada(toDatetimeLocalValue(selected.horarioAlegadoEntrada));
-    setSaida(toDatetimeLocalValue(selected.horarioAlegadoSaida));
+    setEntrada(toPlantaoDatetimeLocalValue(selected.horarioAlegadoEntrada));
+    setSaida(toPlantaoDatetimeLocalValue(selected.horarioAlegadoSaida));
+    setEntradaConsiderada('');
+    setSaidaConsiderada('');
     setComentario('');
     setActionError(null);
   }, [selected]);
+
+  const replicarAlegadoParaConsiderado = () => {
+    setEntradaConsiderada(entrada);
+    setSaidaConsiderada(saida);
+  };
 
   const invalidateAll = async () => {
     await queryClient.invalidateQueries({ queryKey: ['admin', 'justificativas-ausencia'] });
@@ -203,10 +211,12 @@ const JustificativasPontoAdmin = () => {
   const aceitarMutation = useMutation({
     mutationFn: async () => {
       if (!selectedId) throw new Error('Nenhuma justificativa selecionada');
-      if (!entrada || !saida) throw new Error('Informe entrada e saída alegadas');
+      if (!entradaConsiderada || !saidaConsiderada) {
+        throw new Error('Informe entrada e saída consideradas (ou use Replicar)');
+      }
       return adminService.aceitarJustificativaAusencia(selectedId, {
-        horarioAlegadoEntrada: fromDatetimeLocalValue(entrada),
-        horarioAlegadoSaida: fromDatetimeLocalValue(saida),
+        horarioAlegadoEntrada: fromPlantaoDatetimeLocalValue(entradaConsiderada),
+        horarioAlegadoSaida: fromPlantaoDatetimeLocalValue(saidaConsiderada),
       });
     },
     onSuccess: async (res) => {
@@ -258,10 +268,12 @@ const JustificativasPontoAdmin = () => {
     mutationFn: async () => {
       const justId = semPontoDecisaoPlantao?.justificativaPendenteId;
       if (!justId) throw new Error('Nenhuma justificativa pendente para este plantão');
-      if (!semPontoEntrada || !semPontoSaida) throw new Error('Informe entrada e saída');
+      if (!semPontoEntradaConsiderada || !semPontoSaidaConsiderada) {
+        throw new Error('Informe entrada e saída consideradas (ou use Replicar)');
+      }
       return adminService.aceitarJustificativaAusencia(justId, {
-        horarioAlegadoEntrada: fromDatetimeLocalValue(semPontoEntrada),
-        horarioAlegadoSaida: fromDatetimeLocalValue(semPontoSaida),
+        horarioAlegadoEntrada: fromPlantaoDatetimeLocalValue(semPontoEntradaConsiderada),
+        horarioAlegadoSaida: fromPlantaoDatetimeLocalValue(semPontoSaidaConsiderada),
       });
     },
     onSuccess: async (res) => {
@@ -313,12 +325,14 @@ const JustificativasPontoAdmin = () => {
       if (semPontoDecisaoPlantao.justificativaPendenteId) {
         throw new Error('Este plantão já tem justificativa pendente');
       }
-      if (!semPontoEntrada || !semPontoSaida) throw new Error('Informe entrada e saída');
+      if (!semPontoEntradaConsiderada || !semPontoSaidaConsiderada) {
+        throw new Error('Informe entrada e saída consideradas (ou use Replicar)');
+      }
       if (semPontoMotivo.trim().length < 10) throw new Error('O motivo deve ter no mínimo 10 caracteres');
       return adminService.criarEAceitarJustificativaAusencia({
         escalaPlantaoId: semPontoDecisaoPlantao.escalaPlantaoId,
-        horarioAlegadoEntrada: fromDatetimeLocalValue(semPontoEntrada),
-        horarioAlegadoSaida: fromDatetimeLocalValue(semPontoSaida),
+        horarioAlegadoEntrada: fromPlantaoDatetimeLocalValue(semPontoEntradaConsiderada),
+        horarioAlegadoSaida: fromPlantaoDatetimeLocalValue(semPontoSaidaConsiderada),
         motivo: semPontoMotivo.trim(),
       });
     },
@@ -462,12 +476,12 @@ const JustificativasPontoAdmin = () => {
                             <span className="block text-xs text-viva-600">CRM {p.medicoCrm}</span>
                           ) : null}
                         </td>
-                        <td className="py-2 px-3 text-viva-900 whitespace-nowrap">{formatDate(p.data)}</td>
+                        <td className="py-2 px-3 text-viva-900 whitespace-nowrap">{formatPlantaoDate(p.data)}</td>
                         <td className="py-2 px-3 text-viva-900">{p.escalaNome}</td>
                         <td className="py-2 px-3 text-viva-900 whitespace-nowrap text-xs">
-                          {formatDateTime(p.horarioOficialInicio)}
+                          {formatPlantaoDateTime(p.horarioOficialInicio)}
                           <span className="block text-viva-600">
-                            até {formatDateTime(p.horarioOficialFim)}
+                            até {formatPlantaoDateTime(p.horarioOficialFim)}
                           </span>
                         </td>
                         <td className="py-2 px-3">
@@ -508,8 +522,13 @@ const JustificativasPontoAdmin = () => {
                 <div>
                   <h3 className="text-sm font-bold text-viva-900">Decisão neste plantão</h3>
                   <p className="text-xs text-viva-600 mt-1">
-                    {semPontoDecisaoPlantao.medicoNome} · {formatDate(semPontoDecisaoPlantao.data)} ·{' '}
+                    {semPontoDecisaoPlantao.medicoNome} · {formatPlantaoDate(semPontoDecisaoPlantao.data)} ·{' '}
                     {semPontoDecisaoPlantao.escalaNome}
+                  </p>
+                  <p className="text-xs text-viva-700 mt-1">
+                    <span className="font-semibold text-viva-800">Horário do plantão:</span>{' '}
+                    {formatPlantaoDateTime(semPontoDecisaoPlantao.horarioOficialInicio)} —{' '}
+                    {formatPlantaoDateTime(semPontoDecisaoPlantao.horarioOficialFim)}
                   </p>
                 </div>
 
@@ -539,6 +558,48 @@ const JustificativasPontoAdmin = () => {
                       onChange={(e) => setSemPontoSaida(e.target.value)}
                       disabled={busySemPonto}
                     />
+                  </div>
+                </div>
+
+                <div className="rounded-xl border border-viva-200 bg-white p-3 space-y-3">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                    <p className="text-sm font-semibold text-viva-800">Horário considerado (para o ponto)</p>
+                    <button
+                      type="button"
+                      className="btn text-xs border border-viva-300 bg-viva-50 text-viva-800"
+                      onClick={replicarAlegadoParaConsideradoSemPonto}
+                      disabled={busySemPonto || !semPontoEntrada || !semPontoSaida}
+                    >
+                      Replicar alegado → considerado
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label htmlFor="semPontoEntradaConsiderada" className="block text-sm font-semibold text-viva-800 mb-1">
+                        Entrada considerada
+                      </label>
+                      <input
+                        id="semPontoEntradaConsiderada"
+                        type="datetime-local"
+                        className="input w-full"
+                        value={semPontoEntradaConsiderada}
+                        onChange={(e) => setSemPontoEntradaConsiderada(e.target.value)}
+                        disabled={busySemPonto}
+                      />
+                    </div>
+                    <div>
+                      <label htmlFor="semPontoSaidaConsiderada" className="block text-sm font-semibold text-viva-800 mb-1">
+                        Saída considerada
+                      </label>
+                      <input
+                        id="semPontoSaidaConsiderada"
+                        type="datetime-local"
+                        className="input w-full"
+                        value={semPontoSaidaConsiderada}
+                        onChange={(e) => setSemPontoSaidaConsiderada(e.target.value)}
+                        disabled={busySemPonto}
+                      />
+                    </div>
                   </div>
                 </div>
 
@@ -612,7 +673,9 @@ const JustificativasPontoAdmin = () => {
                         type="button"
                         className="btn btn-primary text-sm"
                         onClick={() => aceitarSemPontoMutation.mutate()}
-                        disabled={busySemPonto || !semPontoEntrada || !semPontoSaida}
+                        disabled={
+                          busySemPonto || !semPontoEntradaConsiderada || !semPontoSaidaConsiderada
+                        }
                       >
                         {aceitarSemPontoMutation.isPending ? 'Aceitando…' : 'Aceitar'}
                       </button>
@@ -624,8 +687,8 @@ const JustificativasPontoAdmin = () => {
                       onClick={() => criarEAceitarSemPontoMutation.mutate()}
                       disabled={
                         busySemPonto ||
-                        !semPontoEntrada ||
-                        !semPontoSaida ||
+                        !semPontoEntradaConsiderada ||
+                        !semPontoSaidaConsiderada ||
                         semPontoMotivo.trim().length < 10
                       }
                     >
@@ -681,21 +744,21 @@ const JustificativasPontoAdmin = () => {
                         ) : null}
                       </td>
                       <td className="py-2 pr-4 text-viva-900">
-                        {formatDate(j.escalaPlantao?.data ?? j.horarioOficialInicio)}
+                        {formatPlantaoDate(j.escalaPlantao?.data ?? j.horarioOficialInicio)}
                         <span className="block text-xs text-viva-600">
                           {j.escala?.nome ?? 'Escala'}
                         </span>
                       </td>
                       <td className="py-2 pr-4 text-viva-900 whitespace-nowrap">
-                        {formatDateTime(j.horarioOficialInicio)}
+                        {formatPlantaoDateTime(j.horarioOficialInicio)}
                         <span className="block text-xs text-viva-600">
-                          até {formatDateTime(j.horarioOficialFim)}
+                          até {formatPlantaoDateTime(j.horarioOficialFim)}
                         </span>
                       </td>
                       <td className="py-2 pr-4 text-viva-900 whitespace-nowrap">
-                        {formatDateTime(j.horarioAlegadoEntrada)}
+                        {formatPlantaoDateTime(j.horarioAlegadoEntrada)}
                         <span className="block text-xs text-viva-600">
-                          até {formatDateTime(j.horarioAlegadoSaida)}
+                          até {formatPlantaoDateTime(j.horarioAlegadoSaida)}
                         </span>
                       </td>
                       <td className="py-2 pr-4 text-viva-900 max-w-xs">
@@ -715,7 +778,7 @@ const JustificativasPontoAdmin = () => {
           <div>
             <h2 className="text-lg font-bold text-viva-900">Decisão</h2>
             <p className="text-xs text-viva-600 mt-1">
-              {nomeMedico(selected)} · {formatDate(selected.escalaPlantao?.data ?? selected.horarioOficialInicio)} ·{' '}
+              {nomeMedico(selected)} · {formatPlantaoDate(selected.escalaPlantao?.data ?? selected.horarioOficialInicio)} ·{' '}
               {selected.escala?.nome ?? 'Escala'}
             </p>
           </div>
@@ -723,7 +786,7 @@ const JustificativasPontoAdmin = () => {
           <div className="rounded-xl border border-viva-100 bg-viva-50/40 p-3 text-xs text-viva-700 space-y-1">
             <p>
               <span className="font-semibold text-viva-800">Oficial:</span>{' '}
-              {formatDateTime(selected.horarioOficialInicio)} — {formatDateTime(selected.horarioOficialFim)}
+              {formatPlantaoDateTime(selected.horarioOficialInicio)} — {formatPlantaoDateTime(selected.horarioOficialFim)}
             </p>
             <p className="font-serif whitespace-pre-wrap">
               <span className="font-semibold text-viva-800 font-sans">Motivo:</span> {selected.motivo}
@@ -758,6 +821,48 @@ const JustificativasPontoAdmin = () => {
                 required
                 disabled={busy}
               />
+            </div>
+          </div>
+
+          <div className="rounded-xl border border-viva-200 bg-white p-3 space-y-3">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+              <p className="text-sm font-semibold text-viva-800">Horário considerado (para o ponto)</p>
+              <button
+                type="button"
+                className="btn text-xs border border-viva-300 bg-viva-50 text-viva-800"
+                onClick={replicarAlegadoParaConsiderado}
+                disabled={busy || !entrada || !saida}
+              >
+                Replicar alegado → considerado
+              </button>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label htmlFor="adminEntradaConsiderada" className="block text-sm font-semibold text-viva-800 mb-1">
+                  Entrada considerada
+                </label>
+                <input
+                  id="adminEntradaConsiderada"
+                  type="datetime-local"
+                  className="input w-full"
+                  value={entradaConsiderada}
+                  onChange={(e) => setEntradaConsiderada(e.target.value)}
+                  disabled={busy}
+                />
+              </div>
+              <div>
+                <label htmlFor="adminSaidaConsiderada" className="block text-sm font-semibold text-viva-800 mb-1">
+                  Saída considerada
+                </label>
+                <input
+                  id="adminSaidaConsiderada"
+                  type="datetime-local"
+                  className="input w-full"
+                  value={saidaConsiderada}
+                  onChange={(e) => setSaidaConsiderada(e.target.value)}
+                  disabled={busy}
+                />
+              </div>
             </div>
           </div>
 
@@ -798,7 +903,7 @@ const JustificativasPontoAdmin = () => {
               type="button"
               className="btn btn-primary text-sm"
               onClick={() => aceitarMutation.mutate()}
-              disabled={busy || !entrada || !saida}
+              disabled={busy || !entradaConsiderada || !saidaConsiderada}
             >
               {aceitarMutation.isPending ? 'Aceitando...' : 'Aceitar'}
             </button>
@@ -850,11 +955,11 @@ const JustificativasPontoAdmin = () => {
                   <tr key={j.id} className="border-b last:border-b-0 align-top">
                     <td className="py-2 pr-4 text-viva-900">{nomeMedico(j)}</td>
                     <td className="py-2 pr-4 text-viva-900">
-                      {formatDate(j.escalaPlantao?.data ?? j.horarioOficialInicio)}
+                      {formatPlantaoDate(j.escalaPlantao?.data ?? j.horarioOficialInicio)}
                       <span className="block text-xs text-viva-600">{j.escala?.nome ?? 'Escala'}</span>
                     </td>
                     <td className="py-2 pr-4 text-viva-900 whitespace-nowrap">
-                      {formatDateTime(j.horarioAlegadoEntrada)} — {formatDateTime(j.horarioAlegadoSaida)}
+                      {formatPlantaoDateTime(j.horarioAlegadoEntrada)} — {formatPlantaoDateTime(j.horarioAlegadoSaida)}
                     </td>
                     <td className="py-2 pr-4">
                       <span
@@ -866,7 +971,7 @@ const JustificativasPontoAdmin = () => {
                         <p className="text-xs text-viva-600 mt-1 font-serif">{j.comentarioMaster}</p>
                       ) : null}
                     </td>
-                    <td className="py-2 pr-4 text-viva-900">{formatDateTime(j.decididoEm)}</td>
+                    <td className="py-2 pr-4 text-viva-900">{formatDateTimeLocal(j.decididoEm)}</td>
                   </tr>
                 ))}
               </tbody>

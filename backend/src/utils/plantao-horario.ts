@@ -46,23 +46,25 @@ export function inferCruzaMeiaNoite(horaInicio: string, horaFim: string, explici
   return hf <= hi;
 }
 
+/**
+ * Início do plantão: face do relógio civil do turno em componentes UTC
+ * (alinhado a `instanteDentroDaJanelaPlantaoUtc` — independente do TZ do Node).
+ */
 export function inicioPlantaoAsDate(dataStr: string, s: PlantaoSchedule): Date {
-  const d = new Date(`${dataStr}T00:00:00`);
+  const [y, mo, d] = dataStr.split('-').map((x) => Number(x));
   const h = Math.floor(s.horaInicioMin / 60);
   const m = s.horaInicioMin % 60;
-  d.setHours(h, m, 0, 0);
-  return d;
+  return new Date(Date.UTC(y, mo - 1, d, h, m, 0, 0));
 }
 
 export function fimPlantaoAsDate(dataStr: string, s: PlantaoSchedule): Date {
-  const d = new Date(`${dataStr}T00:00:00`);
-  if (s.cruzaMeiaNoite) {
-    d.setDate(d.getDate() + 1);
-  }
+  const [y, mo, d] = dataStr.split('-').map((x) => Number(x));
   const h = Math.floor(s.horaFimMin / 60);
   const m = s.horaFimMin % 60;
-  d.setHours(h, m, 0, 0);
-  return d;
+  if (s.cruzaMeiaNoite) {
+    return new Date(Date.UTC(y, mo - 1, d + 1, h, m, 0, 0));
+  }
+  return new Date(Date.UTC(y, mo - 1, d, h, m, 0, 0));
 }
 
 /**
