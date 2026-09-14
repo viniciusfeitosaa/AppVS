@@ -53,13 +53,19 @@ Vinculam subgrupos e equipes ao contrato institucional.
 ## Pendências
 
 - [x] Documentar regras de negócio de aprovação de cadastro pendente (se houver UI específica)
+- [ ] **Voltar (placeholders 2026-09-14):** **THALES** e **FREDDY BARBERY** — trocar CPF/CRM TEMP, nome completo, e-mail e demais dados reais (hoje `90000000005` / `90000000006`, `TEMP-0005/CE` / `TEMP-0006/CE`, senha temp `viva@2026`)
 - [ ] **Voltar (lista 22 / 2026-09-11):** campo RQE (não existe no schema); e-mail dos 3 novos (Mariana, Pedro Raphael, Luiz Eduardo); padronizar CRM (`/CE` vs `-CE`) e caixa do nome
-- [x] Apelidos `Dr X` / `PIERRE` no **relatório de procedimentos** → nome completo + CRM do cadastro (2026-09-14; ver `10`)
-- [ ] Revisar outros placeholders/incompletos no corpo clínico (além dos CPF `9000000…` já zerados)
+- [ ] Revisar outros placeholders/incompletos no corpo clínico (além dos CPF `9000000…`)
 
 Fila Master em `/avaliacao`: pendentes de `/cadastro` público. **Aprovar** → `ATIVO`; **Rejeitar** → `REJEITADO`. Botão **Busca médicos (CFM)** abre `portal.cfm.org.br/busca-medicos` (consulta manual).
 
 ## Changelog
+
+### 2026-09-14 — Placeholders THALES e FREDDY BARBERY
+- Criados no tenant Seja Viva Saúde (fantasma / depois dados reais):
+  - **THALES** — CPF `90000000005`, CRM `TEMP-0005/CE`, sem e-mail, senha temp `viva@2026`
+  - **FREDDY BARBERY** — CPF `90000000006`, CRM `TEMP-0006/CE`, sem e-mail, senha temp `viva@2026`
+- Status `ATIVO`; anotar no mapa de bordo para substituição posterior
 
 ### 2026-09-14 — Apelidos do relatório → nome real
 - Em produção: `relatorio_procedimentos_mes` (2026-01/02) — `Dr Sayro`, `Dr Yuri`, `Dra. Amanda`, `Dr. Tomaz`, `PIERRE`, etc. → nomes/CRM do corpo clínico

@@ -17,7 +17,7 @@ O **Viva Saúde** está em produção na VPS (`sejavivasaude.com.br`). Auth, esc
 **Subgrupos e Equipes:** ao **criar equipe**, a **escala nasce automaticamente** com o mesmo nome (1 escala por equipe).  
 **Painel de E-mail:** histórico com botão **Ver** (prévia do corpo).  
 **Relatórios → Procedimentos:** envio de demonstrativo (individual + **lote com “Todos os médicos”**); UX com avisos/e-mail editável; body API **25mb**.  
-**Corpo clínico (parcial):** lista 22 (2026-09-11); em **2026-09-14** apelidos no relatório de procedimentos (`Dr Sayro`, etc.) sobrescritos pelo nome completo + CRM do cadastro. **Voltar:** RQE, e-mails dos 3 novos, normalizar CRM/caixa — `05` / `10`.
+**Corpo clínico (parcial):** lista 22 + placeholders **THALES** e **FREDDY BARBERY** (2026-09-14, CPF `900…` / CRM TEMP — **voltar** com dados reais). Também: RQE, e-mails dos 3 novos, normalizar CRM/caixa — `05`.
 
 ## Módulos — status
 
@@ -72,7 +72,7 @@ Arquivos de referência: `schema.prisma` (`Escala`, `EscalaMedico`, `EscalaPlant
 
 ## Pendências prioritárias
 
-1. **Corpo clínico (lista 22 / RQE)** — limpeza parcial feita (2026-09-11); **voltar** para RQE, e-mails dos 3 novos e padronizar CRM/caixa — `05-medicos-contratos.md`
+1. **Corpo clínico** — placeholders **THALES** / **FREDDY BARBERY** (trocar por dados reais); RQE; e-mails Mariana/Pedro Raphael/Luiz Eduardo; padronizar CRM/caixa — `05-medicos-contratos.md`
 2. **Perfis staff** — Escalista em uso (menu Off + login sem acesso-negado, 2026-09-04). Smoke residual: VER vs EDITAR nas telas — `04-autenticacao-acessos.md`
 3. **Justificativa de ponto** — fluxo Master “Sem ponto” + criar-e-aceitar **em produção**; cadastre **Valores de Plantão** nos contratos (ex.: Santa Quitéria) antes de justificar. E2E médico→Master ainda recomendado — `07-ponto-eletronico.md`
 4. **Push (VPS + store)** — copiar service account JSON; `FIREBASE_SERVICE_ACCOUNT_PATH` (ou `_JSON`); `prisma migrate deploy` (`device_push_tokens`); restart backend; novo AAB/IPA — ver checklist em `12-mobile-capacitor.md`
@@ -95,6 +95,7 @@ Arquivos de referência: `schema.prisma` (`Escala`, `EscalaMedico`, `EscalaPlant
 
 | Data | Entrega |
 |------|---------|
+| 2026-09-14 | **Corpo clínico placeholders** — cadastrados **THALES** e **FREDDY BARBERY** (CPF `90000000005/6`, CRM TEMP, senha temp `viva@2026`, sem e-mail). **Voltar:** substituir por dados reais — `05` |
 | 2026-09-14 | **Relatório financeiro** — filtro **Todas as equipes** (sem exigir subgrupo) + coluna Equipe; cobrança via Valores de Ponto em contratos com escala — `10` |
 | 2026-09-14 | **Justificativa lê Valores de Ponto** — 400 “sem valor” em Santa Quitéria: resolver passa a usar `config_ponto_eletronico` (R$/h × turno) — `07` |
 | 2026-09-14 | **Justificativa ponto: alegado × considerado** — dia/hora do plantão corretos no `datetime-local` (sem −3h); campos considerados + Replicar; aceite usa o considerado — `07` |
