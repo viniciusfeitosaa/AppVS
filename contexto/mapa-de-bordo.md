@@ -139,6 +139,21 @@ Arquivos de referência: `schema.prisma` (`Escala`, `EscalaMedico`, `EscalaPlant
 | 2026-04 | Trocas de plantão |
 | 2026-03 | Módulo vagas, valores plantão |
 
+### Detalhe — Demonstrativos no relatório de procedimentos (2026-09-14)
+
+**Problema:** botão “Enviar demonstrativo” parecia não fazer nada (desabilitado sem aviso se filtro = Todos; e-mail vazio no modal também silenciava o envio). Faltava envio em lote.
+
+**Solução:**
+
+| Item | Comportamento |
+|------|----------------|
+| Individual | Médico filtrado → modal com prévia + PDF da produção |
+| Lote | Filtro **Todos** → lista de todos do resumo; checkbox + e-mail editável; envia um PDF por profissional |
+| UX | Avisos toast; clique na linha seleciona médico; progresso no lote |
+| API | `express.json`/`urlencoded` **25mb** para anexos base64 |
+
+**Arquivos:** `RelatoriosProcedimentos.tsx`, `EnviarDemonstrativoProducaoModal.tsx`, `EnviarDemonstrativoProducaoLoteModal.tsx`, `app.ts`, `contexto/10-relatorios.md`
+
 ### Detalhe — Escalista: login + Escalas (2026-09-04)
 
 **Problema:** após login, Escalista ia para `/acesso-negado`. Causa: enquanto permissões carregavam, a UI assumia acesso total → chamava APIs de módulos Off (ex.: justificativas de ponto) → interceptor 403 redirecionava. Depois, Escalas falhava em contratos/subgrupos/equipes/médicos (só `MEDICOS` / `CONTRATOS_ATIVOS`).
