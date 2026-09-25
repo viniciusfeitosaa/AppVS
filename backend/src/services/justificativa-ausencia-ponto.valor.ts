@@ -79,7 +79,7 @@ async function resolveHorasTurno(
  * Valor/hora em Configuração de Ponto (Valores de Ponto): equipe do médico na escala,
  * senão config do subgrupo (equipeId null). Preferência: linha com equipe específica.
  */
-async function resolveValorHoraConfigPonto(
+export async function resolveValorHoraConfigPonto(
   tenantId: string,
   contratoAtivoId: string,
   escalaId: string,

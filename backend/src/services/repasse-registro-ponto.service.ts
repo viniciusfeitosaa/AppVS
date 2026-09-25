@@ -7,6 +7,7 @@ import {
 } from '../utils/plantao-horario';
 import { isMissingDatabaseColumnError } from '../utils/prisma-column-error';
 import { resolveProducaoMedicoNaEscala } from '../utils/producao-subgrupo.util';
+import { resolveValorHoraConfigPonto } from './justificativa-ausencia-ponto.valor';
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
@@ -27,6 +28,8 @@ type PlantaoRow = {
 /**
  * Calcula o valor de repasse (escala + ponto) no fechamento do ponto, alinhado à regra do relatório naquele
  * instante, para gravar em repasseValorCongelado — alterações futuras em tipos/valores não mudam o histórico.
+ *
+ * Ordem: EscalaMedico.valorHora → Valores de Ponto (config_ponto) → ValorPlantao (total do turno rateado).
  */
 export async function calcularRepasseCongeladoCheckout(
   tenantId: string,
@@ -59,6 +62,18 @@ export async function calcularRepasseCongeladoCheckout(
   const vhAloc = aloc?.valorHora != null ? Number(aloc.valorHora) : NaN;
   if (Number.isFinite(vhAloc) && vhAloc > 0) {
     return round2((duracaoMinutos / 60) * vhAloc);
+  }
+
+  // Valores de Ponto (config por equipe/subgrupo) — mesma fonte do relatório financeiro.
+  const vhConfig = await resolveValorHoraConfigPonto(
+    tenantId,
+    c.id,
+    escalaId,
+    medicoId,
+    checkInAt
+  );
+  if (vhConfig != null && vhConfig > 0) {
+    return round2((duracaoMinutos / 60) * vhConfig);
   }
 
   const tipos = await prisma.tipoPlantao.findMany({

@@ -41,6 +41,8 @@ import {
   listMedicosFiltrosResumoController,
   getMedicoDetalheAdminController,
   downloadMedicoDocumentoPerfilAdminController,
+  listDocumentosValidadeAlertaController,
+  avisarValidadeDocumentoMedicoController,
   listDocusealPendentesController,
   docusealResumoPorEmailsController,
   docusealResendSubmitterController,
@@ -54,6 +56,9 @@ import {
   downloadCadastroPendenteDocumentoController,
   aprovarCadastroPendenteController,
   rejeitarCadastroPendenteController,
+  confirmarOkDocumentoCadastroPendenteController,
+  solicitarDocumentoCadastroPendenteController,
+  substituirDocumentoCadastroPendenteController,
   removerEscalaPlantaoController,
   removerMedicoEscalaController,
   removeContratoEquipeController,
@@ -99,7 +104,7 @@ import {
   requireModuleWrite,
   requireRole,
 } from '../middleware/auth.middleware';
-import { uploadDocumentoEnviado } from '../middleware/upload.middleware';
+import { uploadDocumentoEnviado, uploadPerfilDocumentos } from '../middleware/upload.middleware';
 import { ModuloSistema, UserRole } from '@prisma/client';
 import {
   validateUUIDParam,
@@ -158,6 +163,11 @@ router.get(
   listMedicosController
 );
 router.get(
+  '/medicos/documentos-validade',
+  requireModuleAccess(ModuloSistema.MEDICOS),
+  listDocumentosValidadeAlertaController
+);
+router.get(
   '/medicos/:id',
   requireAnyModuleAccess([ModuloSistema.MEDICOS, ModuloSistema.ESCALAS]),
   validateUUIDParam('id'),
@@ -169,6 +179,13 @@ router.get(
   validateUUIDParam('id'),
   validateUUIDParam('documentoId'),
   downloadMedicoDocumentoPerfilAdminController
+);
+router.post(
+  '/medicos/:id/documentos/:documentoId/avisar-validade',
+  requireModuleAccess(ModuloSistema.MEDICOS),
+  validateUUIDParam('id'),
+  validateUUIDParam('documentoId'),
+  avisarValidadeDocumentoMedicoController
 );
 // Relatório de procedimentos (Lançamentos do mês): persistência por mês no backend.
 // Mantemos apenas autenticação + role MASTER (sem gate por módulo) para evitar "parece que salvou mas some" em outros PCs.
@@ -413,6 +430,28 @@ router.post(
   requireModuleAccess(ModuloSistema.AVALIACAO),
   validateUUIDParam('medicoId'),
   rejeitarCadastroPendenteController
+);
+router.post(
+  '/cadastros-pendentes/:medicoId/documentos/:documentoId/confirmar-ok',
+  requireModuleAccess(ModuloSistema.AVALIACAO),
+  validateUUIDParam('medicoId'),
+  validateUUIDParam('documentoId'),
+  confirmarOkDocumentoCadastroPendenteController
+);
+router.post(
+  '/cadastros-pendentes/:medicoId/documentos/:documentoId/solicitar',
+  requireModuleAccess(ModuloSistema.AVALIACAO),
+  validateUUIDParam('medicoId'),
+  validateUUIDParam('documentoId'),
+  solicitarDocumentoCadastroPendenteController
+);
+router.post(
+  '/cadastros-pendentes/:medicoId/documentos/:documentoId/substituir',
+  requireModuleAccess(ModuloSistema.AVALIACAO),
+  validateUUIDParam('medicoId'),
+  validateUUIDParam('documentoId'),
+  uploadPerfilDocumentos.single('arquivo'),
+  substituirDocumentoCadastroPendenteController
 );
 
 router.get('/documentos-enviados', requireModuleAccess(ModuloSistema.ENVIO_DOCUMENTOS), listDocumentosEnviadosController);

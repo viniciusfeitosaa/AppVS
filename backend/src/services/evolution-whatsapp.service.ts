@@ -11,6 +11,15 @@ export type SendTextResult = {
   messageId?: string;
 };
 
+export type SendWhatsAppTextOpts = {
+  /** Liga delay + typing (default: WHATSAPP_HUMANIZE). */
+  humanize?: boolean;
+  /** Envia presence "composing" antes do texto (default: WHATSAPP_TYPING). */
+  typing?: boolean;
+  /** Delay fixo em ms; senão usa jitter MIN–MAX do env. */
+  delayMs?: number;
+};
+
 function baseUrl(): string {
   return (env.EVOLUTION_API_URL || '').replace(/\/$/, '');
 }
@@ -62,29 +71,101 @@ async function parseEvolutionError(res: Response): Promise<string> {
   }
 }
 
-/** Evolution GO — POST /send/text */
-async function sendTextGo(numberE164: string, text: string): Promise<SendTextResult> {
+function parsePositiveInt(raw: string | undefined, fallback: number): number {
+  const n = parseInt(raw || '', 10);
+  return Number.isFinite(n) && n >= 0 ? n : fallback;
+}
+
+/** Jitter aleatório entre MIN e MAX (ms) para parecer humano. */
+export function humanizeDelayMs(explicit?: number): number {
+  if (typeof explicit === 'number' && Number.isFinite(explicit) && explicit >= 0) {
+    return Math.floor(explicit);
+  }
+  const min = parsePositiveInt(env.WHATSAPP_REPLY_DELAY_MS_MIN, 5000);
+  const max = parsePositiveInt(env.WHATSAPP_REPLY_DELAY_MS_MAX, 12000);
+  const lo = Math.min(min, max);
+  const hi = Math.max(min, max);
+  if (hi <= lo) return lo;
+  return lo + Math.floor(Math.random() * (hi - lo + 1));
+}
+
+function humanizeEnabled(opts?: SendWhatsAppTextOpts): boolean {
+  if (typeof opts?.humanize === 'boolean') return opts.humanize;
+  return env.WHATSAPP_HUMANIZE !== 'false';
+}
+
+function typingEnabled(opts?: SendWhatsAppTextOpts): boolean {
+  if (typeof opts?.typing === 'boolean') return opts.typing;
+  return env.WHATSAPP_TYPING !== 'false';
+}
+
+function sleep(ms: number): Promise<void> {
+  if (ms <= 0) return Promise.resolve();
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
+ * Presence no chat (digitando…). Número sem "+" (Evolution GO / nós RAW).
+ * state: composing | paused | available
+ */
+export async function setChatPresence(
+  numberE164: string,
+  state: 'composing' | 'paused' | 'available' = 'composing'
+): Promise<boolean> {
+  if (!hasEvolutionGoConfig()) return false;
+  const number = numberE164.replace(/^\+/, '').replace(/\D/g, '');
+  if (!number) return false;
+
+  const url = `${baseUrl()}/message/presence`;
+  try {
+    const res = await fetchWithTimeout(url, {
+      method: 'POST',
+      headers: evolutionHeaders(env.EVOLUTION_INSTANCE_ID),
+      body: JSON.stringify({ number, state, isAudio: false }),
+    });
+    if (!res.ok) {
+      safeLogger.warn(`[evolution] presence falhou: ${await parseEvolutionError(res)}`);
+      return false;
+    }
+    return true;
+  } catch (err) {
+    safeLogger.warn('[evolution] presence erro:', err);
+    return false;
+  }
+}
+
+/** Evolution GO — POST /send/text (delay opcional em ms = composing nativo). */
+async function sendTextGo(
+  numberE164: string,
+  text: string,
+  delayMs?: number
+): Promise<SendTextResult> {
   const url = `${baseUrl()}/send/text`;
+  const body: Record<string, unknown> = { number: numberE164, text };
+  if (typeof delayMs === 'number' && delayMs > 0) {
+    body.delay = delayMs;
+  }
+
   const res = await fetchWithTimeout(url, {
     method: 'POST',
     headers: evolutionHeaders(env.EVOLUTION_INSTANCE_ID),
-    body: JSON.stringify({ number: numberE164, text }),
+    body: JSON.stringify(body),
   });
 
   if (!res.ok) {
     throw new Error(`Evolution GO ${res.status}: ${await parseEvolutionError(res)}`);
   }
 
-  let body: { messageId?: string; error?: string; data?: { Info?: { ID?: string } } };
+  let parsed: { messageId?: string; error?: string; data?: { Info?: { ID?: string } } };
   try {
-    body = (await res.json()) as typeof body;
+    parsed = (await res.json()) as typeof parsed;
   } catch {
-    body = {};
+    parsed = {};
   }
-  if (body.error) {
-    throw new Error(`Evolution GO: ${body.error}`);
+  if (parsed.error) {
+    throw new Error(`Evolution GO: ${parsed.error}`);
   }
-  const messageId = body.messageId || body.data?.Info?.ID;
+  const messageId = parsed.messageId || parsed.data?.Info?.ID;
 
   return { ok: true, provider: 'go', messageId };
 }
@@ -111,26 +192,53 @@ async function sendTextLegacy(numberE164: string, text: string): Promise<SendTex
 
 /**
  * Envia texto WhatsApp via Evolution (GO ou legada).
- * @param toPhone telefone com ou sem máscara (BR)
+ * Com humanize: presence "composing" + delay jitter antes do envio.
  */
-export async function sendWhatsAppText(toPhone: string, text: string): Promise<SendTextResult> {
+export async function sendWhatsAppText(
+  toPhone: string,
+  text: string,
+  opts?: SendWhatsAppTextOpts
+): Promise<SendTextResult> {
   const number = normalizePhoneE164Br(toPhone);
   if (!number) {
     throw new Error('Telefone inválido para WhatsApp');
   }
 
   const provider = getEvolutionProvider();
+  const useHumanize = humanizeEnabled(opts);
+  const delayMs = useHumanize ? humanizeDelayMs(opts?.delayMs) : opts?.delayMs ?? 0;
+
   if (provider === 'go') {
     if (!hasEvolutionGoConfig()) {
       throw new Error(
         'Evolution GO não configurado (EVOLUTION_API_URL, EVOLUTION_INSTANCE_ID, EVOLUTION_INSTANCE_TOKEN)'
       );
     }
-    return sendTextGo(number, text);
+
+    if (useHumanize && typingEnabled(opts)) {
+      // Sustenta “digitando…”: presence + delay nativo no /send/text.
+      await setChatPresence(number, 'composing');
+      // Reenvia presence a cada ~4s se o delay for longo (indicador some sozinho).
+      const refreshEvery = 4000;
+      let elapsed = 0;
+      while (elapsed + refreshEvery < delayMs) {
+        await sleep(refreshEvery);
+        elapsed += refreshEvery;
+        await setChatPresence(number, 'composing');
+      }
+      const remaining = Math.max(0, delayMs - elapsed);
+      // O delay restante vai no body do send (API GO aplica composing interno).
+      return sendTextGo(number, text, remaining > 0 ? remaining : undefined);
+    }
+
+    return sendTextGo(number, text, delayMs > 0 ? delayMs : undefined);
   }
 
   if (!hasEvolutionLegacyConfig()) {
     throw new Error('Evolution API legada não configurada');
+  }
+  if (useHumanize && delayMs > 0) {
+    await sleep(delayMs);
   }
   return sendTextLegacy(number, text);
 }

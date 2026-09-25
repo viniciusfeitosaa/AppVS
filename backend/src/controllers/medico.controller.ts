@@ -118,7 +118,9 @@ export const updatePerfilController = async (req: Request, res: Response) => {
     }
 
     const files = (req.files || {}) as Record<string, Express.Multer.File[]>;
-    const perfil = await updatePerfilService(medicoId, tenantId, req.body, files);
+    const { parseDocumentoValidadesFromBody } = await import('../constants/documentos.const');
+    const validades = parseDocumentoValidadesFromBody(req.body);
+    const perfil = await updatePerfilService(medicoId, tenantId, req.body, files, validades);
 
     return res.status(200).json({
       success: true,

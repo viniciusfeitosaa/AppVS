@@ -27,6 +27,15 @@ import {
 } from './docuseal.service';
 import crypto from 'crypto';
 import { Prisma, StatusCadastroMedico } from '@prisma/client';
+import {
+  DOCUMENTO_LABEL_BY_TIPO,
+  DOCUMENTO_TIPOS_COM_VALIDADE,
+  diasAteValidade,
+  piorStatusValidade,
+  statusValidadeDocumento,
+  type StatusValidadeDocumento,
+} from '../constants/documentos.const';
+import { criarNotificacaoComPush, TIPO_NOTIFICACAO } from './notificacao-medico.service';
 
 interface ListMedicosParams {
   tenantId: string;
@@ -322,8 +331,33 @@ export async function listMedicosService(params: ListMedicosParams) {
     return { ...m, equipes: eq };
   });
 
+  const docsValidade =
+    medicoIds.length === 0
+      ? []
+      : await prisma.medicoDocumento.findMany({
+          where: {
+            tenantId: params.tenantId,
+            medicoId: { in: medicoIds },
+            tipo: { in: DOCUMENTO_TIPOS_COM_VALIDADE },
+          },
+          select: { medicoId: true, tipo: true, validadeEm: true },
+        });
+
+  const statusPorMedico = new Map<string, StatusValidadeDocumento[]>();
+  for (const doc of docsValidade) {
+    const st = statusValidadeDocumento(doc.tipo, doc.validadeEm);
+    const list = statusPorMedico.get(doc.medicoId) ?? [];
+    list.push(st);
+    statusPorMedico.set(doc.medicoId, list);
+  }
+
+  const itemsComValidade = itemsComEquipes.map((m) => ({
+    ...m,
+    documentosValidadeStatus: piorStatusValidade(statusPorMedico.get(m.id) ?? []),
+  }));
+
   return {
-    items: itemsComEquipes,
+    items: itemsComValidade,
     pagination: {
       page,
       limit,
@@ -364,6 +398,7 @@ export async function getMedicoDetalheAdminService(tenantId: string, medicoId: s
           nomeArquivo: true,
           mimeType: true,
           tamanhoBytes: true,
+          validadeEm: true,
           updatedAt: true,
         },
         orderBy: { updatedAt: 'desc' },
@@ -404,7 +439,126 @@ export async function getMedicoDetalheAdminService(tenantId: string, medicoId: s
   const { equipeMedicos, subgrupoMedicos, ...rest } = medico;
   void equipeMedicos;
   void subgrupoMedicos;
-  return { ...rest, equipes, subgrupos };
+  return {
+    ...rest,
+    documentos: rest.documentos.map((doc) => ({
+      ...doc,
+      statusValidade: statusValidadeDocumento(doc.tipo, doc.validadeEm),
+      diasParaVencer: doc.validadeEm != null ? diasAteValidade(doc.validadeEm) : null,
+    })),
+    documentosValidadeStatus: piorStatusValidade(
+      rest.documentos.map((doc) => statusValidadeDocumento(doc.tipo, doc.validadeEm))
+    ),
+    equipes,
+    subgrupos,
+  };
+}
+
+/** Lista documentos com validade vencida ou próxima (para painel Médicos). */
+export async function listDocumentosValidadeAlertaService(tenantId: string) {
+  const docs = await prisma.medicoDocumento.findMany({
+    where: {
+      tenantId,
+      tipo: { in: DOCUMENTO_TIPOS_COM_VALIDADE },
+      medico: { statusCadastro: StatusCadastroMedico.ATIVO, ativo: true },
+    },
+    select: {
+      id: true,
+      tipo: true,
+      validadeEm: true,
+      nomeArquivo: true,
+      medicoId: true,
+      medico: { select: { id: true, nomeCompleto: true, email: true, crm: true } },
+    },
+    orderBy: [{ validadeEm: 'asc' }],
+  });
+
+  const items = docs
+    .map((doc) => {
+      const statusValidade = statusValidadeDocumento(doc.tipo, doc.validadeEm);
+      return {
+        documentoId: doc.id,
+        tipo: doc.tipo,
+        tipoLabel: DOCUMENTO_LABEL_BY_TIPO[doc.tipo],
+        validadeEm: doc.validadeEm,
+        statusValidade,
+        diasParaVencer: doc.validadeEm != null ? diasAteValidade(doc.validadeEm) : null,
+        nomeArquivo: doc.nomeArquivo,
+        medico: doc.medico,
+      };
+    })
+    .filter((d) => d.statusValidade === 'VENCIDO' || d.statusValidade === 'PROXIMO' || d.statusValidade === 'SEM_DATA')
+    .sort((a, b) => {
+      const rank = (s: string) => (s === 'VENCIDO' ? 0 : s === 'PROXIMO' ? 1 : 2);
+      const r = rank(a.statusValidade) - rank(b.statusValidade);
+      if (r !== 0) return r;
+      const da = a.diasParaVencer ?? 9999;
+      const db = b.diasParaVencer ?? 9999;
+      return da - db;
+    });
+
+  return { items, total: items.length };
+}
+
+export async function avisarValidadeDocumentoMedicoService(
+  tenantId: string,
+  masterId: string,
+  medicoId: string,
+  documentoId: string
+) {
+  const doc = await prisma.medicoDocumento.findFirst({
+    where: { id: documentoId, tenantId, medicoId },
+    select: {
+      id: true,
+      tipo: true,
+      validadeEm: true,
+      medico: { select: { id: true, nomeCompleto: true } },
+    },
+  });
+  if (!doc) {
+    throw { statusCode: 404, message: 'Documento não encontrado' };
+  }
+
+  const status = statusValidadeDocumento(doc.tipo, doc.validadeEm);
+  const label = DOCUMENTO_LABEL_BY_TIPO[doc.tipo];
+  const dias = doc.validadeEm != null ? diasAteValidade(doc.validadeEm) : null;
+
+  let corpo: string;
+  if (status === 'VENCIDO') {
+    corpo = `O documento "${label}" está vencido. Atualize o ficheiro e a data de validade no seu Perfil → Documentos.`;
+  } else if (status === 'PROXIMO') {
+    corpo = `O documento "${label}" vence em ${dias} dia(s). Renove-o no Perfil → Documentos para manter a regularidade.`;
+  } else if (status === 'SEM_DATA') {
+    corpo = `Falta informar a data de validade do documento "${label}". Atualize no Perfil → Documentos.`;
+  } else {
+    corpo = `Lembrete: confira a validade do documento "${label}" no Perfil → Documentos.`;
+  }
+
+  await criarNotificacaoComPush({
+    tenantId,
+    medicoId,
+    tipo: TIPO_NOTIFICACAO.DOCUMENTO_VALIDADE,
+    titulo: 'Documentação — validade',
+    corpo,
+    metadata: {
+      documentoId: doc.id,
+      tipo: doc.tipo,
+      statusValidade: status,
+      validadeEm: doc.validadeEm ? doc.validadeEm.toISOString().slice(0, 10) : null,
+      origem: 'manual',
+      masterId,
+    },
+  });
+
+  await createAuditLog({
+    acao: 'AVISAR_VALIDADE_DOCUMENTO_MEDICO',
+    tenantId,
+    masterId,
+    medicoId,
+    detalhes: { documentoId: doc.id, tipo: doc.tipo, statusValidade: status },
+  });
+
+  return { ok: true, statusValidade: status };
 }
 
 export async function createMedicoService(input: CreateMedicoInput) {

@@ -23,9 +23,17 @@ export async function getEmailPainelResumoController(req: Request, res: Response
 
 export async function listEmailMensagensController(req: Request, res: Response) {
   try {
-    const limit = parseInt(String(req.query.limit || '50'), 10);
-    const data = await listEmailMensagensService(req.user!.tenantId, limit);
-    return res.json({ success: true, data });
+    const limit = parseInt(String(req.query.limit || '100'), 10);
+    const offset = parseInt(String(req.query.offset || '0'), 10);
+    const q = typeof req.query.q === 'string' ? req.query.q : '';
+    const result = await listEmailMensagensService(req.user!.tenantId, { limit, offset, q });
+    return res.json({
+      success: true,
+      data: result.data,
+      total: result.total,
+      limit: result.limit,
+      offset: result.offset,
+    });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Erro ao listar mensagens';
     return res.status(500).json({ success: false, error: message });

@@ -73,6 +73,12 @@ Senha local dos dois: `Uat@2026`. Relatório: filtro do contrato + `2026-08-01`�
 
 ## Changelog
 
+### 2026-09-14 — Neurologista MED MOVEL: Valores de Ponto no relatório
+- Cadastro 250 / 235,60 em `config_ponto_eletronico` já estava ok; relatório priorizava `repasse_valor_congelado` antigo e o checkout **não** lia Valores de Ponto
+- Checkout: `calcularRepasseCongeladoCheckout` usa config ponto após EscalaMedico e antes de ValorPlantao
+- Relatório: se há R$/h de Valores de Ponto no registro, usa horas × rate (não o congelado legado)
+- Arquivos: `repasse-registro-ponto.service.ts`, `justificativa-ausencia-ponto.valor.ts`, `Relatorios.tsx`
+
 ### 2026-09-14 — Relatório financeiro: todas as equipes + cobrança
 - Filtro equipe liberado com contrato (opção Todas); coluna Equipe na tabela/Excel/PDF
 - Backend aplica Valores de Ponto (repasse + cobrança R$/h) também em registros **com escala**

@@ -10,13 +10,21 @@
  * DOCUSEAL_WEB_BASE_URL (opcional) força a origem dos links de assinatura.
  *
  * Convite (POST /admin/medicos/:id/invite): DOCUSEAL_REQUIRED_TEMPLATES + DOCUSEAL_SECOND_SUBMITTER_EMAIL, etc.
+ *
+ * Assinatura automática da 2.ª parte (Viva Saúde):
+ * - DOCUSEAL_SECOND_AUTO_SIGN=true (default)
+ * - DOCUSEAL_SECOND_SIGNATURE_FIELD_NAME=Assinatura Viva Saude
+ * - PNG em assets/assinatura-viva-saude.png (3 linhas: nome, cargo, CNPJ)
  */
+import fs from 'fs';
+import path from 'path';
 import { buildDocusealInviteEmailBody } from '../utils/email-branding.util';
 import { fetchWithTimeout } from '../utils/fetch-with-timeout';
 import {
   alocarProximoNumeroDocumentoDocuseal,
   DOCUSEAL_CONTADOR_TERMO_TRANSFERENCIA,
 } from '../utils/docuseal-documento-contador.util';
+import { safeLogger } from '../utils/safe-logger';
 
 const DOCUSEAL_DEFAULT_WEB = 'https://docuseal.com';
 
@@ -672,6 +680,48 @@ async function fetchDocusealSubmitter(
   }
 }
 
+/** Completa via API a assinatura da 2.ª parte (pendente) com o PNG institucional. */
+async function autoCompletarSegundaParteSubmitter(
+  apiBase: string,
+  token: string,
+  submitterId: number
+): Promise<boolean> {
+  if (!docusealSecondAutoSignEnabled()) return false;
+
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 15000);
+  try {
+    const resp = await fetchWithTimeout(`${apiBase}/submitters/${submitterId}`, {
+      method: 'PUT',
+      headers: {
+        'X-Auth-Token': token,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        completed: true,
+        send_email: false,
+        require_email_2fa: false,
+        fields: camposAssinaturaSegundaParte(),
+      }),
+      signal: ctrl.signal,
+    });
+    if (!resp.ok) {
+      const txt = await resp.text().catch(() => '');
+      safeLogger.warn(
+        `[docuseal] auto-sign 2.ª parte submitter=${submitterId} falhou: ${resp.status} ${txt.slice(0, 200)}`
+      );
+      return false;
+    }
+    return true;
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : String(e);
+    safeLogger.warn(`[docuseal] auto-sign 2.ª parte submitter=${submitterId}: ${msg}`);
+    return false;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 async function syncSecondParty2faOnPanel(
   documentos: DocusealDocumentoPainelItem[],
   apiBase: string,
@@ -681,7 +731,12 @@ async function syncSecondParty2faOnPanel(
     .filter((d) => d.status === 'pendente_outros' && d.secondSubmitterId != null && d.secondSubmitterId > 0)
     .map((d) => d.secondSubmitterId as number);
   if (ids.length === 0) return;
-  await Promise.all(ids.map((id) => ensureSecondPartyNo2fa(apiBase, token, id)));
+  await Promise.all(
+    ids.map(async (id) => {
+      await ensureSecondPartyNo2fa(apiBase, token, id);
+      await autoCompletarSegundaParteSubmitter(apiBase, token, id);
+    })
+  );
 }
 
 /** Modelos obrigatórios no DocuSeal (JSON no env). */
@@ -717,6 +772,73 @@ function docuseal2faFlagsForFirstPart(): { require_email_2fa: boolean } {
 /** DocuSeal só respeita 2FA desligado na 2.ª parte se `require_email_2fa: false` for explícito. */
 function docuseal2faFlagsForSecondPart(): { require_email_2fa: boolean } {
   return { require_email_2fa: docusealRequireEmail2faSecondPart() };
+}
+
+/** Assina automaticamente a 2.ª parte (Viva Saúde) via API — default ligado. */
+function docusealSecondAutoSignEnabled(): boolean {
+  const v = (process.env.DOCUSEAL_SECOND_AUTO_SIGN ?? 'true').trim().toLowerCase();
+  return !(v === 'false' || v === '0' || v === 'no');
+}
+
+function docusealSecondSignatureFieldName(): string {
+  return process.env.DOCUSEAL_SECOND_SIGNATURE_FIELD_NAME?.trim() || 'Assinatura Viva Saude';
+}
+
+/** Linhas da assinatura institucional (fallback se o PNG não existir). */
+function docusealSecondSignatoryLines(): string[] {
+  const raw = process.env.DOCUSEAL_SECOND_SIGNATORY_LINES?.trim();
+  if (raw) {
+    return raw
+      .split('|')
+      .map((s) => s.trim())
+      .filter(Boolean);
+  }
+  return [
+    'Gustavo Arcanjo Alves Martins',
+    'Diretor Presidente',
+    'CNPJ 06.243.200/0001-51',
+  ];
+}
+
+let cachedAssinaturaVivaDataUri: string | null | undefined;
+
+/** PNG institucional (3 linhas) como data URI para o campo signature do DocuSeal. */
+function assinaturaVivaSaudeDataUri(): string | null {
+  if (cachedAssinaturaVivaDataUri !== undefined) return cachedAssinaturaVivaDataUri;
+  const candidates = [
+    process.env.DOCUSEAL_SECOND_SIGNATURE_PNG_PATH?.trim(),
+    path.join(process.cwd(), 'assets', 'assinatura-viva-saude.png'),
+    path.join(__dirname, '..', '..', 'assets', 'assinatura-viva-saude.png'),
+  ].filter(Boolean) as string[];
+  for (const p of candidates) {
+    try {
+      if (fs.existsSync(p)) {
+        const b64 = fs.readFileSync(p).toString('base64');
+        cachedAssinaturaVivaDataUri = `data:image/png;base64,${b64}`;
+        return cachedAssinaturaVivaDataUri;
+      }
+    } catch {
+      // tenta próximo
+    }
+  }
+  cachedAssinaturaVivaDataUri = null;
+  return null;
+}
+
+function camposAssinaturaSegundaParte(extraFields?: Array<Record<string, unknown>>): Array<Record<string, unknown>> {
+  const fields: Array<Record<string, unknown>> = [...(extraFields || [])];
+  const fieldName = docusealSecondSignatureFieldName();
+  const png = assinaturaVivaSaudeDataUri();
+  // DocuSeal: texto tipado de assinatura tem limite < 60 chars — usamos PNG com 3 linhas.
+  const value =
+    png ||
+    docusealSecondSignatoryLines().join(' · ').slice(0, 59);
+  fields.push({
+    name: fieldName,
+    default_value: value,
+    readonly: true,
+  });
+  return fields;
 }
 
 export function parseRequiredTemplates(): DocusealRequiredTemplate[] {
@@ -868,15 +990,22 @@ function buildSubmittersForTemplate(
     ...docuseal2faFlagsForSecondPart(),
   };
 
+  const extraFields: Array<Record<string, unknown>> = [];
   // No template atual, "Campo de Número 1" pertence à Segunda Parte (Viva Saúde).
   if (opts?.numeroDocumento) {
-    second.fields = [
-      {
-        name: docusealNumeroFieldName(),
-        default_value: opts.numeroDocumento,
-        readonly: true,
-      },
-    ];
+    extraFields.push({
+      name: docusealNumeroFieldName(),
+      default_value: opts.numeroDocumento,
+      readonly: true,
+    });
+  }
+
+  if (docusealSecondAutoSignEnabled()) {
+    second.completed = true;
+    second.send_email = false;
+    second.fields = camposAssinaturaSegundaParte(extraFields);
+  } else if (extraFields.length > 0) {
+    second.fields = extraFields;
   }
 
   return [first, second];

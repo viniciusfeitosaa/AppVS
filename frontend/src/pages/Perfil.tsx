@@ -9,7 +9,11 @@ import {
   DOCUMENTO_LABEL_BY_FIELD,
   DOCUMENTOS_PERFIL_FIELDS,
   DOCUMENTO_TIPO_BY_FIELD,
-  DocumentoPerfilField,
+  documentoExigeValidade,
+  formatValidadePt,
+  labelStatusValidade,
+  type DocumentoPerfilField,
+  type StatusValidadeDocumento,
 } from '../constants/documentosPerfil';
 import { MODULO_LABEL, ModuloSistema } from '../constants/modulos';
 import { ESPECIALIDADES_MEDICAS } from '../constants/profissoesEspecialidades';
@@ -29,6 +33,9 @@ const Perfil = () => {
   const [success, setSuccess] = useState<string | null>(null);
   const [documentosSelecionados, setDocumentosSelecionados] = useState<
     Partial<Record<DocumentoPerfilField, File>>
+  >({});
+  const [documentoValidades, setDocumentoValidades] = useState<
+    Partial<Record<DocumentoPerfilField, string>>
   >({});
   const [savingAcessos, setSavingAcessos] = useState(false);
   const [acessosDraft, setAcessosDraft] = useState<AcessoModuloItem[]>([]);
@@ -138,6 +145,17 @@ const Perfil = () => {
     setError(null);
     setSuccess(null);
     try {
+      for (const field of DOCUMENTOS_PERFIL_FIELDS) {
+        if (!documentoExigeValidade(field)) continue;
+        const novoArquivo = documentosSelecionados[field];
+        if (!novoArquivo) continue;
+        const v = (documentoValidades[field] || '').trim();
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(v)) {
+          setError(`Informe a data de validade de: ${DOCUMENTO_LABEL_BY_FIELD[field]}`);
+          setSaving(false);
+          return;
+        }
+      }
       await medicoService.updatePerfil({
         especialidades:
           form.especialidades.length > 0
@@ -149,10 +167,12 @@ const Perfil = () => {
         dadosBancarios: form.dadosBancarios || perfilMedico.dadosBancarios || '',
         chavePix: form.chavePix || perfilMedico.chavePix || '',
         documentos: documentosSelecionados,
+        documentoValidades,
       });
       await queryClient.invalidateQueries({ queryKey: ['medico', 'perfil'] });
       setSuccess('Perfil atualizado com sucesso.');
       setDocumentosSelecionados({});
+      setDocumentoValidades({});
     } catch (err: any) {
       setError(err.response?.data?.error || 'Não foi possível atualizar o perfil.');
     } finally {
@@ -457,11 +477,22 @@ const Perfil = () => {
                 const existing = perfilMedicoAtual?.documentos?.find((doc) => {
                   return doc.tipo === DOCUMENTO_TIPO_BY_FIELD[field];
                 });
+                const exigeValidade = documentoExigeValidade(field);
+                const validadeAtual =
+                  documentoValidades[field] ??
+                  (existing?.validadeEm ? String(existing.validadeEm).slice(0, 10) : '');
+                const statusVal = existing?.statusValidade as StatusValidadeDocumento | undefined;
                 return (
                   <div key={field} className="rounded-xl bg-viva-50/50 border border-viva-200/50 p-4 hover:bg-viva-50/70 transition">
                     <p className="text-xs font-semibold text-viva-900 font-display">{DOCUMENTO_LABEL_BY_FIELD[field]}</p>
                     <p className="text-[10px] text-viva-600 mt-1 mb-2 font-serif">
                       {existing?.nomeArquivo ? `Atual: ${existing.nomeArquivo}` : 'Ainda não anexado'}
+                      {exigeValidade && existing?.validadeEm
+                        ? ` · Validade: ${formatValidadePt(String(existing.validadeEm).slice(0, 10))}`
+                        : ''}
+                      {statusVal && statusVal !== 'NAO_APLICA' && statusVal !== 'OK'
+                        ? ` · ${labelStatusValidade(statusVal)}`
+                        : ''}
                     </p>
                     {existing?.id && (
                       <div className="flex flex-wrap gap-2 mb-2">
@@ -489,6 +520,21 @@ const Perfil = () => {
                         setDocumentosSelecionados((prev) => ({ ...prev, [field]: file }));
                       }}
                     />
+                    {exigeValidade && (existing || documentosSelecionados[field]) && (
+                      <div className="mt-2">
+                        <label className="block text-[10px] font-semibold uppercase tracking-wider text-viva-600 mb-1">
+                          Validade{documentosSelecionados[field] ? ' *' : ''}
+                        </label>
+                        <input
+                          type="date"
+                          className="input text-sm w-full"
+                          value={validadeAtual}
+                          onChange={(e) =>
+                            setDocumentoValidades((prev) => ({ ...prev, [field]: e.target.value }))
+                          }
+                        />
+                      </div>
+                    )}
                   </div>
                 );
               })}

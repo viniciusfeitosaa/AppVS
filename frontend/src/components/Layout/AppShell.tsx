@@ -176,7 +176,14 @@ const AppShell = () => {
   ];
   const menuGroupsBase: MenuGroup[] = isMaster
     ? [
-        { title: 'Escalas', items: [{ to: '/escalas', label: 'Escalas' }, { to: '/subgrupos-equipes', label: 'Subgrupos e Equipes' }] },
+        {
+          title: 'Escalas',
+          items: [
+            { to: '/escalas', label: 'Escalas' },
+            { to: '/escala-master', label: 'Escala Master' },
+            { to: '/subgrupos-equipes', label: 'Subgrupos e Equipes' },
+          ],
+        },
         {
           title: 'Corpo Clínico',
           items: [
@@ -233,6 +240,7 @@ const AppShell = () => {
   const moduloByRoute: Record<string, ModuloSistema> = {
     '/dashboard': 'DASHBOARD',
     '/escalas': 'ESCALAS',
+    '/escala-master': 'ESCALAS',
     '/subgrupos-equipes': 'ESCALAS',
     '/medicos': 'MEDICOS',
     '/relatorios': 'RELATORIOS',

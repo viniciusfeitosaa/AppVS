@@ -1,3 +1,4 @@
+import env from '../config/env';
 import { getRedisClient } from '../config/redis';
 import {
   phoneFromWhatsAppJid,
@@ -11,7 +12,6 @@ import {
   isWithinBusinessHours,
 } from '../utils/whatsapp-horario-comercial.util';
 import { sendWhatsAppText, deleteWhatsAppMessage } from './evolution-whatsapp.service';
-
 
 export type AtendimentoDepartment = 'administrativo' | 'financeiro' | 'duvidas' | 'viva_atualiza';
 
@@ -37,9 +37,67 @@ type AtendimentoSession = {
 const SESSION_PREFIX = 'wa:atendimento:';
 const PAUSED_PREFIX = 'wa:atendimento:paused:';
 const LID_PHONE_PREFIX = 'wa:lid2phone:';
+const RATE_MIN_PREFIX = 'wa:atendimento:rl:min:';
+const RATE_HOUR_PREFIX = 'wa:atendimento:rl:hour:';
 const SESSION_TTL_SEC = 4 * 60 * 60; // 4h — depois disso, novo contato recebe menu de novo
 /** Pausado pela equipe: sem TTL — só retoma com comando explícito (retomar/despausar). */
 const LID_MAP_TTL_SEC = 30 * 24 * 60 * 60;
+
+function pickVariant(variants: string[]): string {
+  return variants[Math.floor(Math.random() * variants.length)]!;
+}
+
+/** Primeiro nome seguro a partir do pushName do WhatsApp (sem caracteres estranhos). */
+function displayFirstName(pushName?: string): string | undefined {
+  if (!pushName) return undefined;
+  const first = pushName.trim().split(/\s+/)[0]?.replace(/[^\p{L}\p{N}.'-]/gu, '');
+  if (!first || first.length < 2 || first.length > 40) return undefined;
+  return first;
+}
+
+function parsePositiveInt(raw: string | undefined, fallback: number): number {
+  const n = parseInt(raw || '', 10);
+  return Number.isFinite(n) && n > 0 ? n : fallback;
+}
+
+/**
+ * Anti-flood: limita respostas automáticas por telefone.
+ * Retorna false se o limite foi estourado (não enviar).
+ */
+async function allowAutoReply(phone: string): Promise<boolean> {
+  const redis = getRedisClient();
+  if (!redis) return true;
+
+  const perMin = parsePositiveInt(env.WHATSAPP_RATE_LIMIT_PER_MIN, 8);
+  const perHour = parsePositiveInt(env.WHATSAPP_RATE_LIMIT_PER_HOUR, 40);
+  const minKey = `${RATE_MIN_PREFIX}${phone}`;
+  const hourKey = `${RATE_HOUR_PREFIX}${phone}`;
+
+  try {
+    const minCount = await redis.incr(minKey);
+    if (minCount === 1) await redis.expire(minKey, 60);
+    const hourCount = await redis.incr(hourKey);
+    if (hourCount === 1) await redis.expire(hourKey, 3600);
+
+    if (minCount > perMin || hourCount > perHour) {
+      console.warn(
+        `[whatsapp-atendimento] ${phone} → rate limit (min=${minCount}/${perMin} hour=${hourCount}/${perHour})`
+      );
+      return false;
+    }
+    return true;
+  } catch (err) {
+    console.warn('[whatsapp-atendimento] rate limit redis falhou, permitindo envio:', err);
+    return true;
+  }
+}
+
+/** Envio do bot com humanização (typing + delay) e checagem de rate limit. */
+async function replyText(phone: string, text: string): Promise<boolean> {
+  if (!(await allowAutoReply(phone))) return false;
+  await sendWhatsAppText(phone, text, { humanize: true });
+  return true;
+}
 
 type DepartmentChoice = '1' | '2' | '3' | '4';
 
@@ -52,9 +110,22 @@ const DEPARTMENTS: Record<DepartmentChoice, { key: AtendimentoDepartment; label:
 
 const COMMANDS_HINT = '_Digite *menu* para ver as opções • *sair* para encerrar_';
 
-function welcomeMessage(): string {
+function welcomeMessage(pushName?: string): string {
+  const name = displayFirstName(pushName);
+  const greeting = name
+    ? pickVariant([
+        `*Viva Saúde* — Olá, *${name}*! 👋`,
+        `*Viva Saúde* — Oi, *${name}*! Tudo bem? 👋`,
+        `*Viva Saúde* — Bem-vindo(a), *${name}*! 👋`,
+      ])
+    : pickVariant([
+        '*Viva Saúde* — Olá! 👋',
+        '*Viva Saúde* — Oi! Seja bem-vindo(a). 👋',
+        '*Viva Saúde* — Olá! Como podemos ajudar?',
+      ]);
+
   return [
-    '*Viva Saúde* — Olá! 👋',
+    greeting,
     '',
     businessHoursText(),
     '',
@@ -70,26 +141,47 @@ function welcomeMessage(): string {
   ].join('\n');
 }
 
-function outsideHoursMessage(): string {
+function outsideHoursMessage(pushName?: string): string {
+  const name = displayFirstName(pushName);
+  const greeting = name
+    ? `*Viva Saúde* — Olá, *${name}*! 👋`
+    : '*Viva Saúde* — Olá! 👋';
+
   return [
-    '*Viva Saúde* — Olá! 👋',
+    greeting,
     '',
     'No momento estamos *fora do horário de atendimento*.',
     '',
     businessHoursText(),
     '',
-    'Retorne nesses horários ou deixe sua mensagem — responderemos assim que possível.',
+    pickVariant([
+      'Retorne nesses horários ou deixe sua mensagem — responderemos assim que possível.',
+      'Pode deixar sua mensagem; nossa equipe retorna no próximo horário útil.',
+      'Assim que o atendimento reabrir, nossa equipe responde o mais breve possível.',
+    ]),
     '',
     COMMANDS_HINT,
   ].join('\n');
 }
 
-function goodbyeMessage(): string {
-  return [
-    'Atendimento encerrado. Obrigado por falar com a *Viva Saúde*! 🙂',
-    '',
-    'Quando precisar, envie uma mensagem ou digite *menu*.',
-  ].join('\n');
+function goodbyeMessage(pushName?: string): string {
+  const name = displayFirstName(pushName);
+  return pickVariant([
+    [
+      name
+        ? `Atendimento encerrado. Obrigado, *${name}*! Foi um prazer falar com você. 🙂`
+        : 'Atendimento encerrado. Obrigado por falar com a *Viva Saúde*! 🙂',
+      '',
+      'Quando precisar, envie uma mensagem ou digite *menu*.',
+    ].join('\n'),
+    [
+      name
+        ? `Pronto, *${name}*! Encerramos por aqui. Qualquer coisa é só chamar. 🙂`
+        : 'Pronto! Encerramos por aqui. Qualquer coisa é só chamar a *Viva Saúde*. 🙂',
+      '',
+      'Digite *menu* quando quiser recomeçar.',
+    ].join('\n'),
+  ]);
 }
 
 function invalidOptionMessage(): string {
@@ -170,21 +262,44 @@ function invalidDuvidaMessage(): string {
 }
 
 function queuedMessage(label: string): string {
-  return [
-    `Obrigado! Seus dados e a sua dúvida foram registrados no setor *${label}*.`,
-    '',
-    'Em breve você será atendido(a) por nossa equipe. Aguarde um instante, por favor. 🙏',
-    '',
-    COMMANDS_HINT,
-  ].join('\n');
+  return pickVariant([
+    [
+      `Obrigado! Seus dados e a sua dúvida foram registrados no setor *${label}*.`,
+      '',
+      'Em breve você será atendido(a) por nossa equipe. Aguarde um instante, por favor. 🙏',
+      '',
+      COMMANDS_HINT,
+    ].join('\n'),
+    [
+      `Perfeito — registramos tudo no setor *${label}*.`,
+      '',
+      'Nossa equipe já vai te atender. Um instante, por favor. 🙏',
+      '',
+      COMMANDS_HINT,
+    ].join('\n'),
+    [
+      `Recebido! Encaminhamos sua solicitação para *${label}*.`,
+      '',
+      'Fique à vontade — em breve alguém da equipe responde por aqui. 🙏',
+      '',
+      COMMANDS_HINT,
+    ].join('\n'),
+  ]);
 }
 
 function alreadyQueuedMessage(label: string): string {
-  return [
-    `Você já está na fila do setor *${label}*. Nossa equipe responderá em breve.`,
-    '',
-    COMMANDS_HINT,
-  ].join('\n');
+  return pickVariant([
+    [
+      `Você já está na fila do setor *${label}*. Nossa equipe responderá em breve.`,
+      '',
+      COMMANDS_HINT,
+    ].join('\n'),
+    [
+      `Sua solicitação em *${label}* já está com a equipe. Em breve retornamos por aqui.`,
+      '',
+      COMMANDS_HINT,
+    ].join('\n'),
+  ]);
 }
 
 function normalizeChoice(text: string): DepartmentChoice | null {
@@ -319,7 +434,7 @@ async function startDepartmentFlow(
   dept: (typeof DEPARTMENTS)[DepartmentChoice],
   pushName?: string
 ): Promise<void> {
-  await sendWhatsAppText(phone, askContactInfoMessage(dept.key, dept.label));
+  await replyText(phone, askContactInfoMessage(dept.key, dept.label));
   await saveSession(phone, {
     state: 'collecting_info',
     department: dept.key,
@@ -436,7 +551,7 @@ function departmentLabel(key?: AtendimentoDepartment): string {
 
 async function sendMenuOrClosed(phone: string, pushName?: string): Promise<void> {
   const open = isWithinBusinessHours();
-  await sendWhatsAppText(phone, open ? welcomeMessage() : outsideHoursMessage());
+  await replyText(phone, open ? welcomeMessage(pushName) : outsideHoursMessage(pushName));
   if (open) {
     await saveSession(phone, { state: 'menu', updatedAt: new Date().toISOString() });
     console.log(`[whatsapp-atendimento] ${phone}${pushName ? ` (${pushName})` : ''} → menu enviado`);
@@ -568,7 +683,7 @@ export async function handleIncomingWhatsAppMessage(payload: EvolutionWebhookPay
 
   if (isExitCommand(text)) {
     await clearSession(phone);
-    await sendWhatsAppText(phone, goodbyeMessage());
+    await replyText(phone, goodbyeMessage(pushName));
     console.log(`[whatsapp-atendimento] ${phone}${pushName ? ` (${pushName})` : ''} → saiu`);
     return true;
   }
@@ -579,7 +694,7 @@ export async function handleIncomingWhatsAppMessage(payload: EvolutionWebhookPay
   }
 
   if (!open) {
-    await sendWhatsAppText(phone, outsideHoursMessage());
+    await replyText(phone, outsideHoursMessage(pushName));
     await clearSession(phone);
     return true;
   }
@@ -598,7 +713,7 @@ export async function handleIncomingWhatsAppMessage(payload: EvolutionWebhookPay
       return true;
     }
 
-    await sendWhatsAppText(phone, invalidOptionMessage());
+    await replyText(phone, invalidOptionMessage());
     return true;
   }
 
@@ -609,7 +724,7 @@ export async function handleIncomingWhatsAppMessage(payload: EvolutionWebhookPay
     }
 
     if (!isValidContactInfo(text, session.department || 'administrativo')) {
-      await sendWhatsAppText(phone, invalidContactInfoMessage(session.department));
+      await replyText(phone, invalidContactInfoMessage(session.department));
       return true;
     }
 
@@ -623,7 +738,7 @@ export async function handleIncomingWhatsAppMessage(payload: EvolutionWebhookPay
     if (duvidaInline) {
       const full: AtendimentoContactInfo = { ...contactInfo, duvida: duvidaInline };
       const label = departmentLabel(session.department);
-      await sendWhatsAppText(phone, queuedMessage(label));
+      await replyText(phone, queuedMessage(label));
       await saveSession(phone, {
         state: 'queued',
         department: session.department,
@@ -634,7 +749,7 @@ export async function handleIncomingWhatsAppMessage(payload: EvolutionWebhookPay
       return true;
     }
 
-    await sendWhatsAppText(phone, askDuvidaMessage());
+    await replyText(phone, askDuvidaMessage());
     await saveSession(phone, {
       state: 'collecting_duvida',
       department: session.department,
@@ -657,7 +772,7 @@ export async function handleIncomingWhatsAppMessage(payload: EvolutionWebhookPay
     }
 
     if (!isValidDuvidaText(text)) {
-      await sendWhatsAppText(phone, invalidDuvidaMessage());
+      await replyText(phone, invalidDuvidaMessage());
       return true;
     }
 
@@ -667,7 +782,7 @@ export async function handleIncomingWhatsAppMessage(payload: EvolutionWebhookPay
       raw: [session.contactInfo?.raw, text.trim()].filter(Boolean).join('\n'),
     };
     const label = departmentLabel(session.department);
-    await sendWhatsAppText(phone, queuedMessage(label));
+    await replyText(phone, queuedMessage(label));
     await saveSession(phone, {
       state: 'queued',
       department: session.department,
@@ -684,7 +799,7 @@ export async function handleIncomingWhatsAppMessage(payload: EvolutionWebhookPay
       return true;
     }
 
-    await sendWhatsAppText(phone, alreadyQueuedMessage(departmentLabel(session.department)));
+    await replyText(phone, alreadyQueuedMessage(departmentLabel(session.department)));
     return true;
   }
 

@@ -5,8 +5,73 @@ import { useAuth } from '../context/AuthContext';
 import { adminService, type AdminMedico, type AdminMedicoDetalhe, type DocusealDocumentoPainelItem, type Equipe } from '../services/admin.service';
 import { notify } from '../lib/notificationEmitter';
 import { formatCRM, formatCPF, fixMojibake } from '../utils/validation.util';
-import { DOCUMENTO_LABEL_BY_TIPO } from '../constants/documentosPerfil';
+import { DOCUMENTO_LABEL_BY_TIPO, formatValidadePt, labelStatusValidade, type StatusValidadeDocumento } from '../constants/documentosPerfil';
 import { whatsappHrefFromTelefone } from '../utils/whatsapp';
+
+function badgeValidadeDocs(status: string | null | undefined) {
+  if (!status || status === 'OK' || status === 'NAO_APLICA') return null;
+  const label = labelStatusValidade(status as StatusValidadeDocumento) || status;
+  const cls =
+    status === 'VENCIDO'
+      ? 'bg-red-100 text-red-800 border-red-200'
+      : status === 'PROXIMO'
+        ? 'bg-amber-100 text-amber-900 border-amber-200'
+        : 'bg-zinc-100 text-zinc-700 border-zinc-200';
+  return (
+    <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold ${cls}`}>
+      {label}
+    </span>
+  );
+}
+
+function DocumentosValidadeAlertaPanel({ onSelectMedico }: { onSelectMedico: (medicoId: string) => void }) {
+  const { data, isLoading } = useQuery({
+    queryKey: ['admin', 'medicos', 'documentos-validade'],
+    queryFn: () => adminService.listDocumentosValidadeAlerta(),
+    staleTime: 60_000,
+  });
+  const items = data?.data?.items ?? [];
+  if (isLoading || items.length === 0) return null;
+
+  const vencidos = items.filter((i) => i.statusValidade === 'VENCIDO').length;
+  const proximos = items.filter((i) => i.statusValidade === 'PROXIMO').length;
+  const semData = items.filter((i) => i.statusValidade === 'SEM_DATA').length;
+
+  return (
+    <div className="card mb-6 border-l-4 border-amber-400 bg-amber-50/40">
+      <h3 className="text-sm font-bold text-viva-900 font-display mb-1">Documentação — validade</h3>
+      <p className="text-xs text-viva-700 font-serif mb-3">
+        {vencidos > 0 ? `${vencidos} vencido(s)` : null}
+        {vencidos > 0 && (proximos > 0 || semData > 0) ? ' · ' : null}
+        {proximos > 0 ? `${proximos} próximo(s) do vencimento` : null}
+        {(vencidos > 0 || proximos > 0) && semData > 0 ? ' · ' : null}
+        {semData > 0 ? `${semData} sem data` : null}
+        {' — clique no nome para abrir o profissional.'}
+      </p>
+      <ul className="space-y-1.5 max-h-40 overflow-y-auto">
+        {items.slice(0, 12).map((item) => (
+          <li key={item.documentoId} className="flex flex-wrap items-center justify-between gap-2 text-xs">
+            <button
+              type="button"
+              className="text-left font-semibold text-viva-800 hover:underline"
+              onClick={() => onSelectMedico(item.medico.id)}
+            >
+              {fixMojibake(item.medico.nomeCompleto)}
+            </button>
+            <span className="text-viva-600 truncate">
+              {item.tipoLabel}
+              {item.validadeEm ? ` · ${formatValidadePt(String(item.validadeEm).slice(0, 10))}` : ''}
+            </span>
+            {badgeValidadeDocs(item.statusValidade)}
+          </li>
+        ))}
+      </ul>
+      {items.length > 12 ? (
+        <p className="mt-2 text-[11px] text-viva-600">+{items.length - 12} outros — veja no detalhe de cada médico.</p>
+      ) : null}
+    </div>
+  );
+}
 
 /** Chave alinhada com `normalizarEmailDocuseal` no backend (ex.: @gmail → @gmail.com). */
 function emailChaveDocuseal(email: string | null | undefined): string {
@@ -679,6 +744,11 @@ const Medicos = () => {
       <h2 className="text-2xl font-bold text-viva-900 mb-1">Médicos</h2>
       <p className="text-gray-600 mb-6">Lista de profissionais vinculados ao seu tenant.</p>
 
+      <DocumentosValidadeAlertaPanel onSelectMedico={(id) => {
+        const m = medicos.find((x) => x.id === id);
+        if (m) setSelectedMedico(m);
+      }} />
+
       <div className="card mb-6">
         <h3 className="text-lg font-bold text-viva-900 mb-4">Filtros</h3>
 
@@ -974,7 +1044,10 @@ const Medicos = () => {
                     title="Clique para selecionar"
                   >
                     <td className="py-2 pr-4 font-medium text-viva-900">
-                      {fixMojibake(medico.nomeCompleto)}
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span>{fixMojibake(medico.nomeCompleto)}</span>
+                        {badgeValidadeDocs(medico.documentosValidadeStatus)}
+                      </div>
                     </td>
                     <td className="py-2 pr-4 text-gray-700">{fixMojibake(medico.profissao ?? '-')}</td>
                     <td className="py-2 pr-4 text-gray-700">{formatCRM(medico.crm ?? '')}</td>
@@ -1761,6 +1834,13 @@ const Medicos = () => {
                       <h4 className="text-xs font-semibold uppercase tracking-wider text-viva-700 font-display mb-2">
                         Documentos de perfil
                       </h4>
+                      {detalhe.documentosValidadeStatus &&
+                        detalhe.documentosValidadeStatus !== 'OK' &&
+                        detalhe.documentosValidadeStatus !== 'NAO_APLICA' && (
+                          <p className="mb-2 text-xs text-amber-900 font-serif">
+                            Atenção: {labelStatusValidade(detalhe.documentosValidadeStatus as StatusValidadeDocumento)}.
+                          </p>
+                        )}
                       {(detalhe.documentos?.length ?? 0) === 0 ? (
                         <p className="text-sm text-viva-600 font-serif">Nenhum documento de perfil enviado.</p>
                       ) : (
@@ -1771,21 +1851,52 @@ const Medicos = () => {
                               className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-viva-100 bg-viva-50/40 px-3 py-2.5"
                             >
                               <div className="min-w-0">
-                                <p className="text-sm font-medium text-viva-900">
-                                  {DOCUMENTO_LABEL_BY_TIPO[doc.tipo] || doc.tipo}
+                                <p className="text-sm font-medium text-viva-900 flex flex-wrap items-center gap-2">
+                                  <span>{DOCUMENTO_LABEL_BY_TIPO[doc.tipo] || doc.tipo}</span>
+                                  {badgeValidadeDocs(doc.statusValidade)}
                                 </p>
                                 <p className="text-xs text-viva-600 truncate">
-                                  {doc.nomeArquivo} · {formatBytes(doc.tamanhoBytes)} ·{' '}
+                                  {doc.nomeArquivo} · {formatBytes(doc.tamanhoBytes)}
+                                  {doc.validadeEm
+                                    ? ` · Validade: ${formatValidadePt(String(doc.validadeEm).slice(0, 10))}`
+                                    : ''}
+                                  {doc.diasParaVencer != null && doc.statusValidade === 'PROXIMO'
+                                    ? ` (${doc.diasParaVencer}d)`
+                                    : ''}
+                                  {' · '}
                                   {doc.updatedAt ? new Date(doc.updatedAt).toLocaleString('pt-BR') : '—'}
                                 </p>
                               </div>
-                              <button
-                                type="button"
-                                className="btn btn-secondary text-sm shrink-0"
-                                onClick={() => adminService.openMedicoDocumentoPerfil(detalhe.id, doc.id)}
-                              >
-                                Abrir
-                              </button>
+                              <div className="flex flex-wrap gap-2 shrink-0">
+                                <button
+                                  type="button"
+                                  className="btn btn-secondary text-sm"
+                                  onClick={() => adminService.openMedicoDocumentoPerfil(detalhe.id, doc.id)}
+                                >
+                                  Abrir
+                                </button>
+                                {(doc.statusValidade === 'VENCIDO' ||
+                                  doc.statusValidade === 'PROXIMO' ||
+                                  doc.statusValidade === 'SEM_DATA') && (
+                                  <button
+                                    type="button"
+                                    className="btn text-sm border border-amber-300 bg-amber-50 text-amber-900"
+                                    onClick={async () => {
+                                      try {
+                                        await adminService.avisarValidadeDocumento(detalhe.id, doc.id);
+                                        notify({ kind: 'success', title: 'Validade', message: 'Alerta enviado ao profissional.' });
+                                      } catch (err: unknown) {
+                                        const msg =
+                                          (err as { response?: { data?: { error?: string } } })?.response?.data
+                                            ?.error || 'Não foi possível enviar o alerta.';
+                                        notify({ kind: 'warning', title: 'Validade', message: msg });
+                                      }
+                                    }}
+                                  >
+                                    Avisar
+                                  </button>
+                                )}
+                              </div>
                             </li>
                           ))}
                         </ul>

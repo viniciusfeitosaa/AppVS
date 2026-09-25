@@ -79,6 +79,15 @@ const envSchema = z.object({
   EVOLUTION_INSTANCE: z.string().optional(), // nome da instância (Evolution API legada)
   EVOLUTION_WEBHOOK_SECRET: z.string().optional(), // header X-Evolution-Secret (opcional)
   WHATSAPP_ATENDIMENTO_ENABLED: z.enum(['true', 'false']).optional().default('true'),
+  /** Humaniza respostas do bot (delay + typing). Default ligado. */
+  WHATSAPP_HUMANIZE: z.enum(['true', 'false']).optional().default('true'),
+  WHATSAPP_TYPING: z.enum(['true', 'false']).optional().default('true'),
+  WHATSAPP_REPLY_DELAY_MS_MIN: z.string().default('5000'),
+  WHATSAPP_REPLY_DELAY_MS_MAX: z.string().default('12000'),
+  /** Máx. respostas automáticas por telefone / minuto (anti-flood). */
+  WHATSAPP_RATE_LIMIT_PER_MIN: z.string().default('8'),
+  /** Máx. respostas automáticas por telefone / hora. */
+  WHATSAPP_RATE_LIMIT_PER_HOUR: z.string().default('40'),
   TWILIO_ACCOUNT_SID: z.string().optional(),
   TWILIO_AUTH_TOKEN: z.string().optional(),
   TWILIO_WHATSAPP_FROM: z.string().optional(),

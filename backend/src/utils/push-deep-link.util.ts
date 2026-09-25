@@ -18,6 +18,8 @@ export function pathForNotificacaoTipo(tipo: string): string {
     case 'JUSTIFICATIVA_PONTO_ACEITA':
     case 'JUSTIFICATIVA_PONTO_RECUSADA':
       return '/historico-pontos';
+    case 'DOCUMENTO_VALIDADE':
+      return '/perfil';
     default:
       return '/dashboard';
   }

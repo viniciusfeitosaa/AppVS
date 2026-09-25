@@ -67,3 +67,57 @@ export const DOCUMENTO_LABEL_BY_TIPO: Record<string, string> = Object.fromEntrie
     DOCUMENTO_LABEL_BY_FIELD[field],
   ])
 );
+
+/** Documentos que exigem data de validade informada pelo profissional. */
+export const DOCUMENTOS_PERFIL_COM_VALIDADE = [
+  'cedulaIdentidadeCrm',
+  'certidaoRegularidadeFiscalCrm',
+  'comprovanteEnderecoResidencia',
+  'declaracaoRegularidadeContribuinteIndividual',
+  'rqeRegistroQualificacao',
+] as const satisfies readonly DocumentoPerfilField[];
+
+export type DocumentoPerfilComValidade = (typeof DOCUMENTOS_PERFIL_COM_VALIDADE)[number];
+
+export const VALIDADE_FIELD_PREFIX = 'validadeEm__';
+
+export const DOCUMENTO_VALIDADE_DIAS_ALERTA = 30;
+
+export type StatusValidadeDocumento = 'OK' | 'PROXIMO' | 'VENCIDO' | 'SEM_DATA' | 'NAO_APLICA';
+
+export function documentoExigeValidade(field: DocumentoPerfilField): boolean {
+  return (DOCUMENTOS_PERFIL_COM_VALIDADE as readonly DocumentoPerfilField[]).includes(field);
+}
+
+export function validadeFormFieldName(field: DocumentoPerfilField): string {
+  return `${VALIDADE_FIELD_PREFIX}${field}`;
+}
+
+export function labelStatusValidade(status: StatusValidadeDocumento | null | undefined): string {
+  switch (status) {
+    case 'VENCIDO':
+      return 'Vencido';
+    case 'PROXIMO':
+      return 'Próximo do vencimento';
+    case 'SEM_DATA':
+      return 'Sem data de validade';
+    case 'OK':
+      return 'Válido';
+    default:
+      return '';
+  }
+}
+
+export function formatValidadePt(isoDate: string | null | undefined): string {
+  if (!isoDate) return '—';
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(isoDate);
+  if (!m) {
+    try {
+      return new Date(isoDate).toLocaleDateString('pt-BR');
+    } catch {
+      return isoDate;
+    }
+  }
+  return `${m[3]}/${m[2]}/${m[1]}`;
+}
+

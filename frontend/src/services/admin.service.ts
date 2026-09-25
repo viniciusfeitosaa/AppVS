@@ -129,6 +129,12 @@ export interface CadastroPendenteDocumento {
   mimeType: string;
   tamanhoBytes: number;
   createdAt: string;
+  validadeEm?: string | null;
+  statusValidade?: string | null;
+  statusRevisao?: 'PENDENTE' | 'OK' | 'SOLICITADO';
+  solicitacaoMensagem?: string | null;
+  solicitadoEm?: string | null;
+  revisadoEm?: string | null;
 }
 
 export interface CadastroPendenteDetalhe {
@@ -137,6 +143,7 @@ export interface CadastroPendenteDetalhe {
   email: string | null;
   profissao: string;
   crm: string | null;
+  rqe?: string | null;
   cpf: string;
   telefone: string | null;
   especialidades: string[];
@@ -145,6 +152,8 @@ export interface CadastroPendenteDetalhe {
   enderecoResidencial: string | null;
   dadosBancarios: string | null;
   chavePix: string | null;
+  localInteresseTrabalho?: string | null;
+  interesseTrabalho?: string | null;
   createdAt: string;
   updatedAt: string;
   documentos: CadastroPendenteDocumento[];
@@ -172,6 +181,7 @@ export interface AdminMedico {
   createdAt: string;
   updatedAt: string;
   equipes?: MedicoEquipeResumo[];
+  documentosValidadeStatus?: string | null;
 }
 
 export interface AdminMedicoDocumentoPerfil {
@@ -180,6 +190,9 @@ export interface AdminMedicoDocumentoPerfil {
   nomeArquivo: string;
   mimeType: string;
   tamanhoBytes: number;
+  validadeEm?: string | null;
+  statusValidade?: string | null;
+  diasParaVencer?: number | null;
   updatedAt: string;
 }
 
@@ -193,6 +206,7 @@ export interface AdminMedicoDetalhe extends AdminMedico {
   termosCadastroVersao: string | null;
   inviteAcceptedAt: string | null;
   documentos: AdminMedicoDocumentoPerfil[];
+  documentosValidadeStatus?: string | null;
   subgrupos: { id: string; nome: string; ativo: boolean }[];
 }
 
@@ -610,6 +624,33 @@ export const adminService = {
 
   getMedicoDetalhe: async (medicoId: string) => {
     const response = await api.get<{ success: boolean; data: AdminMedicoDetalhe }>('/admin/medicos/' + medicoId);
+    return response.data;
+  },
+
+  listDocumentosValidadeAlerta: async () => {
+    const response = await api.get<{
+      success: boolean;
+      data: {
+        items: Array<{
+          documentoId: string;
+          tipo: string;
+          tipoLabel: string;
+          validadeEm: string | null;
+          statusValidade: string;
+          diasParaVencer: number | null;
+          nomeArquivo: string;
+          medico: { id: string; nomeCompleto: string; email: string | null; crm: string | null };
+        }>;
+        total: number;
+      };
+    }>('/admin/medicos/documentos-validade');
+    return response.data;
+  },
+
+  avisarValidadeDocumento: async (medicoId: string, documentoId: string) => {
+    const response = await api.post<{ success: boolean; message?: string }>(
+      `/admin/medicos/${medicoId}/documentos/${documentoId}/avisar-validade`
+    );
     return response.data;
   },
 
@@ -1193,6 +1234,40 @@ export const adminService = {
     const response = await api.get<Blob>(
       `/admin/cadastros-pendentes/${medicoId}/documentos/${documentoId}/download`,
       { responseType: 'blob' }
+    );
+    return response.data;
+  },
+
+  confirmarOkDocumentoCadastroPendente: async (medicoId: string, documentoId: string) => {
+    const response = await api.post(
+      `/admin/cadastros-pendentes/${medicoId}/documentos/${documentoId}/confirmar-ok`
+    );
+    return response.data;
+  },
+
+  solicitarDocumentoCadastroPendente: async (
+    medicoId: string,
+    documentoId: string,
+    mensagem: string
+  ) => {
+    const response = await api.post(
+      `/admin/cadastros-pendentes/${medicoId}/documentos/${documentoId}/solicitar`,
+      { mensagem }
+    );
+    return response.data;
+  },
+
+  substituirDocumentoCadastroPendente: async (
+    medicoId: string,
+    documentoId: string,
+    file: File
+  ) => {
+    const form = new FormData();
+    form.append('arquivo', file);
+    const response = await api.post(
+      `/admin/cadastros-pendentes/${medicoId}/documentos/${documentoId}/substituir`,
+      form,
+      { headers: { 'Content-Type': 'multipart/form-data' } }
     );
     return response.data;
   },

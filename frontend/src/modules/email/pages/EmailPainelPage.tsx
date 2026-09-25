@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '../../../context/AuthContext';
@@ -20,11 +20,24 @@ const tabs: { id: EmailPainelTab; label: string }[] = [
   { id: 'historico', label: 'Histórico' },
 ];
 
+const PAGE_SIZE = 100;
+
 const EmailPainelPage = () => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [tab, setTab] = useState<EmailPainelTab>('visao-geral');
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [histSearch, setHistSearch] = useState('');
+  const [histSearchDebounced, setHistSearchDebounced] = useState('');
+  const [histOffset, setHistOffset] = useState(0);
+
+  useEffect(() => {
+    const t = window.setTimeout(() => {
+      setHistSearchDebounced(histSearch.trim());
+      setHistOffset(0);
+    }, 300);
+    return () => window.clearTimeout(t);
+  }, [histSearch]);
 
   const { data: modulosResp } = useQuery({
     queryKey: ['auth', 'modulos-acesso', user?.id],
@@ -40,10 +53,16 @@ const EmailPainelPage = () => {
     enabled: !!user && hasAccess,
   });
 
-  const { data: mensagensResp, isLoading: loadingMensagens } = useQuery({
-    queryKey: ['email', 'mensagens'],
-    queryFn: () => emailModuleService.listMensagens(),
-    enabled: !!user && hasAccess,
+  const { data: mensagensResp, isLoading: loadingMensagens, isFetching: fetchingMensagens } = useQuery({
+    queryKey: ['email', 'mensagens', PAGE_SIZE, histOffset, histSearchDebounced],
+    queryFn: () =>
+      emailModuleService.listMensagens({
+        limit: PAGE_SIZE,
+        offset: histOffset,
+        q: histSearchDebounced || undefined,
+      }),
+    enabled: !!user && hasAccess && tab === 'historico',
+    placeholderData: (prev) => prev,
   });
 
   const invalidate = () => {
@@ -71,6 +90,7 @@ const EmailPainelPage = () => {
 
   const resumo = resumoResp?.data;
   const mensagens = mensagensResp?.data ?? [];
+  const total = mensagensResp?.total ?? mensagens.length;
 
   const handleEnviarRascunho = async (id: string) => {
     setBusyId(id);
@@ -92,7 +112,6 @@ const EmailPainelPage = () => {
   };
 
   const handleSendNow = async (payload: EnviarAgoraEmailPayload) => {
-    // enviar-agora aceita anexos (PDF de demonstrativo); create + enviar não.
     await emailModuleService.enviarAgora(payload);
     invalidate();
     setTab('historico');
@@ -115,9 +134,7 @@ const EmailPainelPage = () => {
             type="button"
             onClick={() => setTab(t.id)}
             className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-              tab === t.id
-                ? 'bg-viva-600 text-white'
-                : 'text-viva-800 hover:bg-viva-50'
+              tab === t.id ? 'bg-viva-600 text-white' : 'text-viva-800 hover:bg-viva-50'
             }`}
           >
             {t.label}
@@ -132,9 +149,16 @@ const EmailPainelPage = () => {
           <div className="card border-l-4 border-viva-500">
             <h2 className="font-semibold text-viva-900 mb-2">Como usar este módulo</h2>
             <ul className="text-sm text-gray-600 space-y-1 list-disc pl-5">
-              <li><strong>Novo e-mail</strong> — compose, salve rascunho ou envie na hora.</li>
-              <li><strong>Histórico</strong> — acompanhe status (rascunho, enviado, falha) e use <strong>Ver</strong> para abrir o conteúdo do e-mail.</li>
-              <li>Envio via <strong>Maddy</strong> — mesmo servidor usado em esqueci-senha e e-mails de cadastro.</li>
+              <li>
+                <strong>Novo e-mail</strong> — compose, salve rascunho ou envie na hora.
+              </li>
+              <li>
+                <strong>Histórico</strong> — lista completa com busca e páginas; use <strong>Ver</strong> para o
+                conteúdo.
+              </li>
+              <li>
+                Envio via <strong>Maddy</strong> — mesmo servidor usado em esqueci-senha e e-mails de cadastro.
+              </li>
             </ul>
           </div>
         </div>
@@ -168,10 +192,17 @@ const EmailPainelPage = () => {
       {tab === 'historico' && (
         <EmailHistoryTable
           mensagens={mensagens}
-          loading={loadingMensagens}
+          total={total}
+          loading={loadingMensagens || fetchingMensagens}
           onEnviar={handleEnviarRascunho}
           onExcluir={handleExcluir}
           busyId={busyId}
+          search={histSearch}
+          onSearchChange={setHistSearch}
+          pageSize={PAGE_SIZE}
+          offset={histOffset}
+          onPrevPage={() => setHistOffset((o) => Math.max(0, o - PAGE_SIZE))}
+          onNextPage={() => setHistOffset((o) => o + PAGE_SIZE)}
         />
       )}
     </div>

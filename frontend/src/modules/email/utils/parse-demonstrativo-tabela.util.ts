@@ -29,6 +29,8 @@ const EMAIL_INVALIDO_REGEX = /e-?mail\s+n[aã]o\s+validado/i;
 const RS_REGEX = /R\$\s*[\d.,]+/gi;
 /** Valor BR: 1.234,56 ou 1234,56 / 48,00 */
 const NUM_MONEY_REGEX = /\d{1,3}(?:\.\d{3})+,\d{2}|\d+,\d{2}/g;
+/** Linha (quase) só com valor monetário, ex.: `R$2.340,00` ou `R$ 2.340,00`. */
+const LINHA_SO_RS_REGEX = /^R\$\s*[\d.,]+\s*$/i;
 /** Tokens típicos de local/plantão — cortam o nome. */
 const LOCAL_TOKEN_REGEX =
   /^(UPA|UPINHA|FLEX|PS|PA|PRONTO|PRONTO-SOCORRO|SAMU|UBS|CAPS|HOSP|HOSPITAL|PLANTAO|PLANTÃO)/i;
@@ -92,13 +94,25 @@ function limparHorasNoLocal(local: string): string {
     .trim();
 }
 
+/** Número sem milhar e típico de horas de plantão (não valor em R$). */
+function pareceHorasPlantao(raw: string): boolean {
+  if (/\.\d{3},/.test(raw)) return false;
+  const n = parseValorBRL(`R$ ${raw}`);
+  // Ex.: 6,00 … 192,00 no export ISGH; valores em R$ costumam ter milhar ou vir na linha com R$.
+  return Number.isFinite(n) && n > 0 && n < 1000;
+}
+
 /**
  * Extrai local + valor da linha (após o e-mail).
  *
  * - Prefere montantes com "R$".
  * - Com 2+ valores "R$": penúltimo = valor da linha; último = total (não entra na soma).
  * - Com 1 "R$": é o valor da linha; texto antes pode incluir horas (removidas do local).
- * - Sem "R$": com 2+ números monetários, penúltimo = valor; senão o único.
+ * - Sem "R$":
+ *   - 2 números (ex.: `36,00 4.680,00`): típico **horas + valor** → usa o **último** (valor em R$).
+ *   - 3+ números: penúltimo = valor da linha; último = total acumulado.
+ *   - 1 número que parece horas (ex.: `… Diarista 18,00`): retorna null → aguarda `R$…` na linha seguinte.
+ *   - 1 número com milhar: valor da linha.
  * - Linha só com local/horas (sem valor): retorna null → caller aguarda R$ na linha seguinte.
  */
 function extrairLocalEValor(depois: string): { local: string; valorRaw: string } | null {
@@ -117,18 +131,40 @@ function extrairLocalEValor(depois: string): { local: string; valorRaw: string }
   const numMatches = [...texto.matchAll(new RegExp(NUM_MONEY_REGEX.source, 'g'))];
   if (!numMatches.length) return null;
 
-  // Um único número e parece "só horas" com asterisco (estilo NF sem R$ na mesma linha)
-  if (numMatches.length === 1 && /\*\s*\d/.test(texto)) {
+  // Um único número e parece "só horas" (com ou sem asterisco) → valor vem na linha seguinte com R$
+  if (numMatches.length === 1 && pareceHorasPlantao(numMatches[0]![0])) {
     return null;
   }
 
-  // valor + total colados sem R$
-  const pick = numMatches.length >= 2 ? numMatches[numMatches.length - 2]! : numMatches[numMatches.length - 1]!;
+  let pick: RegExpMatchArray;
+  let blockStart: number;
+
+  if (numMatches.length === 1) {
+    pick = numMatches[0]!;
+    blockStart = pick.index ?? 0;
+  } else if (numMatches.length === 2) {
+    // Planilha: Local | Horas | Valor → o valor é o ÚLTIMO.
+    const a = numMatches[0]!;
+    const b = numMatches[1]!;
+    const aTemMilhar = /\.\d{3},/.test(a[0]);
+    const bTemMilhar = /\.\d{3},/.test(b[0]);
+    if (!aTemMilhar && bTemMilhar) {
+      pick = b;
+    } else if (aTemMilhar && !bTemMilhar) {
+      pick = a;
+    } else {
+      const aNum = parseValorBRL(`R$ ${a[0]}`);
+      const bNum = parseValorBRL(`R$ ${b[0]}`);
+      pick = bNum >= aNum ? b : a;
+    }
+    blockStart = a.index ?? 0;
+  } else {
+    // 3+: penúltimo = valor da linha; último = total (não entra na soma)
+    pick = numMatches[numMatches.length - 2]!;
+    blockStart = pick.index ?? 0;
+  }
+
   const valorRaw = pick[0];
-  const blockStart =
-    numMatches.length >= 2
-      ? (numMatches[numMatches.length - 2]!.index ?? 0)
-      : (pick.index ?? 0);
   const local = limparHorasNoLocal(texto.slice(0, blockStart)) || '—';
   return { local, valorRaw };
 }
@@ -138,18 +174,29 @@ export function parseDemonstrativoTabela(texto: string): ParseDemonstrativoTabel
   const ignorados: DemonstrativoLinhaIgnorada[] = [];
   let pendente: { email: string; nome: string; local: string } | null = null;
 
+  const flushPendenteSemValor = () => {
+    if (!pendente) return;
+    pushIgnorado(
+      ignorados,
+      `${pendente.nome} <${pendente.email}> ${pendente.local}`,
+      'Produção sem valor (R$) na linha seguinte',
+      pendente.nome
+    );
+    pendente = null;
+  };
+
   for (const raw of texto.split(/\r?\n/)) {
     const linha = raw.trim();
     if (!linha) continue;
 
     if (EMAIL_INVALIDO_REGEX.test(linha)) {
-      pendente = null;
+      flushPendenteSemValor();
       pushIgnorado(ignorados, linha, 'E-mail não validado');
       continue;
     }
 
-    // Linha só de valor (R$) continuando a produção anterior (estilo NF)
-    if (pendente && /^R\$\s*[\d.,]+/i.test(linha) && !EMAIL_REGEX.test(linha)) {
+    // Linha só de valor (R$) continuando a produção anterior (export ISGH: horas numa linha, R$ na seguinte)
+    if (pendente && LINHA_SO_RS_REGEX.test(linha) && !EMAIL_REGEX.test(linha)) {
       const m = linha.match(/R\$\s*[\d.,]+/i);
       if (m) {
         adicionarLinha(porEmail, pendente.email, pendente.nome, pendente.local, m[0]);
@@ -160,7 +207,7 @@ export function parseDemonstrativoTabela(texto: string): ParseDemonstrativoTabel
 
     const emailMatch = linha.match(EMAIL_REGEX);
     if (!emailMatch) {
-      if (/^R\$\s*[\d.,]+/i.test(linha)) {
+      if (LINHA_SO_RS_REGEX.test(linha) || /^R\$\s*[\d.,]+/i.test(linha)) {
         pushIgnorado(ignorados, linha, 'Valor sem profissional (e-mail) associado');
       } else {
         pushIgnorado(ignorados, linha, 'E-mail não encontrado');
@@ -186,6 +233,7 @@ export function parseDemonstrativoTabela(texto: string): ParseDemonstrativoTabel
     if (!extraido) {
       const localSo = limparHorasNoLocal(depois.replace(new RegExp(NUM_MONEY_REGEX.source, 'g'), ''));
       if (localSo) {
+        flushPendenteSemValor();
         pendente = { email, nome, local: localSo };
       } else {
         pushIgnorado(ignorados, linha, 'Valor monetário não encontrado', nome);
@@ -193,18 +241,12 @@ export function parseDemonstrativoTabela(texto: string): ParseDemonstrativoTabel
       continue;
     }
 
+    flushPendenteSemValor();
     adicionarLinha(porEmail, email, nome, extraido.local, extraido.valorRaw);
     pendente = null;
   }
 
-  if (pendente) {
-    pushIgnorado(
-      ignorados,
-      `${pendente.nome} <${pendente.email}> ${pendente.local}`,
-      'Produção sem valor (R$) na linha seguinte',
-      pendente.nome
-    );
-  }
+  flushPendenteSemValor();
 
   const destinatarios = [...porEmail.values()]
     .map((d) => ({

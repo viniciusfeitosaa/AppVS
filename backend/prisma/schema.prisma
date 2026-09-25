@@ -46,6 +46,13 @@ enum StatusCadastroMedico {
   REJEITADO
 }
 
+/// Revisão de documento de perfil na fila Avaliação (cadastro público).
+enum StatusRevisaoDocumentoPerfil {
+  PENDENTE
+  OK
+  SOLICITADO
+}
+
 enum EmailMensagemStatus {
   RASCUNHO
   ENVIADO
@@ -219,6 +226,12 @@ model Medico {
   senhaHash     String   @db.VarChar(255) // Hash bcrypt
   especialidades String[] @default([]) @map("especialidades") // várias especialidades; médico sem nenhuma = Clínica Médica
   vinculo       String?  @db.VarChar(20)   // Ex: "PJ" ou vazio (Associado)
+  /// Número do RQE (médicos com especialidade registrada); opcional.
+  rqe           String?  @db.VarChar(60)
+  /// Preferência: cidade / unidade / região onde deseja atuar.
+  localInteresseTrabalho String? @map("local_interesse_trabalho") @db.Text
+  /// Preferência: tipo de interesse (plantão, ambulatorial, etc.).
+  interesseTrabalho String? @map("interesse_trabalho") @db.Text
   telefone      String?  @db.VarChar(20)
   estadoCivil   String?  @map("estado_civil") @db.VarChar(60)
   enderecoResidencial String? @map("endereco_residencial") @db.Text
@@ -279,6 +292,14 @@ model MedicoDocumento {
   caminhoArquivo String            @map("caminho_arquivo") @db.Text
   mimeType      String             @map("mime_type") @db.VarChar(120)
   tamanhoBytes  Int                @map("tamanho_bytes")
+  /// Data de validade do documento (quando o tipo exige controle de vencimento).
+  validadeEm    DateTime?          @map("validade_em") @db.Date
+  /// Revisão na Avaliação: Pendente / OK / Solicitado de novo.
+  statusRevisao StatusRevisaoDocumentoPerfil @default(PENDENTE) @map("status_revisao")
+  revisadoEm    DateTime?          @map("revisado_em")
+  revisadoPorMasterId String?      @map("revisado_por_master_id") @db.VarChar(36)
+  solicitacaoMensagem String?      @map("solicitacao_mensagem") @db.Text
+  solicitadoEm  DateTime?          @map("solicitado_em")
   createdAt     DateTime           @default(now()) @map("created_at")
   updatedAt     DateTime           @updatedAt @map("updated_at")
 
@@ -290,6 +311,8 @@ model MedicoDocumento {
   @@index([tenantId])
   @@index([medicoId])
   @@index([tipo])
+  @@index([statusRevisao])
+  @@index([tenantId, validadeEm])
 }
 
 model DocumentoEnviado {

@@ -39,6 +39,19 @@ async function processEmailJob(job: Job<EmailJobPayload>): Promise<void> {
       });
       break;
     }
+    case 'cadastro-documento-solicitado': {
+      const { enviarEmailCadastroDocumentoSolicitado } = await import(
+        '../services/cadastro-publico-email.service'
+      );
+      await enviarEmailCadastroDocumentoSolicitado({
+        to: job.data.to,
+        nomeCompleto: job.data.nomeCompleto,
+        nomeDocumento: job.data.nomeDocumento,
+        mensagem: job.data.mensagem,
+        nomeInstituicao: job.data.nomeInstituicao,
+      });
+      break;
+    }
     case 'reset-password': {
       const { sendResetPasswordEmailJob } = await import('../services/auth.service');
       await sendResetPasswordEmailJob(job.data.to, job.data.resetLink);

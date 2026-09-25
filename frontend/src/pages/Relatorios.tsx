@@ -537,8 +537,6 @@ const Relatorios = () => {
         rawCongelado != null && rawCongelado !== ''
           ? Number(rawCongelado)
           : NaN;
-      const temRepasseCongelado =
-        Number.isFinite(repasseCongeladoNum) && repasseCongeladoNum > 0;
       const repasseRateBackendRaw = item.id ? valorHoraPorRegistroPontoId[item.id] : undefined;
       const repasseRateBackend =
         repasseRateBackendRaw != null && Number.isFinite(Number(repasseRateBackendRaw))
@@ -549,6 +547,11 @@ const Relatorios = () => {
         cobrancaRateBackendRaw != null && Number.isFinite(Number(cobrancaRateBackendRaw))
           ? Number(cobrancaRateBackendRaw)
           : null;
+      const temRepasseCongelado =
+        Number.isFinite(repasseCongeladoNum) &&
+        repasseCongeladoNum > 0 &&
+        // Valores de Ponto (config) prevalecem: alteração no cadastro deve refletir no relatório.
+        !(repasseRateBackend != null && repasseRateBackend > 0);
       const diaKey = diaKeyFromIso(item.checkInAt);
       const gradeKey = gradeResolvido != null ? String(gradeResolvido).trim().toLowerCase() : '';
       const cadResolvido = gradeKey ? valoresPlantaoPorGrade.get(gradeKey) ?? null : null;

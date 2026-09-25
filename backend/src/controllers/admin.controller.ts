@@ -38,6 +38,8 @@ import {
   listMedicosService,
   listMedicosFiltrosResumoService,
   getMedicoDetalheAdminService,
+  listDocumentosValidadeAlertaService,
+  avisarValidadeDocumentoMedicoService,
   removerEscalaPlantaoService,
   removerMedicoEscalaService,
   removeContratoEquipeService,
@@ -68,10 +70,13 @@ import {
 } from '../services/docuseal.service';
 import {
   aprovarCadastroPendenteService,
+  confirmarOkDocumentoCadastroPendenteService,
   downloadCadastroPendenteDocumentoService,
   getCadastroPendenteDetalheService,
   listCadastrosPendentesService,
   rejeitarCadastroPendenteService,
+  solicitarDocumentoCadastroPendenteService,
+  substituirDocumentoCadastroPendenteService,
 } from '../services/cadastro-pendente.service';
 import {
   getRelatorioProcedimentosMesService,
@@ -159,6 +164,41 @@ export const getMedicoDetalheAdminController = async (req: Request, res: Respons
     return res.status(error.statusCode || 500).json({
       success: false,
       error: error.message || 'Erro ao carregar dados do profissional',
+    });
+  }
+};
+
+export const listDocumentosValidadeAlertaController = async (req: Request, res: Response) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ success: false, error: 'Não autenticado' });
+    }
+    const data = await listDocumentosValidadeAlertaService(req.user.tenantId);
+    return res.status(200).json({ success: true, data });
+  } catch (error: any) {
+    return res.status(error.statusCode || 500).json({
+      success: false,
+      error: error.message || 'Erro ao listar alertas de validade',
+    });
+  }
+};
+
+export const avisarValidadeDocumentoMedicoController = async (req: Request, res: Response) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ success: false, error: 'Não autenticado' });
+    }
+    const data = await avisarValidadeDocumentoMedicoService(
+      req.user.tenantId,
+      req.user.id,
+      String(req.params.id),
+      String(req.params.documentoId)
+    );
+    return res.status(200).json({ success: true, data, message: 'Alerta enviado ao profissional' });
+  } catch (error: any) {
+    return res.status(error.statusCode || 500).json({
+      success: false,
+      error: error.message || 'Erro ao enviar alerta de validade',
     });
   }
 };
@@ -1674,6 +1714,69 @@ export const rejeitarCadastroPendenteController = async (req: Request, res: Resp
     return res.status(error.statusCode || 500).json({
       success: false,
       error: error.message || 'Erro ao rejeitar cadastro',
+    });
+  }
+};
+
+export const confirmarOkDocumentoCadastroPendenteController = async (req: Request, res: Response) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ success: false, error: 'Não autenticado' });
+    }
+    const data = await confirmarOkDocumentoCadastroPendenteService(
+      req.user.tenantId,
+      req.user.id,
+      req.params.medicoId,
+      req.params.documentoId
+    );
+    return res.status(200).json({ success: true, data, message: 'Documento confirmado' });
+  } catch (error: any) {
+    return res.status(error.statusCode || 500).json({
+      success: false,
+      error: error.message || 'Erro ao confirmar documento',
+    });
+  }
+};
+
+export const solicitarDocumentoCadastroPendenteController = async (req: Request, res: Response) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ success: false, error: 'Não autenticado' });
+    }
+    const mensagem = typeof req.body?.mensagem === 'string' ? req.body.mensagem : '';
+    const data = await solicitarDocumentoCadastroPendenteService(
+      req.user.tenantId,
+      req.user.id,
+      req.params.medicoId,
+      req.params.documentoId,
+      mensagem
+    );
+    return res.status(200).json({ success: true, data, message: 'Solicitação enviada por e-mail' });
+  } catch (error: any) {
+    return res.status(error.statusCode || 500).json({
+      success: false,
+      error: error.message || 'Erro ao solicitar documento',
+    });
+  }
+};
+
+export const substituirDocumentoCadastroPendenteController = async (req: Request, res: Response) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ success: false, error: 'Não autenticado' });
+    }
+    const data = await substituirDocumentoCadastroPendenteService(
+      req.user.tenantId,
+      req.user.id,
+      req.params.medicoId,
+      req.params.documentoId,
+      req.file
+    );
+    return res.status(200).json({ success: true, data, message: 'Documento substituído' });
+  } catch (error: any) {
+    return res.status(error.statusCode || 500).json({
+      success: false,
+      error: error.message || 'Erro ao substituir documento',
     });
   }
 };

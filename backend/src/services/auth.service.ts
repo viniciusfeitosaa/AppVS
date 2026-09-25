@@ -7,6 +7,7 @@ import { generateTokens } from '../utils/jwt.util';
 import { createAuditLog } from './auditoria.service';
 import { StatusCadastroMedico, UserRole } from '@prisma/client';
 import { upsertMedicoDocumentosFromMulter } from './medico.service';
+import type { DocumentoPerfilFieldName } from '../constants/documentos.const';
 import { TERMOS_CADASTRO_VERSAO } from '../constants/termos-cadastro.const';
 import { enviarEmailsPosCadastroPublico } from './cadastro-publico-email.service';
 import crypto from 'crypto';
@@ -308,12 +309,15 @@ interface RegisterPublicMedicoInput {
   cpf: string;
   profissao: string;
   crm?: string;
+  rqe?: string;
   especialidades?: string[];
   telefone: string;
   estadoCivil?: string;
   enderecoResidencial?: string;
   dadosBancarios?: string;
   chavePix?: string;
+  localInteresseTrabalho?: string;
+  interesseTrabalho?: string;
   /** Aceite explícito dos termos e declaração do cadastro público. */
   aceitouTermos?: boolean | string;
 }
@@ -735,7 +739,8 @@ export const acceptInviteService = async (
 
 export const registerPublicMedicoService = async (
   input: RegisterPublicMedicoInput,
-  files?: Record<string, Express.Multer.File[] | undefined> | null
+  files?: Record<string, Express.Multer.File[] | undefined> | null,
+  validades?: Partial<Record<DocumentoPerfilFieldName, string>> | null
 ) => {
   const tenant = await getDefaultTenant();
   const cpf = input.cpf.replace(/\D/g, '');
@@ -811,6 +816,17 @@ export const registerPublicMedicoService = async (
 
   const trimOpt = (v: string | undefined) => (v && String(v).trim()) || undefined;
 
+  const localInteresse = trimOpt(input.localInteresseTrabalho);
+  const interesseTrabalho = trimOpt(input.interesseTrabalho);
+  if (!localInteresse) {
+    throw { statusCode: 400, message: 'Informe o local / região de interesse de trabalho' };
+  }
+  if (!interesseTrabalho) {
+    throw { statusCode: 400, message: 'Informe o interesse de trabalho' };
+  }
+
+  const rqe = isMedico ? trimOpt(input.rqe) : undefined;
+
   const medico = await prisma.$transaction(async (tx: any) => {
     const created = await tx.medico.create({
       data: {
@@ -820,6 +836,7 @@ export const registerPublicMedicoService = async (
         cpf,
         profissao,
         crm,
+        rqe: rqe ?? null,
         senhaHash,
         especialidades: especialidadesFinal,
         vinculo: 'Associado',
@@ -828,6 +845,8 @@ export const registerPublicMedicoService = async (
         enderecoResidencial: trimOpt(input.enderecoResidencial),
         dadosBancarios: trimOpt(input.dadosBancarios),
         chavePix: trimOpt(input.chavePix),
+        localInteresseTrabalho: localInteresse,
+        interesseTrabalho,
         termosCadastroAceitosEm: new Date(),
         termosCadastroVersao: TERMOS_CADASTRO_VERSAO,
         ativo: false,
@@ -845,7 +864,7 @@ export const registerPublicMedicoService = async (
       },
     });
 
-    await upsertMedicoDocumentosFromMulter(tx, tenant.id, created.id, files);
+    await upsertMedicoDocumentosFromMulter(tx, tenant.id, created.id, files, validades);
 
     await createAuditLog(
       {

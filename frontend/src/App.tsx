@@ -26,6 +26,7 @@ import Medicos from './pages/Medicos';
 import FeaturePlaceholder from './pages/FeaturePlaceholder';
 import ContratosAtivos from './pages/ContratosAtivos';
 const Escalas = lazy(() => import('./pages/Escalas'));
+const EscalaMaster = lazy(() => import('./pages/EscalaMaster'));
 const PerfisEquipe = lazy(() => import('./pages/PerfisEquipe'));
 import SubgruposEquipes from './pages/SubgruposEquipes';
 import ValoresPlantao from './pages/ValoresPlantao';
@@ -128,6 +129,14 @@ function AppRoutes() {
           element={
             <Suspense fallback={<PageLoadingScreen />}>
               <Escalas />
+            </Suspense>
+          }
+        />
+        <Route
+          path="/escala-master"
+          element={
+            <Suspense fallback={<PageLoadingScreen />}>
+              <EscalaMaster />
             </Suspense>
           }
         />

@@ -128,7 +128,9 @@ export const acceptInviteController = async (req: Request, res: Response) => {
 export const registerPublicController = async (req: Request, res: Response) => {
   try {
     const files = (req.files as Record<string, Express.Multer.File[]> | undefined) || undefined;
-    const result = await registerPublicMedicoService(req.body, files);
+    const { parseDocumentoValidadesFromBody } = await import('../constants/documentos.const');
+    const validades = parseDocumentoValidadesFromBody(req.body);
+    const result = await registerPublicMedicoService(req.body, files, validades);
     return res.status(201).json({
       success: true,
       data: result,

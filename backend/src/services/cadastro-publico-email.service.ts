@@ -399,3 +399,66 @@ export async function enviarEmailPrecadastroAceito(params: {
     text
   );
 }
+
+function subjectDocumentoSolicitado(): string {
+  return `Documentação pendente — reenvio solicitado | ${org()}`;
+}
+
+export async function enviarEmailCadastroDocumentoSolicitado(params: {
+  to: string | null | undefined;
+  nomeCompleto: string;
+  nomeDocumento: string;
+  mensagem: string;
+  nomeInstituicao?: string | null;
+}): Promise<void> {
+  const to = (params.to ?? '').trim().toLowerCase();
+  if (!to) return;
+  const primeiro = params.nomeCompleto.trim().split(/\s+/)[0] || 'Profissional';
+  const orgName = params.nomeInstituicao?.trim() || org();
+  const docLabel = params.nomeDocumento.trim() || 'documento';
+  const mensagem = params.mensagem.trim();
+
+  const html = buildEmailShell({
+    preheader: `Precisamos que você reenvie um documento do seu cadastro na ${orgName}.`,
+    headline: 'Solicitação de reenvio de documento',
+    bodyParagraphsHtml: [
+      p(`Olá, <strong style="color:#0f172a;">${escapeHtmlText(primeiro)}</strong>.`),
+      p(
+        `A equipe da <strong style="color:#0f172a;">${escapeHtmlText(
+          orgName
+        )}</strong> está analisando o seu pedido de cadastro e precisa que você envie novamente o documento abaixo, com os dados cadastrais corretos e legíveis.`
+      ),
+      p(
+        `<strong style="color:#0f172a;">Documento solicitado:</strong><br>${escapeHtmlText(docLabel)}`
+      ),
+      mensagem
+        ? `<div style="margin:0 0 14px;padding:14px 16px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;"><p style="margin:0 0 6px;font-size:12px;font-weight:600;letter-spacing:0.04em;text-transform:uppercase;color:#64748b;">Motivo / orientação da análise</p><p style="margin:0;font-size:15px;line-height:1.65;color:#334155;white-space:pre-wrap;">${escapeHtmlText(
+            mensagem
+          )}</p></div>`
+        : '',
+      p(
+        'Como o seu cadastro ainda está <strong style="color:#0f172a;">em análise</strong>, o acesso à plataforma permanece bloqueado. Por favor, <strong style="color:#0f172a;">responda a este e-mail anexando o ficheiro correto</strong> (PDF ou imagem).'
+      ),
+      p(
+        'Assim que recebermos o documento atualizado, a análise do seu cadastro poderá continuar. Em caso de dúvida, responda a esta mensagem ou contacte o canal de suporte da instituição.'
+      ),
+    ].filter(Boolean),
+  });
+
+  const text = [
+    `Olá, ${primeiro}.`,
+    '',
+    `A equipe da ${orgName} está analisando o seu pedido de cadastro e precisa do reenvio do documento abaixo.`,
+    '',
+    `Documento solicitado: ${docLabel}`,
+    '',
+    mensagem ? `Motivo / orientação da análise:\n${mensagem}\n` : '',
+    'Como o cadastro ainda está em análise, responda a este e-mail anexando o ficheiro correto (PDF ou imagem).',
+    '',
+    'Assim que recebermos o documento, a análise poderá continuar.',
+  ]
+    .filter((line) => line !== undefined)
+    .join('\n');
+
+  await sendEmailHtml(to, subjectDocumentoSolicitado(), html, text);
+}

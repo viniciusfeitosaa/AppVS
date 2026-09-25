@@ -114,6 +114,16 @@ function resolveRegistroConselho(dados: FormData, profissao: string): string | u
 
 export function mapCadastroToRegisterPayload(dados: FormData): RegisterPayload {
   const profissao = mapProfissao(dados.categoriaProfissional, dados.categoriaProfissionalDetalhe);
+  const cidade = String(dados.cidade || '').trim();
+  const estado = String(dados.estado || '').trim().toUpperCase();
+  const localInteresse =
+    [cidade, estado].filter(Boolean).join(' / ') || 'A definir';
+  const especialidade = String(dados.especialidadeProfissional || '').trim();
+  const interesseTrabalho =
+    especialidade ||
+    String(dados.categoriaProfissionalDetalhe || '').trim() ||
+    'Cadastro via formulário COOPVITTA';
+
   const payload: RegisterPayload = {
     nomeCompleto: String(dados.nomeCompleto || '').trim(),
     email: String(dados.email || '').trim().toLowerCase(),
@@ -126,13 +136,14 @@ export function mapCadastroToRegisterPayload(dados: FormData): RegisterPayload {
     enderecoResidencial: montarEnderecoResidencial(dados),
     dadosBancarios: montarDadosBancarios(dados),
     chavePix: String(dados.pix || '').trim(),
+    localInteresseTrabalho: localInteresse,
+    interesseTrabalho,
     aceitouTermos: dados.termoConsentimento === true,
   };
 
   const crm = resolveRegistroConselho(dados, profissao);
   if (crm) payload.crm = crm;
 
-  const especialidade = String(dados.especialidadeProfissional || '').trim();
   if (especialidade) {
     payload.especialidades = [especialidade];
   }

@@ -275,6 +275,22 @@ export const validateRegisterMedico = [
     .trim()
     .isLength({ max: 120 })
     .withMessage('Chave Pix inválida'),
+  body('rqe')
+    .optional({ values: 'falsy' })
+    .isString()
+    .trim()
+    .isLength({ max: 60 })
+    .withMessage('RQE inválido'),
+  body('localInteresseTrabalho')
+    .isString()
+    .trim()
+    .isLength({ min: 2, max: 500 })
+    .withMessage('Informe o local / região de interesse de trabalho (2 a 500 caracteres)'),
+  body('interesseTrabalho')
+    .isString()
+    .trim()
+    .isLength({ min: 2, max: 1000 })
+    .withMessage('Informe o interesse de trabalho (2 a 1000 caracteres)'),
   body('aceitouTermos').custom((value) => {
     if (value === true || value === 1) return true;
     if (typeof value === 'string') {

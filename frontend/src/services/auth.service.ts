@@ -92,6 +92,7 @@ export interface RegisterPayload {
   cpf: string;
   profissao: string;
   crm?: string;
+  rqe?: string;
   especialidades?: string[];
   telefone: string;
   password: string;
@@ -100,11 +101,14 @@ export interface RegisterPayload {
   enderecoResidencial?: string;
   dadosBancarios?: string;
   chavePix?: string;
+  localInteresseTrabalho: string;
+  interesseTrabalho: string;
   /** Obrigatório no cadastro público (aceite de termos e declaração). */
   aceitouTermos: boolean;
 }
 
 export type RegisterDocumentFiles = Partial<Record<DocumentoPerfilField, File>>;
+export type RegisterDocumentValidades = Partial<Record<DocumentoPerfilField, string>>;
 
 export const authService = {
   login: async (credentials: LoginCredentials): Promise<LoginResponse> => {
@@ -117,7 +121,11 @@ export const authService = {
     return response.data;
   },
 
-  register: async (payload: RegisterPayload, files?: RegisterDocumentFiles) => {
+  register: async (
+    payload: RegisterPayload,
+    files?: RegisterDocumentFiles,
+    validades?: RegisterDocumentValidades
+  ) => {
     const hasFile = files && Object.values(files).some((f) => f instanceof File);
     if (!hasFile) {
       const response = await api.post('/auth/register', payload);
@@ -141,10 +149,18 @@ export const authService = {
     if (payload.enderecoResidencial) appendScalar('enderecoResidencial', payload.enderecoResidencial);
     if (payload.dadosBancarios) appendScalar('dadosBancarios', payload.dadosBancarios);
     if (payload.chavePix) appendScalar('chavePix', payload.chavePix);
+    if (payload.rqe) appendScalar('rqe', payload.rqe);
+    appendScalar('localInteresseTrabalho', payload.localInteresseTrabalho);
+    appendScalar('interesseTrabalho', payload.interesseTrabalho);
     fd.append('aceitouTermos', payload.aceitouTermos ? 'true' : 'false');
     (payload.especialidades || []).forEach((e) => fd.append('especialidades', e));
     Object.entries(files || {}).forEach(([k, file]) => {
       if (file instanceof File) fd.append(k, file);
+    });
+    Object.entries(validades || {}).forEach(([field, date]) => {
+      if (date && String(date).trim()) {
+        fd.append(`validadeEm__${field}`, String(date).trim().slice(0, 10));
+      }
     });
     // Não usar axios aqui: o cliente global força JSON e o transformRequest pode estragar FormData.
     // fetch deixa o browser definir multipart/form-data com boundary correto.

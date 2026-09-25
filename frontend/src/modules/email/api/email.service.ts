@@ -18,8 +18,24 @@ export const emailModuleService = {
     return response.data;
   },
 
-  listMensagens: async (limit = 50): Promise<{ success: boolean; data: EmailMensagem[] }> => {
-    const response = await api.get('/email/mensagens', { params: { limit } });
+  listMensagens: async (params?: {
+    limit?: number;
+    offset?: number;
+    q?: string;
+  }): Promise<{
+    success: boolean;
+    data: EmailMensagem[];
+    total?: number;
+    limit?: number;
+    offset?: number;
+  }> => {
+    const response = await api.get('/email/mensagens', {
+      params: {
+        limit: params?.limit ?? 100,
+        offset: params?.offset ?? 0,
+        q: params?.q || undefined,
+      },
+    });
     return response.data;
   },
 

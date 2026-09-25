@@ -1,7 +1,15 @@
 import fs from 'fs';
 import type { Prisma } from '@prisma/client';
 import { prisma } from '../config/database';
-import { DOCUMENTO_TIPO_BY_FIELD, DOCUMENTOS_PERFIL_FIELDS } from '../constants/documentos.const';
+import {
+  DOCUMENTO_LABEL_BY_TIPO,
+  DOCUMENTO_TIPO_BY_FIELD,
+  DOCUMENTOS_PERFIL_FIELDS,
+  documentoExigeValidadeField,
+  parseValidadeEmDate,
+  statusValidadeDocumento,
+  type DocumentoPerfilFieldName,
+} from '../constants/documentos.const';
 import {
   fileExistsSafe,
   resolveStoredFileToAbsolute,
@@ -34,37 +42,88 @@ export async function upsertMedicoDocumentosFromMulter(
   prismaClient: Prisma.TransactionClient | typeof prisma,
   tenantId: string,
   medicoId: string,
-  files: Record<string, Express.Multer.File[] | undefined> | undefined | null
+  files: Record<string, Express.Multer.File[] | undefined> | undefined | null,
+  validades?: Partial<Record<DocumentoPerfilFieldName, string>> | null
 ) {
-  if (!files) return;
+  const validadeMap = validades || {};
+  const hasFiles = files && Object.values(files).some((arr) => arr && arr.length > 0);
+  const hasValidades = Object.keys(validadeMap).length > 0;
+  if (!hasFiles && !hasValidades) return;
+
   await Promise.all(
     DOCUMENTOS_PERFIL_FIELDS.map(async (fieldName) => {
-      const file = files[fieldName]?.[0];
-      if (!file) return;
-      await prismaClient.medicoDocumento.upsert({
-        where: {
-          tenantId_medicoId_tipo: {
+      const file = files?.[fieldName]?.[0];
+      const validadeRaw = validadeMap[fieldName];
+      const exigeValidade = documentoExigeValidadeField(fieldName);
+      const validadeParsed =
+        validadeRaw !== undefined ? parseValidadeEmDate(validadeRaw) : undefined;
+
+      if (validadeRaw !== undefined && validadeRaw.trim() && validadeParsed === null) {
+        throw {
+          statusCode: 400,
+          message: `Data de validade inválida para ${DOCUMENTO_LABEL_BY_TIPO[DOCUMENTO_TIPO_BY_FIELD[fieldName]]}. Use AAAA-MM-DD.`,
+        };
+      }
+
+      if (!file && validadeRaw === undefined) return;
+
+      if (file && exigeValidade && (validadeParsed === undefined || validadeParsed === null)) {
+        throw {
+          statusCode: 400,
+          message: `Informe a data de validade de: ${DOCUMENTO_LABEL_BY_TIPO[DOCUMENTO_TIPO_BY_FIELD[fieldName]]}.`,
+        };
+      }
+
+      const tipo = DOCUMENTO_TIPO_BY_FIELD[fieldName];
+
+      if (file) {
+        await prismaClient.medicoDocumento.upsert({
+          where: {
+            tenantId_medicoId_tipo: {
+              tenantId,
+              medicoId,
+              tipo,
+            },
+          },
+          update: {
+            nomeArquivo: file.originalname,
+            caminhoArquivo: toStoredUploadPath(file.path),
+            mimeType: file.mimetype,
+            tamanhoBytes: file.size,
+            ...(exigeValidade && validadeParsed ? { validadeEm: validadeParsed } : {}),
+          },
+          create: {
             tenantId,
             medicoId,
-            tipo: DOCUMENTO_TIPO_BY_FIELD[fieldName],
+            tipo,
+            nomeArquivo: file.originalname,
+            caminhoArquivo: toStoredUploadPath(file.path),
+            mimeType: file.mimetype,
+            tamanhoBytes: file.size,
+            validadeEm: exigeValidade ? validadeParsed ?? null : null,
           },
-        },
-        update: {
-          nomeArquivo: file.originalname,
-          caminhoArquivo: toStoredUploadPath(file.path),
-          mimeType: file.mimetype,
-          tamanhoBytes: file.size,
-        },
-        create: {
-          tenantId,
-          medicoId,
-          tipo: DOCUMENTO_TIPO_BY_FIELD[fieldName],
-          nomeArquivo: file.originalname,
-          caminhoArquivo: toStoredUploadPath(file.path),
-          mimeType: file.mimetype,
-          tamanhoBytes: file.size,
-        },
-      });
+        });
+        return;
+      }
+
+      if (validadeParsed) {
+        const existing = await prismaClient.medicoDocumento.findUnique({
+          where: {
+            tenantId_medicoId_tipo: { tenantId, medicoId, tipo },
+          },
+          select: { id: true },
+        });
+        if (!existing) {
+          throw {
+            statusCode: 400,
+            message: `Anexe o ficheiro antes de informar a validade de: ${DOCUMENTO_LABEL_BY_TIPO[tipo]}.`,
+          };
+        }
+        await prismaClient.medicoDocumento.update({
+          where: { id: existing.id },
+          data: { validadeEm: validadeParsed },
+        });
+      }
     })
   );
 }
@@ -113,6 +172,7 @@ export const getPerfilService = async (medicoId: string, tenantId: string) => {
           caminhoArquivo: true,
           mimeType: true,
           tamanhoBytes: true,
+          validadeEm: true,
           updatedAt: true,
         },
         orderBy: {
@@ -130,7 +190,7 @@ export const getPerfilService = async (medicoId: string, tenantId: string) => {
     ...medico,
     documentos: medico.documentos.map((doc) => ({
       ...doc,
-      /** Download apenas via GET /api/medico/perfil/documentos/:id/download (autenticado). */
+      statusValidade: statusValidadeDocumento(doc.tipo, doc.validadeEm),
     })),
   };
 };
@@ -157,7 +217,8 @@ export const updatePerfilService = async (
   medicoId: string,
   tenantId: string,
   input: UpdatePerfilInput,
-  files: Record<string, Express.Multer.File[]>
+  files: Record<string, Express.Multer.File[]>,
+  validades?: Partial<Record<DocumentoPerfilFieldName, string>> | null
 ) => {
   const medico = await prisma.medico.findFirst({
     where: { id: medicoId, tenantId },
@@ -182,7 +243,7 @@ export const updatePerfilService = async (
     },
   });
 
-  await upsertMedicoDocumentosFromMulter(prisma, tenantId, medico.id, files);
+  await upsertMedicoDocumentosFromMulter(prisma, tenantId, medico.id, files, validades);
 
   return getPerfilService(medico.id, tenantId);
 };

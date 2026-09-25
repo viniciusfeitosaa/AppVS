@@ -35,6 +35,8 @@ export interface MedicoPerfil {
     caminhoArquivo: string;
     mimeType: string;
     tamanhoBytes: number;
+    validadeEm?: string | null;
+    statusValidade?: string;
     updatedAt: string;
   }>;
 }
@@ -74,6 +76,7 @@ export const medicoService = {
     dadosBancarios?: string;
     chavePix?: string;
     documentos?: Partial<Record<DocumentoPerfilField, File>>;
+    documentoValidades?: Partial<Record<DocumentoPerfilField, string>>;
   }): Promise<PerfilResponse> => {
     const formData = new FormData();
     if (payload.especialidades?.length)
@@ -86,6 +89,13 @@ export const medicoService = {
     if (payload.documentos) {
       Object.entries(payload.documentos).forEach(([field, file]) => {
         if (file) formData.append(field, file);
+      });
+    }
+    if (payload.documentoValidades) {
+      Object.entries(payload.documentoValidades).forEach(([field, date]) => {
+        if (date && String(date).trim()) {
+          formData.append(`validadeEm__${field}`, String(date).trim().slice(0, 10));
+        }
       });
     }
     const response = await api.put<PerfilResponse>('/medico/perfil', formData, {

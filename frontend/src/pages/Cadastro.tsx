@@ -18,10 +18,23 @@ import {
   DOCUMENTOS_PERFIL_FIELDS,
   DOCUMENTOS_PERFIL_OBRIGATORIOS_CADASTRO,
   DOCUMENTO_LABEL_BY_FIELD,
+  documentoExigeValidade,
   isDocumentoObrigatorioNoCadastro,
+  validadeFormFieldName,
   type DocumentoPerfilField,
 } from '../constants/documentosPerfil';
 import { validateCPF, validateCRM } from '../utils/validation.util';
+import {
+  BANCOS_CADASTRO,
+  TIPOS_CHAVE_PIX,
+  formatarChavePixPorTipo,
+  inputModeChavePix,
+  labelBancoPorCodigo,
+  normalizarChavePix,
+  placeholderChavePix,
+  validarChavePix,
+  type TipoChavePix,
+} from '../constants/bancosPix';
 
 function formatBytes(n: number): string {
   if (n < 1024) return `${n} B`;
@@ -37,6 +50,7 @@ const STEP_LABELS = [
   'Estado civil e endereço',
   'Repasse (texto)',
   'Documentos',
+  'Local e interesse',
   'Senha e aceite',
 ] as const;
 
@@ -91,12 +105,13 @@ function montarEnderecoResidencial(data: {
 function montarDadosBancariosTexto(data: {
   dadosBancoConta: string;
   dadosBancoAgencia: string;
-  dadosBancoNome: string;
+  dadosBancoCodigo: string;
+  dadosBancoNomeOutro?: string;
 }): string {
   return [
     `Conta: ${data.dadosBancoConta.trim()}`,
     `Agência: ${data.dadosBancoAgencia.trim()}`,
-    `Banco: ${data.dadosBancoNome.trim()}`,
+    `Banco: ${labelBancoPorCodigo(data.dadosBancoCodigo, data.dadosBancoNomeOutro)}`,
   ].join('\n');
 }
 
@@ -122,6 +137,7 @@ const cadastroSchema = z
     telefone: z.string().min(8, 'Telefone é obrigatório'),
     profissao: z.string().min(2, 'Selecione a profissão'),
     crm: z.string().optional(),
+    rqe: z.string().optional(),
     estadoCivil: z.string().min(1, 'Selecione o estado civil'),
     cep: z
       .string()
@@ -141,8 +157,23 @@ const cadastroSchema = z
       .regex(/^[A-Za-z]{2}$/, 'UF inválida (use duas letras, ex.: SP)'),
     dadosBancoConta: z.string().min(1, 'Informe a conta'),
     dadosBancoAgencia: z.string().min(1, 'Informe a agência'),
-    dadosBancoNome: z.string().min(2, 'Informe o nome do banco'),
-    chavePix: z.string().min(3, 'Informe a chave Pix (obrigatório)'),
+    dadosBancoCodigo: z.string().min(1, 'Selecione o banco'),
+    dadosBancoNomeOutro: z.string().optional(),
+    tipoChavePix: z.enum(['cpf', 'cnpj', 'email', 'telefone', 'aleatoria'], {
+      required_error: 'Selecione o tipo da chave Pix',
+      invalid_type_error: 'Selecione o tipo da chave Pix',
+    }),
+    chavePix: z.string().min(1, 'Informe a chave Pix (obrigatório)'),
+    localInteresseTrabalho: z
+      .string()
+      .trim()
+      .min(2, 'Informe o local ou região de interesse')
+      .max(500, 'Texto demasiado longo'),
+    interesseTrabalho: z
+      .string()
+      .trim()
+      .min(2, 'Informe o interesse de trabalho')
+      .max(1000, 'Texto demasiado longo'),
     password: z.string().min(8, 'Senha deve ter no mínimo 8 caracteres'),
     confirmPassword: z.string().min(8, 'Confirme a senha'),
     aceitouTermos: z.boolean().refine((v) => v === true, {
@@ -154,30 +185,49 @@ const cadastroSchema = z
     path: ['confirmPassword'],
   })
   .superRefine((data, ctx) => {
-    if (!profissaoExigeRegistroConselho(data.profissao)) return;
-    const v = (data.crm || '').trim();
-    if (!v) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: 'Informe o número do registro no conselho',
-        path: ['crm'],
-      });
-      return;
-    }
-    if (data.profissao === 'Médico') {
-      if (!validateCRM(v)) {
+    if (data.dadosBancoCodigo === 'outro') {
+      const nome = (data.dadosBancoNomeOutro || '').trim();
+      if (nome.length < 2) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
-          message: 'CRM inválido. Use o formato número-UF (ex.: 12345-CE)',
+          message: 'Informe o nome do banco',
+          path: ['dadosBancoNomeOutro'],
+        });
+      }
+    }
+
+    const pixErr = validarChavePix(data.tipoChavePix as TipoChavePix, data.chavePix);
+    if (pixErr) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: pixErr,
+        path: ['chavePix'],
+      });
+    }
+
+    if (profissaoExigeRegistroConselho(data.profissao)) {
+      const v = (data.crm || '').trim();
+      if (!v) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'Informe o número do registro no conselho',
+          path: ['crm'],
+        });
+      } else if (data.profissao === 'Médico') {
+        if (!validateCRM(v)) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: 'CRM inválido. Use o formato número-UF (ex.: 12345-CE)',
+            path: ['crm'],
+          });
+        }
+      } else if (v.length < 4) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'Registro muito curto (mínimo 4 caracteres)',
           path: ['crm'],
         });
       }
-    } else if (v.length < 4) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: 'Registro muito curto (mínimo 4 caracteres)',
-        path: ['crm'],
-      });
     }
   });
 
@@ -196,9 +246,10 @@ const FIELDS_BY_STEP: Record<number, FieldPath<CadastroFormData>[]> = {
     'enderecoUf',
     'enderecoComplemento',
   ],
-  3: ['dadosBancoConta', 'dadosBancoAgencia', 'dadosBancoNome', 'chavePix'],
+  3: ['dadosBancoConta', 'dadosBancoAgencia', 'dadosBancoCodigo', 'dadosBancoNomeOutro', 'tipoChavePix', 'chavePix'],
   4: [],
-  5: ['password', 'confirmPassword', 'aceitouTermos'],
+  5: ['localInteresseTrabalho', 'interesseTrabalho'],
+  6: ['password', 'confirmPassword', 'aceitouTermos'],
 };
 
 const Cadastro = () => {
@@ -210,6 +261,7 @@ const Cadastro = () => {
   const [especialidadesSelecionadas, setEspecialidadesSelecionadas] = useState<string[]>([]);
   const [buscaEspecialidade, setBuscaEspecialidade] = useState('');
   const [docFiles, setDocFiles] = useState<Partial<Record<DocumentoPerfilField, File | null>>>({});
+  const [docValidades, setDocValidades] = useState<Partial<Record<DocumentoPerfilField, string>>>({});
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [cepAutoLoading, setCepAutoLoading] = useState(false);
@@ -240,10 +292,15 @@ const Cadastro = () => {
       enderecoCidade: '',
       enderecoUf: '',
       crm: '',
+      rqe: '',
       dadosBancoConta: '',
       dadosBancoAgencia: '',
-      dadosBancoNome: '',
+      dadosBancoCodigo: '',
+      dadosBancoNomeOutro: '',
+      tipoChavePix: undefined,
       chavePix: '',
+      localInteresseTrabalho: '',
+      interesseTrabalho: '',
       cpf: '',
       aceitouTermos: false,
     },
@@ -299,6 +356,8 @@ const Cadastro = () => {
   const profissao = watch('profissao');
   const isMedico = profissao === 'Médico';
   const exigeRegistroConselho = profissaoExigeRegistroConselho(profissao);
+  const dadosBancoCodigo = watch('dadosBancoCodigo');
+  const tipoChavePix = watch('tipoChavePix');
 
   useEffect(() => {
     if (profissao !== 'Médico') {
@@ -327,6 +386,7 @@ const Cadastro = () => {
       keys.forEach((k) => map.set(k, s));
     });
     map.set('crm', 1);
+    map.set('rqe', 1);
     return map;
   }, [fieldsByStep]);
 
@@ -338,6 +398,7 @@ const Cadastro = () => {
       telefone: 'Telefone',
       profissao: 'Profissão',
       crm: 'Registro no conselho',
+      rqe: 'RQE',
       estadoCivil: 'Estado civil',
       cep: 'CEP',
       enderecoLogradouro: 'Logradouro',
@@ -348,8 +409,12 @@ const Cadastro = () => {
       enderecoUf: 'UF',
       dadosBancoConta: 'Conta bancária',
       dadosBancoAgencia: 'Agência',
-      dadosBancoNome: 'Banco',
+      dadosBancoCodigo: 'Banco',
+      dadosBancoNomeOutro: 'Nome do banco',
+      tipoChavePix: 'Tipo da chave Pix',
       chavePix: 'Chave Pix',
+      localInteresseTrabalho: 'Local de interesse',
+      interesseTrabalho: 'Interesse de trabalho',
       password: 'Senha',
       confirmPassword: 'Confirmar senha',
       aceitouTermos: 'Aceite dos termos',
@@ -392,6 +457,17 @@ const Cadastro = () => {
   const documentosObrigatoriosPreenchidos = () =>
     DOCUMENTOS_PERFIL_OBRIGATORIOS_CADASTRO.every((k) => docFiles[k] instanceof File);
 
+  const documentosValidadesOk = () => {
+    for (const field of DOCUMENTOS_PERFIL_FIELDS) {
+      if (!documentoExigeValidade(field)) continue;
+      const file = docFiles[field];
+      if (!(file instanceof File)) continue;
+      const v = (docValidades[field] || '').trim();
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(v)) return false;
+    }
+    return true;
+  };
+
   const goNext = async () => {
     setError(null);
     const keys =
@@ -427,6 +503,12 @@ const Cadastro = () => {
       );
       return;
     }
+    if (step === 4 && !documentosValidadesOk()) {
+      setError(
+        'Informe a data de validade (AAAA-MM-DD) de cada documento anexado que exige validade (conselho, certidão, comprovante de endereço, etc.).'
+      );
+      return;
+    }
     setStep((s) => Math.min(s + 1, STEP_LABELS.length - 1));
   };
 
@@ -449,6 +531,11 @@ const Cadastro = () => {
       setError(
         'Anexe os documentos obrigatórios na etapa Documentos (conselho, regularidade fiscal, endereço e RG/CPF ou CNH).'
       );
+      setIsLoading(false);
+      return;
+    }
+    if (!documentosValidadesOk()) {
+      setError('Informe a data de validade dos documentos anexados que exigem validade.');
       setIsLoading(false);
       return;
     }
@@ -475,9 +562,12 @@ const Cadastro = () => {
         dadosBancarios: montarDadosBancariosTexto({
           dadosBancoConta: data.dadosBancoConta,
           dadosBancoAgencia: data.dadosBancoAgencia,
-          dadosBancoNome: data.dadosBancoNome,
+          dadosBancoCodigo: data.dadosBancoCodigo,
+          dadosBancoNomeOutro: data.dadosBancoNomeOutro,
         }),
-        chavePix: data.chavePix.trim(),
+        chavePix: normalizarChavePix(data.tipoChavePix, data.chavePix),
+        localInteresseTrabalho: data.localInteresseTrabalho.trim(),
+        interesseTrabalho: data.interesseTrabalho.trim(),
         aceitouTermos: data.aceitouTermos,
       };
       if (profissaoExigeRegistroConselho(data.profissao)) {
@@ -485,10 +575,13 @@ const Cadastro = () => {
       }
       if (data.profissao.trim() === 'Médico') {
         payload.especialidades = [...especialidadesSelecionadas];
+        const rqe = (data.rqe || '').trim();
+        if (rqe) payload.rqe = rqe;
       }
 
       const files = {} as Record<DocumentoPerfilField, File>;
       for (const k of DOCUMENTOS_PERFIL_FIELDS) {
+        if (k === 'rqeRegistroQualificacao' && data.profissao.trim() !== 'Médico') continue;
         const f = docFiles[k];
         if (f instanceof File) files[k] = f;
       }
@@ -503,7 +596,7 @@ const Cadastro = () => {
         }
       }
 
-      const response = await authService.register(payload, files) as {
+      const response = await authService.register(payload, files, docValidades) as {
         success?: boolean;
         data?: { message?: string; medico?: unknown };
       };
@@ -686,6 +779,22 @@ const Cadastro = () => {
                     maxLength={60}
                   />
                   {errors.crm && <p className="mt-1.5 text-[13px] text-red-600/95">{errors.crm.message}</p>}
+                </div>
+              )}
+              {isMedico && (
+                <div>
+                  <label className="cadastro-field-label">RQE (Registro de Qualificação de Especialista)</label>
+                  <input
+                    {...formRegister('rqe')}
+                    className="cadastro-field"
+                    placeholder="Ex.: 12345/CE"
+                    autoComplete="off"
+                    maxLength={60}
+                  />
+                  <p className="mt-1.5 text-[12px] text-zinc-500">
+                    Opcional se ainda não tiver RQE. Se tiver especialidade registrada, informe o número.
+                  </p>
+                  {errors.rqe && <p className="mt-1.5 text-[13px] text-red-600/95">{errors.rqe.message}</p>}
                 </div>
               )}
               {isMedico && (
@@ -877,27 +986,95 @@ const Cadastro = () => {
                 </div>
                 <div>
                   <label className="cadastro-field-label">Banco</label>
-                  <input
-                    {...formRegister('dadosBancoNome')}
-                    className="cadastro-field"
-                    placeholder="Nome do banco"
-                    autoComplete="organization"
-                    required
-                  />
-                  {errors.dadosBancoNome && (
-                    <p className="mt-1.5 text-[13px] text-red-600/95">{errors.dadosBancoNome.message}</p>
+                  <select {...formRegister('dadosBancoCodigo')} className="cadastro-field" required>
+                    <option value="">Selecione o banco</option>
+                    {BANCOS_CADASTRO.map((b) => (
+                      <option key={b.codigo} value={b.codigo}>
+                        {b.label}
+                      </option>
+                    ))}
+                  </select>
+                  {errors.dadosBancoCodigo && (
+                    <p className="mt-1.5 text-[13px] text-red-600/95">{errors.dadosBancoCodigo.message}</p>
                   )}
                 </div>
+                {dadosBancoCodigo === 'outro' && (
+                  <div>
+                    <label className="cadastro-field-label">Nome do banco</label>
+                    <input
+                      {...formRegister('dadosBancoNomeOutro')}
+                      className="cadastro-field"
+                      placeholder="Digite o nome do banco"
+                      autoComplete="organization"
+                      maxLength={80}
+                    />
+                    {errors.dadosBancoNomeOutro && (
+                      <p className="mt-1.5 text-[13px] text-red-600/95">{errors.dadosBancoNomeOutro.message}</p>
+                    )}
+                  </div>
+                )}
               </div>
-              <div>
-                <label className="cadastro-field-label">Chave Pix</label>
-                <input
-                  {...formRegister('chavePix')}
-                  className="cadastro-field"
-                  placeholder="E-mail, telefone, EVP ou CPF"
-                  required
-                />
-                {errors.chavePix && <p className="mt-1.5 text-[13px] text-red-600/95">{errors.chavePix.message}</p>}
+              <div className="rounded-2xl border border-zinc-200/60 bg-zinc-50/25 p-5 sm:p-6 space-y-5 shadow-inner">
+                <p className="cadastro-section-title">Chave Pix</p>
+                <div>
+                  <label className="cadastro-field-label">Tipo da chave</label>
+                  <select
+                    {...formRegister('tipoChavePix', {
+                      onChange: () => {
+                        setValue('chavePix', '', { shouldValidate: false });
+                      },
+                    })}
+                    className="cadastro-field"
+                    required
+                  >
+                    <option value="">Selecione o tipo</option>
+                    {TIPOS_CHAVE_PIX.map((t) => (
+                      <option key={t.value} value={t.value}>
+                        {t.label}
+                      </option>
+                    ))}
+                  </select>
+                  {errors.tipoChavePix && (
+                    <p className="mt-1.5 text-[13px] text-red-600/95">{errors.tipoChavePix.message}</p>
+                  )}
+                </div>
+                {tipoChavePix && (
+                  <div>
+                    <label className="cadastro-field-label">Chave Pix</label>
+                    <Controller
+                      name="chavePix"
+                      control={control}
+                      render={({ field }) => (
+                        <input
+                          {...field}
+                          value={field.value || ''}
+                          onChange={(e) => {
+                            const formatted = formatarChavePixPorTipo(
+                              tipoChavePix as TipoChavePix,
+                              e.target.value
+                            );
+                            field.onChange(formatted);
+                          }}
+                          className="cadastro-field"
+                          placeholder={placeholderChavePix(tipoChavePix as TipoChavePix)}
+                          inputMode={inputModeChavePix(tipoChavePix as TipoChavePix)}
+                          autoComplete={tipoChavePix === 'email' ? 'email' : 'off'}
+                          required
+                        />
+                      )}
+                    />
+                    <p className="mt-1.5 text-[12px] text-zinc-500">
+                      {tipoChavePix === 'telefone'
+                        ? 'Informe DDD + celular. O número será salvo no formato internacional (+55).'
+                        : tipoChavePix === 'aleatoria'
+                          ? 'Cole ou digite a chave aleatória (EVP) no formato UUID.'
+                          : 'Digite no formato indicado para evitar erros no repasse.'}
+                    </p>
+                    {errors.chavePix && (
+                      <p className="mt-1.5 text-[13px] text-red-600/95">{errors.chavePix.message}</p>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -908,10 +1085,14 @@ const Cadastro = () => {
                 <span className="font-medium text-zinc-700">Obrigatórios: </span>
                 documento do conselho profissional, certidão de regularidade fiscal no conselho, comprovante de endereço
                 e RG/CPF ou CNH (identidade civil). Um ficheiro por tipo; PDF ou imagem, até 10 MB cada. Os restantes
-                documentos são opcionais.
+                documentos são opcionais{isMedico ? ' (inclui RQE para médicos)' : ''}.
+                {' '}Documentos com validade pedem a data impressa no documento.
               </p>
-              {DOCUMENTOS_PERFIL_CADASTRO_ORDEM.map((field) => {
+              {DOCUMENTOS_PERFIL_CADASTRO_ORDEM.filter(
+                (field) => field !== 'rqeRegistroQualificacao' || isMedico
+              ).map((field) => {
                 const obrigatorio = isDocumentoObrigatorioNoCadastro(field);
+                const exigeValidade = documentoExigeValidade(field);
                 return (
                 <div
                   key={field}
@@ -934,6 +1115,26 @@ const Cadastro = () => {
                   {docFiles[field] && (
                     <p className="mt-2 text-[12px] text-emerald-800/90">Selecionado: {docFiles[field]!.name}</p>
                   )}
+                  {exigeValidade && (docFiles[field] || obrigatorio) && (
+                    <div className="mt-3">
+                      <label className="cadastro-field-label" htmlFor={validadeFormFieldName(field)}>
+                        Validade do documento{docFiles[field] ? ' *' : ''}
+                      </label>
+                      <input
+                        id={validadeFormFieldName(field)}
+                        type="date"
+                        className="cadastro-field"
+                        value={docValidades[field] || ''}
+                        onChange={(e) =>
+                          setDocValidades((prev) => ({ ...prev, [field]: e.target.value }))
+                        }
+                        required={Boolean(docFiles[field])}
+                      />
+                      <p className="mt-1 text-[12px] text-zinc-500">
+                        Informe a data de validade que consta no documento.
+                      </p>
+                    </div>
+                  )}
                 </div>
               );
               })}
@@ -941,6 +1142,39 @@ const Cadastro = () => {
           )}
 
           {step === 5 && (
+            <div className="space-y-5">
+              <p className="text-[15px] text-zinc-500 leading-relaxed">
+                Antes de criar a conta, diga onde gostaria de atuar e qual o seu interesse de trabalho. Isso ajuda a
+                equipe na análise do cadastro.
+              </p>
+              <div>
+                <label className="cadastro-field-label">Local / região de interesse de trabalho</label>
+                <input
+                  {...formRegister('localInteresseTrabalho')}
+                  className="cadastro-field"
+                  placeholder="Ex.: Fortaleza, Santa Quitéria, UPA X, região metropolitana…"
+                  maxLength={500}
+                />
+                {errors.localInteresseTrabalho && (
+                  <p className="mt-1.5 text-[13px] text-red-600/95">{errors.localInteresseTrabalho.message}</p>
+                )}
+              </div>
+              <div>
+                <label className="cadastro-field-label">Interesse de trabalho</label>
+                <textarea
+                  {...formRegister('interesseTrabalho')}
+                  className="cadastro-field min-h-[100px]"
+                  placeholder="Ex.: plantões de 12h, urgência/emergência, ambulatorial, UTI, preferência de dias…"
+                  maxLength={1000}
+                />
+                {errors.interesseTrabalho && (
+                  <p className="mt-1.5 text-[13px] text-red-600/95">{errors.interesseTrabalho.message}</p>
+                )}
+              </div>
+            </div>
+          )}
+
+          {step === 6 && (
             <div className="space-y-5">
               <div>
                 <label className="cadastro-field-label">Senha</label>

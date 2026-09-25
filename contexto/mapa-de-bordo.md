@@ -27,7 +27,7 @@ O **Viva Saúde** está em produção na VPS (`sejavivasaude.com.br`). Auth, esc
 | Dashboard | ✅ | ✅ | |
 | Médicos | ✅ | ✅ | Filtros; DocuSeal; lista 22; apelidos `Dr X` no relatório → nome real — pendente RQE/e-mail — `05` |
 | Contratos | ✅ | ✅ | |
-| Escalas / plantões | ✅ | ✅ | Trocas; multi-escala no mês; **1 escala/equipe** (auto ao criar equipe); editar nome equipe — `06` |
+| Escalas / plantões | ✅ | ✅ | Trocas; multi-escala no mês; **1 escala/equipe** (auto ao criar equipe); editar nome equipe; **Escala Master** `/escala-master` (macro por subgrupo, só leitura, linha=equipe) — `06` |
 | Valores plantão/ponto | ✅ | ⏳ | Por contrato/escala; UI com **margem %** (só front). **Pendente:** inverter motor — cobrança + % → repasse (spec `2026-08-22-margem-cobranca-primeiro-design.md`) — `06`/`07` |
 | Ponto eletrônico | ✅ | ✅ | Geo, foto, histórico; **justificativa** + área Master “Sem ponto no plantão” (decidir / criar-e-aceitar) — `07` |
 | Vagas | ✅ | ✅ | Wizard de anúncio |
@@ -39,7 +39,7 @@ O **Viva Saúde** está em produção na VPS (`sejavivasaude.com.br`). Auth, esc
 | Mobile / Capacitor | ✅ | ✅ | **1.0.4** (build 6), targetSdk 36; FCM na VPS ok; falta AAB/IPA + teste — `12` |
 | Configurações / módulos | ✅ | ✅ | Matriz de acesso MASTER/MEDICO |
 | Perfis staff / escalista | ✅ | ✅ | OFF/VER/EDITAR; menu oculta Off; login Escalista ok; GETs + CRUD equipe com `ESCALAS` — `04` |
-| Avaliação (master) | ✅ | ✅ | Só cadastro público `/cadastro` (não precadastro aceito); CFM abre o portal sem pré-preenchimento |
+| Avaliação (master) | ✅ | ✅ | Cadastro público `/cadastro`; **revisão por documento** (pré-visualizar, OK, solicitar e-mail, substituir); CFM abre o portal |
 | Atendimentos | — | ⏳ Placeholder | `FeaturePlaceholder` |
 | Landing | ✅ | ✅ | + pasta `landing/` |
 
@@ -97,6 +97,11 @@ Arquivos de referência: `schema.prisma` (`Escala`, `EscalaMedico`, `EscalaPlant
 |------|---------|
 | 2026-09-14 | **Corpo clínico placeholders** — cadastrados **THALES** e **FREDDY BARBERY** (CPF `90000000005/6`, CRM TEMP, senha temp `viva@2026`, sem e-mail). **Voltar:** substituir por dados reais — `05` |
 | 2026-09-14 | **Relatório financeiro** — filtro **Todas as equipes** (sem exigir subgrupo) + coluna Equipe; cobrança via Valores de Ponto em contratos com escala — `10` |
+| 2026-09-18 | **Documentos com validade** — cadastro/perfil pedem data nos docs que vencem (conselho, certidão, endereço, declaração, RQE); status na lista Médicos + painel de alertas; botão Avisar + job periódico (notificação/push) — `05`/`09` |
+| 2026-09-18 | **Cadastro: local/interesse + RQE** — etapa antes da senha com local e interesse de trabalho; campo RQE (texto) + upload RQE só para Médico; visível na Avaliação — `05`/`11` |
+| 2026-09-16 | **Avaliação: revisão de documentos** — pré-visualizar, status Pendente/OK/Solicitado, solicitar reenvio por e-mail (template formal) e substituir ficheiro pelo Master — `05`/`11` |
+| 2026-09-14 | **Neuro MED MOVEL no financeiro** — Valores de Ponto 250/235,60 já salvos; relatório usava congelado antigo; checkout passa a ler config ponto; front prefere rate do cadastro — `07`/`10` |
+| 2026-09-14 | **Escala Master** — menu Escalas → `/escala-master`: grade mensal macro do subgrupo (Equipe \| Turno \| dias), só leitura, plantões via `listEquipePlantoes` — `06` |
 | 2026-09-14 | **Justificativa lê Valores de Ponto** — 400 “sem valor” em Santa Quitéria: resolver passa a usar `config_ponto_eletronico` (R$/h × turno) — `07` |
 | 2026-09-14 | **Justificativa ponto: alegado × considerado** — dia/hora do plantão corretos no `datetime-local` (sem −3h); campos considerados + Replicar; aceite usa o considerado — `07` |
 | 2026-09-14 | **Apelidos → nome real no relatório** — em `relatorio_procedimentos_mes`, `Dr Sayro`/`Dr Yuri`/etc. e `PIERRE` sobrescritos pelo cadastro completo + CRM (55 ocorrências; meses 2026-01/02) — `05`/`10` |

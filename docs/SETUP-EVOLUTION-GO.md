@@ -89,7 +89,29 @@ EVOLUTION_INSTANCE_ID=uuid-retornado-no-create
 
 # Webhook (fase 2)
 # EVOLUTION_WEBHOOK_SECRET=...
+
+# Menu automático de atendimento
+# WHATSAPP_ATENDIMENTO_ENABLED=true
+
+# Proteção / humanização (recomendado ligado)
+# — delay jitter entre receber e responder + status "digitando..."
+# — rate limit por telefone (anti-flood se alguém spammar o bot)
+WHATSAPP_HUMANIZE=true
+WHATSAPP_TYPING=true
+WHATSAPP_REPLY_DELAY_MS_MIN=5000
+WHATSAPP_REPLY_DELAY_MS_MAX=12000
+WHATSAPP_RATE_LIMIT_PER_MIN=8
+WHATSAPP_RATE_LIMIT_PER_HOUR=40
 ```
+
+## Checklist operacional (Meta / Baileys)
+
+Além do código acima:
+
+- Não ligar automação em chip novo (use 15–30 dias com conversas humanas antes)
+- Não fazer broadcast / lista fria por este número
+- Equipe: digite `pausar` / `retomar` no chat quando for atendimento humano
+- Monitore denúncias/bloqueios nas primeiras semanas
 
 ## Acesso ao painel (produção)
 

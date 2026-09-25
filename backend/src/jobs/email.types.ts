@@ -12,6 +12,14 @@ export type EmailJobPayload =
       nomeInstituicao?: string | null;
     }
   | {
+      type: 'cadastro-documento-solicitado';
+      to: string;
+      nomeCompleto: string;
+      nomeDocumento: string;
+      mensagem: string;
+      nomeInstituicao?: string | null;
+    }
+  | {
       type: 'reset-password';
       to: string;
       resetLink: string;

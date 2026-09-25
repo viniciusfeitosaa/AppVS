@@ -131,14 +131,46 @@ export async function testarConexaoSmtpService() {
   return { ...info, conexao };
 }
 
-export async function listEmailMensagensService(tenantId: string, limit = 50) {
-  const rows = await prisma.emailMensagem.findMany({
+export async function listEmailMensagensService(
+  tenantId: string,
+  opts?: { limit?: number; offset?: number; q?: string }
+) {
+  const limit = Math.min(Math.max(opts?.limit ?? 100, 1), 500);
+  const offset = Math.max(opts?.offset ?? 0, 0);
+  const q = (opts?.q ?? '').trim();
+  const ql = q.toLowerCase();
+
+  if (!q) {
+    const [total, rows] = await Promise.all([
+      prisma.emailMensagem.count({ where: { tenantId } }),
+      prisma.emailMensagem.findMany({
+        where: { tenantId },
+        orderBy: { createdAt: 'desc' },
+        take: limit,
+        skip: offset,
+        select: mensagemSelect,
+      }),
+    ]);
+    return { data: rows.map(mapMensagem), total, limit, offset };
+  }
+
+  // Busca por assunto (DB) + e-mail parcial (filtro em memória na janela recente).
+  const recent = await prisma.emailMensagem.findMany({
     where: { tenantId },
     orderBy: { createdAt: 'desc' },
-    take: Math.min(limit, 100),
+    take: 500,
     select: mensagemSelect,
   });
-  return rows.map(mapMensagem);
+  const filtered = recent
+    .map(mapMensagem)
+    .filter(
+      (m) =>
+        m.assunto.toLowerCase().includes(ql) ||
+        m.destinatarios.some((d) => d.toLowerCase().includes(ql))
+    );
+  const total = filtered.length;
+  const data = filtered.slice(offset, offset + limit);
+  return { data, total, limit, offset };
 }
 
 export async function getEmailMensagemService(tenantId: string, id: string) {
