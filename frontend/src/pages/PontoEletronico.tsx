@@ -3,13 +3,17 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../context/AuthContext';
 import { authService } from '../services/auth.service';
 import { PONTO_SEM_ESCALA_ESCALA_ID } from '../constants/ponto';
-import { pontoService } from '../services/ponto.service';
+import { pontoService, type MinhaBiometriaFacial } from '../services/ponto.service';
+import { BIOMETRIA_CONSENTIMENTO_TEXTO } from '../constants/biometria';
+import { usePontoOffline } from '../hooks/usePontoOffline';
+import { enfileirarPonto, type PontoOfflineItem } from '../lib/pontoOfflineQueue';
 import {
   fimPlantaoCliente,
   inicioPlantaoCliente,
   type PlantaoAgendaInput,
 } from '../utils/plantao-agenda';
 import { notify } from '../lib/notificationEmitter';
+import { BadgeFaceSituacao, type FaceSituacao } from '../components/ponto/SituacaoRegistroPonto';
 
 const formatDuration = (minutes: number) => {
   const h = Math.floor(minutes / 60);
@@ -64,6 +68,7 @@ type MeuDiaPontoApi = {
     minutosAtrasoCheckin?: number | null;
     escalaId?: string | null;
     escala?: { nome?: string } | null;
+    faceSituacao?: FaceSituacao | null;
   }>;
   totalMinutosHoje?: number;
   totalMinutosSemana?: number;
@@ -152,6 +157,14 @@ type EscalaPontoPainel = {
 /** Várias escalas: `ok` = mais próxima por GPS; `fallback` = GPS indisponível ou sem referência — usa primeira da lista. */
 type EscalaAutoStatus = 'idle' | 'unica' | 'loading' | 'ok' | 'fallback';
 
+type ModoCaptura = 'checkin' | 'checkout' | 'biometria';
+
+function textoConferenciaRosto(conferencia: 'ok' | 'sem-conferencia' | 'parar', assimMesmo: boolean): string {
+  if (assimMesmo) return ' Rosto não reconhecido: a foto será analisada pelo administrador.';
+  if (conferencia === 'ok') return ' Rosto reconhecido.';
+  return '';
+}
+
 const PontoEletronico = () => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
@@ -169,6 +182,17 @@ const PontoEletronico = () => {
   const [streamAttachKey, setStreamAttachKey] = useState(0);
   const [motivoSemFoto, setMotivoSemFoto] = useState('');
   const [showSemFotoSection, setShowSemFotoSection] = useState(false);
+  /** O mesmo modal de câmera serve para entrada, saída e cadastro da foto de referência. */
+  const [modoCaptura, setModoCaptura] = useState<ModoCaptura>('checkin');
+  const [aposBiometria, setAposBiometria] = useState<'checkin' | 'checkout' | null>(null);
+  const [consentiuBiometria, setConsentiuBiometria] = useState(false);
+  const [conferindoRosto, setConferindoRosto] = useState(false);
+  /** Foto que não passou na conferência facial: o médico escolhe tirar outra ou registrar assim (vai para revisão). */
+  const [fotoNaoConferida, setFotoNaoConferida] = useState<{
+    foto: File;
+    previewUrl: string;
+    mensagem: string;
+  } | null>(null);
   /** Várias escalas: escolha automática por GPS (sem select). */
   const [escalaAutoStatus, setEscalaAutoStatus] = useState<EscalaAutoStatus>('idle');
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -184,12 +208,53 @@ const PontoEletronico = () => {
     staleTime: 2 * 60 * 1000,
   });
 
-  const { data: painelResp, isLoading: loadingPainel } = useQuery({
+  const { fila, online, sincronizando, sincronizar, descartar } = usePontoOffline(isMedico ? user?.id : undefined);
+  /** Sem internet ou com pontos ainda na fila, novos pontos também vão para a fila (preserva a ordem). */
+  const usarFila = !online || fila.length > 0;
+
+  const { data: painelRespRede, isLoading: loadingPainelRede } = useQuery({
     queryKey: ['ponto', 'painel-inicial'],
     queryFn: () => pontoService.getPainelInicial(),
     enabled: !!user && isMedico,
     staleTime: 25 * 1000,
+    refetchInterval: (query) => {
+      const regs = (query.state.data?.data?.meuDia as MeuDiaPontoApi | undefined)?.registrosHoje ?? [];
+      const recente = (iso?: string | null) => !!iso && Date.now() - new Date(iso).getTime() < 5 * 60 * 1000;
+      return regs.some((r) => r.faceSituacao === 'EM_ANALISE' && (recente(r.checkInAt) || recente(r.checkOutAt)))
+        ? 5000
+        : false;
+    },
   });
+
+  const { data: biometriaResp } = useQuery({
+    queryKey: ['ponto', 'biometria'],
+    queryFn: () => pontoService.getMinhaBiometria(),
+    enabled: !!user && isMedico,
+    staleTime: 60 * 1000,
+  });
+  const biometriaInfo = biometriaResp?.data;
+  const precisaBiometria = !!biometriaInfo?.habilitado && !!biometriaInfo?.precisaCadastrar;
+
+  const painelCacheKey = user?.id ? `ponto-painel:${user.id}` : null;
+  useEffect(() => {
+    if (painelRespRede && painelCacheKey) {
+      try {
+        localStorage.setItem(painelCacheKey, JSON.stringify(painelRespRede));
+      } catch {
+        // armazenamento cheio: offline fica sem dados da última visita
+      }
+    }
+  }, [painelRespRede, painelCacheKey]);
+  const painelResp = useMemo(() => {
+    if (painelRespRede || online || !painelCacheKey) return painelRespRede;
+    try {
+      const raw = localStorage.getItem(painelCacheKey);
+      return raw ? (JSON.parse(raw) as typeof painelRespRede) : undefined;
+    } catch {
+      return undefined;
+    }
+  }, [painelRespRede, online, painelCacheKey]);
+  const loadingPainel = loadingPainelRede && !painelResp;
 
   const meuDiaPayload = painelResp?.data?.meuDia as MeuDiaPontoApi | undefined;
   const meuDiaResp =
@@ -357,7 +422,13 @@ const PontoEletronico = () => {
     );
   }
 
-  const registroAberto = meuDiaResp?.data?.registroAberto;
+  const ultimoDaFila = fila[fila.length - 1];
+  const registroAberto: { checkInAt?: string | null } | null | undefined = ultimoDaFila
+    ? ultimoDaFila.tipo === 'checkin'
+      ? { checkInAt: ultimoDaFila.capturadoEm }
+      : null
+    : meuDiaResp?.data?.registroAberto;
+  const podeCheckinOffline = usarFila && !!escalaIdEfetivo;
   const registrosHoje = meuDiaResp?.data?.registrosHoje || [];
   const totalMinutosHoje = meuDiaResp?.data?.totalMinutosHoje || 0;
   const totalMinutosSemana = meuDiaResp?.data?.totalMinutosSemana || 0;
@@ -498,12 +569,70 @@ const PontoEletronico = () => {
     void iniciarCamera();
   };
 
+  const descartarFotoNaoConferida = () => {
+    setFotoNaoConferida((atual) => {
+      if (atual) URL.revokeObjectURL(atual.previewUrl);
+      return null;
+    });
+  };
+
+  /**
+   * Confere o rosto antes de registrar. Retorna 'ok' (reconhecido), 'sem-conferencia'
+   * (sem biometria/serviço fora) ou 'parar' (não reconhecido: modal mostra as opções).
+   */
+  const conferirRostoAntes = async (foto: File): Promise<'ok' | 'sem-conferencia' | 'parar'> => {
+    if (!biometriaInfo?.habilitado || usarFila) return 'sem-conferencia';
+    setConferindoRosto(true);
+    try {
+      const { data } = await pontoService.conferirRosto(foto);
+      if (!data?.resultado || data.resultado === 'INDISPONIVEL') return 'sem-conferencia';
+      if (data.resultado === 'CONFERE') return 'ok';
+      setFotoNaoConferida({
+        foto,
+        previewUrl: URL.createObjectURL(foto),
+        mensagem: data.mensagem || 'Não conseguimos confirmar que é você.',
+      });
+      return 'parar';
+    } catch {
+      return 'sem-conferencia';
+    } finally {
+      setConferindoRosto(false);
+    }
+  };
+
   const closeCheckinModal = () => {
+    descartarFotoNaoConferida();
     setVideoPronto(false);
     setMotivoSemFoto('');
     setShowSemFotoSection(false);
     setStreamAttachKey(0);
+    setAposBiometria(null);
+    setConsentiuBiometria(false);
     setCheckinModalOpen(false);
+  };
+
+  const abrirModalCamera = (modo: ModoCaptura, depois: 'checkin' | 'checkout' | null = null) => {
+    descartarFotoNaoConferida();
+    setError(null);
+    setCameraErro(false);
+    setVideoPronto(false);
+    setMotivoSemFoto('');
+    setShowSemFotoSection(false);
+    setStreamAttachKey(0);
+    setModoCaptura(modo);
+    setAposBiometria(depois);
+    setConsentiuBiometria(false);
+    setCheckinModalOpen(true);
+    // Mesmo gesto do clique: necessário para Safari/iOS aceitar getUserMedia.
+    void iniciarCamera();
+  };
+
+  const openCheckoutModal = () => {
+    if (precisaBiometria && online) {
+      abrirModalCamera('biometria', 'checkout');
+      return;
+    }
+    abrirModalCamera('checkout');
   };
 
   const openCheckinModal = () => {
@@ -515,19 +644,15 @@ const PontoEletronico = () => {
       }
       return;
     }
-    if (!registroAberto && escalaIdEfetivo && canCheckInResp?.data?.allowed === false) {
+    if (!usarFila && !registroAberto && escalaIdEfetivo && canCheckInResp?.data?.allowed === false) {
       setError(null);
       return;
     }
-    setError(null);
-    setCameraErro(false);
-    setVideoPronto(false);
-    setMotivoSemFoto('');
-    setShowSemFotoSection(false);
-    setStreamAttachKey(0);
-    setCheckinModalOpen(true);
-    // Mesmo gesto do clique: necessário para Safari/iOS aceitar getUserMedia.
-    void iniciarCamera();
+    if (precisaBiometria && online) {
+      abrirModalCamera('biometria', 'checkin');
+      return;
+    }
+    abrirModalCamera('checkin');
   };
 
   const tratarErroCheckin = (err: any) => {
@@ -595,15 +720,41 @@ const PontoEletronico = () => {
     });
   };
 
-  const handleCheckIn = async () => {
+  type DadosPontoFila = Omit<PontoOfflineItem, 'clientUuid' | 'capturadoEm' | 'tentativas' | 'medicoId'>;
+
+  const guardarNoAparelho = async (dados: DadosPontoFila) => {
+    if (!user?.id) return;
+    try {
+      await enfileirarPonto({ ...dados, medicoId: user.id });
+    } catch (e: any) {
+      setError(e?.message || 'Não foi possível guardar o ponto no aparelho.');
+      return;
+    }
+    setObservacao('');
+    closeCheckinModal();
+    notify({
+      kind: 'warning',
+      title: dados.tipo === 'checkin' ? 'Entrada guardada no aparelho' : 'Saída guardada no aparelho',
+      message: 'Sem conexão agora. O ponto será enviado automaticamente quando houver internet.',
+      source: 'ponto',
+    });
+  };
+
+  const handleCheckIn = async (fotoAssimMesmo?: File) => {
     setLoadingAction(true);
     setError(null);
+    let pendente: DadosPontoFila | null = null;
     try {
-      const foto = await capturarQuadroAtualComoArquivo();
+      const foto = fotoAssimMesmo ?? (await capturarQuadroAtualComoArquivo());
       if (!foto) {
         setError(
           'Não foi possível capturar a imagem da câmera. Aguarde o vídeo carregar e posicione-se em frente à câmera antes de confirmar.'
         );
+        setLoadingAction(false);
+        return;
+      }
+      const conferencia = fotoAssimMesmo ? 'sem-conferencia' : await conferirRostoAntes(foto);
+      if (conferencia === 'parar') {
         setLoadingAction(false);
         return;
       }
@@ -614,6 +765,18 @@ const PontoEletronico = () => {
           'Não foi possível obter sua localização. Verifique se o acesso à localização está permitido para este site no navegador e tente novamente. Se o GPS estiver buscando sinal, aguarde alguns segundos.'
         );
         setLoadingAction(false);
+        return;
+      }
+      pendente = {
+        tipo: 'checkin',
+        escalaId: escalaIdEfetivo || undefined,
+        observacao: observacao || undefined,
+        latitude: pos?.latitude,
+        longitude: pos?.longitude,
+        foto,
+      };
+      if (usarFila) {
+        await guardarNoAparelho(pendente);
         return;
       }
       const resposta = await pontoService.checkIn({
@@ -628,15 +791,17 @@ const PontoEletronico = () => {
       const minutosAtraso = Number(resposta?.data?.minutosAtrasoCheckin ?? 0);
       const atrasado = !!resposta?.data?.checkInAtrasado;
       notify({
-        kind: atrasado ? 'warning' : 'success',
+        kind: atrasado || fotoAssimMesmo ? 'warning' : 'success',
         title: atrasado ? 'Check-in realizado com atraso' : 'Check-in realizado',
-        message: atrasado
-          ? `Ponto de entrada registrado com atraso de ${Math.max(1, minutosAtraso)} min.`
-          : 'Ponto de entrada registrado com sucesso.',
+        message:
+          (atrasado
+            ? `Ponto de entrada registrado com atraso de ${Math.max(1, minutosAtraso)} min.`
+            : 'Ponto de entrada registrado com sucesso.') + textoConferenciaRosto(conferencia, !!fotoAssimMesmo),
         source: 'ponto',
       });
     } catch (err: any) {
-      tratarErroCheckin(err);
+      if (!err?.response && pendente) await guardarNoAparelho(pendente);
+      else tratarErroCheckin(err);
     } finally {
       setLoadingAction(false);
     }
@@ -651,6 +816,7 @@ const PontoEletronico = () => {
 
     setLoadingAction(true);
     setError(null);
+    let pendente: DadosPontoFila | null = null;
     try {
       const pos = await obterPosicao();
       if (exigeGeolocalizacao && !pos) {
@@ -658,6 +824,18 @@ const PontoEletronico = () => {
           'Não foi possível obter sua localização. Verifique se o acesso à localização está permitido para este site no navegador e tente novamente. Se o GPS estiver buscando sinal, aguarde alguns segundos.'
         );
         setLoadingAction(false);
+        return;
+      }
+      pendente = {
+        tipo: 'checkin',
+        escalaId: escalaIdEfetivo || undefined,
+        observacao: observacao || undefined,
+        latitude: pos?.latitude,
+        longitude: pos?.longitude,
+        motivoSemFoto: m,
+      };
+      if (usarFila) {
+        await guardarNoAparelho(pendente);
         return;
       }
       const resposta = await pontoService.checkInSemFoto({
@@ -680,16 +858,46 @@ const PontoEletronico = () => {
         source: 'ponto',
       });
     } catch (err: any) {
-      tratarErroCheckin(err);
+      if (!err?.response && pendente) await guardarNoAparelho(pendente);
+      else tratarErroCheckin(err);
     } finally {
       setLoadingAction(false);
     }
   };
 
-  const handleCheckOut = async () => {
+  const tratarErroCheckout = (err: any) => {
+    const status = err.response?.status;
+    const msg = err.response?.data?.error;
+    if (status === 403) {
+      setError('Você não tem permissão para registrar ponto. Verifique o acesso ao módulo Ponto Eletrônico com o administrador.');
+    } else if (status === 404 || msg?.toLowerCase().includes('check-in em aberto')) {
+      setError('Seu ponto foi fechado.');
+    } else {
+      setError(msg || 'Não foi possível registrar checkout.');
+    }
+  };
+
+  const handleCheckOut = async (semFoto: boolean, fotoAssimMesmo?: File) => {
+    const motivo = motivoSemFoto.trim();
+    if (semFoto && motivo.length < 15) {
+      setError('Descreva o motivo em pelo menos 15 caracteres (ex.: permissão de câmera negada no Chrome).');
+      return;
+    }
     setLoadingAction(true);
     setError(null);
+    let pendente: DadosPontoFila | null = null;
     try {
+      const foto = semFoto ? null : (fotoAssimMesmo ?? (await capturarQuadroAtualComoArquivo()));
+      if (!semFoto && !foto) {
+        setError('Não foi possível capturar a imagem da câmera. Aguarde o vídeo carregar e tente novamente.');
+        setLoadingAction(false);
+        return;
+      }
+      const conferencia = !foto || fotoAssimMesmo ? 'sem-conferencia' : await conferirRostoAntes(foto);
+      if (conferencia === 'parar') {
+        setLoadingAction(false);
+        return;
+      }
       const pos = await obterPosicao();
       if (exigeGeolocalizacao && !pos) {
         setError(
@@ -698,26 +906,103 @@ const PontoEletronico = () => {
         setLoadingAction(false);
         return;
       }
+      pendente = {
+        tipo: 'checkout',
+        observacao: observacao || undefined,
+        latitude: pos?.latitude,
+        longitude: pos?.longitude,
+        ...(foto ? { foto } : { motivoSemFoto: motivo }),
+      };
+      if (usarFila) {
+        await guardarNoAparelho(pendente);
+        return;
+      }
       await pontoService.checkOut({
         observacao,
         ...(pos && { latitude: pos.latitude, longitude: pos.longitude }),
+        ...(foto ? { foto } : { motivoSemFoto: motivo }),
       });
       setObservacao('');
+      closeCheckinModal();
       await refresh();
-      notify({ kind: 'success', title: 'Checkout realizado', message: 'Ponto de saída registrado com sucesso.', source: 'ponto' });
+      notify({
+        kind: fotoAssimMesmo ? 'warning' : 'success',
+        title: 'Checkout realizado',
+        message: foto
+          ? 'Ponto de saída registrado com sucesso.' + textoConferenciaRosto(conferencia, !!fotoAssimMesmo)
+          : 'Ponto de saída registrado sem foto.',
+        source: 'ponto',
+      });
     } catch (err: any) {
-      const status = err.response?.status;
-      const msg = err.response?.data?.error;
-      if (status === 403) {
-        setError('Você não tem permissão para registrar ponto. Verifique o acesso ao módulo Ponto Eletrônico com o administrador.');
-      } else if (status === 404 || msg?.toLowerCase().includes('check-in em aberto')) {
-        setError('Seu ponto foi fechado.');
-      } else {
-        setError(msg || 'Não foi possível registrar checkout.');
-      }
+      if (!err?.response && pendente) await guardarNoAparelho(pendente);
+      else tratarErroCheckout(err);
     } finally {
       setLoadingAction(false);
     }
+  };
+
+  const handleCadastrarBiometria = async () => {
+    if (!consentiuBiometria || !biometriaInfo) {
+      setError('Leia e aceite o termo para cadastrar sua foto de referência.');
+      return;
+    }
+    setLoadingAction(true);
+    setError(null);
+    try {
+      const foto = await capturarQuadroAtualComoArquivo();
+      if (!foto) {
+        setError('Não foi possível capturar a imagem da câmera. Aguarde o vídeo carregar e tente novamente.');
+        return;
+      }
+      await pontoService.cadastrarBiometria(foto, biometriaInfo.consentimentoVersao);
+      await queryClient.invalidateQueries({ queryKey: ['ponto', 'biometria'] });
+      notify({
+        kind: 'success',
+        title: 'Foto de referência enviada',
+        message: 'Ela será usada para confirmar sua identidade ao bater o ponto.',
+        source: 'ponto',
+      });
+      if (aposBiometria) {
+        setModoCaptura(aposBiometria);
+        setAposBiometria(null);
+      } else {
+        closeCheckinModal();
+      }
+    } catch (err: any) {
+      setError(err.response?.data?.error || 'Não foi possível cadastrar a foto. Tente novamente.');
+    } finally {
+      setLoadingAction(false);
+    }
+  };
+
+  const pularBiometria = () => {
+    setError(null);
+    setModoCaptura(aposBiometria ?? 'checkin');
+    setAposBiometria(null);
+  };
+
+  const confirmarComFoto = () => {
+    if (modoCaptura === 'biometria') return void handleCadastrarBiometria();
+    if (modoCaptura === 'checkout') return void handleCheckOut(false);
+    return void handleCheckIn();
+  };
+
+  const tirarOutraFoto = () => {
+    setError(null);
+    descartarFotoNaoConferida();
+  };
+
+  const registrarAssimMesmo = () => {
+    const foto = fotoNaoConferida?.foto;
+    if (!foto) return;
+    descartarFotoNaoConferida();
+    if (modoCaptura === 'checkout') return void handleCheckOut(false, foto);
+    return void handleCheckIn(foto);
+  };
+
+  const confirmarSemFoto = () => {
+    if (modoCaptura === 'checkout') return void handleCheckOut(true);
+    return void handleCheckInSemFoto();
   };
 
   return (
@@ -793,6 +1078,29 @@ const PontoEletronico = () => {
           )}
         </div>
 
+        {biometriaInfo?.habilitado && (
+          <BiometriaStatusAviso
+            info={biometriaInfo}
+            onCadastrar={() => abrirModalCamera('biometria')}
+          />
+        )}
+
+        {!online && (
+          <p className="mb-4 rounded-xl border border-amber-200 bg-amber-50/80 p-3 text-center text-[11px] text-amber-900 font-serif">
+            Sem internet. Os pontos serão guardados neste aparelho e enviados automaticamente quando a conexão voltar.
+          </p>
+        )}
+
+        {fila.length > 0 && (
+          <FilaOfflineAviso
+            fila={fila}
+            online={online}
+            sincronizando={sincronizando}
+            onEnviar={() => void sincronizar()}
+            onDescartar={(id) => void descartar(id)}
+          />
+        )}
+
         {error && !checkinModalOpen && (
           <p className="mb-4 p-3 rounded-xl bg-red-50 border border-red-200 text-xs text-red-700 text-center">
             {error}
@@ -801,7 +1109,7 @@ const PontoEletronico = () => {
 
         <div className="flex justify-center">
           {!registroAberto ? (
-            canCheckIn ? (
+            canCheckIn || podeCheckinOffline ? (
               <button
                 type="button"
                 className="btn btn-primary px-8 py-3"
@@ -824,7 +1132,7 @@ const PontoEletronico = () => {
           ) : (
             <button
               className="btn btn-primary px-8 py-3"
-              onClick={handleCheckOut}
+              onClick={openCheckoutModal}
               disabled={loadingAction}
             >
               {loadingAction ? 'Registrando...' : 'Bater ponto (saída)'}
@@ -894,7 +1202,10 @@ const PontoEletronico = () => {
                       key={r.id}
                       className="rounded-xl bg-viva-50/50 border border-viva-200/50 px-4 py-3 hover:bg-viva-50/70 transition"
                     >
-                      <p className="font-semibold text-viva-900 font-display text-xs">{nomeEscala}</p>
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <p className="font-semibold text-viva-900 font-display text-xs">{nomeEscala}</p>
+                        <BadgeFaceSituacao situacao={r.faceSituacao} />
+                      </div>
                       <p className="text-[10px] text-viva-600 mt-1">
                         Início: {new Date(r.checkInAt).toLocaleTimeString()} · Fim:{' '}
                         {r.checkOutAt ? new Date(r.checkOutAt).toLocaleTimeString() : 'Em aberto'} · Duração:{' '}
@@ -918,8 +1229,18 @@ const PontoEletronico = () => {
         >
           <div className="card max-w-md w-full shadow-2xl border border-viva-200/80 max-h-[90vh] overflow-y-auto">
             <h2 id="checkin-foto-titulo" className="text-base font-bold text-viva-900 font-display mb-1">
-              Foto do rosto — check-in
+              {modoCaptura === 'biometria'
+                ? 'Foto de referência (reconhecimento facial)'
+                : modoCaptura === 'checkout'
+                  ? 'Foto do rosto — saída'
+                  : 'Foto do rosto — check-in'}
             </h2>
+            {modoCaptura === 'biometria' && (
+              <p className="text-[11px] text-viva-600 font-serif mb-3">
+                Rosto centralizado, sem óculos escuros, boné ou máscara, em local bem iluminado. Esta foto será
+                comparada com as fotos tiradas ao bater o ponto.
+              </p>
+            )}
 
             <div className="space-y-3">
               {!cameraErro ? (
@@ -943,14 +1264,47 @@ const PontoEletronico = () => {
                         Iniciando câmera…
                       </span>
                     )}
+                    {fotoNaoConferida && (
+                      <img
+                        src={fotoNaoConferida.previewUrl}
+                        alt="Foto que não foi reconhecida"
+                        className="absolute inset-0 w-full h-full object-cover"
+                      />
+                    )}
+                    {conferindoRosto && (
+                      <span className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-viva-950/55 text-sm text-white font-serif px-4 text-center">
+                        <span className="h-6 w-6 rounded-full border-2 border-white/40 border-t-white animate-spin" />
+                        Conferindo seu rosto…
+                      </span>
+                    )}
                   </div>
-                  {videoPronto && (
+                  {fotoNaoConferida && (
+                    <div className="rounded-xl border border-amber-300 bg-amber-50 p-3 space-y-1">
+                      <p className="text-xs font-semibold text-amber-900">Rosto não reconhecido</p>
+                      <p className="text-[11px] text-amber-800 font-serif leading-relaxed">{fotoNaoConferida.mensagem}</p>
+                      <p className="text-[11px] text-amber-800 font-serif leading-relaxed">
+                        Se registrar assim mesmo, o ponto será salvo e a foto será analisada pelo administrador.
+                      </p>
+                    </div>
+                  )}
+                  {videoPronto && !fotoNaoConferida && (
                     <p className="text-[11px] text-viva-600 font-serif text-center">
                       Quando estiver pronto, confirme — a captura ocorre no momento do clique.
                     </p>
                   )}
-                  {mensagemAtrasoCheckin && (
+                  {mensagemAtrasoCheckin && modoCaptura === 'checkin' && (
                     <p className="text-[11px] text-amber-700 font-medium text-center">{mensagemAtrasoCheckin}</p>
+                  )}
+                  {modoCaptura === 'biometria' && (
+                    <label className="flex items-start gap-2 rounded-xl border border-viva-200 bg-viva-50/60 p-3 text-[11px] text-viva-800 font-serif leading-relaxed">
+                      <input
+                        type="checkbox"
+                        className="mt-0.5"
+                        checked={consentiuBiometria}
+                        onChange={(e) => setConsentiuBiometria(e.target.checked)}
+                      />
+                      <span>{BIOMETRIA_CONSENTIMENTO_TEXTO}</span>
+                    </label>
                   )}
                 </>
               ) : (
@@ -967,7 +1321,7 @@ const PontoEletronico = () => {
               )}
             </div>
 
-            {showSemFotoSection && (
+            {showSemFotoSection && modoCaptura !== 'biometria' && (
               <div className="mt-5 pt-4 border-t border-viva-100 border-dashed">
                 <p className="text-xs font-semibold text-viva-800 font-display mb-2">Sem câmera agora</p>
                 <p className="text-[11px] text-viva-600 font-serif mb-2">
@@ -993,28 +1347,72 @@ const PontoEletronico = () => {
               <button type="button" className="btn text-sm border border-viva-300 bg-white text-viva-800" onClick={closeCheckinModal}>
                 Cancelar
               </button>
-              <button
-                type="button"
-                className="btn text-sm border border-viva-300 bg-white text-viva-800"
-                onClick={() => {
-                  if (!showSemFotoSection) {
-                    setShowSemFotoSection(true);
-                    return;
-                  }
-                  void handleCheckInSemFoto();
-                }}
-                disabled={loadingAction || (showSemFotoSection && motivoSemFoto.trim().length < 15)}
-              >
-                {showSemFotoSection ? (loadingAction ? 'Registrando...' : 'Confirmar sem foto') : 'Registrar sem foto'}
-              </button>
+              {fotoNaoConferida ? (
+                <>
+                  <button
+                    type="button"
+                    className="btn text-sm border border-amber-300 bg-white text-amber-800"
+                    onClick={registrarAssimMesmo}
+                    disabled={loadingAction}
+                  >
+                    Registrar assim mesmo
+                  </button>
+                  <button type="button" className="btn btn-primary text-sm" onClick={tirarOutraFoto} disabled={loadingAction}>
+                    Tirar outra foto
+                  </button>
+                </>
+              ) : (
+                <>
+              {modoCaptura === 'biometria' ? (
+                aposBiometria && (
+                  <button
+                    type="button"
+                    className="btn text-sm border border-viva-300 bg-white text-viva-800"
+                    onClick={pularBiometria}
+                    disabled={loadingAction}
+                  >
+                    Agora não, só bater o ponto
+                  </button>
+                )
+              ) : (
+                <button
+                  type="button"
+                  className="btn text-sm border border-viva-300 bg-white text-viva-800"
+                  onClick={() => {
+                    if (!showSemFotoSection) {
+                      setShowSemFotoSection(true);
+                      return;
+                    }
+                    confirmarSemFoto();
+                  }}
+                  disabled={loadingAction || (showSemFotoSection && motivoSemFoto.trim().length < 15)}
+                >
+                  {showSemFotoSection ? (loadingAction ? 'Registrando...' : 'Confirmar sem foto') : 'Registrar sem foto'}
+                </button>
+              )}
               <button
                 type="button"
                 className="btn btn-primary text-sm"
-                onClick={handleCheckIn}
-                disabled={loadingAction || cameraErro || !videoPronto}
+                onClick={confirmarComFoto}
+                disabled={
+                  loadingAction ||
+                  cameraErro ||
+                  !videoPronto ||
+                  (modoCaptura === 'biometria' && !consentiuBiometria)
+                }
               >
-                {loadingAction ? 'Registrando...' : 'Confirmar entrada (com foto)'}
+                {conferindoRosto
+                  ? 'Conferindo rosto...'
+                  : loadingAction
+                    ? 'Enviando...'
+                    : modoCaptura === 'biometria'
+                      ? 'Salvar foto de referência'
+                      : modoCaptura === 'checkout'
+                        ? 'Confirmar saída (com foto)'
+                        : 'Confirmar entrada (com foto)'}
               </button>
+                </>
+              )}
             </div>
           </div>
         </div>
@@ -1022,5 +1420,98 @@ const PontoEletronico = () => {
     </div>
   );
 };
+
+function FilaOfflineAviso({
+  fila,
+  online,
+  sincronizando,
+  onEnviar,
+  onDescartar,
+}: {
+  fila: PontoOfflineItem[];
+  online: boolean;
+  sincronizando: boolean;
+  onEnviar: () => void;
+  onDescartar: (clientUuid: string) => void;
+}) {
+  return (
+    <div className="mb-4 rounded-xl border border-viva-200 bg-viva-50/70 p-3 space-y-2">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="text-xs font-semibold text-viva-900 font-display">
+          {fila.length === 1 ? '1 ponto guardado no aparelho' : `${fila.length} pontos guardados no aparelho`}
+        </p>
+        <button
+          type="button"
+          className="btn-sm btn-primary"
+          onClick={onEnviar}
+          disabled={!online || sincronizando || !!fila[0]?.erro}
+        >
+          {sincronizando ? 'Enviando…' : 'Enviar agora'}
+        </button>
+      </div>
+      <ul className="space-y-1.5">
+        {fila.map((item) => (
+          <li key={item.clientUuid} className="rounded-lg bg-white/80 border border-viva-200/70 px-3 py-2 text-[11px]">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-viva-800">
+                <strong>{item.tipo === 'checkin' ? 'Entrada' : 'Saída'}</strong> ·{' '}
+                {new Date(item.capturadoEm).toLocaleString('pt-BR', {
+                  day: '2-digit',
+                  month: '2-digit',
+                  hour: '2-digit',
+                  minute: '2-digit',
+                })}
+                {!item.foto && ' · sem foto'}
+              </span>
+              {item.erro && (
+                <button
+                  type="button"
+                  className="text-red-700 font-semibold hover:underline"
+                  onClick={() => {
+                    if (window.confirm('Descartar este ponto? Ele não será registrado; use a justificativa de ponto se precisar.')) {
+                      onDescartar(item.clientUuid);
+                    }
+                  }}
+                >
+                  Descartar
+                </button>
+              )}
+            </div>
+            {item.erro && <p className="mt-1 text-red-700">{item.erro}</p>}
+          </li>
+        ))}
+      </ul>
+      {fila[0]?.erro && (
+        <p className="text-[10px] text-viva-600 font-serif">
+          O servidor recusou o primeiro ponto da fila. Descarte-o para que os seguintes possam ser enviados.
+        </p>
+      )}
+    </div>
+  );
+}
+
+function BiometriaStatusAviso({ info, onCadastrar }: { info: MinhaBiometriaFacial; onCadastrar: () => void }) {
+  const b = info.biometria;
+  if (b?.status === 'APROVADA') return null;
+  if (b?.status === 'PENDENTE_APROVACAO') {
+    return (
+      <p className="mb-4 rounded-xl border border-viva-200 bg-viva-50/70 p-3 text-center text-[11px] text-viva-700 font-serif">
+        Sua foto de referência foi enviada e está em análise pela coordenação.
+      </p>
+    );
+  }
+  return (
+    <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50/80 p-3 text-center space-y-2">
+      <p className="text-xs text-viva-800 font-serif">
+        {b?.status === 'REJEITADA'
+          ? `Sua foto de referência não foi aprovada${b.motivoRejeicao ? `: ${b.motivoRejeicao}` : ''}. Tire uma nova foto.`
+          : 'Cadastre sua foto de referência para o reconhecimento facial do ponto.'}
+      </p>
+      <button type="button" className="btn btn-primary text-xs px-4 py-2" onClick={onCadastrar}>
+        Cadastrar foto de referência
+      </button>
+    </div>
+  );
+}
 
 export default PontoEletronico;

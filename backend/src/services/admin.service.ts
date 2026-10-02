@@ -301,7 +301,18 @@ export async function listMedicosService(params: ListMedicosParams) {
                 id: true,
                 nome: true,
                 ativo: true,
-                subgrupo: { select: { id: true, nome: true } },
+                subgrupo: {
+                  select: {
+                    id: true,
+                    nome: true,
+                    contratoSubgrupos: {
+                      select: { contratoAtivo: { select: { id: true, nome: true, ativo: true } } },
+                    },
+                  },
+                },
+                contratoEquipes: {
+                  select: { contratoAtivo: { select: { id: true, nome: true, ativo: true } } },
+                },
               },
             },
           },
@@ -309,7 +320,13 @@ export async function listMedicosService(params: ListMedicosParams) {
 
   const equipesPorMedico = new Map<
     string,
-    { id: string; nome: string; ativo: boolean; subgrupo: { id: string; nome: string } | null }[]
+    {
+      id: string;
+      nome: string;
+      ativo: boolean;
+      subgrupo: { id: string; nome: string } | null;
+      contratos: { id: string; nome: string; ativo: boolean }[];
+    }[]
   >();
   for (const row of equipeLinks) {
     const e = row.equipe;
@@ -320,6 +337,14 @@ export async function listMedicosService(params: ListMedicosParams) {
       nome: e.nome,
       ativo: e.ativo,
       subgrupo: e.subgrupo ? { id: e.subgrupo.id, nome: e.subgrupo.nome } : null,
+      contratos: [
+        ...new Map(
+          [
+            ...e.contratoEquipes.map((ce) => ce.contratoAtivo),
+            ...(e.subgrupo?.contratoSubgrupos ?? []).map((cs) => cs.contratoAtivo),
+          ].map((c) => [c.id, c])
+        ).values(),
+      ],
     });
     equipesPorMedico.set(row.medicoId, list);
   }
@@ -1601,6 +1626,16 @@ export async function listRegistrosPontoAdminService(
     minutosAtrasoCheckin: true,
     fotoCheckinCaminho: true,
     motivoCheckinSemFoto: true,
+    fotoCheckoutCaminho: true,
+    motivoCheckoutSemFoto: true,
+    faceStatus: true,
+    faceSimilaridade: true,
+    faceCheckoutStatus: true,
+    faceCheckoutSimilaridade: true,
+    faceRevisao: true,
+    offlineCheckin: true,
+    offlineCheckout: true,
+    offlineRevisar: true,
     createdAt: true,
     updatedAt: true,
     medico: {

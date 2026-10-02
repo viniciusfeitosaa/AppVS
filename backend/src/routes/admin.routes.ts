@@ -144,6 +144,14 @@ import {
   listUsuariosStaffController,
   updateUsuarioStaffController,
 } from '../controllers/usuario-staff.controller';
+import {
+  fotoBiometriaAdminController,
+  fotoCheckoutAdminController,
+  listBiometriasAdminController,
+  listDivergenciasFaciaisController,
+  revisarBiometriaAdminController,
+  revisarFacePontoController,
+} from '../controllers/biometria-facial.controller';
 import blogAdminRoutes from './blog-admin.routes';
 import conteudoAdminRoutes from './conteudo-admin.routes';
 
@@ -394,6 +402,36 @@ router.get(
   '/relatorio-plantoes-somente-escala',
   requireModuleAccess(ModuloSistema.RELATORIOS),
   listPlantoesSomenteEscalaRelatorioController
+);
+router.get(
+  '/registros-ponto/:id/foto-checkout',
+  requireModuleAccess(ModuloSistema.PONTO_ELETRONICO),
+  validateUUIDParam('id'),
+  fotoCheckoutAdminController
+);
+router.get('/biometrias-faciais', requireModuleAccess(ModuloSistema.PONTO_ELETRONICO), listBiometriasAdminController);
+router.post(
+  '/biometrias-faciais/:id/revisar',
+  requireModuleAccess(ModuloSistema.PONTO_ELETRONICO),
+  validateUUIDParam('id'),
+  revisarBiometriaAdminController
+);
+router.get(
+  '/biometrias-faciais/:id/foto',
+  requireModuleAccess(ModuloSistema.PONTO_ELETRONICO),
+  validateUUIDParam('id'),
+  fotoBiometriaAdminController
+);
+router.get(
+  '/ponto/divergencias-faciais',
+  requireModuleAccess(ModuloSistema.PONTO_ELETRONICO),
+  listDivergenciasFaciaisController
+);
+router.post(
+  '/registros-ponto/:id/revisao-facial',
+  requireModuleAccess(ModuloSistema.PONTO_ELETRONICO),
+  validateUUIDParam('id'),
+  revisarFacePontoController
 );
 router.get(
   '/registros-ponto/:id/foto-checkin',

@@ -88,6 +88,17 @@ const envSchema = z.object({
   WHATSAPP_RATE_LIMIT_PER_MIN: z.string().default('8'),
   /** Máx. respostas automáticas por telefone / hora. */
   WHATSAPP_RATE_LIMIT_PER_HOUR: z.string().default('40'),
+  /** face-service (UniFace) na rede Docker; sem URL/token a verificação facial fica desligada. */
+  FACE_SERVICE_URL: z.string().url().optional(),
+  FACE_SERVICE_TOKEN: z.string().optional(),
+  FACE_SERVICE_TIMEOUT_MS: z.string().default('10000'),
+  FACE_MATCH_THRESHOLD: z.string().default('0.45'),
+  FACE_REVIEW_THRESHOLD: z.string().default('0.30'),
+  FACE_LIVENESS_THRESHOLD: z.string().default('0.50'),
+  FACE_CONSENTIMENTO_VERSAO: z.string().default('2026-10-v1'),
+  /** Sem 'true' o job de retenção só registra no log o que apagaria. */
+  PONTO_FOTO_RETENCAO_ATIVA: z.string().default('false'),
+  PONTO_FOTO_RETENCAO_DIAS: z.string().default('90'),
   TWILIO_ACCOUNT_SID: z.string().optional(),
   TWILIO_AUTH_TOKEN: z.string().optional(),
   TWILIO_WHATSAPP_FROM: z.string().optional(),

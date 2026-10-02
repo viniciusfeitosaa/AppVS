@@ -1,3 +1,4 @@
+import { anexarSelfieCadastroPublico, validarSelfieCadastroPublico } from './biometria-facial.service';
 import { prisma } from '../config/database';
 import env from '../config/env';
 import { normalizeCRM, validateCPF, validateCRM } from '../utils/validation.util';
@@ -740,7 +741,8 @@ export const acceptInviteService = async (
 export const registerPublicMedicoService = async (
   input: RegisterPublicMedicoInput,
   files?: Record<string, Express.Multer.File[] | undefined> | null,
-  validades?: Partial<Record<DocumentoPerfilFieldName, string>> | null
+  validades?: Partial<Record<DocumentoPerfilFieldName, string>> | null,
+  selfie?: { fotoAbs: string; consentiu: boolean; consentimentoVersao?: string }
 ) => {
   const tenant = await getDefaultTenant();
   const cpf = input.cpf.replace(/\D/g, '');
@@ -827,6 +829,10 @@ export const registerPublicMedicoService = async (
 
   const rqe = isMedico ? trimOpt(input.rqe) : undefined;
 
+  const selfieEnroll = selfie
+    ? await validarSelfieCadastroPublico(selfie.fotoAbs, selfie.consentiu, selfie.consentimentoVersao)
+    : null;
+
   const medico = await prisma.$transaction(async (tx: any) => {
     const created = await tx.medico.create({
       data: {
@@ -884,6 +890,15 @@ export const registerPublicMedicoService = async (
 
     return created;
   });
+
+  if (selfie && selfieEnroll) {
+    await anexarSelfieCadastroPublico({
+      tenantId: tenant.id,
+      medicoId: medico.id,
+      fotoAbs: selfie.fotoAbs,
+      enroll: selfieEnroll,
+    });
+  }
 
   try {
     const { enqueueEmailJob } = await import('../jobs/email-queue');

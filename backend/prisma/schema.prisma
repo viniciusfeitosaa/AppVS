@@ -21,6 +21,29 @@ enum OrigemRegistroPonto {
   JUSTIFICADO_SEM_PONTO
 }
 
+enum StatusBiometriaFacial {
+  PENDENTE_APROVACAO
+  APROVADA
+  REJEITADA
+}
+
+enum FaceStatusPonto {
+  PENDENTE
+  CONFERE
+  INCERTO
+  DIVERGENTE
+  SPOOF_SUSPEITO
+  SEM_ROSTO
+  SEM_BIOMETRIA
+  SEM_FOTO
+  ERRO
+}
+
+enum RevisaoFacePonto {
+  CONFIRMADO_MEDICO
+  FRAUDE_SUSPEITA
+}
+
 enum StatusJustificativaAusenciaPonto {
   PENDENTE
   ACEITA
@@ -98,180 +121,181 @@ model Tenant {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  medicos         Medico[]
-  usuariosMaster  UsuarioMaster[]
-  contratosAtivos ContratoAtivo[]
-  escalas         Escala[]
-  escalaMedicos   EscalaMedico[]
-  escalaPlantoes EscalaPlantao[]
-  registrosPonto  RegistroPonto[]
-  medicoDocumentos MedicoDocumento[]
-  documentosEnviados DocumentoEnviado[]
-  acessosModulosPerfil AcessoModuloPerfil[]
-  subgrupos       Subgrupo[]
-  equipes         Equipe[]
-  subgrupoMedicos SubgrupoMedico[]
-  equipeMedicos   EquipeMedico[]
-  escalaSubgrupos EscalaSubgrupo[]
-  escalaEquipes           EscalaEquipe[]
-  valoresPlantao          ValorPlantao[]
-  tiposPlantao            TipoPlantao[]
-  adicionaisPlantaoData   AdicionalPlantaoData[]
-  configPontoEletronico   ConfigPontoEletronico[]
-  contratoSubgrupos       ContratoSubgrupo[]
-  contratoEquipes         ContratoEquipe[]
-  resetSenhaTokens        ResetSenhaToken[]
-  notificacoesMedico      NotificacaoMedico[]
-  devicePushTokens        DevicePushToken[]
-  solicitacoesTrocaPlantao SolicitacaoTrocaPlantao[]
-  vagas                   Vaga[]
-  vagaInteresses          VagaInteresse[]
-  blogCategories          BlogCategory[]
-  blogPosts               BlogPost[]
-  blogComments            BlogComment[]
-  emailMensagens          EmailMensagem[]
-  conteudoPalestrantes    ConteudoPalestrante[]
-  conteudoEventos         ConteudoEvento[]
-  conteudoParticipantes   ConteudoParticipante[]
+  medicos                     Medico[]
+  usuariosMaster              UsuarioMaster[]
+  contratosAtivos             ContratoAtivo[]
+  escalas                     Escala[]
+  escalaMedicos               EscalaMedico[]
+  escalaPlantoes              EscalaPlantao[]
+  registrosPonto              RegistroPonto[]
+  biometriasFaciais           MedicoBiometriaFacial[]
+  medicoDocumentos            MedicoDocumento[]
+  documentosEnviados          DocumentoEnviado[]
+  acessosModulosPerfil        AcessoModuloPerfil[]
+  subgrupos                   Subgrupo[]
+  equipes                     Equipe[]
+  subgrupoMedicos             SubgrupoMedico[]
+  equipeMedicos               EquipeMedico[]
+  escalaSubgrupos             EscalaSubgrupo[]
+  escalaEquipes               EscalaEquipe[]
+  valoresPlantao              ValorPlantao[]
+  tiposPlantao                TipoPlantao[]
+  adicionaisPlantaoData       AdicionalPlantaoData[]
+  configPontoEletronico       ConfigPontoEletronico[]
+  contratoSubgrupos           ContratoSubgrupo[]
+  contratoEquipes             ContratoEquipe[]
+  resetSenhaTokens            ResetSenhaToken[]
+  notificacoesMedico          NotificacaoMedico[]
+  devicePushTokens            DevicePushToken[]
+  solicitacoesTrocaPlantao    SolicitacaoTrocaPlantao[]
+  vagas                       Vaga[]
+  vagaInteresses              VagaInteresse[]
+  blogCategories              BlogCategory[]
+  blogPosts                   BlogPost[]
+  blogComments                BlogComment[]
+  emailMensagens              EmailMensagem[]
+  conteudoPalestrantes        ConteudoPalestrante[]
+  conteudoEventos             ConteudoEvento[]
+  conteudoParticipantes       ConteudoParticipante[]
   justificativasAusenciaPonto JustificativaAusenciaPonto[]
   perfisAcesso                PerfilAcesso[]
   docusealDocumentoContadores DocusealDocumentoContador[]
 
-  @@map("tenants")
   @@index([slug])
+  @@map("tenants")
 }
 
 model ResetSenhaToken {
-  id         String   @id @default(uuid())
-  tenantId   String   @map("tenant_id")
-  email      String   @db.VarChar(255)
-  tokenHash  String   @map("token_hash") @db.VarChar(255)
-  tipo       String   @db.VarChar(20)   // MASTER | MEDICO
-  expiresAt  DateTime @map("expires_at")
-  createdAt  DateTime @default(now()) @map("created_at")
+  id        String   @id @default(uuid())
+  tenantId  String   @map("tenant_id")
+  email     String   @db.VarChar(255)
+  tokenHash String   @map("token_hash") @db.VarChar(255)
+  tipo      String   @db.VarChar(20) // MASTER | MEDICO
+  expiresAt DateTime @map("expires_at")
+  createdAt DateTime @default(now()) @map("created_at")
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
-  @@map("reset_senha_tokens")
   @@index([tokenHash])
   @@index([tenantId, email])
+  @@map("reset_senha_tokens")
 }
 
 model ContratoAtivo {
-  id          String   @id @default(uuid())
-  tenantId    String   @map("tenant_id")
-  nome        String   @db.VarChar(180)
-  descricao   String?  @db.Text
-  dataInicio  DateTime @map("data_inicio")
-  dataFim     DateTime? @map("data_fim")
-  ativo       Boolean  @default(true)
-  usaEscala   Boolean  @default(true) @map("usa_escala")
-  usaPonto    Boolean  @default(true) @map("usa_ponto")
-  permiteTrocaPlantao Boolean @default(true) @map("permite_troca_plantao")
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
+  id                  String    @id @default(uuid())
+  tenantId            String    @map("tenant_id")
+  nome                String    @db.VarChar(180)
+  descricao           String?   @db.Text
+  dataInicio          DateTime  @map("data_inicio")
+  dataFim             DateTime? @map("data_fim")
+  ativo               Boolean   @default(true)
+  usaEscala           Boolean   @default(true) @map("usa_escala")
+  usaPonto            Boolean   @default(true) @map("usa_ponto")
+  permiteTrocaPlantao Boolean   @default(true) @map("permite_troca_plantao")
+  createdAt           DateTime  @default(now()) @map("created_at")
+  updatedAt           DateTime  @updatedAt @map("updated_at")
 
-  tenant               Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  escalas              Escala[]
-  valoresPlantao       ValorPlantao[]
-  tiposPlantao         TipoPlantao[]
+  tenant                Tenant                  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  escalas               Escala[]
+  valoresPlantao        ValorPlantao[]
+  tiposPlantao          TipoPlantao[]
   adicionaisPlantaoData AdicionalPlantaoData[]
   configPontoEletronico ConfigPontoEletronico[]
-  contratoSubgrupos    ContratoSubgrupo[]
-  contratoEquipes      ContratoEquipe[]
+  contratoSubgrupos     ContratoSubgrupo[]
+  contratoEquipes       ContratoEquipe[]
 
-  @@map("contratos_ativos")
   @@index([tenantId])
   @@index([ativo])
   @@index([dataInicio])
+  @@map("contratos_ativos")
 }
 
 model UsuarioMaster {
-  id        String   @id @default(uuid())
-  tenantId  String   @map("tenant_id")
-  nome      String   @db.VarChar(255)
-  email     String   @db.VarChar(255)
-  senhaHash String   @map("senha_hash") @db.VarChar(255)
-  role      UserRole @default(MASTER)
-  ativo     Boolean  @default(true)
-  perfilAcessoId String? @map("perfil_acesso_id")
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  id             String   @id @default(uuid())
+  tenantId       String   @map("tenant_id")
+  nome           String   @db.VarChar(255)
+  email          String   @db.VarChar(255)
+  senhaHash      String   @map("senha_hash") @db.VarChar(255)
+  role           UserRole @default(MASTER)
+  ativo          Boolean  @default(true)
+  perfilAcessoId String?  @map("perfil_acesso_id")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
 
-  tenant       Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  perfilAcesso PerfilAcesso? @relation(fields: [perfilAcessoId], references: [id], onDelete: SetNull)
-  sessoes      SessaoMaster[]
-  auditoriaLog Auditoria[]   @relation("auditoria_master")
-  blogPosts    BlogPost[]
-  blogCommentRespostas BlogComment[] @relation("blog_comment_respostas")
-  emailMensagensCriadas EmailMensagem[] @relation("email_mensagem_criador")
-  conteudoEventosCriados ConteudoEvento[] @relation("conteudo_evento_criador")
+  tenant                          Tenant                       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  perfilAcesso                    PerfilAcesso?                @relation(fields: [perfilAcessoId], references: [id], onDelete: SetNull)
+  sessoes                         SessaoMaster[]
+  auditoriaLog                    Auditoria[]                  @relation("auditoria_master")
+  blogPosts                       BlogPost[]
+  blogCommentRespostas            BlogComment[]                @relation("blog_comment_respostas")
+  emailMensagensCriadas           EmailMensagem[]              @relation("email_mensagem_criador")
+  conteudoEventosCriados          ConteudoEvento[]             @relation("conteudo_evento_criador")
   justificativasAusenciaDecididas JustificativaAusenciaPonto[] @relation("justificativa_ausencia_decidido_por")
 
-  @@map("usuarios_master")
   @@unique([tenantId, email])
   @@index([tenantId])
   @@index([email])
+  @@map("usuarios_master")
 }
 
 // Modelo de Médico / Profissional de saúde
 model Medico {
-  id            String   @id @default(uuid())
-  tenantId      String   @map("tenant_id")
-  cpf           String   @db.VarChar(11) // CPF sem formatação (11 dígitos)
-  profissao     String   @db.VarChar(80) // Médico, Enfermeiro, Fonoaudiólogo, etc.
-  crm           String?  @db.VarChar(60) // CRM, CRO, COREN, CRP, etc. (obrigatório conforme profissão)
-  nomeCompleto  String   @db.VarChar(255)
-  email         String?  @db.VarChar(255)
-  senhaHash     String   @db.VarChar(255) // Hash bcrypt
-  especialidades String[] @default([]) @map("especialidades") // várias especialidades; médico sem nenhuma = Clínica Médica
-  vinculo       String?  @db.VarChar(20)   // Ex: "PJ" ou vazio (Associado)
+  id                      String               @id @default(uuid())
+  tenantId                String               @map("tenant_id")
+  cpf                     String               @db.VarChar(11) // CPF sem formatação (11 dígitos)
+  profissao               String               @db.VarChar(80) // Médico, Enfermeiro, Fonoaudiólogo, etc.
+  crm                     String?              @db.VarChar(60) // CRM, CRO, COREN, CRP, etc. (obrigatório conforme profissão)
+  nomeCompleto            String               @db.VarChar(255)
+  email                   String?              @db.VarChar(255)
+  senhaHash               String               @db.VarChar(255) // Hash bcrypt
+  especialidades          String[]             @default([]) @map("especialidades") // várias especialidades; médico sem nenhuma = Clínica Médica
+  vinculo                 String?              @db.VarChar(20) // Ex: "PJ" ou vazio (Associado)
   /// Número do RQE (médicos com especialidade registrada); opcional.
-  rqe           String?  @db.VarChar(60)
+  rqe                     String?              @db.VarChar(60)
   /// Preferência: cidade / unidade / região onde deseja atuar.
-  localInteresseTrabalho String? @map("local_interesse_trabalho") @db.Text
+  localInteresseTrabalho  String?              @map("local_interesse_trabalho") @db.Text
   /// Preferência: tipo de interesse (plantão, ambulatorial, etc.).
-  interesseTrabalho String? @map("interesse_trabalho") @db.Text
-  telefone      String?  @db.VarChar(20)
-  estadoCivil   String?  @map("estado_civil") @db.VarChar(60)
-  enderecoResidencial String? @map("endereco_residencial") @db.Text
-  dadosBancarios String? @map("dados_bancarios") @db.Text
-  chavePix      String?  @map("chave_pix") @db.VarChar(120)
-  inviteTokenHash String?  @map("invite_token_hash") @db.VarChar(255)
-  inviteExpiresAt DateTime? @map("invite_expires_at")
-  inviteAcceptedAt DateTime? @map("invite_accepted_at")
+  interesseTrabalho       String?              @map("interesse_trabalho") @db.Text
+  telefone                String?              @db.VarChar(20)
+  estadoCivil             String?              @map("estado_civil") @db.VarChar(60)
+  enderecoResidencial     String?              @map("endereco_residencial") @db.Text
+  dadosBancarios          String?              @map("dados_bancarios") @db.Text
+  chavePix                String?              @map("chave_pix") @db.VarChar(120)
+  inviteTokenHash         String?              @map("invite_token_hash") @db.VarChar(255)
+  inviteExpiresAt         DateTime?            @map("invite_expires_at")
+  inviteAcceptedAt        DateTime?            @map("invite_accepted_at")
   /// Cadastro público: PENDENTE_ANALISE até aprovação no módulo Avaliação; convites/admin criam ATIVO.
-  statusCadastro StatusCadastroMedico @default(ATIVO) @map("status_cadastro")
+  statusCadastro          StatusCadastroMedico @default(ATIVO) @map("status_cadastro")
   /// Momento em que o utilizador aceitou a declaração/termos no formulário de cadastro público (se aplicável).
-  termosCadastroAceitosEm DateTime? @map("termos_cadastro_aceitos_em")
+  termosCadastroAceitosEm DateTime?            @map("termos_cadastro_aceitos_em")
   /// Identificador da versão dos textos legais aceites (ex.: 2026.1).
-  termosCadastroVersao   String?   @map("termos_cadastro_versao") @db.VarChar(24)
-  ativo         Boolean  @default(true)
-  createdAt     DateTime @default(now()) @map("created_at")
-  updatedAt     DateTime @updatedAt @map("updated_at")
+  termosCadastroVersao    String?              @map("termos_cadastro_versao") @db.VarChar(24)
+  ativo                   Boolean              @default(true)
+  createdAt               DateTime             @default(now()) @map("created_at")
+  updatedAt               DateTime             @updatedAt @map("updated_at")
 
   // Relações
-  tenant         Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  sessoes        Sessao[]
-  auditoria      Auditoria[]
-  escalaMedicos  EscalaMedico[]
-  escalaPlantoes EscalaPlantao[]
-  registrosPonto RegistroPonto[]
-  documentos     MedicoDocumento[]
-  documentosEnviados DocumentoEnviado[]
-  subgrupoMedicos SubgrupoMedico[]
-  equipeMedicos   EquipeMedico[]
-  notificacoes    NotificacaoMedico[]
-  devicePushTokens DevicePushToken[]
-  solicitacoesTrocaComoSolicitante SolicitacaoTrocaPlantao[] @relation("SolicitacaoTrocaSolicitante")
-  solicitacoesTrocaComoDestino     SolicitacaoTrocaPlantao[] @relation("SolicitacaoTrocaDestino")
-  vagasPublicadas                Vaga[]
-  vagaInteressesComoCandidato    VagaInteresse[] @relation("VagaInteresseCandidato")
-  conteudoPalestrantes           ConteudoPalestrante[]
-  conteudoParticipacoes          ConteudoParticipante[]
-  justificativasAusenciaPonto    JustificativaAusenciaPonto[]
+  tenant                           Tenant                       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  sessoes                          Sessao[]
+  auditoria                        Auditoria[]
+  escalaMedicos                    EscalaMedico[]
+  escalaPlantoes                   EscalaPlantao[]
+  registrosPonto                   RegistroPonto[]
+  biometriasFaciais                MedicoBiometriaFacial[]
+  documentos                       MedicoDocumento[]
+  documentosEnviados               DocumentoEnviado[]
+  subgrupoMedicos                  SubgrupoMedico[]
+  equipeMedicos                    EquipeMedico[]
+  notificacoes                     NotificacaoMedico[]
+  devicePushTokens                 DevicePushToken[]
+  solicitacoesTrocaComoSolicitante SolicitacaoTrocaPlantao[]    @relation("SolicitacaoTrocaSolicitante")
+  solicitacoesTrocaComoDestino     SolicitacaoTrocaPlantao[]    @relation("SolicitacaoTrocaDestino")
+  vagasPublicadas                  Vaga[]
+  vagaInteressesComoCandidato      VagaInteresse[]              @relation("VagaInteresseCandidato")
+  conteudoPalestrantes             ConteudoPalestrante[]
+  conteudoParticipacoes            ConteudoParticipante[]
+  justificativasAusenciaPonto      JustificativaAusenciaPonto[]
 
-  @@map("medicos")
   @@unique([tenantId, cpf])
   @@unique([tenantId, crm])
   @@unique([tenantId, email])
@@ -281,60 +305,61 @@ model Medico {
   @@index([tenantId, nomeCompleto])
   @@index([tenantId, ativo])
   @@index([tenantId, statusCadastro])
+  @@map("medicos")
 }
 
 model MedicoDocumento {
-  id            String             @id @default(uuid())
-  tenantId      String             @map("tenant_id")
-  medicoId      String             @map("medico_id")
-  tipo          DocumentoPerfilTipo
-  nomeArquivo   String             @map("nome_arquivo") @db.VarChar(255)
-  caminhoArquivo String            @map("caminho_arquivo") @db.Text
-  mimeType      String             @map("mime_type") @db.VarChar(120)
-  tamanhoBytes  Int                @map("tamanho_bytes")
+  id                  String                       @id @default(uuid())
+  tenantId            String                       @map("tenant_id")
+  medicoId            String                       @map("medico_id")
+  tipo                DocumentoPerfilTipo
+  nomeArquivo         String                       @map("nome_arquivo") @db.VarChar(255)
+  caminhoArquivo      String                       @map("caminho_arquivo") @db.Text
+  mimeType            String                       @map("mime_type") @db.VarChar(120)
+  tamanhoBytes        Int                          @map("tamanho_bytes")
   /// Data de validade do documento (quando o tipo exige controle de vencimento).
-  validadeEm    DateTime?          @map("validade_em") @db.Date
+  validadeEm          DateTime?                    @map("validade_em") @db.Date
   /// Revisão na Avaliação: Pendente / OK / Solicitado de novo.
-  statusRevisao StatusRevisaoDocumentoPerfil @default(PENDENTE) @map("status_revisao")
-  revisadoEm    DateTime?          @map("revisado_em")
-  revisadoPorMasterId String?      @map("revisado_por_master_id") @db.VarChar(36)
-  solicitacaoMensagem String?      @map("solicitacao_mensagem") @db.Text
-  solicitadoEm  DateTime?          @map("solicitado_em")
-  createdAt     DateTime           @default(now()) @map("created_at")
-  updatedAt     DateTime           @updatedAt @map("updated_at")
+  statusRevisao       StatusRevisaoDocumentoPerfil @default(PENDENTE) @map("status_revisao")
+  revisadoEm          DateTime?                    @map("revisado_em")
+  revisadoPorMasterId String?                      @map("revisado_por_master_id") @db.VarChar(36)
+  solicitacaoMensagem String?                      @map("solicitacao_mensagem") @db.Text
+  solicitadoEm        DateTime?                    @map("solicitado_em")
+  createdAt           DateTime                     @default(now()) @map("created_at")
+  updatedAt           DateTime                     @updatedAt @map("updated_at")
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   medico Medico @relation(fields: [medicoId], references: [id], onDelete: Cascade)
 
-  @@map("medico_documentos")
   @@unique([tenantId, medicoId, tipo])
   @@index([tenantId])
   @@index([medicoId])
   @@index([tipo])
   @@index([statusRevisao])
   @@index([tenantId, validadeEm])
+  @@map("medico_documentos")
 }
 
 model DocumentoEnviado {
-  id              String   @id @default(uuid())
-  tenantId        String   @map("tenant_id")
-  medicoId        String   @map("medico_id")
-  titulo          String?  @db.VarChar(255)
-  nomeArquivo     String   @map("nome_arquivo") @db.VarChar(255)
-  caminhoArquivo  String   @map("caminho_arquivo") @db.Text
-  mimeType        String   @map("mime_type") @db.VarChar(120)
-  tamanhoBytes    Int      @map("tamanho_bytes")
-  enviadoPorId    String?  @map("enviado_por_id") @db.VarChar(36)
+  id             String    @id @default(uuid())
+  tenantId       String    @map("tenant_id")
+  medicoId       String    @map("medico_id")
+  titulo         String?   @db.VarChar(255)
+  nomeArquivo    String    @map("nome_arquivo") @db.VarChar(255)
+  caminhoArquivo String    @map("caminho_arquivo") @db.Text
+  mimeType       String    @map("mime_type") @db.VarChar(120)
+  tamanhoBytes   Int       @map("tamanho_bytes")
+  enviadoPorId   String?   @map("enviado_por_id") @db.VarChar(36)
   /// Profissional registrou ciência / assinatura eletrónica do documento (POST dedicado).
-  aceitoEm        DateTime? @map("aceito_em")
-  createdAt       DateTime @default(now()) @map("created_at")
+  aceitoEm       DateTime? @map("aceito_em")
+  createdAt      DateTime  @default(now()) @map("created_at")
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   medico Medico @relation(fields: [medicoId], references: [id], onDelete: Cascade)
 
-  @@map("documentos_enviados")
   @@index([tenantId])
   @@index([medicoId])
+  @@map("documentos_enviados")
 }
 
 /// Vaga divulgada por um médico no tenant (módulo Vagas).
@@ -357,53 +382,53 @@ model Vaga {
   createdAt              DateTime @default(now()) @map("created_at")
   expiresAt              DateTime @map("expires_at")
 
-  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  medico Medico @relation(fields: [medicoPublicadorId], references: [id], onDelete: Cascade)
+  tenant     Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  medico     Medico          @relation(fields: [medicoPublicadorId], references: [id], onDelete: Cascade)
   interesses VagaInteresse[]
 
-  @@map("vagas")
   @@index([tenantId, expiresAt])
   @@index([medicoPublicadorId])
+  @@map("vagas")
 }
 
 /// Interesse de um médico em uma vaga (candidatura).
 model VagaInteresse {
-  id                  String              @id @default(uuid())
-  tenantId            String              @map("tenant_id")
-  vagaId              String              @map("vaga_id")
-  candidatoMedicoId   String              @map("candidato_medico_id")
-  status              StatusInteresseVaga @default(PENDENTE)
-  createdAt           DateTime            @default(now()) @map("created_at")
-  updatedAt           DateTime            @updatedAt @map("updated_at")
+  id                String              @id @default(uuid())
+  tenantId          String              @map("tenant_id")
+  vagaId            String              @map("vaga_id")
+  candidatoMedicoId String              @map("candidato_medico_id")
+  status            StatusInteresseVaga @default(PENDENTE)
+  createdAt         DateTime            @default(now()) @map("created_at")
+  updatedAt         DateTime            @updatedAt @map("updated_at")
 
   tenant    Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   vaga      Vaga   @relation(fields: [vagaId], references: [id], onDelete: Cascade)
   candidato Medico @relation("VagaInteresseCandidato", fields: [candidatoMedicoId], references: [id], onDelete: Cascade)
 
-  @@map("vaga_interesses")
   @@unique([vagaId, candidatoMedicoId])
   @@index([tenantId])
   @@index([vagaId])
   @@index([candidatoMedicoId])
   @@index([status])
+  @@map("vaga_interesses")
 }
 
 model AcessoModuloPerfil {
-  id        String       @id @default(uuid())
-  tenantId  String       @map("tenant_id")
+  id        String        @id @default(uuid())
+  tenantId  String        @map("tenant_id")
   perfil    UserRole
   modulo    ModuloSistema
-  permitido Boolean      @default(true)
-  createdAt DateTime     @default(now()) @map("created_at")
-  updatedAt DateTime     @updatedAt @map("updated_at")
+  permitido Boolean       @default(true)
+  createdAt DateTime      @default(now()) @map("created_at")
+  updatedAt DateTime      @updatedAt @map("updated_at")
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
-  @@map("acessos_modulos_perfil")
   @@unique([tenantId, perfil, modulo])
   @@index([tenantId])
   @@index([perfil])
   @@index([modulo])
+  @@map("acessos_modulos_perfil")
 }
 
 model PerfilAcesso {
@@ -415,13 +440,13 @@ model PerfilAcesso {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  tenant  Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  modulos PerfilAcessoModulo[]
+  tenant   Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  modulos  PerfilAcessoModulo[]
   usuarios UsuarioMaster[]
 
-  @@map("perfis_acesso")
   @@unique([tenantId, nome])
   @@index([tenantId])
+  @@map("perfis_acesso")
 }
 
 model PerfilAcessoModulo {
@@ -434,9 +459,9 @@ model PerfilAcessoModulo {
 
   perfil PerfilAcesso @relation(fields: [perfilAcessoId], references: [id], onDelete: Cascade)
 
-  @@map("perfis_acesso_modulos")
   @@unique([perfilAcessoId, modulo])
   @@index([perfilAcessoId])
+  @@map("perfis_acesso_modulos")
 }
 
 model Escala {
@@ -451,21 +476,21 @@ model Escala {
   createdAt       DateTime @default(now()) @map("created_at")
   updatedAt       DateTime @updatedAt @map("updated_at")
 
-  tenant         Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  contratoAtivo  ContratoAtivo  @relation(fields: [contratoAtivoId], references: [id], onDelete: Cascade)
-  alocacoes      EscalaMedico[]
-  plantoes       EscalaPlantao[]
-  registrosPonto RegistroPonto[]
-  escalaSubgrupos EscalaSubgrupo[]
-  escalaEquipes   EscalaEquipe[]
+  tenant                      Tenant                       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  contratoAtivo               ContratoAtivo                @relation(fields: [contratoAtivoId], references: [id], onDelete: Cascade)
+  alocacoes                   EscalaMedico[]
+  plantoes                    EscalaPlantao[]
+  registrosPonto              RegistroPonto[]
+  escalaSubgrupos             EscalaSubgrupo[]
+  escalaEquipes               EscalaEquipe[]
   justificativasAusenciaPonto JustificativaAusenciaPonto[]
 
-  @@map("escalas")
   @@index([tenantId])
   @@index([contratoAtivoId])
   @@index([ativo])
   @@index([dataInicio])
   @@index([tenantId, ativo, dataInicio])
+  @@map("escalas")
 }
 
 model Subgrupo {
@@ -481,17 +506,17 @@ model Subgrupo {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  tenant                 Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  subgrupoMedicos        SubgrupoMedico[]
-  escalaSubgrupos        EscalaSubgrupo[]
-  equipes                Equipe[]
-  valoresPlantao         ValorPlantao[]
-  configPontoEletronico  ConfigPontoEletronico[]
-  contratoSubgrupos      ContratoSubgrupo[]
+  tenant                Tenant                  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  subgrupoMedicos       SubgrupoMedico[]
+  escalaSubgrupos       EscalaSubgrupo[]
+  equipes               Equipe[]
+  valoresPlantao        ValorPlantao[]
+  configPontoEletronico ConfigPontoEletronico[]
+  contratoSubgrupos     ContratoSubgrupo[]
 
-  @@map("subgrupos")
   @@unique([tenantId, nome])
   @@index([tenantId])
+  @@map("subgrupos")
 }
 
 model Equipe {
@@ -504,54 +529,54 @@ model Equipe {
   createdAt  DateTime @default(now()) @map("created_at")
   updatedAt  DateTime @updatedAt @map("updated_at")
 
-  tenant                 Tenant                  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  subgrupo               Subgrupo?               @relation(fields: [subgrupoId], references: [id], onDelete: SetNull)
-  equipeMedicos          EquipeMedico[]
-  escalaEquipes          EscalaEquipe[]
-  configPontoEletronico  ConfigPontoEletronico[]
-  contratoEquipes        ContratoEquipe[]
-  valoresPlantao         ValorPlantao[]
+  tenant                Tenant                  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  subgrupo              Subgrupo?               @relation(fields: [subgrupoId], references: [id], onDelete: SetNull)
+  equipeMedicos         EquipeMedico[]
+  escalaEquipes         EscalaEquipe[]
+  configPontoEletronico ConfigPontoEletronico[]
+  contratoEquipes       ContratoEquipe[]
+  valoresPlantao        ValorPlantao[]
 
-  @@map("equipes")
   @@unique([tenantId, subgrupoId, nome])
   @@index([tenantId])
   @@index([subgrupoId])
+  @@map("equipes")
 }
 
 model ContratoSubgrupo {
-  id               String   @id @default(uuid())
-  tenantId         String   @map("tenant_id")
-  contratoAtivoId  String   @map("contrato_ativo_id")
-  subgrupoId       String   @map("subgrupo_id")
-  createdAt        DateTime @default(now()) @map("created_at")
+  id              String   @id @default(uuid())
+  tenantId        String   @map("tenant_id")
+  contratoAtivoId String   @map("contrato_ativo_id")
+  subgrupoId      String   @map("subgrupo_id")
+  createdAt       DateTime @default(now()) @map("created_at")
 
   tenant        Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  contratoAtivo ContratoAtivo  @relation(fields: [contratoAtivoId], references: [id], onDelete: Cascade)
-  subgrupo      Subgrupo       @relation(fields: [subgrupoId], references: [id], onDelete: Cascade)
+  contratoAtivo ContratoAtivo @relation(fields: [contratoAtivoId], references: [id], onDelete: Cascade)
+  subgrupo      Subgrupo      @relation(fields: [subgrupoId], references: [id], onDelete: Cascade)
 
-  @@map("contrato_subgrupos")
   @@unique([tenantId, contratoAtivoId, subgrupoId])
   @@index([tenantId])
   @@index([contratoAtivoId])
   @@index([subgrupoId])
+  @@map("contrato_subgrupos")
 }
 
 model ContratoEquipe {
-  id               String   @id @default(uuid())
-  tenantId         String   @map("tenant_id")
-  contratoAtivoId  String   @map("contrato_ativo_id")
-  equipeId         String   @map("equipe_id")
-  createdAt        DateTime @default(now()) @map("created_at")
+  id              String   @id @default(uuid())
+  tenantId        String   @map("tenant_id")
+  contratoAtivoId String   @map("contrato_ativo_id")
+  equipeId        String   @map("equipe_id")
+  createdAt       DateTime @default(now()) @map("created_at")
 
   tenant        Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  contratoAtivo ContratoAtivo  @relation(fields: [contratoAtivoId], references: [id], onDelete: Cascade)
+  contratoAtivo ContratoAtivo @relation(fields: [contratoAtivoId], references: [id], onDelete: Cascade)
   equipe        Equipe        @relation(fields: [equipeId], references: [id], onDelete: Cascade)
 
-  @@map("contrato_equipes")
   @@unique([tenantId, contratoAtivoId, equipeId])
   @@index([tenantId])
   @@index([contratoAtivoId])
   @@index([equipeId])
+  @@map("contrato_equipes")
 }
 
 model SubgrupoMedico {
@@ -565,11 +590,11 @@ model SubgrupoMedico {
   subgrupo Subgrupo @relation(fields: [subgrupoId], references: [id], onDelete: Cascade)
   medico   Medico   @relation(fields: [medicoId], references: [id], onDelete: Cascade)
 
-  @@map("subgrupo_medicos")
   @@unique([tenantId, subgrupoId, medicoId])
   @@index([tenantId])
   @@index([subgrupoId])
   @@index([medicoId])
+  @@map("subgrupo_medicos")
 }
 
 model EquipeMedico {
@@ -583,12 +608,12 @@ model EquipeMedico {
   equipe Equipe @relation(fields: [equipeId], references: [id], onDelete: Cascade)
   medico Medico @relation(fields: [medicoId], references: [id], onDelete: Cascade)
 
-  @@map("equipe_medicos")
   @@unique([tenantId, equipeId, medicoId])
   @@index([tenantId])
   @@index([equipeId])
   @@index([medicoId])
   @@index([tenantId, medicoId])
+  @@map("equipe_medicos")
 }
 
 model EscalaSubgrupo {
@@ -602,11 +627,11 @@ model EscalaSubgrupo {
   escala   Escala   @relation(fields: [escalaId], references: [id], onDelete: Cascade)
   subgrupo Subgrupo @relation(fields: [subgrupoId], references: [id], onDelete: Cascade)
 
-  @@map("escala_subgrupos")
   @@unique([tenantId, escalaId, subgrupoId])
   @@index([tenantId])
   @@index([escalaId])
   @@index([subgrupoId])
+  @@map("escala_subgrupos")
 }
 
 model EscalaEquipe {
@@ -620,12 +645,12 @@ model EscalaEquipe {
   escala Escala @relation(fields: [escalaId], references: [id], onDelete: Cascade)
   equipe Equipe @relation(fields: [equipeId], references: [id], onDelete: Cascade)
 
-  @@map("escala_equipes")
   @@unique([tenantId, escalaId, equipeId])
   @@index([tenantId])
   @@index([escalaId])
   @@index([equipeId])
   @@index([tenantId, escalaId])
+  @@map("escala_equipes")
 }
 
 model EscalaMedico {
@@ -643,35 +668,34 @@ model EscalaMedico {
   escala Escala @relation(fields: [escalaId], references: [id], onDelete: Cascade)
   medico Medico @relation(fields: [medicoId], references: [id], onDelete: Cascade)
 
-  @@map("escala_medicos")
   @@unique([tenantId, escalaId, medicoId])
   @@index([tenantId])
   @@index([escalaId])
   @@index([medicoId])
   @@index([tenantId, medicoId, ativo])
+  @@map("escala_medicos")
 }
 
 model EscalaPlantao {
-  id         String   @id @default(uuid())
-  tenantId   String   @map("tenant_id")
-  escalaId   String   @map("escala_id")
-  data       DateTime @db.Date
-  gradeId    String   @map("grade_id") @db.VarChar(36)
-  medicoId   String   @map("medico_id")
-  valorHora  Decimal? @map("valor_hora") @db.Decimal(10, 2)
+  id                 String   @id @default(uuid())
+  tenantId           String   @map("tenant_id")
+  escalaId           String   @map("escala_id")
+  data               DateTime @db.Date
+  gradeId            String   @map("grade_id") @db.VarChar(36)
+  medicoId           String   @map("medico_id")
+  valorHora          Decimal? @map("valor_hora") @db.Decimal(10, 2)
   /// Duração prevista do turno (h) congelada ao criar/editar o slot — relatório não recalcula com tipo alterado depois.
   horasTurnoSnapshot Decimal? @map("horas_turno_snapshot") @db.Decimal(10, 4)
-  createdAt  DateTime @default(now()) @map("created_at")
-  updatedAt  DateTime @updatedAt @map("updated_at")
+  createdAt          DateTime @default(now()) @map("created_at")
+  updatedAt          DateTime @updatedAt @map("updated_at")
 
-  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  escala Escala @relation(fields: [escalaId], references: [id], onDelete: Cascade)
-  medico Medico @relation(fields: [medicoId], references: [id], onDelete: Cascade)
-  solicitacoesTrocaPrincipal     SolicitacaoTrocaPlantao[] @relation("TrocaPlantaoPrincipal")
-  solicitacoesTrocaContrapartida SolicitacaoTrocaPlantao[] @relation("TrocaPlantaoContrapartida")
+  tenant                         Tenant                       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  escala                         Escala                       @relation(fields: [escalaId], references: [id], onDelete: Cascade)
+  medico                         Medico                       @relation(fields: [medicoId], references: [id], onDelete: Cascade)
+  solicitacoesTrocaPrincipal     SolicitacaoTrocaPlantao[]    @relation("TrocaPlantaoPrincipal")
+  solicitacoesTrocaContrapartida SolicitacaoTrocaPlantao[]    @relation("TrocaPlantaoContrapartida")
   justificativasAusenciaPonto    JustificativaAusenciaPonto[]
 
-  @@map("escala_plantoes")
   /// Vários médicos podem compartilhar o mesmo dia/turno (cada um com seu registro).
   @@unique([escalaId, data, gradeId, medicoId])
   @@index([tenantId])
@@ -680,57 +704,58 @@ model EscalaPlantao {
   @@index([data])
   @@index([tenantId, medicoId, data])
   @@index([escalaId, data])
+  @@map("escala_plantoes")
 }
 
 model JustificativaAusenciaPonto {
-  id                     String                           @id @default(uuid())
-  tenantId               String                           @map("tenant_id")
-  medicoId               String                           @map("medico_id")
-  escalaId               String                           @map("escala_id")
-  escalaPlantaoId        String                           @map("escala_plantao_id")
-  horarioOficialInicio   DateTime                         @map("horario_oficial_inicio")
-  horarioOficialFim      DateTime                         @map("horario_oficial_fim")
-  horarioAlegadoEntrada  DateTime                         @map("horario_alegado_entrada")
-  horarioAlegadoSaida    DateTime                         @map("horario_alegado_saida")
-  motivo                 String                           @db.Text
-  status                 StatusJustificativaAusenciaPonto @default(PENDENTE)
-  comentarioMaster       String?                          @map("comentario_master") @db.Text
-  decididoPorMasterId    String?                          @map("decidido_por_master_id")
-  decididoEm             DateTime?                        @map("decidido_em")
-  registroPontoId        String?                          @map("registro_ponto_id")
-  createdAt              DateTime                         @default(now()) @map("created_at")
-  updatedAt              DateTime                         @updatedAt @map("updated_at")
+  id                    String                           @id @default(uuid())
+  tenantId              String                           @map("tenant_id")
+  medicoId              String                           @map("medico_id")
+  escalaId              String                           @map("escala_id")
+  escalaPlantaoId       String                           @map("escala_plantao_id")
+  horarioOficialInicio  DateTime                         @map("horario_oficial_inicio")
+  horarioOficialFim     DateTime                         @map("horario_oficial_fim")
+  horarioAlegadoEntrada DateTime                         @map("horario_alegado_entrada")
+  horarioAlegadoSaida   DateTime                         @map("horario_alegado_saida")
+  motivo                String                           @db.Text
+  status                StatusJustificativaAusenciaPonto @default(PENDENTE)
+  comentarioMaster      String?                          @map("comentario_master") @db.Text
+  decididoPorMasterId   String?                          @map("decidido_por_master_id")
+  decididoEm            DateTime?                        @map("decidido_em")
+  registroPontoId       String?                          @map("registro_ponto_id")
+  createdAt             DateTime                         @default(now()) @map("created_at")
+  updatedAt             DateTime                         @updatedAt @map("updated_at")
 
-  tenant        Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  medico        Medico          @relation(fields: [medicoId], references: [id], onDelete: Cascade)
-  escala        Escala          @relation(fields: [escalaId], references: [id], onDelete: Cascade)
-  escalaPlantao EscalaPlantao   @relation(fields: [escalaPlantaoId], references: [id], onDelete: Cascade)
-  decididoPor   UsuarioMaster?  @relation("justificativa_ausencia_decidido_por", fields: [decididoPorMasterId], references: [id], onDelete: SetNull)
-  registroPonto RegistroPonto?  @relation(fields: [registroPontoId], references: [id], onDelete: SetNull)
+  tenant        Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  medico        Medico         @relation(fields: [medicoId], references: [id], onDelete: Cascade)
+  escala        Escala         @relation(fields: [escalaId], references: [id], onDelete: Cascade)
+  escalaPlantao EscalaPlantao  @relation(fields: [escalaPlantaoId], references: [id], onDelete: Cascade)
+  decididoPor   UsuarioMaster? @relation("justificativa_ausencia_decidido_por", fields: [decididoPorMasterId], references: [id], onDelete: SetNull)
+  registroPonto RegistroPonto? @relation(fields: [registroPontoId], references: [id], onDelete: SetNull)
 
-  @@map("justificativas_ausencia_ponto")
+  @@unique([registroPontoId])
   @@index([tenantId, status])
   @@index([tenantId, medicoId])
   @@index([escalaPlantaoId])
-  @@unique([registroPontoId])
+  @@map("justificativas_ausencia_ponto")
 }
 
 // Registro de pedido: PERMUTA (troca bilateral) ou CEDER (cede o plantão ao aceitante, sem contrapartida).
 // medicoDestinoId e contrapartidaPlantaoId nulos = pedido aberto à equipe.
 model SolicitacaoTrocaPlantao {
-  id                       String   @id @default(uuid())
-  tenantId                 String   @map("tenant_id")
-  escalaPlantaoId          String   @map("escala_plantao_id")
+  id                     String    @id @default(uuid())
+  tenantId               String    @map("tenant_id")
+  escalaPlantaoId        String    @map("escala_plantao_id")
   /// Plantão do colega que o solicitante assume em troca (mesma escala). Só em PERMUTA.
-  contrapartidaPlantaoId   String?  @map("contrapartida_plantao_id")
-  medicoSolicitanteId      String   @map("medico_solicitante_id")
+  contrapartidaPlantaoId String?   @map("contrapartida_plantao_id")
+  medicoSolicitanteId    String    @map("medico_solicitante_id")
   /// Null = aberto a colegas da mesma equipe na escala; preenchido ao aceitar ou em pedido direto.
-  medicoDestinoId          String?  @map("medico_destino_id")
+  medicoDestinoId        String?   @map("medico_destino_id")
   /// PERMUTA | CEDER
-  tipoSolicitacao          String   @default("PERMUTA") @map("tipo_solicitacao") @db.VarChar(20)
-  status                   String   @default("PENDENTE") @db.VarChar(20)
-  respondidaEm             DateTime? @map("respondida_em")
-  createdAt                DateTime @default(now()) @map("created_at")
+  tipoSolicitacao        String    @default("PERMUTA") @map("tipo_solicitacao") @db.VarChar(20)
+  status                 String    @default("PENDENTE") @db.VarChar(20)
+  respondidaEm           DateTime? @map("respondida_em")
+  createdAt              DateTime  @default(now()) @map("created_at")
 
   tenant               Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   plantao              EscalaPlantao  @relation("TrocaPlantaoPrincipal", fields: [escalaPlantaoId], references: [id], onDelete: Cascade)
@@ -738,61 +763,61 @@ model SolicitacaoTrocaPlantao {
   solicitante          Medico         @relation("SolicitacaoTrocaSolicitante", fields: [medicoSolicitanteId], references: [id], onDelete: Cascade)
   destino              Medico?        @relation("SolicitacaoTrocaDestino", fields: [medicoDestinoId], references: [id], onDelete: Cascade)
 
-  @@map("solicitacoes_troca_plantao")
   @@index([tenantId, medicoSolicitanteId])
   @@index([tenantId, medicoDestinoId, status])
   @@index([escalaPlantaoId])
   @@index([contrapartidaPlantaoId])
+  @@map("solicitacoes_troca_plantao")
 }
 
 model TipoPlantao {
-  id               String   @id @default(uuid())
-  tenantId         String   @map("tenant_id")
-  contratoAtivoId  String   @map("contrato_ativo_id")
-  nome             String   @db.VarChar(120)
-  horaInicio       String   @map("hora_inicio") @db.VarChar(5)
-  horaFim          String   @map("hora_fim") @db.VarChar(5)
-  cruzaMeiaNoite   Boolean  @default(false) @map("cruza_meia_noite")
-  ordem            Int      @default(0)
-  createdAt        DateTime @default(now()) @map("created_at")
-  updatedAt        DateTime @updatedAt @map("updated_at")
+  id              String   @id @default(uuid())
+  tenantId        String   @map("tenant_id")
+  contratoAtivoId String   @map("contrato_ativo_id")
+  nome            String   @db.VarChar(120)
+  horaInicio      String   @map("hora_inicio") @db.VarChar(5)
+  horaFim         String   @map("hora_fim") @db.VarChar(5)
+  cruzaMeiaNoite  Boolean  @default(false) @map("cruza_meia_noite")
+  ordem           Int      @default(0)
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
 
   tenant        Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   contratoAtivo ContratoAtivo @relation(fields: [contratoAtivoId], references: [id], onDelete: Cascade)
 
-  @@map("tipos_plantao")
   @@index([tenantId, contratoAtivoId])
+  @@map("tipos_plantao")
 }
 
 model ValorPlantao {
-  id               String   @id @default(uuid())
-  tenantId         String   @map("tenant_id")
-  contratoAtivoId  String   @map("contrato_ativo_id")
-  subgrupoId       String   @map("subgrupo_id")
+  id                      String   @id @default(uuid())
+  tenantId                String   @map("tenant_id")
+  contratoAtivoId         String   @map("contrato_ativo_id")
+  subgrupoId              String   @map("subgrupo_id")
   /// Quando null, valor padrão do subgrupo (legado). Quando preenchido, valor específico da equipe.
-  equipeId         String?  @map("equipe_id")
-  gradeId          String   @map("grade_id") @db.VarChar(36)
-  valorHora        Decimal? @map("valor_hora") @db.Decimal(10, 2)
+  equipeId                String?  @map("equipe_id")
+  gradeId                 String   @map("grade_id") @db.VarChar(36)
+  valorHora               Decimal? @map("valor_hora") @db.Decimal(10, 2)
   /// Cobrança (R$/h) do tipo, quando aplicável (repasse ao profissional usa valorHora).
-  valorHoraCobranca Decimal? @map("valor_hora_cobranca") @db.Decimal(10, 2)
+  valorHoraCobranca       Decimal? @map("valor_hora_cobranca") @db.Decimal(10, 2)
   /// Valores por dia da semana (seg-dom) para repasse (R$/h). Dias ausentes → fallback em valorHora.
-  valorHoraPorDia   Json?    @map("valor_hora_por_dia")
+  valorHoraPorDia         Json?    @map("valor_hora_por_dia")
   /// Valores por dia da semana (seg-dom) para cobrança (R$/h). Dias ausentes → fallback em valorHoraCobranca.
-  valorHoraCobrancaPorDia Json? @map("valor_hora_cobranca_por_dia")
-  createdAt        DateTime @default(now()) @map("created_at")
-  updatedAt        DateTime @updatedAt @map("updated_at")
+  valorHoraCobrancaPorDia Json?    @map("valor_hora_cobranca_por_dia")
+  createdAt               DateTime @default(now()) @map("created_at")
+  updatedAt               DateTime @updatedAt @map("updated_at")
 
   tenant        Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   contratoAtivo ContratoAtivo @relation(fields: [contratoAtivoId], references: [id], onDelete: Cascade)
   subgrupo      Subgrupo      @relation(fields: [subgrupoId], references: [id], onDelete: Cascade)
   equipe        Equipe?       @relation(fields: [equipeId], references: [id], onDelete: Cascade)
 
-  @@map("valores_plantao")
   @@index([tenantId])
   @@index([contratoAtivoId])
   @@index([subgrupoId])
   @@index([equipeId])
   @@index([tenantId, contratoAtivoId, subgrupoId, gradeId, equipeId])
+  @@map("valores_plantao")
 }
 
 model AdicionalPlantaoData {
@@ -808,77 +833,104 @@ model AdicionalPlantaoData {
   tenant        Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   contratoAtivo ContratoAtivo @relation(fields: [contratoAtivoId], references: [id], onDelete: Cascade)
 
-  @@map("adicionais_plantao_data")
   @@unique([tenantId, contratoAtivoId, data, gradeId])
   @@index([tenantId])
   @@index([contratoAtivoId])
   @@index([data])
+  @@map("adicionais_plantao_data")
 }
 
 model ConfigPontoEletronico {
-  id                String   @id @default(uuid())
-  tenantId          String   @map("tenant_id")
-  contratoAtivoId   String   @map("contrato_ativo_id")
-  subgrupoId        String   @map("subgrupo_id")
-  equipeId          String?  @map("equipe_id")
-  horasPrevistasMes Int?     @map("horas_previstas_mes")
-  valorHora         Decimal? @map("valor_hora") @db.Decimal(10, 2)
+  id                      String   @id @default(uuid())
+  tenantId                String   @map("tenant_id")
+  contratoAtivoId         String   @map("contrato_ativo_id")
+  subgrupoId              String   @map("subgrupo_id")
+  equipeId                String?  @map("equipe_id")
+  horasPrevistasMes       Int?     @map("horas_previstas_mes")
+  valorHora               Decimal? @map("valor_hora") @db.Decimal(10, 2)
   // valor/hora cobrança (só ponto); repasse ao profissional em valorHora
-  valorHoraCobranca Decimal? @map("valor_hora_cobranca") @db.Decimal(10, 2)
+  valorHoraCobranca       Decimal? @map("valor_hora_cobranca") @db.Decimal(10, 2)
   /// Valores por dia da semana (seg-dom) para ponto sem escala. Dias ausentes → fallback em valorHora/valorHoraCobranca.
-  valorHoraPorDia   Json?    @map("valor_hora_por_dia")
-  valorHoraCobrancaPorDia Json? @map("valor_hora_cobranca_por_dia")
-  horarioEntrada    String?   @map("horario_entrada") @db.VarChar(5)
-  horarioSaida      String?   @map("horario_saida") @db.VarChar(5)
-  toleranciaMinutos Int?      @map("tolerancia_minutos")
-  latitude          Decimal?  @map("latitude") @db.Decimal(10, 7)
-  longitude         Decimal?  @map("longitude") @db.Decimal(10, 7)
-  raioMetros        Int?      @map("raio_metros")
-  enderecoPonto     String?   @map("endereco_ponto") @db.VarChar(500)
-  createdAt         DateTime  @default(now()) @map("created_at")
-  updatedAt         DateTime  @updatedAt @map("updated_at")
+  valorHoraPorDia         Json?    @map("valor_hora_por_dia")
+  valorHoraCobrancaPorDia Json?    @map("valor_hora_cobranca_por_dia")
+  horarioEntrada          String?  @map("horario_entrada") @db.VarChar(5)
+  horarioSaida            String?  @map("horario_saida") @db.VarChar(5)
+  toleranciaMinutos       Int?     @map("tolerancia_minutos")
+  latitude                Decimal? @map("latitude") @db.Decimal(10, 7)
+  longitude               Decimal? @map("longitude") @db.Decimal(10, 7)
+  raioMetros              Int?     @map("raio_metros")
+  enderecoPonto           String?  @map("endereco_ponto") @db.VarChar(500)
+  createdAt               DateTime @default(now()) @map("created_at")
+  updatedAt               DateTime @updatedAt @map("updated_at")
 
   tenant        Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   contratoAtivo ContratoAtivo @relation(fields: [contratoAtivoId], references: [id], onDelete: Cascade)
   subgrupo      Subgrupo      @relation(fields: [subgrupoId], references: [id], onDelete: Cascade)
   equipe        Equipe?       @relation(fields: [equipeId], references: [id], onDelete: Cascade)
 
-  @@map("config_ponto_eletronico")
   @@unique([tenantId, contratoAtivoId, subgrupoId, equipeId])
   @@index([tenantId])
   @@index([contratoAtivoId])
   @@index([subgrupoId])
   @@index([equipeId])
   @@index([tenantId, equipeId])
+  @@map("config_ponto_eletronico")
 }
 
 model RegistroPonto {
-  id             String              @id @default(uuid())
-  tenantId       String              @map("tenant_id")
-  escalaId       String?             @map("escala_id")
-  medicoId       String              @map("medico_id")
-  checkInAt      DateTime            @map("checkin_at")
-  checkOutAt     DateTime?           @map("checkout_at")
-  origem         OrigemRegistroPonto @default(APP_MEDICO)
-  observacao     String?             @db.Text
-  duracaoMinutos Int?                @map("duracao_minutos")
+  id                       String              @id @default(uuid())
+  tenantId                 String              @map("tenant_id")
+  escalaId                 String?             @map("escala_id")
+  medicoId                 String              @map("medico_id")
+  checkInAt                DateTime            @map("checkin_at")
+  checkOutAt               DateTime?           @map("checkout_at")
+  origem                   OrigemRegistroPonto @default(APP_MEDICO)
+  observacao               String?             @db.Text
+  duracaoMinutos           Int?                @map("duracao_minutos")
   /// Valor de repasse (escala+ponto proporcional) congelado no checkout; relatório usa isto em vez de recalcular com tipos/valores atuais.
-  repasseValorCongelado Decimal?     @map("repasse_valor_congelado") @db.Decimal(12, 2)
+  repasseValorCongelado    Decimal?            @map("repasse_valor_congelado") @db.Decimal(12, 2)
   /// True quando o check-in ocorreu após o horário de início + tolerância configurada.
-  checkInAtrasado Boolean            @default(false) @map("checkin_atrasado")
+  checkInAtrasado          Boolean             @default(false) @map("checkin_atrasado")
   /// Minutos que excederam a tolerância no momento do check-in.
-  minutosAtrasoCheckin Int?          @map("minutos_atraso_checkin")
-  fotoCheckinCaminho String?         @map("foto_checkin_caminho") @db.VarChar(512)
-  motivoCheckinSemFoto String?      @map("motivo_checkin_sem_foto") @db.VarChar(500)
-  createdAt      DateTime            @default(now()) @map("created_at")
-  updatedAt      DateTime            @updatedAt @map("updated_at")
+  minutosAtrasoCheckin     Int?                @map("minutos_atraso_checkin")
+  fotoCheckinCaminho       String?             @map("foto_checkin_caminho") @db.VarChar(512)
+  motivoCheckinSemFoto     String?             @map("motivo_checkin_sem_foto") @db.VarChar(500)
+  fotoCheckoutCaminho      String?             @map("foto_checkout_caminho") @db.VarChar(512)
+  motivoCheckoutSemFoto    String?             @map("motivo_checkout_sem_foto") @db.VarChar(500)
+  faceStatus               FaceStatusPonto?    @map("face_status")
+  faceSimilaridade         Decimal?            @map("face_similaridade") @db.Decimal(5, 4)
+  faceLiveness             Decimal?            @map("face_liveness") @db.Decimal(5, 4)
+  faceVerificadoEm         DateTime?           @map("face_verificado_em")
+  faceCheckoutStatus       FaceStatusPonto?    @map("face_checkout_status")
+  faceCheckoutSimilaridade Decimal?            @map("face_checkout_similaridade") @db.Decimal(5, 4)
+  faceCheckoutLiveness     Decimal?            @map("face_checkout_liveness") @db.Decimal(5, 4)
+  faceCheckoutVerificadoEm DateTime?           @map("face_checkout_verificado_em")
+  faceBiometriaId          String?             @map("face_biometria_id")
+  faceRevisao              RevisaoFacePonto?   @map("face_revisao")
+  faceRevisaoPorId         String?             @map("face_revisao_por_id")
+  faceRevisaoEm            DateTime?           @map("face_revisao_em")
+  faceRevisaoObs           String?             @map("face_revisao_obs") @db.VarChar(500)
+  /// Fotos de check-in/checkout apagadas pela retenção (status e scores permanecem).
+  fotoExpurgadaEm          DateTime?           @map("foto_expurgada_em")
+  /// Ponto capturado sem internet e enviado depois (horários = captura no aparelho, corrigida pelo desvio do relógio).
+  offlineCheckin           Boolean             @default(false) @map("offline_checkin")
+  offlineCheckout          Boolean             @default(false) @map("offline_checkout")
+  checkinClientUuid        String?             @unique @map("checkin_client_uuid") @db.VarChar(36)
+  checkoutClientUuid       String?             @unique @map("checkout_client_uuid") @db.VarChar(36)
+  checkinSincronizadoEm    DateTime?           @map("checkin_sincronizado_em")
+  checkoutSincronizadoEm   DateTime?           @map("checkout_sincronizado_em")
+  /// Relógio do servidor − relógio do aparelho no envio (ms), pior caso entre entrada e saída.
+  offlineDesvioRelogioMs   Int?                @map("offline_desvio_relogio_ms")
+  /// Sincronizado com muito atraso ou relógio do aparelho muito desviado: vai para revisão do Master.
+  offlineRevisar           Boolean             @default(false) @map("offline_revisar")
+  createdAt                DateTime            @default(now()) @map("created_at")
+  updatedAt                DateTime            @updatedAt @map("updated_at")
 
-  tenant Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  escala Escala? @relation(fields: [escalaId], references: [id], onDelete: SetNull)
-  medico Medico  @relation(fields: [medicoId], references: [id], onDelete: Cascade)
+  tenant                Tenant                      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  escala                Escala?                     @relation(fields: [escalaId], references: [id], onDelete: SetNull)
+  medico                Medico                      @relation(fields: [medicoId], references: [id], onDelete: Cascade)
   justificativaAusencia JustificativaAusenciaPonto?
 
-  @@map("registros_ponto")
   @@index([tenantId])
   @@index([escalaId])
   @@index([medicoId])
@@ -886,6 +938,37 @@ model RegistroPonto {
   @@index([tenantId, medicoId, checkOutAt, checkInAt])
   /// Listagens por médico + intervalo de data (hoje / semana no ponto).
   @@index([tenantId, medicoId, checkInAt])
+  @@index([tenantId, faceStatus])
+  @@index([tenantId, faceCheckoutStatus])
+  @@map("registros_ponto")
+}
+
+model MedicoBiometriaFacial {
+  id                  String                @id @default(uuid())
+  tenantId            String                @map("tenant_id")
+  medicoId            String                @map("medico_id")
+  status              StatusBiometriaFacial @default(PENDENTE_APROVACAO)
+  fotoCaminho         String                @map("foto_caminho") @db.VarChar(512)
+  /// 512 floats L2-normalizados; só comparável com o mesmo `modelo`.
+  embedding           Float[]
+  modelo              String                @db.VarChar(60)
+  livenessScore       Decimal?              @map("liveness_score") @db.Decimal(5, 4)
+  qualidade           Json?
+  origem              String                @db.VarChar(30)
+  consentimentoEm     DateTime              @map("consentimento_em")
+  consentimentoVersao String                @map("consentimento_versao") @db.VarChar(20)
+  revisadoPorId       String?               @map("revisado_por_id")
+  revisadoEm          DateTime?             @map("revisado_em")
+  motivoRejeicao      String?               @map("motivo_rejeicao") @db.VarChar(500)
+  ativa               Boolean               @default(true)
+  createdAt           DateTime              @default(now()) @map("created_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  medico Medico @relation(fields: [medicoId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, medicoId, ativa])
+  @@index([tenantId, status])
+  @@map("medico_biometrias_faciais")
 }
 
 // Notificações in-app para o profissional (equipe, escala, etc.)
@@ -903,9 +986,9 @@ model NotificacaoMedico {
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   medico Medico @relation(fields: [medicoId], references: [id], onDelete: Cascade)
 
-  @@map("notificacoes_medico")
   @@index([tenantId, medicoId, createdAt])
   @@index([medicoId, lidaEm])
+  @@map("notificacoes_medico")
 }
 
 /// Tokens FCM para push no app Capacitor (iOS/Android).
@@ -921,10 +1004,10 @@ model DevicePushToken {
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   medico Medico @relation(fields: [medicoId], references: [id], onDelete: Cascade)
 
-  @@map("device_push_tokens")
   @@unique([token])
   @@index([tenantId, medicoId])
   @@index([medicoId])
+  @@map("device_push_tokens")
 }
 
 // Modelo de Sessão (Tokens JWT)
@@ -940,9 +1023,9 @@ model Sessao {
   // Relação
   medico Medico @relation(fields: [medicoId], references: [id], onDelete: Cascade)
 
-  @@map("sessoes")
   @@index([medicoId])
   @@index([expiresAt])
+  @@map("sessoes")
 }
 
 model SessaoMaster {
@@ -956,9 +1039,9 @@ model SessaoMaster {
 
   master UsuarioMaster @relation(fields: [masterId], references: [id], onDelete: Cascade)
 
-  @@map("sessoes_master")
   @@index([masterId])
   @@index([expiresAt])
+  @@map("sessoes_master")
 }
 
 // Modelo de Auditoria (Logs de ações)
@@ -969,18 +1052,18 @@ model Auditoria {
   acao      String   @db.VarChar(100) // Ex: "LOGIN", "LOGOUT", "ACESSO_DASHBOARD"
   ipAddress String?  @map("ip_address") @db.VarChar(45)
   userAgent String?  @map("user_agent") @db.Text
-  detalhes  Json?    // Dados adicionais em JSON
+  detalhes  Json? // Dados adicionais em JSON
   createdAt DateTime @default(now()) @map("created_at")
 
   // Relação
   medico Medico?        @relation(fields: [medicoId], references: [id], onDelete: SetNull)
   master UsuarioMaster? @relation("auditoria_master", fields: [masterId], references: [id], onDelete: SetNull)
 
-  @@map("auditoria")
   @@index([medicoId])
   @@index([masterId])
   @@index([acao])
   @@index([createdAt])
+  @@map("auditoria")
 }
 
 enum BlogPostStatus {
@@ -1029,9 +1112,9 @@ model BlogPost {
   createdAt      DateTime       @default(now()) @map("created_at")
   updatedAt      DateTime       @updatedAt @map("updated_at")
 
-  tenant     Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  category   BlogCategory  @relation(fields: [categoryId], references: [id], onDelete: Restrict)
-  autor      UsuarioMaster @relation(fields: [autorId], references: [id], onDelete: Restrict)
+  tenant      Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  category    BlogCategory  @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  autor       UsuarioMaster @relation(fields: [autorId], references: [id], onDelete: Restrict)
   comentarios BlogComment[]
 
   @@unique([tenantId, slug])
@@ -1041,18 +1124,18 @@ model BlogPost {
 }
 
 model BlogComment {
-  id              String            @id @default(uuid())
-  tenantId        String            @map("tenant_id")
-  postId          String            @map("post_id")
-  autorNome       String            @map("autor_nome") @db.VarChar(120)
-  autorEmail      String            @map("autor_email") @db.VarChar(255)
-  conteudo        String            @db.Text
-  status          BlogCommentStatus @default(PENDENTE)
-  respostaTexto   String?           @map("resposta_texto") @db.Text
-  respondidoPorId String?           @map("respondido_por_id")
-  respondidoEm    DateTime?         @map("respondido_em")
-  consentimentoLgpd Boolean         @default(false) @map("consentimento_lgpd")
-  createdAt       DateTime          @default(now()) @map("created_at")
+  id                String            @id @default(uuid())
+  tenantId          String            @map("tenant_id")
+  postId            String            @map("post_id")
+  autorNome         String            @map("autor_nome") @db.VarChar(120)
+  autorEmail        String            @map("autor_email") @db.VarChar(255)
+  conteudo          String            @db.Text
+  status            BlogCommentStatus @default(PENDENTE)
+  respostaTexto     String?           @map("resposta_texto") @db.Text
+  respondidoPorId   String?           @map("respondido_por_id")
+  respondidoEm      DateTime?         @map("respondido_em")
+  consentimentoLgpd Boolean           @default(false) @map("consentimento_lgpd")
+  createdAt         DateTime          @default(now()) @map("created_at")
 
   tenant        Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   post          BlogPost       @relation(fields: [postId], references: [id], onDelete: Cascade)
@@ -1077,8 +1160,8 @@ model EmailMensagem {
   createdAt         DateTime            @default(now()) @map("created_at")
   updatedAt         DateTime            @updatedAt @map("updated_at")
 
-  tenant          Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  criadoPorMaster UsuarioMaster?  @relation("email_mensagem_criador", fields: [criadoPorMasterId], references: [id], onDelete: SetNull)
+  tenant          Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  criadoPorMaster UsuarioMaster? @relation("email_mensagem_criador", fields: [criadoPorMasterId], references: [id], onDelete: SetNull)
 
   @@index([tenantId, createdAt(sort: Desc)])
   @@index([tenantId, status])
@@ -1145,29 +1228,29 @@ model ConteudoPalestrante {
 }
 
 model ConteudoEvento {
-  id                 String               @id @default(uuid())
-  tenantId           String               @map("tenant_id")
-  titulo             String               @db.VarChar(255)
-  capaUrl            String?              @map("capa_url") @db.VarChar(500)
-  youtubeUrl         String?              @map("youtube_url") @db.VarChar(500)
-  youtubeVideoId     String?              @map("youtube_video_id") @db.VarChar(32)
-  descricao          String?              @db.Text
-  iniciaEm           DateTime             @map("inicia_em")
-  status             ConteudoEventoStatus @default(RASCUNHO)
-  palestranteId      String?              @map("palestrante_id")
-  tokenPalestrante   String               @unique @map("token_palestrante") @db.VarChar(64)
-  tokenInscricao     String               @unique @map("token_inscricao") @db.VarChar(64)
-  tokenFrequencia    String               @unique @map("token_frequencia") @db.VarChar(64)
-  frequenciaAberta   Boolean              @default(false) @map("frequencia_aberta")
-  frequenciaAbertaEm DateTime?            @map("frequencia_aberta_em")
-  frequenciaFechadaEm DateTime?           @map("frequencia_fechada_em")
+  id                  String               @id @default(uuid())
+  tenantId            String               @map("tenant_id")
+  titulo              String               @db.VarChar(255)
+  capaUrl             String?              @map("capa_url") @db.VarChar(500)
+  youtubeUrl          String?              @map("youtube_url") @db.VarChar(500)
+  youtubeVideoId      String?              @map("youtube_video_id") @db.VarChar(32)
+  descricao           String?              @db.Text
+  iniciaEm            DateTime             @map("inicia_em")
+  status              ConteudoEventoStatus @default(RASCUNHO)
+  palestranteId       String?              @map("palestrante_id")
+  tokenPalestrante    String               @unique @map("token_palestrante") @db.VarChar(64)
+  tokenInscricao      String               @unique @map("token_inscricao") @db.VarChar(64)
+  tokenFrequencia     String               @unique @map("token_frequencia") @db.VarChar(64)
+  frequenciaAberta    Boolean              @default(false) @map("frequencia_aberta")
+  frequenciaAbertaEm  DateTime?            @map("frequencia_aberta_em")
+  frequenciaFechadaEm DateTime?            @map("frequencia_fechada_em")
   /// Exige preenchimento da avaliação de aula ao confirmar presença.
-  avaliacaoAtiva     Boolean              @default(false) @map("avaliacao_ativa")
+  avaliacaoAtiva      Boolean              @default(false) @map("avaliacao_ativa")
   /// JSON: { titulo, meta, perguntas[] } — ver conteudo-avaliacao.const.ts
-  avaliacaoFormulario Json?               @map("avaliacao_formulario")
-  criadoPorMasterId  String?              @map("criado_por_master_id")
-  createdAt          DateTime             @default(now()) @map("created_at")
-  updatedAt          DateTime             @updatedAt @map("updated_at")
+  avaliacaoFormulario Json?                @map("avaliacao_formulario")
+  criadoPorMasterId   String?              @map("criado_por_master_id")
+  createdAt           DateTime             @default(now()) @map("created_at")
+  updatedAt           DateTime             @updatedAt @map("updated_at")
 
   tenant          Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   palestrante     ConteudoPalestrante?   @relation(fields: [palestranteId], references: [id], onDelete: SetNull)
@@ -1180,38 +1263,38 @@ model ConteudoEvento {
 }
 
 model ConteudoParticipante {
-  id                     String                     @id @default(uuid())
-  tenantId               String                     @map("tenant_id")
-  eventoId               String                     @map("evento_id")
-  origem                 ConteudoParticipanteOrigem
+  id                           String                     @id @default(uuid())
+  tenantId                     String                     @map("tenant_id")
+  eventoId                     String                     @map("evento_id")
+  origem                       ConteudoParticipanteOrigem
   /// Perfil do inscrito externo (ou médico do app).
-  perfil                 ConteudoParticipantePerfil @default(MEDICO)
-  medicoId               String?                    @map("medico_id")
-  nome                   String                     @db.VarChar(255)
-  email                  String                     @db.VarChar(255)
-  telefone               String?                    @db.VarChar(30)
-  cpf                    String?                    @db.VarChar(14)
-  crm                    String?                    @db.VarChar(60)
-  especialidade          String?                    @db.VarChar(120)
-  cidade                 String?                    @db.VarChar(120)
-  faculdade              String?                    @db.VarChar(255)
-  semestre               String?                    @db.VarChar(40)
-  participaLiga          Boolean?                   @map("participa_liga")
-  ligaNome               String?                    @map("liga_nome") @db.VarChar(255)
+  perfil                       ConteudoParticipantePerfil @default(MEDICO)
+  medicoId                     String?                    @map("medico_id")
+  nome                         String                     @db.VarChar(255)
+  email                        String                     @db.VarChar(255)
+  telefone                     String?                    @db.VarChar(30)
+  cpf                          String?                    @db.VarChar(14)
+  crm                          String?                    @db.VarChar(60)
+  especialidade                String?                    @db.VarChar(120)
+  cidade                       String?                    @db.VarChar(120)
+  faculdade                    String?                    @db.VarChar(255)
+  semestre                     String?                    @db.VarChar(40)
+  participaLiga                Boolean?                   @map("participa_liga")
+  ligaNome                     String?                    @map("liga_nome") @db.VarChar(255)
   /// Precadastro para possível ingresso no corpo clínico.
-  interesseCorpoClinico  Boolean                    @default(true) @map("interesse_corpo_clinico")
-  consentimentoLgpd      Boolean                    @default(false) @map("consentimento_lgpd")
+  interesseCorpoClinico        Boolean                    @default(true) @map("interesse_corpo_clinico")
+  consentimentoLgpd            Boolean                    @default(false) @map("consentimento_lgpd")
   /// Fluxo aceite → e-mail → cadastro ATIVO (não passa por Avaliação).
-  precadastroStatus      ConteudoPrecadastroStatus  @default(AGUARDANDO) @map("precadastro_status")
-  tokenCadastroCorpo     String?                    @unique @map("token_cadastro_corpo") @db.VarChar(64)
-  precadastroAceitoEm    DateTime?                  @map("precadastro_aceito_em")
-  precadastroAceitoPorMasterId String?              @map("precadastro_aceito_por_master_id")
-  presenteEm             DateTime?                  @map("presente_em")
-  presencaOrigem         ConteudoPresencaOrigem?    @map("presenca_origem")
+  precadastroStatus            ConteudoPrecadastroStatus  @default(AGUARDANDO) @map("precadastro_status")
+  tokenCadastroCorpo           String?                    @unique @map("token_cadastro_corpo") @db.VarChar(64)
+  precadastroAceitoEm          DateTime?                  @map("precadastro_aceito_em")
+  precadastroAceitoPorMasterId String?                    @map("precadastro_aceito_por_master_id")
+  presenteEm                   DateTime?                  @map("presente_em")
+  presencaOrigem               ConteudoPresencaOrigem?    @map("presenca_origem")
   /// Respostas da avaliação de aula (mapa perguntaId → valor).
-  avaliacaoRespostas     Json?                      @map("avaliacao_respostas")
-  avaliadoEm             DateTime?                  @map("avaliado_em")
-  createdAt              DateTime                   @default(now()) @map("created_at")
+  avaliacaoRespostas           Json?                      @map("avaliacao_respostas")
+  avaliadoEm                   DateTime?                  @map("avaliado_em")
+  createdAt                    DateTime                   @default(now()) @map("created_at")
 
   tenant Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   evento ConteudoEvento @relation(fields: [eventoId], references: [id], onDelete: Cascade)

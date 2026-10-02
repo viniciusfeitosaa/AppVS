@@ -8,6 +8,8 @@ import { connectRedis, disconnectRedis } from './config/redis';
 import { markShuttingDown } from './config/shutdown';
 import { startEmailQueue, stopEmailQueue } from './jobs/email-queue';
 import { startPushQueue, stopPushQueue } from './jobs/push-queue';
+import { startFaceVerifyQueue, stopFaceVerifyQueue } from './jobs/face-verify-queue';
+import { startPontoFotoRetencaoJob, stopPontoFotoRetencaoJob } from './jobs/ponto-foto-retencao-job';
 import {
   startDocumentoValidadeJob,
   stopDocumentoValidadeJob,
@@ -52,9 +54,11 @@ function startServer() {
         if (ok) {
           startEmailQueue();
           startPushQueue();
+          startFaceVerifyQueue();
         }
       });
       startDocumentoValidadeJob();
+      startPontoFotoRetencaoJob();
     });
 
     trackConnections(server);
@@ -67,7 +71,9 @@ function startServer() {
         safeLogger.info('Servidor HTTP encerrado (sem novas conexões)');
         await stopEmailQueue();
         await stopPushQueue();
+        await stopFaceVerifyQueue();
         stopDocumentoValidadeJob();
+        stopPontoFotoRetencaoJob();
         await disconnectRedis();
         await disconnectDatabase();
         process.exit(0);

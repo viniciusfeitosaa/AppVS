@@ -265,9 +265,10 @@ export async function deleteSelfAccountService(
       documentos: { select: { caminhoArquivo: true } },
       documentosEnviados: { select: { caminhoArquivo: true } },
       registrosPonto: {
-        where: { fotoCheckinCaminho: { not: null } },
-        select: { fotoCheckinCaminho: true },
+        where: { OR: [{ fotoCheckinCaminho: { not: null } }, { fotoCheckoutCaminho: { not: null } }] },
+        select: { fotoCheckinCaminho: true, fotoCheckoutCaminho: true },
       },
+      biometriasFaciais: { select: { fotoCaminho: true } },
     },
   });
 
@@ -300,6 +301,10 @@ export async function deleteSelfAccountService(
   }
   for (const ponto of medico.registrosPonto) {
     safeUnlinkStoredPath(ponto.fotoCheckinCaminho);
+    safeUnlinkStoredPath(ponto.fotoCheckoutCaminho);
+  }
+  for (const b of medico.biometriasFaciais) {
+    safeUnlinkStoredPath(b.fotoCaminho);
   }
 
   await prisma.medico.delete({ where: { id: medico.id } });

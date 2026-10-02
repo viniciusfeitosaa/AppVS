@@ -59,7 +59,10 @@ export const uploadPerfilDocumentos = multer({
 });
 
 /** Campos opcionais do cadastro público (mesmos tipos do perfil). */
-export const registerPublicUploadFields = DOCUMENTOS_PERFIL_FIELDS.map((name) => ({ name, maxCount: 1 }));
+export const registerPublicUploadFields = [
+  ...DOCUMENTOS_PERFIL_FIELDS.map((name) => ({ name, maxCount: 1 })),
+  { name: 'selfieBiometria', maxCount: 1 },
+];
 
 /** Só processa multipart em `/auth/register`; JSON continua sem multer. */
 export function maybeRegisterPublicUploadMiddleware(req: Request, res: Response, next: NextFunction): void {
@@ -79,6 +82,14 @@ export function maybeRegisterPublicUploadMiddleware(req: Request, res: Response,
       res.status(400).json({ success: false, error: msg });
       return;
     }
+    // Cadastro recusado (validação, duplicidade, selfie ruim): nada referencia os anexos.
+    res.on('finish', () => {
+      if (res.statusCode < 400) return;
+      const files = (req.files as Record<string, Express.Multer.File[]> | undefined) || {};
+      Object.values(files)
+        .flat()
+        .forEach((f) => fs.unlink(f.path, () => {}));
+    });
     next();
   });
 }
@@ -155,6 +166,83 @@ export const uploadPontoCheckinMiddleware = (req: Request, res: Response, next: 
     }
     next();
   });
+};
+
+const uploadBiometriaDir = path.resolve(process.cwd(), 'uploads', 'biometria');
+
+const uploadBiometria = multer({
+  storage: multer.diskStorage({
+    destination: (req: Request, _file: Express.Multer.File, cb) => {
+      const tenantId = (req as any).user?.tenantId || 'unknown';
+      const dir = path.join(uploadBiometriaDir, tenantId);
+      if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true });
+      }
+      cb(null, dir);
+    },
+    filename: (_req: Request, file: Express.Multer.File, cb) => {
+      const ext = path.extname(file.originalname || '').toLowerCase();
+      const safeExt = ['.jpg', '.jpeg', '.png', '.webp'].includes(ext) ? ext : '.jpg';
+      cb(null, `biometria-${Date.now()}-${Math.round(Math.random() * 1e9)}${safeExt}`);
+    },
+  }),
+  limits: { fileSize: 5 * 1024 * 1024, files: 1 },
+  fileFilter: (_req, file, cb) => {
+    if (imageMime.has(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error('Tipo de arquivo não permitido. Use JPEG, PNG ou WebP.'));
+    }
+  },
+});
+
+export const uploadBiometriaMiddleware = (req: Request, res: Response, next: NextFunction): void => {
+  uploadBiometria.single('foto')(req, res, (err: unknown) => {
+    if (err) {
+      const msg = err instanceof Error ? err.message : 'Erro no upload da foto';
+      res.status(400).json({ success: false, error: msg });
+      return;
+    }
+    next();
+  });
+};
+
+const uploadConferirRosto = multer({
+  storage: multer.diskStorage({
+    destination: (_req: Request, _file: Express.Multer.File, cb) => {
+      const dir = path.resolve(process.cwd(), 'uploads', 'tmp-conferir-rosto');
+      if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true });
+      }
+      cb(null, dir);
+    },
+    filename: (_req: Request, _file: Express.Multer.File, cb) => {
+      cb(null, `conferir-${Date.now()}-${Math.round(Math.random() * 1e9)}.jpg`);
+    },
+  }),
+  limits: { fileSize: 5 * 1024 * 1024, files: 1 },
+});
+
+/** Foto descartável: o controller apaga após a comparação. */
+export const uploadConferirRostoMiddleware = (req: Request, res: Response, next: NextFunction): void => {
+  uploadConferirRosto.single('foto')(req, res, (err: unknown) => {
+    if (err) {
+      const msg = err instanceof Error ? err.message : 'Erro no upload da foto';
+      res.status(400).json({ success: false, error: msg });
+      return;
+    }
+    next();
+  });
+};
+
+/** Checkout aceita multipart (com foto) ou JSON (sem foto + motivo); só aplica multer no primeiro caso. */
+export const maybeUploadPontoCheckoutMiddleware = (req: Request, res: Response, next: NextFunction): void => {
+  const ct = (req.headers['content-type'] || '').toLowerCase();
+  if (!ct.includes('multipart/form-data')) {
+    next();
+    return;
+  }
+  uploadPontoCheckinMiddleware(req, res, next);
 };
 
 const uploadConteudosDir = path.resolve(process.cwd(), 'uploads', 'conteudos');

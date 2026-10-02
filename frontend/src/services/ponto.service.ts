@@ -22,6 +22,25 @@ interface CheckOutPayload {
   longitude?: number;
 }
 
+export type ResultadoConferenciaRosto = 'CONFERE' | 'NAO_CONFERE' | 'SEM_ROSTO' | 'SPOOF_SUSPEITO' | 'INDISPONIVEL';
+
+export interface ConferenciaRosto {
+  resultado: ResultadoConferenciaRosto | null;
+  mensagem: string | null;
+}
+
+export interface MinhaBiometriaFacial {
+  habilitado: boolean;
+  consentimentoVersao: string;
+  precisaCadastrar: boolean;
+  biometria: {
+    id: string;
+    status: 'PENDENTE_APROVACAO' | 'APROVADA' | 'REJEITADA';
+    motivoRejeicao: string | null;
+    createdAt: string;
+  } | null;
+}
+
 export interface TrocaPlantaoPendenteItem {
   id: string;
   createdAt: string;
@@ -61,9 +80,47 @@ export const pontoService = {
     return response.data;
   },
 
-  checkOut: async (payload?: CheckOutPayload) => {
-    const response = await api.post('/ponto/checkout', payload || {});
+  checkOut: async (payload: CheckOutPayload & { foto?: File; motivoSemFoto?: string }) => {
+    if (payload.foto) {
+      const formData = new FormData();
+      if (payload.observacao) formData.append('observacao', payload.observacao);
+      if (payload.latitude != null) formData.append('latitude', String(payload.latitude));
+      if (payload.longitude != null) formData.append('longitude', String(payload.longitude));
+      formData.append('foto', payload.foto);
+      const response = await api.post('/ponto/checkout', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      return response.data;
+    }
+    const { foto: _f, ...json } = payload;
+    const response = await api.post('/ponto/checkout', json);
     return response.data;
+  },
+
+  getMinhaBiometria: async () => {
+    const response = await api.get('/ponto/biometria');
+    return response.data as { success: boolean; data: MinhaBiometriaFacial };
+  },
+
+  cadastrarBiometria: async (foto: File, consentimentoVersao: string) => {
+    const formData = new FormData();
+    formData.append('foto', foto);
+    formData.append('consentimento', 'true');
+    formData.append('consentimentoVersao', consentimentoVersao);
+    const response = await api.post('/ponto/biometria', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return response.data;
+  },
+
+  conferirRosto: async (foto: File) => {
+    const formData = new FormData();
+    formData.append('foto', foto);
+    const response = await api.post('/ponto/biometria/conferir', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+      timeout: 15000,
+    });
+    return response.data as { success: boolean; data: ConferenciaRosto };
   },
 
   getMeuDia: async () => {
@@ -164,6 +221,7 @@ export const pontoService = {
           duracaoMinutos: number | null;
           checkInAtrasado: boolean;
           minutosAtrasoCheckin: number | null;
+          faceSituacao?: 'CONFERE' | 'EM_ANALISE' | 'DIVERGENCIA' | 'SEM_BIOMETRIA' | null;
           origem?: string | null;
           valor: number | null;
           escalaId: string | null;

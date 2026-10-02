@@ -1,7 +1,7 @@
 # 07 — Ponto eletrônico
 
 **Status:** ✅ Implementado (+ justificativa Master “Sem ponto” + criar-e-aceitar)  
-**Última atualização:** 2026-09-04
+**Última atualização:** 2026-10-02
 
 ## Funcionalidades
 
@@ -13,6 +13,8 @@
 - Repasse/registro congelado (`repasse-registro-ponto.service.ts`)
 - Índices de performance (`perf_ponto_indexes`, check-in médico)
 - **Justificativa de ausência de ponto** — médico pede quando não concluiu o ponto; Master aceita/recusa; aceite gera `RegistroPonto` com origem `JUSTIFICADO_SEM_PONTO` e **valor cheio do plantão**
+- **Reconhecimento facial (UniFace)** — foto de referência + verificação assíncrona da entrada e da saída; sinaliza para o Master, **nunca bloqueia** (ver seção abaixo)
+- **Ponto offline** — fila no aparelho (IndexedDB) e envio automático quando a internet volta
 
 ## Modelos Prisma
 
@@ -127,7 +129,38 @@ Service: `justificativa-ausencia-ponto.service.ts` + `justificativa-ausencia-pon
 - `POST /api/admin/justificativas-ausencia/:id/aceitar` — body opcional: `horarioAlegadoEntrada`, `horarioAlegadoSaida`
 - `POST /api/admin/justificativas-ausencia/:id/recusar` — body opcional: `comentario`
 
+## Reconhecimento facial e offline
+
+Spec completo: `docs/superpowers/specs/2026-10-02-ponto-reconhecimento-facial-design.md`.
+
+**Serviço:** container `face-service` (Python/FastAPI, onnxruntime CPU, 1 vCPU / 768 MB, sem porta pública, token `FACE_SERVICE_TOKEN`). Modelos: RetinaFace MNET_V2, MobileFace MNET_V2, MiniFASNet V2+V1SE. Sem `FACE_SERVICE_URL`/`TOKEN` no backend a verificação fica desligada (pontos sem status facial).
+
+**Foto de referência** (`MedicoBiometriaFacial`): selfie no cadastro público (campo `selfieBiometria` em `POST /auth/register`) ou no primeiro ponto (`POST /ponto/biometria`), sempre com consentimento LGPD versionado (`FACE_CONSENTIMENTO_VERSAO`, texto em `frontend/src/constants/biometria.ts`). Fica `PENDENTE_APROVACAO`; aprovar o cadastro na Avaliação aprova a selfie; rejeitar o cadastro apaga a selfie na hora.
+
+**Verificação:** fila BullMQ `coopvitta-face-verify` (concorrência 1) grava `faceStatus` / `faceCheckoutStatus` (`CONFERE`, `INCERTO`, `DIVERGENTE`, `SPOOF_SUSPEITO`, `SEM_ROSTO`, `SEM_BIOMETRIA`, `SEM_FOTO`, `ERRO`). Limiares: `FACE_MATCH_THRESHOLD` 0,45, `FACE_REVIEW_THRESHOLD` 0,30, `FACE_LIVENESS_THRESHOLD` 0,50. Checkout **sempre** pede foto (ou motivo ≥ 15 caracteres). Médico vê só o selo (`faceSituacao`), sem score — no histórico e nos registros de hoje da tela de ponto (atualiza a cada 5 s enquanto está "Conferindo rosto…").
+
+**Conferência na hora:** antes de registrar (online, com foto de referência), o app chama `POST /api/ponto/biometria/conferir` (foto descartável em `uploads/tmp-conferir-rosto`, apagada após a resposta). Resultado `CONFERE` registra direto ("Rosto reconhecido"); `NAO_CONFERE` / `SEM_ROSTO` / `SPOOF_SUSPEITO` mostram a foto com aviso e as opções **Tirar outra foto** ou **Registrar assim mesmo** (vai para revisão do Master — nunca bloqueia). Serviço indisponível ou sem biometria: registra sem conferência. O status oficial continua vindo da fila.
+
+**Master:** tela **Reconhecimento facial** (`/reconhecimento-facial`, módulo `PONTO_ELETRONICO`) com abas Divergências (referência × entrada × saída, "É o médico" / "Suspeita de fraude") e Fotos de referência (aprovar/rejeitar). Card no Dashboard e coluna "Reconhecimento facial" no relatório de ponto.
+
+**Offline:**
+- `public/sw.js` (servido em `/app/sw.js`, sem cache no nginx) guarda só a interface; nunca intercepta `/api/`. Desligar: build com `VITE_SW_DESATIVADO=true`.
+- Fila em IndexedDB (`lib/pontoOfflineQueue.ts`, máx. 20 itens), sincronizada em ordem por `usePontoOffline` (evento online, foco, a cada 60 s). Com fila pendente, novos pontos também entram na fila. Recusa do servidor trava a fila até o médico descartar o item.
+- `POST /ponto/checkin-offline` e `/checkout-offline` (multipart): `clientUuid` (idempotente), `capturadoEm` e `enviadoEm` no relógio do aparelho. Horário gravado = captura corrigida pelo desvio do relógio (`utils/ponto-offline.util.ts`). Recusa > 24 h; marca `offlineRevisar` se sincronizou > 12 h depois ou relógio desviado > 10 min (entra na lista de divergências).
+- Sessão: com token vencido e **sem internet** o app mantém o usuário logado; ao reconectar, o 401 pede login e a fila (por médico) é enviada depois.
+- iOS (WKWebView) só roda service worker com App-Bound Domains — não configurado ainda; Android e navegador funcionam.
+
+**Retenção** (`jobs/ponto-foto-retencao-job.ts`, diário): apaga fotos de ponto com mais de `PONTO_FOTO_RETENCAO_DIAS` (90) exceto verificação pendente, divergência ou offline sem revisão e suspeita de fraude; grava `fotoExpurgadaEm`. Apaga biometria de médico desativado após aprovação ou rejeitado. **Desligado por padrão**: sem `PONTO_FOTO_RETENCAO_ATIVA=true` só registra no log o que apagaria.
+
+**Migrations:** `20261002180000_ponto_reconhecimento_facial`, `20261002200000_ponto_foto_expurgo`, `20261002210000_ponto_offline`.
+
 ## Changelog
+
+### 2026-10-02 — Reconhecimento facial + offline + retenção
+- face-service (UniFace) no compose; biometria, verificação de entrada e saída, tela Reconhecimento facial, selos no histórico/relatório/Dashboard
+- Selfie opcional no cadastro público; selfie na Avaliação
+- Ponto offline (service worker + IndexedDB + endpoints idempotentes)
+- Job de retenção de fotos (desligado até `PONTO_FOTO_RETENCAO_ATIVA=true`)
 
 ### 2026-09-14 — Justificativa aceita Valores de Ponto
 - `resolverValorCheioPlantao` também lê `config_ponto_eletronico` (R$/h × horas do turno) quando não há linha em `valores_plantao`

@@ -12,6 +12,8 @@ import {
 } from '../constants/profissaoConselho';
 import { TERMOS_CADASTRO_TEXTO_COMPLETO, TERMOS_CADASTRO_TITULO, TERMOS_CADASTRO_VERSAO } from '../constants/termosCadastro';
 import { BrandLogo } from '../components/brand/BrandLogo';
+import { SelfieCaptura } from '../components/biometria/SelfieCaptura';
+import { BIOMETRIA_CONSENTIMENTO_TEXTO, BIOMETRIA_CONSENTIMENTO_VERSAO } from '../constants/biometria';
 import {
   CADASTRO_MAX_BYTES_PER_FILE,
   DOCUMENTOS_PERFIL_CADASTRO_ORDEM,
@@ -50,7 +52,7 @@ const STEP_LABELS = [
   'Estado civil e endereço',
   'Repasse (texto)',
   'Documentos',
-  'Local e interesse',
+  'Local, interesse e selfie',
   'Senha e aceite',
 ] as const;
 
@@ -263,6 +265,8 @@ const Cadastro = () => {
   const [docFiles, setDocFiles] = useState<Partial<Record<DocumentoPerfilField, File | null>>>({});
   const [docValidades, setDocValidades] = useState<Partial<Record<DocumentoPerfilField, string>>>({});
   const [showPassword, setShowPassword] = useState(false);
+  const [selfie, setSelfie] = useState<File | null>(null);
+  const [consentiuSelfie, setConsentiuSelfie] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [cepAutoLoading, setCepAutoLoading] = useState(false);
   const [cepAutoMensagem, setCepAutoMensagem] = useState<string | null>(null);
@@ -509,6 +513,10 @@ const Cadastro = () => {
       );
       return;
     }
+    if (step === 5 && selfie && !consentiuSelfie) {
+      setError('Aceite o termo de uso da imagem facial ou remova a selfie para continuar.');
+      return;
+    }
     setStep((s) => Math.min(s + 1, STEP_LABELS.length - 1));
   };
 
@@ -596,7 +604,18 @@ const Cadastro = () => {
         }
       }
 
-      const response = await authService.register(payload, files, docValidades) as {
+      if (selfie && !consentiuSelfie) {
+        setError('Aceite o termo de uso da imagem facial ou remova a selfie (etapa Local, interesse e selfie).');
+        setIsLoading(false);
+        return;
+      }
+
+      const response = await authService.register(
+        payload,
+        files,
+        docValidades,
+        selfie ? { foto: selfie, consentimentoVersao: BIOMETRIA_CONSENTIMENTO_VERSAO } : undefined
+      ) as {
         success?: boolean;
         data?: { message?: string; medico?: unknown };
       };
@@ -1169,6 +1188,26 @@ const Cadastro = () => {
                 />
                 {errors.interesseTrabalho && (
                   <p className="mt-1.5 text-[13px] text-red-600/95">{errors.interesseTrabalho.message}</p>
+                )}
+              </div>
+
+              <div className="rounded-2xl border border-zinc-200/70 bg-zinc-50/40 p-4 space-y-3">
+                <p className="text-[14px] font-semibold text-zinc-900">Selfie para o ponto eletrônico (recomendado)</p>
+                <p className="text-[13px] text-zinc-600 leading-relaxed">
+                  Usada para confirmar sua identidade ao bater o ponto. Rosto centralizado, sem óculos escuros, boné ou
+                  máscara, em local bem iluminado. Se preferir, você pode enviar depois, no primeiro ponto.
+                </p>
+                <SelfieCaptura value={selfie} onChange={setSelfie} />
+                {selfie && (
+                  <label className="flex items-start gap-3 cursor-pointer text-[13px] text-zinc-800 leading-snug">
+                    <input
+                      type="checkbox"
+                      className="mt-0.5"
+                      checked={consentiuSelfie}
+                      onChange={(e) => setConsentiuSelfie(e.target.checked)}
+                    />
+                    <span>{BIOMETRIA_CONSENTIMENTO_TEXTO}</span>
+                  </label>
                 )}
               </div>
             </div>

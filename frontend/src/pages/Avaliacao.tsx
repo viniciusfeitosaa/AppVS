@@ -13,6 +13,87 @@ import {
   DOCUMENTO_TIPO_BY_FIELD,
   type DocumentoPerfilField,
 } from '../constants/documentosPerfil';
+import { FotoFacialProtegida } from '../components/biometria/FotoFacialProtegida';
+
+function SelfieCadastroPendente({
+  biometria,
+  onAtualizado,
+}: {
+  biometria: CadastroPendenteDetalhe['biometria'];
+  onAtualizado: () => void;
+}) {
+  const [motivo, setMotivo] = useState('');
+  const [rejeitando, setRejeitando] = useState(false);
+  const [erro, setErro] = useState<string | null>(null);
+  const rejeitar = useMutation({
+    mutationFn: () => adminService.revisarBiometriaFacial(biometria!.id, 'REJEITADA', motivo.trim()),
+    onSuccess: () => {
+      setRejeitando(false);
+      onAtualizado();
+    },
+    onError: (e: any) => setErro(e.response?.data?.error || 'Não foi possível rejeitar a selfie.'),
+  });
+
+  return (
+    <div>
+      <h3 className="text-sm font-bold text-viva-900 font-display mb-2">Selfie (reconhecimento facial do ponto)</h3>
+      {!biometria ? (
+        <p className="text-sm text-viva-700 font-serif">
+          Não enviou selfie. Ela será pedida no primeiro ponto eletrônico.
+        </p>
+      ) : (
+        <div className="grid grid-cols-[120px_1fr] gap-3 items-start">
+          <FotoFacialProtegida tipo="biometria" id={biometria.id} legenda="Selfie do cadastro" />
+          <div className="space-y-2 text-xs text-viva-700">
+            <p>
+              Prova de vida:{' '}
+              {biometria.livenessScore == null ? '—' : `${Math.round(Number(biometria.livenessScore) * 100)}%`}
+            </p>
+            {biometria.status === 'REJEITADA' ? (
+              <p className="text-red-700">
+                Selfie rejeitada{biometria.motivoRejeicao ? `: ${biometria.motivoRejeicao}` : ''}. O profissional
+                fará uma nova no primeiro ponto.
+              </p>
+            ) : (
+              <>
+                <p>Ao aprovar o cadastro, a selfie também é aprovada.</p>
+                {rejeitando && (
+                  <textarea
+                    className="w-full rounded-xl border border-viva-200 bg-white px-3 py-2 text-xs text-viva-900 min-h-[56px]"
+                    placeholder="Motivo (o profissional verá). Ex.: rosto cortado, foto escura."
+                    value={motivo}
+                    onChange={(e) => setMotivo(e.target.value)}
+                    maxLength={500}
+                  />
+                )}
+                {erro && <p className="text-red-700">{erro}</p>}
+                <button
+                  type="button"
+                  className="btn-sm border border-red-300 bg-white text-red-700"
+                  disabled={rejeitar.isPending}
+                  onClick={() => {
+                    setErro(null);
+                    if (!rejeitando) {
+                      setRejeitando(true);
+                      return;
+                    }
+                    if (!motivo.trim()) {
+                      setErro('Informe o motivo.');
+                      return;
+                    }
+                    rejeitar.mutate();
+                  }}
+                >
+                  {rejeitando ? 'Confirmar: pedir nova selfie' : 'Pedir nova selfie'}
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 function labelDocumentoTipo(tipo: string): string {
   const entry = Object.entries(DOCUMENTO_TIPO_BY_FIELD).find(([, v]) => v === tipo);
@@ -80,6 +161,15 @@ const Avaliacao = () => {
     mensagem: string;
   }>({ open: false, doc: null, mensagem: '' });
 
+  const [aprovarModal, setAprovarModal] = useState<{
+    open: boolean;
+    detalhe: CadastroPendenteDetalhe | null;
+    pendentes: number;
+    contratoId: string;
+    subgrupoId: string;
+    equipeId: string;
+  }>({ open: false, detalhe: null, pendentes: 0, contratoId: '', subgrupoId: '', equipeId: '' });
+
   const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
   useEffect(() => {
@@ -120,15 +210,88 @@ const Avaliacao = () => {
     await queryClient.invalidateQueries({ queryKey: ['admin', 'cadastros-pendentes', selectedId] });
   };
 
-  const aprovarMutation = useMutation({
-    mutationFn: (medicoId: string) => adminService.aprovarCadastroPendente(medicoId),
-    onSuccess: async () => {
-      setActionError(null);
-      setSelectedId(null);
-      await queryClient.invalidateQueries({ queryKey: ['admin', 'cadastros-pendentes'] });
+  const contratosQuery = useQuery({
+    queryKey: ['admin', 'contratos-ativos', 'avaliacao'],
+    queryFn: async () => {
+      const r = await adminService.listContratosAtivos({ page: 1, limit: 200 });
+      return (r.data ?? []).filter((c) => c.ativo);
     },
-    onError: (e: unknown) => {
-      const err = e as { response?: { data?: { error?: string } } };
+    enabled: aprovarModal.open,
+  });
+
+  const contratoVinculosQuery = useQuery({
+    queryKey: ['admin', 'contrato-vinculos', aprovarModal.contratoId],
+    queryFn: async () => {
+      const [subs, eqs] = await Promise.all([
+        adminService.listContratoSubgrupos(aprovarModal.contratoId),
+        adminService.listContratoEquipes(aprovarModal.contratoId),
+      ]);
+      const subgrupos = new Map<string, string>();
+      for (const s of subs.data ?? []) if (s.subgrupo.ativo) subgrupos.set(s.subgrupo.id, s.subgrupo.nome);
+      for (const e of eqs.data ?? []) if (e.equipe.subgrupo) subgrupos.set(e.equipe.subgrupo.id, e.equipe.subgrupo.nome);
+      const equipesDiretas = (eqs.data ?? [])
+        .filter((e) => e.equipe.ativo)
+        .map((e) => ({ id: e.equipe.id, nome: e.equipe.nome, subgrupoId: e.equipe.subgrupo?.id ?? '' }));
+      return {
+        subgrupos: [...subgrupos].map(([id, nome]) => ({ id, nome })).sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR')),
+        equipesDiretas,
+      };
+    },
+    enabled: aprovarModal.open && !!aprovarModal.contratoId,
+  });
+
+  const equipesSubgrupoQuery = useQuery({
+    queryKey: ['admin', 'equipes', 'subgrupo', aprovarModal.subgrupoId],
+    queryFn: async () => {
+      const r = await adminService.listEquipes({ subgrupoId: aprovarModal.subgrupoId });
+      return (r.data ?? []).filter((e) => e.ativo);
+    },
+    enabled: aprovarModal.open && !!aprovarModal.subgrupoId,
+  });
+
+  const equipesOpcoes = (() => {
+    const mapa = new Map<string, string>();
+    for (const e of equipesSubgrupoQuery.data ?? []) mapa.set(e.id, e.nome);
+    for (const e of contratoVinculosQuery.data?.equipesDiretas ?? []) {
+      if (!aprovarModal.subgrupoId || e.subgrupoId === aprovarModal.subgrupoId) mapa.set(e.id, e.nome);
+    }
+    return [...mapa].map(([id, nome]) => ({ id, nome })).sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
+  })();
+
+  const fecharAprovarModal = () =>
+    setAprovarModal({ open: false, detalhe: null, pendentes: 0, contratoId: '', subgrupoId: '', equipeId: '' });
+
+  const aprovarMutation = useMutation({
+    mutationFn: async ({ medicoId, equipeId }: { medicoId: string; equipeId?: string }) => {
+      await adminService.aprovarCadastroPendente(medicoId);
+      if (!equipeId) return { vinculado: false };
+      try {
+        await adminService.addMedicoToEquipe(equipeId, medicoId);
+        return { vinculado: true };
+      } catch (e: unknown) {
+        const err = e as { response?: { data?: { error?: string } } };
+        throw new Error(
+          `Cadastro aprovado, mas não foi possível vincular à equipe: ${err.response?.data?.error || 'erro desconhecido'}. Vincule pelo Corpo Clínico.`
+        );
+      }
+    },
+    onSuccess: async ({ vinculado }) => {
+      setActionError(null);
+      setActionInfo(vinculado ? 'Cadastro aprovado e médico vinculado à equipe.' : 'Cadastro aprovado.');
+      setSelectedId(null);
+      fecharAprovarModal();
+      await queryClient.invalidateQueries({ queryKey: ['admin', 'cadastros-pendentes'] });
+      await queryClient.invalidateQueries({ queryKey: ['admin', 'medicos'] });
+    },
+    onError: async (e: unknown) => {
+      const err = e as { message?: string; response?: { data?: { error?: string } } };
+      if (!err.response && err.message?.startsWith('Cadastro aprovado')) {
+        setActionError(err.message);
+        setSelectedId(null);
+        fecharAprovarModal();
+        await queryClient.invalidateQueries({ queryKey: ['admin', 'cadastros-pendentes'] });
+        return;
+      }
       setActionError(err.response?.data?.error || 'Não foi possível aprovar.');
     },
   });
@@ -244,13 +407,14 @@ const Avaliacao = () => {
       const s = doc.statusRevisao || 'PENDENTE';
       return s === 'PENDENTE' || s === 'SOLICITADO';
     });
-    const aviso =
-      pendentes.length > 0
-        ? `Atenção: ainda há ${pendentes.length} documento(s) Pendente ou Solicitado. Aprovar mesmo assim?`
-        : 'Aprovar este cadastro? O profissional passará a poder entrar na plataforma.';
-    if (window.confirm(aviso)) {
-      aprovarMutation.mutate(d.id);
-    }
+    setAprovarModal({
+      open: true,
+      detalhe: d,
+      pendentes: pendentes.length,
+      contratoId: '',
+      subgrupoId: '',
+      equipeId: '',
+    });
   };
 
   if (modulosLoading) {
@@ -447,6 +611,11 @@ const Avaliacao = () => {
                 </div>
               </dl>
 
+              <SelfieCadastroPendente
+                biometria={d.biometria ?? null}
+                onAtualizado={() => queryClient.invalidateQueries({ queryKey: ['admin', 'cadastros-pendentes'] })}
+              />
+
               <div>
                 <h3 className="text-sm font-bold text-viva-900 font-display mb-2">Documentos enviados</h3>
                 {!d.documentos?.length && (
@@ -578,6 +747,129 @@ const Avaliacao = () => {
               ) : (
                 <p className="p-6 text-sm text-viva-700">Pré-visualização indisponível.</p>
               )}
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {aprovarModal.open && aprovarModal.detalhe ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="bg-white rounded-xl shadow-xl max-w-lg w-full p-5 space-y-4">
+            <div>
+              <h3 className="font-bold text-viva-950 font-display">Aprovar e direcionar ao corpo clínico</h3>
+              <p className="text-sm text-viva-700 mt-1">
+                <strong>{aprovarModal.detalhe.nomeCompleto}</strong> passará a poder entrar na plataforma. Escolha o
+                contrato, o subgrupo e a equipe em que ele vai atuar.
+              </p>
+              {aprovarModal.pendentes > 0 && (
+                <p className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+                  Atenção: ainda há {aprovarModal.pendentes} documento(s) Pendente ou Solicitado.
+                </p>
+              )}
+            </div>
+
+            <div className="space-y-3">
+              <div>
+                <label htmlFor="aprovar-contrato" className="block text-xs font-medium text-viva-600 mb-1">
+                  Contrato
+                </label>
+                <select
+                  id="aprovar-contrato"
+                  className="w-full py-2 px-3 text-sm border border-viva-200 rounded-lg bg-viva-50/50"
+                  value={aprovarModal.contratoId}
+                  onChange={(e) =>
+                    setAprovarModal((s) => ({ ...s, contratoId: e.target.value, subgrupoId: '', equipeId: '' }))
+                  }
+                >
+                  <option value="">{contratosQuery.isLoading ? 'Carregando…' : 'Selecione o contrato'}</option>
+                  {(contratosQuery.data ?? []).map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.nome}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label htmlFor="aprovar-subgrupo" className="block text-xs font-medium text-viva-600 mb-1">
+                  Subgrupo
+                </label>
+                <select
+                  id="aprovar-subgrupo"
+                  className="w-full py-2 px-3 text-sm border border-viva-200 rounded-lg bg-viva-50/50 disabled:opacity-50"
+                  disabled={!aprovarModal.contratoId}
+                  value={aprovarModal.subgrupoId}
+                  onChange={(e) => setAprovarModal((s) => ({ ...s, subgrupoId: e.target.value, equipeId: '' }))}
+                >
+                  <option value="">
+                    {contratoVinculosQuery.isLoading
+                      ? 'Carregando…'
+                      : aprovarModal.contratoId && !contratoVinculosQuery.data?.subgrupos.length
+                        ? 'Nenhum subgrupo vinculado a este contrato'
+                        : 'Selecione o subgrupo'}
+                  </option>
+                  {(contratoVinculosQuery.data?.subgrupos ?? []).map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.nome}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label htmlFor="aprovar-equipe" className="block text-xs font-medium text-viva-600 mb-1">
+                  Equipe
+                </label>
+                <select
+                  id="aprovar-equipe"
+                  className="w-full py-2 px-3 text-sm border border-viva-200 rounded-lg bg-viva-50/50 disabled:opacity-50"
+                  disabled={!aprovarModal.contratoId || (!aprovarModal.subgrupoId && !equipesOpcoes.length)}
+                  value={aprovarModal.equipeId}
+                  onChange={(e) => setAprovarModal((s) => ({ ...s, equipeId: e.target.value }))}
+                >
+                  <option value="">
+                    {equipesSubgrupoQuery.isLoading
+                      ? 'Carregando…'
+                      : aprovarModal.subgrupoId && !equipesOpcoes.length
+                        ? 'Nenhuma equipe ativa neste subgrupo'
+                        : 'Selecione a equipe'}
+                  </option>
+                  {equipesOpcoes.map((e) => (
+                    <option key={e.id} value={e.id}>
+                      {e.nome}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap justify-end gap-2">
+              <button
+                type="button"
+                className="btn btn-secondary text-sm py-2 px-4 rounded-lg"
+                disabled={aprovarMutation.isPending}
+                onClick={fecharAprovarModal}
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                className="btn btn-secondary text-sm py-2 px-4 rounded-lg disabled:opacity-50"
+                disabled={aprovarMutation.isPending}
+                onClick={() => aprovarMutation.mutate({ medicoId: aprovarModal.detalhe!.id })}
+              >
+                Aprovar sem equipe
+              </button>
+              <button
+                type="button"
+                className="btn btn-primary text-sm py-2 px-4 rounded-lg disabled:opacity-50"
+                disabled={aprovarMutation.isPending || !aprovarModal.equipeId}
+                onClick={() =>
+                  aprovarMutation.mutate({ medicoId: aprovarModal.detalhe!.id, equipeId: aprovarModal.equipeId })
+                }
+              >
+                {aprovarMutation.isPending ? 'Aprovando…' : 'Aprovar e vincular'}
+              </button>
             </div>
           </div>
         </div>

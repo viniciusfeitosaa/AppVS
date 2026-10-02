@@ -1,8 +1,12 @@
+import fs from 'fs';
 import { OrigemRegistroPonto, Prisma, type TipoPlantao } from '@prisma/client';
 import { prisma } from '../config/database';
 import { PONTO_SEM_ESCALA_ESCALA_ID } from '../constants/ponto.const';
 import { fileExistsSafe, resolveStoredFileToAbsolute } from '../utils/upload-path.util';
 import { createAuditLog } from './auditoria.service';
+import { faceServiceConfigurado } from './face-client.service';
+import { enqueueFaceVerify, statusFaceInicial } from '../jobs/face-verify-queue';
+import { situacaoFaceParaMedico } from '../utils/face-decisao.util';
 import { fimPlantaoAsDate, inicioPlantaoAsDate } from '../utils/plantao-horario';
 import {
   enrichPlantaoComTipo,
@@ -161,14 +165,14 @@ async function getConfigPontoParaMedico(
   return pickGeoConfigSemEscala(medicoEquipes, configs);
 }
 
-const startOfToday = () => {
-  const date = new Date();
+const startOfToday = (ref: Date = new Date()) => {
+  const date = new Date(ref);
   date.setHours(0, 0, 0, 0);
   return date;
 };
 
-const endOfToday = () => {
-  const date = new Date();
+const endOfToday = (ref: Date = new Date()) => {
+  const date = new Date(ref);
   date.setHours(23, 59, 59, 999);
   return date;
 };
@@ -231,14 +235,15 @@ function escolherPlantaoParaJanelaCheckinHoje(
 async function validarJanelaCheckinPlantaoEscalaHoje(
   tenantId: string,
   medicoId: string,
-  escalaId: string
+  escalaId: string,
+  instante: Date = new Date()
 ): Promise<ResultadoJanelaCheckinEscala> {
   const plantoesHoje = await prisma.escalaPlantao.findMany({
     where: {
       tenantId,
       escalaId,
       medicoId,
-      data: { gte: startOfToday(), lte: endOfToday() },
+      data: { gte: startOfToday(instante), lte: endOfToday(instante) },
     },
     select: {
       id: true,
@@ -255,7 +260,7 @@ async function validarJanelaCheckinPlantaoEscalaHoje(
     return { ok: false, message: 'Escala sem contrato vinculado para calcular o horário do plantão.' };
   }
   const tipoMaps = await loadTiposMapPorContratoLeitura(tenantId, [cid]);
-  const plantaoHoje = escolherPlantaoParaJanelaCheckinHoje(plantoesHoje, tipoMaps, new Date());
+  const plantaoHoje = escolherPlantaoParaJanelaCheckinHoje(plantoesHoje, tipoMaps, instante);
   if (!plantaoHoje) {
     return { ok: false, message: 'Você não possui plantão nesta escala para hoje' };
   }
@@ -263,7 +268,7 @@ async function validarJanelaCheckinPlantaoEscalaHoje(
   const dataStr = plantaoHoje.data.toISOString().slice(0, 10);
   const inicio = inicioPlantaoAsDate(dataStr, schedule);
   const fim = fimPlantaoAsDate(dataStr, schedule);
-  const now = new Date();
+  const now = instante;
   const abertura = new Date(inicio.getTime() - MINUTOS_ANTES_INICIO_CHECKIN_PONTO_ESCALA * 60 * 1000);
   if (now.getTime() < abertura.getTime()) {
     const hm = abertura.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
@@ -289,7 +294,7 @@ async function calcularAtrasoCheckinPlantaoEscalaHoje(
       tenantId,
       escalaId,
       medicoId,
-      data: { gte: startOfToday(), lte: endOfToday() },
+      data: { gte: startOfToday(instanteCheckIn), lte: endOfToday(instanteCheckIn) },
     },
     select: {
       id: true,
@@ -413,6 +418,13 @@ export function clearPontoCaches(tenantId: string, medicoId: string) {
   minhasEscalasCache.delete(key);
 }
 
+export interface PontoOfflineOpts {
+  clientUuid: string;
+  instante: Date;
+  desvioMs: number;
+  revisar: boolean;
+}
+
 export async function checkInService(
   tenantId: string,
   medicoId: string,
@@ -421,8 +433,19 @@ export async function checkInService(
   latitude?: number | null,
   longitude?: number | null,
   fotoCheckinCaminho?: string | null,
-  motivoCheckinSemFoto?: string | null
+  motivoCheckinSemFoto?: string | null,
+  offline?: PontoOfflineOpts
 ) {
+  if (offline) {
+    const existente = await prisma.registroPonto.findFirst({
+      where: { tenantId, medicoId, checkinClientUuid: offline.clientUuid },
+      select: { id: true, escalaId: true, checkInAt: true },
+    });
+    if (existente) {
+      if (fotoCheckinCaminho) fs.unlink(resolveStoredFileToAbsolute(fotoCheckinCaminho), () => {});
+      return { ...existente, duplicado: true };
+    }
+  }
   const hasFoto = !!fotoCheckinCaminho?.trim();
   const motivo = motivoCheckinSemFoto?.trim();
   if (hasFoto && motivo) {
@@ -440,7 +463,16 @@ export async function checkInService(
       throw { statusCode: 400, message: 'O motivo deve ter no máximo 500 caracteres.' };
     }
   }
-  const instanteCheckIn = new Date();
+  const instanteCheckIn = offline?.instante ?? new Date();
+  const dadosOffline = offline
+    ? {
+        offlineCheckin: true,
+        checkinClientUuid: offline.clientUuid,
+        checkinSincronizadoEm: new Date(),
+        offlineDesvioRelogioMs: offline.desvioMs,
+        offlineRevisar: offline.revisar,
+      }
+    : {};
   const registroAberto = await prisma.registroPonto.findFirst({
     where: { tenantId, medicoId, checkOutAt: null },
     orderBy: { checkInAt: 'desc' },
@@ -482,7 +514,7 @@ export async function checkInService(
       }
     }
 
-    return prisma.$transaction(async (tx: any) => {
+    const registroSemEscala = await prisma.$transaction(async (tx: any) => {
       const registroAbertoTx = await tx.registroPonto.findFirst({
         where: { tenantId, medicoId, checkOutAt: null },
         orderBy: { checkInAt: 'desc' },
@@ -503,6 +535,8 @@ export async function checkInService(
           minutosAtrasoCheckin: null,
           fotoCheckinCaminho: hasFoto ? fotoCheckinCaminho!.trim() : null,
           motivoCheckinSemFoto: hasFoto ? null : motivo!,
+          faceStatus: faceServiceConfigurado() ? statusFaceInicial(hasFoto) : null,
+          ...dadosOffline,
         },
       });
       await createAuditLog(
@@ -516,6 +550,7 @@ export async function checkInService(
             registroPontoId: registro.id,
             checkInSemFoto: !hasFoto,
             ...(hasFoto ? {} : { motivoResumo: motivo!.slice(0, 120) }),
+            ...(offline ? { offline: true, desvioRelogioMs: offline.desvioMs } : {}),
           },
         },
         tx
@@ -523,6 +558,8 @@ export async function checkInService(
       clearPontoCaches(tenantId, medicoId);
       return registro;
     });
+    if (hasFoto) void enqueueFaceVerify(registroSemEscala.id, 'checkin').catch(() => {});
+    return registroSemEscala;
   }
 
   // Com escala real: regras por subgrupo das equipes do médico nesta escala.
@@ -539,7 +576,7 @@ export async function checkInService(
   }
 
   if (prod.requireJanelaPlantao) {
-    const janela = await validarJanelaCheckinPlantaoEscalaHoje(tenantId, medicoId, escalaId);
+    const janela = await validarJanelaCheckinPlantaoEscalaHoje(tenantId, medicoId, escalaId, instanteCheckIn);
     if (!janela.ok) {
       throw { statusCode: 403, message: janela.message };
     }
@@ -571,7 +608,7 @@ export async function checkInService(
     };
   }
 
-  return prisma.$transaction(async (tx: any) => {
+  const registroCriado = await prisma.$transaction(async (tx: any) => {
     // Revalida em transação para evitar race condition (dois check-ins simultâneos)
     const registroAbertoTx = await tx.registroPonto.findFirst({
       where: { tenantId, medicoId, checkOutAt: null },
@@ -595,6 +632,8 @@ export async function checkInService(
         minutosAtrasoCheckin: atrasoCheckin.minutosAtrasoCheckin,
         fotoCheckinCaminho: hasFoto ? fotoCheckinCaminho!.trim() : null,
         motivoCheckinSemFoto: hasFoto ? null : motivo!,
+        faceStatus: faceServiceConfigurado() ? statusFaceInicial(hasFoto) : null,
+        ...dadosOffline,
       },
     });
 
@@ -611,6 +650,7 @@ export async function checkInService(
           minutosToleranciaCheckin: atrasoCheckin.minutosTolerancia,
           checkInSemFoto: !hasFoto,
           ...(hasFoto ? {} : { motivoResumo: motivo!.slice(0, 120) }),
+          ...(offline ? { offline: true, desvioRelogioMs: offline.desvioMs } : {}),
         },
       },
       tx
@@ -619,6 +659,8 @@ export async function checkInService(
     clearPontoCaches(tenantId, medicoId);
     return registro;
   });
+  if (hasFoto) void enqueueFaceVerify(registroCriado.id, 'checkin').catch(() => {});
+  return registroCriado;
 }
 
 export async function checkOutService(
@@ -626,8 +668,30 @@ export async function checkOutService(
   medicoId: string,
   observacao?: string,
   latitude?: number | null,
-  longitude?: number | null
+  longitude?: number | null,
+  fotoCheckoutCaminho?: string | null,
+  motivoCheckoutSemFoto?: string | null,
+  offline?: PontoOfflineOpts
 ) {
+  if (offline) {
+    const existente = await prisma.registroPonto.findFirst({
+      where: { tenantId, medicoId, checkoutClientUuid: offline.clientUuid },
+      select: { id: true, escalaId: true },
+    });
+    if (existente) {
+      if (fotoCheckoutCaminho) fs.unlink(resolveStoredFileToAbsolute(fotoCheckoutCaminho), () => {});
+      return { ...existente, duplicado: true };
+    }
+  }
+  const hasFoto = !!fotoCheckoutCaminho?.trim();
+  const motivoSemFoto = motivoCheckoutSemFoto?.trim();
+  if (!hasFoto && (!motivoSemFoto || motivoSemFoto.length < 15)) {
+    throw {
+      statusCode: 400,
+      message:
+        'Foto obrigatória no checkout. Sem foto, informe o motivo (mínimo 15 caracteres). Ex.: permissão de câmera negada.',
+    };
+  }
   const registroAberto = await prisma.registroPonto.findFirst({
     where: { tenantId, medicoId, checkOutAt: null },
     orderBy: { checkInAt: 'desc' },
@@ -648,7 +712,7 @@ export async function checkOutService(
     }
   }
 
-  const checkoutTime = new Date();
+  const checkoutTime = offline?.instante ?? new Date();
   if (checkoutTime <= registroAberto.checkInAt) {
     throw { statusCode: 400, message: 'Horário de checkout inválido' };
   }
@@ -670,11 +734,27 @@ export async function checkOutService(
     }
   }
 
-  return prisma.$transaction(async (tx: any) => {
+  const registroFechado = await prisma.$transaction(async (tx: any) => {
     const baseCheckoutData = {
       checkOutAt: checkoutTime,
       observacao: observacao?.trim() || registroAberto.observacao,
       duracaoMinutos,
+      fotoCheckoutCaminho: hasFoto ? fotoCheckoutCaminho!.trim() : null,
+      motivoCheckoutSemFoto: hasFoto ? null : motivoSemFoto!.slice(0, 500),
+      faceCheckoutStatus: faceServiceConfigurado() ? statusFaceInicial(hasFoto) : null,
+      ...(offline
+        ? {
+            offlineCheckout: true,
+            checkoutClientUuid: offline.clientUuid,
+            checkoutSincronizadoEm: new Date(),
+            offlineDesvioRelogioMs:
+              registroAberto.offlineDesvioRelogioMs != null &&
+              Math.abs(registroAberto.offlineDesvioRelogioMs) > Math.abs(offline.desvioMs)
+                ? registroAberto.offlineDesvioRelogioMs
+                : offline.desvioMs,
+            offlineRevisar: registroAberto.offlineRevisar || offline.revisar,
+          }
+        : {}),
     };
     let updated;
     try {
@@ -717,7 +797,14 @@ export async function checkOutService(
         acao: 'CHECKOUT_MEDICO',
         tenantId,
         medicoId,
-        detalhes: { escalaId: registro.escalaId, registroPontoId: registro.id, duracaoMinutos },
+        detalhes: {
+          escalaId: registro.escalaId,
+          registroPontoId: registro.id,
+          duracaoMinutos,
+          checkoutSemFoto: !hasFoto,
+          ...(hasFoto ? {} : { motivoResumo: motivoSemFoto!.slice(0, 120) }),
+          ...(offline ? { offline: true, desvioRelogioMs: offline.desvioMs } : {}),
+        },
       },
       tx
     );
@@ -725,6 +812,8 @@ export async function checkOutService(
     clearPontoCaches(tenantId, medicoId);
     return registro;
   });
+  if (hasFoto) void enqueueFaceVerify(registroFechado.id, 'checkout').catch(() => {});
+  return registroFechado;
 }
 
 export async function getMeuDiaPontoService(tenantId: string, medicoId: string) {
@@ -892,7 +981,10 @@ export async function getMeuDiaPontoService(tenantId: string, medicoId: string) 
 
   const payload = {
     registroAberto: aberto,
-    registrosHoje: registros,
+    registrosHoje: registros.map((r) => ({
+      ...r,
+      faceSituacao: situacaoFaceParaMedico(r.faceStatus, r.faceCheckoutStatus, r.faceRevisao),
+    })),
     totalMinutosHoje: totalMinutos,
     totalMinutosSemana,
     ultimoRegistroPonto: ultimoRegistro,
@@ -1351,6 +1443,7 @@ export async function getHistoricoPontosMedicoService(
       escalaId: r.escalaId,
       escala: r.escala,
       equipe: r.escalaId ? (contextoEscala.get(r.escalaId)?.equipeNome ?? null) : null,
+      faceSituacao: situacaoFaceParaMedico(r.faceStatus, r.faceCheckoutStatus, r.faceRevisao),
     })),
   };
 }

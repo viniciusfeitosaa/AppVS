@@ -56,6 +56,9 @@ function copyPublicAssetsToApp() {
     const dest = path.join(appDir, name);
     if (fs.existsSync(src)) fs.copyFileSync(src, dest);
   }
+  // Escopo do service worker = pasta onde ele é servido; na raiz ele cobriria a landing.
+  const sw = path.join(distDir, 'sw.js');
+  if (fs.existsSync(sw)) fs.renameSync(sw, path.join(appDir, 'sw.js'));
 }
 
 if (!useAppSubpath) {

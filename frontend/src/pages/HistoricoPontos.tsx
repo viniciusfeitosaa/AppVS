@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { SituacaoRegistroPonto } from '../components/ponto/SituacaoRegistroPonto';
+import { BadgeFaceSituacao, SituacaoRegistroPonto } from '../components/ponto/SituacaoRegistroPonto';
 import { pontoService } from '../services/ponto.service';
 
 const formatMonthInput = (date: Date) => {
@@ -129,6 +129,11 @@ const HistoricoPontos = () => {
                         atrasado={r.checkInAtrasado}
                         minutosAtraso={r.minutosAtrasoCheckin}
                       />
+                      {r.faceSituacao && (
+                        <div className="mt-1">
+                          <BadgeFaceSituacao situacao={r.faceSituacao} />
+                        </div>
+                      )}
                     </td>
                     <td className="py-2 pr-4 text-viva-900">{formatDuration(r.duracaoMinutos)}</td>
                     <td className="py-2 pr-4 text-viva-900 font-semibold">{formatCurrency(r.valor)}</td>

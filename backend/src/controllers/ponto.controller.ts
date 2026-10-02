@@ -2,6 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import { Request, Response } from 'express';
 import { assertFileIsAllowedImage } from '../utils/image-magic-bytes.util';
+import { isClientUuidValido, resolverInstanteOffline } from '../utils/ponto-offline.util';
 import {
   checkInService,
   checkOutService,
@@ -109,21 +110,106 @@ export const checkInSemFotoController = async (req: Request, res: Response) => {
 };
 
 export const checkOutController = async (req: Request, res: Response) => {
+  const file = (req as Request & { file?: Express.Multer.File }).file;
   try {
     if (!req.user) {
+      if (file?.path) fs.unlink(file.path, () => {});
       return res.status(401).json({ success: false, error: 'Não autenticado' });
     }
 
-    const { observacao, latitude, longitude } = req.body;
+    const { observacao, latitude, longitude, motivoSemFoto } = req.body;
     const lat = latitude != null && latitude !== '' ? Number(latitude) : null;
     const lon = longitude != null && longitude !== '' ? Number(longitude) : null;
 
-    const data = await checkOutService(req.user.tenantId, req.user.id, observacao, lat, lon);
+    let fotoRel: string | null = null;
+    if (file?.path) {
+      try {
+        await assertFileIsAllowedImage(file.path);
+      } catch (e: any) {
+        fs.unlink(file.path, () => {});
+        return res.status(400).json({ success: false, error: e?.message || 'Arquivo de imagem inválido.' });
+      }
+      fotoRel = path.relative(process.cwd(), file.path).split(path.sep).join('/');
+    }
+
+    const data = await checkOutService(
+      req.user.tenantId,
+      req.user.id,
+      observacao,
+      lat,
+      lon,
+      fotoRel,
+      fotoRel ? null : motivoSemFoto != null ? String(motivoSemFoto) : null
+    );
     return res.status(200).json({ success: true, data, message: 'Checkout realizado com sucesso' });
   } catch (error: any) {
+    if (file?.path) fs.unlink(file.path, () => {});
     return res.status(error.statusCode || 500).json({
       success: false,
       error: error.message || 'Erro ao realizar checkout',
+    });
+  }
+};
+
+const UUID_GENERICO_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * Ponto capturado sem internet (fila do aparelho). Idempotente por `clientUuid`:
+ * reenvio do mesmo item devolve o registro já criado.
+ */
+export const pontoOfflineController = (tipo: 'checkin' | 'checkout') => async (req: Request, res: Response) => {
+  const file = (req as Request & { file?: Express.Multer.File }).file;
+  const descartar = () => file?.path && fs.unlink(file.path, () => {});
+  try {
+    if (!req.user) {
+      descartar();
+      return res.status(401).json({ success: false, error: 'Não autenticado' });
+    }
+    const { clientUuid, capturadoEm, enviadoEm, escalaId, observacao, latitude, longitude, motivoSemFoto } = req.body;
+    if (!isClientUuidValido(clientUuid)) {
+      descartar();
+      return res.status(400).json({ success: false, error: 'clientUuid inválido' });
+    }
+    if (tipo === 'checkin' && !(typeof escalaId === 'string' && UUID_GENERICO_RE.test(escalaId))) {
+      descartar();
+      return res.status(400).json({ success: false, error: 'escalaId inválido' });
+    }
+    const tempo = resolverInstanteOffline({ capturadoEm, enviadoEm });
+    const lat = latitude != null && latitude !== '' ? Number(latitude) : null;
+    const lon = longitude != null && longitude !== '' ? Number(longitude) : null;
+    const obs = typeof observacao === 'string' ? observacao.slice(0, 500) : undefined;
+
+    let fotoRel: string | null = null;
+    if (file?.path) {
+      try {
+        await assertFileIsAllowedImage(file.path);
+      } catch (e: any) {
+        descartar();
+        return res.status(400).json({ success: false, error: e?.message || 'Arquivo de imagem inválido.' });
+      }
+      fotoRel = path.relative(process.cwd(), file.path).split(path.sep).join('/');
+    }
+    const motivo = fotoRel ? null : motivoSemFoto != null ? String(motivoSemFoto).trim() : null;
+    const offline = { clientUuid, instante: tempo.instante, desvioMs: tempo.desvioMs, revisar: tempo.revisar };
+
+    const data =
+      tipo === 'checkin'
+        ? await checkInService(req.user.tenantId, req.user.id, escalaId, obs, lat, lon, fotoRel, motivo, offline)
+        : await checkOutService(req.user.tenantId, req.user.id, obs, lat, lon, fotoRel, motivo, offline);
+    const duplicado = !!(data as { duplicado?: boolean }).duplicado;
+    return res.status(duplicado ? 200 : 201).json({
+      success: true,
+      data: { ...data, instante: tempo.instante, revisar: tempo.revisar },
+      message: duplicado ? 'Ponto offline já sincronizado' : 'Ponto offline sincronizado',
+    });
+  } catch (error: any) {
+    descartar();
+    if (error?.code === 'P2002') {
+      return res.status(200).json({ success: true, data: { duplicado: true }, message: 'Ponto offline já sincronizado' });
+    }
+    return res.status(error.statusCode || 500).json({
+      success: false,
+      error: error.message || 'Erro ao sincronizar ponto offline',
     });
   }
 };

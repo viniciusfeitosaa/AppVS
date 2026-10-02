@@ -14,6 +14,9 @@ services:
       redis:
         condition: service_healthy
 
+  face-service:
+    container_name: coopvitta-face-service
+
   frontend:
     container_name: coopvitta-frontend
     ports: !reset []

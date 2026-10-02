@@ -10,7 +10,7 @@ import { adminService } from '../services/admin.service';
 import { fixMojibake } from '../utils/validation.util';
 import { notify } from '../lib/notificationEmitter';
 import { addPdfBrandHeader } from '../utils/pdf-branding';
-import { SituacaoRegistroPonto, situacaoRegistroPontoTexto } from '../components/ponto/SituacaoRegistroPonto';
+import { faceResumoMasterTexto, SituacaoRegistroPonto, situacaoRegistroPontoTexto } from '../components/ponto/SituacaoRegistroPonto';
 
 type RegistroPontoLinha = {
   id: string;
@@ -20,6 +20,11 @@ type RegistroPontoLinha = {
   origem?: string | null;
   checkInAtrasado?: boolean;
   minutosAtrasoCheckin?: number | null;
+  faceStatus?: string | null;
+  faceCheckoutStatus?: string | null;
+  faceRevisao?: string | null;
+  offlineCheckin?: boolean;
+  offlineCheckout?: boolean;
   medico?: { nomeCompleto?: string | null } | null;
 };
 
@@ -179,6 +184,12 @@ const RelatoriosPontoEletronico = () => {
       origem: r.origem ?? null,
       atrasado: !!r.checkInAtrasado,
       minutosAtraso: Math.max(0, Number(r.minutosAtrasoCheckin ?? 0)),
+      facial: [
+        faceResumoMasterTexto(r.faceStatus, r.faceCheckoutStatus, r.faceRevisao),
+        r.offlineCheckin || r.offlineCheckout ? 'Offline' : null,
+      ]
+        .filter((x) => x && x !== '—')
+        .join(' · ') || '—',
     }));
   }, [registros]);
 
@@ -197,6 +208,7 @@ const RelatoriosPontoEletronico = () => {
         atrasado: row.atrasado,
         minutosAtraso: row.minutosAtraso,
       }),
+      'Reconhecimento facial': row.facial,
       'Total do dia': formatDuration(row.minutos),
     }));
     rows.push({
@@ -204,6 +216,7 @@ const RelatoriosPontoEletronico = () => {
       Entrada: '',
       Saida: '',
       Situação: '',
+      'Reconhecimento facial': '',
       'Total do dia': formatDuration(totalMinutosMes),
     });
     const ws = XLSX.utils.json_to_sheet(rows);
@@ -227,6 +240,7 @@ const RelatoriosPontoEletronico = () => {
         textoSeguroPdf('Entrada'),
         textoSeguroPdf('Saída'),
         textoSeguroPdf('Situação'),
+        textoSeguroPdf('Reconhecimento facial'),
         textoSeguroPdf('Total do dia'),
       ]],
       body: linhasTabela.map((row) => [
@@ -240,10 +254,12 @@ const RelatoriosPontoEletronico = () => {
             minutosAtraso: row.minutosAtraso,
           })
         ),
+        textoSeguroPdf(row.facial),
         textoSeguroPdf(formatDuration(row.minutos)),
       ]),
       foot: [[
         textoSeguroPdf('TOTAL DO MÊS'),
+        '',
         '',
         '',
         '',
@@ -413,6 +429,7 @@ const RelatoriosPontoEletronico = () => {
                     <th className="py-2 pr-4">Hora da entrada</th>
                     <th className="py-2 pr-4">Hora da saída</th>
                     <th className="py-2 pr-4">Situação na entrada</th>
+                    <th className="py-2 pr-4">Reconhecimento facial</th>
                     <th className="py-2 pr-4">Total de horas do dia</th>
                   </tr>
                 </thead>
@@ -429,6 +446,7 @@ const RelatoriosPontoEletronico = () => {
                           minutosAtraso={row.minutosAtraso}
                         />
                       </td>
+                      <td className="py-2 pr-4 text-xs text-viva-800">{row.facial}</td>
                       <td className="py-2 pr-4 text-viva-900">{formatDuration(row.minutos)}</td>
                     </tr>
                   ))}

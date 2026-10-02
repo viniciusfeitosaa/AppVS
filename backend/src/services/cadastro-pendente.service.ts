@@ -1,6 +1,7 @@
 import fs from 'fs';
 import { StatusCadastroMedico, StatusRevisaoDocumentoPerfil } from '@prisma/client';
 import { prisma } from '../config/database';
+import { aprovarBiometriaPendenteDoCadastro, excluirBiometriasDoMedico } from './biometria-facial.service';
 import { DOCUMENTO_LABEL_BY_TIPO, statusValidadeDocumento } from '../constants/documentos.const';
 import { createAuditLog } from './auditoria.service';
 import { getMedicoDocumentoPerfilForDownload } from './medico.service';
@@ -101,13 +102,21 @@ export async function getCadastroPendenteDetalheService(tenantId: string, medico
       rqe: true,
       localInteresseTrabalho: true,
       interesseTrabalho: true,
+      biometriasFaciais: {
+        where: { ativa: true },
+        orderBy: { createdAt: 'desc' },
+        take: 1,
+        select: { id: true, status: true, livenessScore: true, motivoRejeicao: true, createdAt: true },
+      },
     },
   });
   if (!m) {
     throw { statusCode: 404, message: 'Cadastro pendente não encontrado ou já processado' };
   }
+  const { biometriasFaciais, ...resto } = m;
   return {
-    ...m,
+    ...resto,
+    biometria: biometriasFaciais[0] ?? null,
     documentos: m.documentos.map((doc) => ({
       ...doc,
       statusValidade: statusValidadeDocumento(doc.tipo, doc.validadeEm),
@@ -331,6 +340,8 @@ export async function aprovarCadastroPendenteService(tenantId: string, masterId:
     },
   });
 
+  await aprovarBiometriaPendenteDoCadastro(tenantId, medicoId, masterId);
+
   await createAuditLog({
     acao: 'APROVAR_CADASTRO_PUBLICO_MEDICO',
     tenantId,
@@ -388,6 +399,8 @@ export async function rejeitarCadastroPendenteService(tenantId: string, masterId
       ativo: false,
     },
   });
+
+  await excluirBiometriasDoMedico(tenantId, medicoId);
 
   await createAuditLog({
     acao: 'REJEITAR_CADASTRO_PUBLICO_MEDICO',

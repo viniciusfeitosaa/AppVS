@@ -441,6 +441,19 @@ const Dashboard = () => {
   });
   const justificativasPendentesPreview = justificativasPendentesMaster.slice(0, 1);
 
+  const { data: faceDivergenciasMaster = [] } = useQuery({
+    queryKey: ['admin', 'divergencias-faciais', false, 'dashboard'],
+    queryFn: async () => (await adminService.listDivergenciasFaciais({ revisados: false, dias: 90 })).data ?? [],
+    enabled: !!user && isMaster && podePonto,
+    staleTime: 60 * 1000,
+  });
+  const { data: biometriasPendentesMaster = [] } = useQuery({
+    queryKey: ['admin', 'biometrias-faciais', 'PENDENTE_APROVACAO', 'dashboard'],
+    queryFn: async () => (await adminService.listBiometriasFaciais('PENDENTE_APROVACAO')).data ?? [],
+    enabled: !!user && isMaster && podePonto,
+    staleTime: 60 * 1000,
+  });
+
   const aceitarTrocaMutation = useMutation({
     mutationFn: (p: { id: string; plantaoContrapartidaId?: string }) =>
       pontoService.aceitarTrocaPlantao(
@@ -1218,6 +1231,33 @@ const Dashboard = () => {
               +{justificativasPendentesMaster.length - justificativasPendentesPreview.length} na fila
             </p>
           )}
+        </div>
+      )}
+
+      {isMaster && podePonto && (faceDivergenciasMaster.length > 0 || biometriasPendentesMaster.length > 0) && (
+        <div className="card col-span-full stagger-2 border-l-4 border-l-red-400 bg-gradient-to-r from-red-50/70 to-amber-50/30">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h3 className="text-sm font-semibold text-red-900 font-display">Reconhecimento facial</h3>
+              <p className="text-xs text-red-800/90 mt-0.5 font-serif">
+                {[
+                  faceDivergenciasMaster.length > 0 &&
+                    (faceDivergenciasMaster.length === 1
+                      ? '1 ponto com divergência facial'
+                      : `${faceDivergenciasMaster.length} pontos com divergência facial`),
+                  biometriasPendentesMaster.length > 0 &&
+                    (biometriasPendentesMaster.length === 1
+                      ? '1 foto de referência aguardando aprovação'
+                      : `${biometriasPendentesMaster.length} fotos de referência aguardando aprovação`),
+                ]
+                  .filter(Boolean)
+                  .join(' · ')}
+              </p>
+            </div>
+            <Link to="/reconhecimento-facial" className="btn-sm btn-primary shrink-0">
+              Revisar
+            </Link>
+          </div>
         </div>
       )}
 

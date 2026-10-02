@@ -538,6 +538,7 @@ const normalizarNucleoProcedimento = (raw: string): string => {
   s = s.replace(/\b(supracondileana|transtrocateriana|transcoterciana) do femur\b/g, '$1 femur');
   const pairs: [RegExp, string][] = [
     [/\bplanalto tibial\b/g, 'pilao tibial'],
+    [/\bplato tibial\b/g, 'pilao tibial'],
     [/\bsupracondiliana\b/g, 'supracondileana'],
     [/\bsupracondiliano\b/g, 'supracondileano'],
     [
@@ -673,6 +674,7 @@ const findProcedimentoBasePorParNomes = (
       .filter((b) => {
         const bn1 = normalizarNucleoProcedimento(b.nome1);
         const bn2 = normalizarNucleoProcedimento(b.nome2);
+        if (bn1.length < 6 || bn2.length < 6) return false;
         return (bn1.includes(n1) || n1.includes(bn1)) && (bn2.includes(n2) || n2.includes(bn2));
       })
       .map((b) => ({ b, s: 0.55 }));
@@ -693,6 +695,41 @@ const findProcedimentoBasePorParNomes = (
   if (ranked.length >= 2 && ranked[0]!.s - ranked[1]!.s >= 0.1) return { ok: ranked[0]!.b };
   if (list.length > 1) return { err: 'ambiguous' };
   return { err: 'notfound' };
+};
+
+const digitosCodigoProced = (s: string) => String(s ?? '').replace(/\D/g, '');
+
+/**
+ * Código SIGTAP da planilha (ex.: 408050632 ou 04.08.05.063-2) — casa com Cód. 1 ou Cód. 2 da base.
+ * Vários pares com o mesmo código: prefere o 1.º, depois desempata pelo total de honorários.
+ */
+const findProcedimentoBasePorCodigoSigtap = (
+  base: ProcedimentoBase[],
+  codigo: string,
+  totalHonorarios?: number
+): ProcedimentoBase | undefined => {
+  const d = digitosCodigoProced(codigo);
+  if (d.length < 8) return undefined;
+  const iguais = (c: string) => {
+    const dc = digitosCodigoProced(c);
+    return dc.length >= 8 && dc.replace(/^0+/, '') === d.replace(/^0+/, '');
+  };
+  const escolher = (cands: ProcedimentoBase[]): ProcedimentoBase | undefined => {
+    if (cands.length === 1) return cands[0];
+    if (cands.length < 2 || totalHonorarios == null) return undefined;
+    const exato = unicoParPorTotalHonorarios(cands, totalHonorarios);
+    if (exato) return exato;
+    const ordenados = [...cands].sort(
+      (a, z) => Math.abs(somaValoresBase(a) - totalHonorarios) - Math.abs(somaValoresBase(z) - totalHonorarios)
+    );
+    const d0 = Math.abs(somaValoresBase(ordenados[0]!) - totalHonorarios);
+    const d1 = Math.abs(somaValoresBase(ordenados[1]!) - totalHonorarios);
+    return d1 - d0 > 1 ? ordenados[0] : undefined;
+  };
+  return (
+    escolher(base.filter((b) => iguais(b.codigo1))) ??
+    escolher(base.filter((b) => iguais(b.codigo2)))
+  );
 };
 
 /** Único registo na base cuja soma TUSS (valor1+valor2) coincide com o total importado (±R$0,02). */
@@ -746,9 +783,12 @@ const findProcedimentoBasePorNomeProcedimento = (
   if (r2) return { ok: r2 };
   if (exact2.length > 1) return { err: 'ambiguous' };
 
+  // Nomes vazios/curtos na base (ex.: COORDENADOR sem 2.º) casariam com qualquer texto via includes.
+  const nomeSubstringOk = (n: string) => n.length >= 6;
+
   const sub1 = base.filter((b) => {
     const n1 = normalizarNucleoProcedimento(b.nome1);
-    return n1.includes(t) || t.includes(n1);
+    return nomeSubstringOk(n1) && (n1.includes(t) || t.includes(n1));
   });
   const r3 = resolveMulti(sub1, 'nome1');
   if (r3) return { ok: r3 };
@@ -756,7 +796,7 @@ const findProcedimentoBasePorNomeProcedimento = (
 
   const sub2 = base.filter((b) => {
     const n2 = normalizarNucleoProcedimento(b.nome2);
-    return n2.includes(t) || t.includes(n2);
+    return nomeSubstringOk(n2) && (n2.includes(t) || t.includes(n2));
   });
   const r4 = resolveMulti(sub2, 'nome2');
   if (r4) return { ok: r4 };
@@ -1012,6 +1052,10 @@ const LANC_IMPORT_COLS: { id: string; normKeys: string[] }[] = [
   { id: 'instrumento', normKeys: ['ins', 'ins.', 'instrumento'] },
   { id: 'codigo1', normKeys: ['codigo 1', 'cod 1', 'cod. 1', 'cod1', 'codigo1'] },
   { id: 'codigo2', normKeys: ['codigo 2', 'cod 2', 'cod. 2', 'cod2', 'codigo2'] },
+  {
+    id: 'codigoSigtap',
+    normKeys: ['codigo', 'cod', 'cod.', 'codigo sigtap', 'sigtap', 'codigo procedimento', 'codigo do procedimento'],
+  },
   {
     id: 'valor1',
     normKeys: ['valor 1', 'valor1', 'r$ 1', 'rs 1'],
@@ -1700,6 +1744,7 @@ const parsePlanilhaLancamentos = (
     const instrumento = cellStrImport(row, col, 'instrumento');
     const codigo1 = cellStrImport(row, col, 'codigo1');
     const codigo2 = cellStrImport(row, col, 'codigo2');
+    const codigoSigtap = cellStrImport(row, col, 'codigoSigtap');
     const v1s = cellStrImport(row, col, 'valor1');
     const v2s = cellStrImport(row, col, 'valor2');
     let honorTotalStr = cellStrImport(row, col, 'honorariosTotalPar');
@@ -1761,11 +1806,21 @@ const parsePlanilhaLancamentos = (
     }
 
     let base: ProcedimentoBase | undefined;
+    const baseViaSigtap =
+      !temTriploCompleto && codigoSigtap
+        ? findProcedimentoBasePorCodigoSigtap(
+            baseProcedimentos,
+            codigoSigtap,
+            temHonorParaId ? honorT0Raw : undefined
+          )
+        : undefined;
     if (temTriploCompleto) {
       base = findProcedimentoBaseImport(baseProcedimentos, instrumento, codigo1, codigo2);
       if (!base) {
         pushErroLinha(`procedimento não encontrado na base (${instrumento} | ${codigo1} | ${codigo2}).`);
       }
+    } else if (baseViaSigtap) {
+      base = baseViaSigtap;
     } else if (nomeProc) {
       const honorDisamb = temHonorParaId ? honorT0Raw : undefined;
       const hit = findProcedimentoBasePorNomeProcedimento(baseProcedimentos, nomeProc, honorDisamb);
@@ -1987,6 +2042,14 @@ const migrarProcedimentos = (raw: unknown): LinhaProcedimento[] => {
 };
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
+
+const contratosDoMedico = (m: AdminMedico): string => {
+  const nomes = new Set<string>();
+  for (const e of m.equipes ?? []) {
+    for (const c of e.contratos ?? []) if (c.ativo) nomes.add(c.nome);
+  }
+  return [...nomes].sort((a, b) => a.localeCompare(b, 'pt-BR')).join(', ');
+};
 
 const quemRepasseEfetivo = (l: LinhaProcedimento, mes: DadosMes): RascunhoProfsT => l.quemRepasse ?? pickRascunhoProfs(mes);
 
@@ -2609,6 +2672,27 @@ const RelatoriosProcedimentos = () => {
       repasseTotal: rTot,
     };
   }, [linhasTotais, local, r2Pct]);
+
+  const importPreviewCalculo = useMemo(() => {
+    if (!importPreview?.linhas.length) return null;
+    let cobranca = 0;
+    let margem = 0;
+    let repasse = 0;
+    const porLinha = importPreview.linhas.map((l) => {
+      const bruto = round2(parseBrl(l.valorPrimeiro) + parseBrl(l.valorSegundo));
+      const r = repassePorLinhaMargemFixa(bruto, r2Pct, quemRepasseEfetivo(l, local));
+      cobranca += bruto;
+      margem += r.margemLinha;
+      repasse += r.repasseLinha;
+      return { bruto, r1: r.r1, r2: r.r2 };
+    });
+    return {
+      porLinha,
+      cobranca: round2(cobranca),
+      margem: round2(margem),
+      repasse: round2(repasse),
+    };
+  }, [importPreview, local, r2Pct]);
 
   const resumoMedicos = useMemo(() => {
     const mapa = new Map<
@@ -3694,11 +3778,14 @@ const RelatoriosProcedimentos = () => {
                           <th className="px-1.5 py-1.5 font-medium text-right">V2</th>
                           <th className="px-1.5 py-1.5 font-medium">1.º rep.</th>
                           <th className="px-1.5 py-1.5 font-medium">2.º rep.</th>
-                          <th className="px-1.5 py-1.5 font-medium text-right">Total</th>
+                          <th className="px-1.5 py-1.5 font-medium text-right">Cobrança</th>
+                          <th className="px-1.5 py-1.5 font-medium text-right">Rep. 1.º</th>
+                          <th className="px-1.5 py-1.5 font-medium text-right">Rep. 2.º</th>
                         </tr>
                       </thead>
                       <tbody>
                         {importPreview.linhas.map((l, i) => {
+                          const calc = importPreviewCalculo?.porLinha[i];
                           const q = l.quemRepasse!;
                           const m1 = q.incluirProfissional1
                             ? rotuloQuem(q.profissional1Nome, q.profissional1Crm) ?? '—'
@@ -3747,12 +3834,34 @@ const RelatoriosProcedimentos = () => {
                               <td className="px-1.5 py-1 text-right font-mono font-semibold tabular-nums">
                                 {BRL.format(bruto)}
                               </td>
+                              <td className="px-1.5 py-1 text-right font-mono tabular-nums text-emerald-800">
+                                {calc && q.incluirProfissional1 ? BRL.format(calc.r1) : '—'}
+                              </td>
+                              <td className="px-1.5 py-1 text-right font-mono tabular-nums text-emerald-800">
+                                {calc && q.incluirProfissional2 ? BRL.format(calc.r2) : '—'}
+                              </td>
                             </tr>
                           );
                         })}
                       </tbody>
                     </table>
                   </div>
+                  {importPreviewCalculo && (
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 border-t border-viva-200/70 bg-white px-3 py-2.5">
+                      {[
+                        { t: 'Valor cobrança', v: importPreviewCalculo.cobranca },
+                        { t: `Margem coop. (${MARGEM_COOP_PCT}%)`, v: importPreviewCalculo.margem },
+                        { t: `Repasse (${PCT.format(REPASSE_FRAC_LINHA * 100)}%)`, v: importPreviewCalculo.repasse },
+                      ].map((c) => (
+                        <div key={c.t} className="rounded-lg border border-viva-200/60 bg-viva-50/40 px-3 py-2">
+                          <p className="text-[10px] font-semibold uppercase text-viva-500 font-display tracking-wide">
+                            {c.t}
+                          </p>
+                          <p className="text-sm font-bold text-viva-900 font-mono tabular-nums">{BRL.format(c.v)}</p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                   <div className="flex flex-wrap items-center justify-end gap-2 border-t border-viva-200/70 bg-viva-50/40 px-3 py-2.5">
                     <button
                       type="button"
@@ -3955,6 +4064,9 @@ const RelatoriosProcedimentos = () => {
                             >
                               {m.nomeCompleto}
                               {m.crm && <span className="text-viva-500"> · {m.crm}</span>}
+                              <span className="block text-[11px] text-viva-500">
+                                {contratosDoMedico(m) || 'Sem contrato vinculado'}
+                              </span>
                             </button>
                           </li>
                         ))}
@@ -4060,6 +4172,9 @@ const RelatoriosProcedimentos = () => {
                             >
                               {m.nomeCompleto}
                               {m.crm && <span className="text-viva-500"> · {m.crm}</span>}
+                              <span className="block text-[11px] text-viva-500">
+                                {contratosDoMedico(m) || 'Sem contrato vinculado'}
+                              </span>
                             </button>
                           </li>
                         ))}
@@ -5086,7 +5201,7 @@ const RelatoriosProcedimentos = () => {
               </div>
             </div>
             <div className="min-h-0 flex-1 overflow-auto px-3 sm:px-4 pb-4">
-              <table className="w-full min-w-[980px] border-collapse text-left text-xs text-viva-800">
+              <table className="w-full min-w-[1080px] border-collapse text-left text-xs text-viva-800">
                 <thead className="sticky top-0 z-[1] bg-slate-800/95 text-[10px] font-display font-semibold uppercase text-white sm:text-xs">
                   <tr>
                     <th className="px-2 py-2.5 sm:px-3">Instrumento</th>
@@ -5096,6 +5211,7 @@ const RelatoriosProcedimentos = () => {
                     <th className="px-2 py-2.5 sm:px-3">Código 2</th>
                     <th className="px-2 py-2.5 sm:px-3 min-w-[12rem]">2 Procedimento</th>
                     <th className="px-2 py-2.5 sm:px-3 text-right">Valor 2 (R$)</th>
+                    <th className="px-2 py-2.5 sm:px-3 text-right">Total (R$)</th>
                     <th className="px-2 py-2.5 sm:px-3 min-w-[10rem]">Ações</th>
                   </tr>
                 </thead>
@@ -5158,6 +5274,11 @@ const RelatoriosProcedimentos = () => {
                           value={numBrl(b.valor2)}
                           onChange={(e) => atualizarRascunhoBase(b.id, { valor2: parseBrl(e.target.value) })}
                         />
+                      </td>
+                      <td className="px-1 py-1 sm:px-2 align-top">
+                        <div className="flex h-9 min-w-[5.5rem] items-center justify-end rounded-lg bg-viva-50 px-2 text-xs font-mono font-semibold tabular-nums text-viva-900">
+                          {numBrl(round2((Number(b.valor1) || 0) + (Number(b.valor2) || 0)))}
+                        </div>
                       </td>
                       <td className="px-1 py-1 sm:px-2 align-top">
                         <div className="flex flex-col gap-1 min-w-[7rem]">

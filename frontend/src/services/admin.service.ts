@@ -157,6 +157,13 @@ export interface CadastroPendenteDetalhe {
   createdAt: string;
   updatedAt: string;
   documentos: CadastroPendenteDocumento[];
+  biometria?: {
+    id: string;
+    status: 'PENDENTE_APROVACAO' | 'APROVADA' | 'REJEITADA';
+    livenessScore: number | string | null;
+    motivoRejeicao: string | null;
+    createdAt: string;
+  } | null;
 }
 
 /** Equipes do profissional (listagem em `/admin/medicos`). */
@@ -165,6 +172,7 @@ export interface MedicoEquipeResumo {
   nome: string;
   ativo: boolean;
   subgrupo: { id: string; nome: string } | null;
+  contratos?: { id: string; nome: string; ativo: boolean }[];
 }
 
 export interface AdminMedico {
@@ -604,6 +612,56 @@ export type ProcedimentoBaseItem = {
 export interface ProcedimentosBaseApiResponse {
   success: boolean;
   data: ProcedimentoBaseItem[] | null;
+}
+
+export interface BiometriaFacialAdmin {
+  id: string;
+  status: 'PENDENTE_APROVACAO' | 'APROVADA' | 'REJEITADA';
+  origem: string;
+  livenessScore: number | null;
+  qualidade: Record<string, number> | null;
+  motivoRejeicao: string | null;
+  revisadoEm: string | null;
+  createdAt: string;
+  medico: { id: string; nomeCompleto: string; crm: string | null; cpf: string | null };
+}
+
+export type FaceStatusPonto =
+  | 'PENDENTE'
+  | 'CONFERE'
+  | 'INCERTO'
+  | 'DIVERGENTE'
+  | 'SPOOF_SUSPEITO'
+  | 'SEM_ROSTO'
+  | 'SEM_BIOMETRIA'
+  | 'SEM_FOTO'
+  | 'ERRO';
+
+export interface DivergenciaFacialAdmin {
+  id: string;
+  checkInAt: string;
+  checkOutAt: string | null;
+  faceStatus: FaceStatusPonto | null;
+  faceSimilaridade: number | null;
+  faceLiveness: number | null;
+  faceCheckoutStatus: FaceStatusPonto | null;
+  faceCheckoutSimilaridade: number | null;
+  faceCheckoutLiveness: number | null;
+  faceBiometriaId: string | null;
+  faceRevisao: 'CONFIRMADO_MEDICO' | 'FRAUDE_SUSPEITA' | null;
+  faceRevisaoEm: string | null;
+  faceRevisaoObs: string | null;
+  escala: { id: string; nome: string } | null;
+  medico: { id: string; nomeCompleto: string; crm: string | null };
+  temFotoCheckin: boolean;
+  temFotoCheckout: boolean;
+  biometriaStatus: BiometriaFacialAdmin['status'] | null;
+  offlineCheckin: boolean;
+  offlineCheckout: boolean;
+  checkinSincronizadoEm: string | null;
+  checkoutSincronizadoEm: string | null;
+  offlineDesvioRelogioMs: number | null;
+  offlineRevisar: boolean;
 }
 
 export const adminService = {
@@ -1070,6 +1128,41 @@ export const adminService = {
     window.open(url, '_blank', 'noopener,noreferrer');
     // libera depois (tempo para o navegador carregar o blob)
     window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+  },
+
+  /** Foto protegida como object URL (quem chama deve revogar). */
+  getFotoFacialUrl: async (
+    tipo: 'checkin' | 'checkout' | 'biometria',
+    id: string
+  ): Promise<string> => {
+    const path =
+      tipo === 'biometria'
+        ? `/admin/biometrias-faciais/${id}/foto`
+        : `/admin/registros-ponto/${id}/foto-${tipo}`;
+    const response = await api.get(path, { responseType: 'blob' });
+    return URL.createObjectURL(
+      new Blob([response.data], { type: response.headers['content-type'] || 'image/jpeg' })
+    );
+  },
+
+  listBiometriasFaciais: async (status?: BiometriaFacialAdmin['status']) => {
+    const response = await api.get('/admin/biometrias-faciais', { params: status ? { status } : undefined });
+    return response.data as { success: boolean; data: BiometriaFacialAdmin[] };
+  },
+
+  revisarBiometriaFacial: async (id: string, decisao: 'APROVADA' | 'REJEITADA', motivo?: string) => {
+    const response = await api.post(`/admin/biometrias-faciais/${id}/revisar`, { decisao, motivo });
+    return response.data;
+  },
+
+  listDivergenciasFaciais: async (params: { revisados?: boolean; dias?: number }) => {
+    const response = await api.get('/admin/ponto/divergencias-faciais', { params });
+    return response.data as { success: boolean; data: DivergenciaFacialAdmin[] };
+  },
+
+  revisarFacePonto: async (registroId: string, decisao: 'CONFIRMADO_MEDICO' | 'FRAUDE_SUSPEITA', observacao?: string) => {
+    const response = await api.post(`/admin/registros-ponto/${registroId}/revisao-facial`, { decisao, observacao });
+    return response.data;
   },
 
   getMatrizAcessosModulos: async (): Promise<{

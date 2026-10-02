@@ -127,10 +127,24 @@ export const acceptInviteController = async (req: Request, res: Response) => {
 
 export const registerPublicController = async (req: Request, res: Response) => {
   try {
-    const files = (req.files as Record<string, Express.Multer.File[]> | undefined) || undefined;
+    const { selfieBiometria, ...files } =
+      (req.files as Record<string, Express.Multer.File[]> | undefined) || {};
     const { parseDocumentoValidadesFromBody } = await import('../constants/documentos.const');
     const validades = parseDocumentoValidadesFromBody(req.body);
-    const result = await registerPublicMedicoService(req.body, files, validades);
+    const selfie = selfieBiometria?.[0];
+    const result = await registerPublicMedicoService(
+      req.body,
+      files,
+      validades,
+      selfie
+        ? {
+            fotoAbs: selfie.path,
+            consentiu: req.body.consentimentoBiometria === 'true',
+            consentimentoVersao:
+              typeof req.body.consentimentoBiometriaVersao === 'string' ? req.body.consentimentoBiometriaVersao : undefined,
+          }
+        : undefined
+    );
     return res.status(201).json({
       success: true,
       data: result,

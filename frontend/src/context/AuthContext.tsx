@@ -82,7 +82,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         clearStoredSession();
       } else {
         const payload = decodeJwtPayloadUnsafe<{ exp?: number; id?: string }>(token);
-        if (!payload?.id || (typeof payload.exp === 'number' && payload.exp * 1000 <= Date.now())) {
+        const expirado = typeof payload?.exp === 'number' && payload.exp * 1000 <= Date.now();
+        // Sem internet não há como renovar: mantém a sessão para o ponto offline; o 401 ao reconectar pede login.
+        if (!payload?.id || (expirado && navigator.onLine)) {
           clearStoredSession();
         } else {
           const parsed = JSON.parse(storedUser);

@@ -124,9 +124,10 @@ export const authService = {
   register: async (
     payload: RegisterPayload,
     files?: RegisterDocumentFiles,
-    validades?: RegisterDocumentValidades
+    validades?: RegisterDocumentValidades,
+    selfie?: { foto: File; consentimentoVersao: string }
   ) => {
-    const hasFile = files && Object.values(files).some((f) => f instanceof File);
+    const hasFile = !!selfie || (files && Object.values(files).some((f) => f instanceof File));
     if (!hasFile) {
       const response = await api.post('/auth/register', payload);
       return response.data;
@@ -157,6 +158,11 @@ export const authService = {
     Object.entries(files || {}).forEach(([k, file]) => {
       if (file instanceof File) fd.append(k, file);
     });
+    if (selfie) {
+      fd.append('selfieBiometria', selfie.foto);
+      fd.append('consentimentoBiometria', 'true');
+      fd.append('consentimentoBiometriaVersao', selfie.consentimentoVersao);
+    }
     Object.entries(validades || {}).forEach(([field, date]) => {
       if (date && String(date).trim()) {
         fd.append(`validadeEm__${field}`, String(date).trim().slice(0, 10));

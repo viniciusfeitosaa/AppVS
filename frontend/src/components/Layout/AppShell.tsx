@@ -13,6 +13,7 @@ import { ModuloSistema } from '../../constants/modulos';
 import NotificationBell from './NotificationBell';
 import GlobalToasts from './GlobalToasts';
 import { BrandLogo } from '../brand/BrandLogo';
+import { usePontoOffline } from '../../hooks/usePontoOffline';
 
 export { canEdit, hasAccess, isAdminPleno } from '../../services/auth.service';
 
@@ -125,6 +126,7 @@ const getMobileIcon = (label: string) => {
 
 const AppShell = () => {
   const { user, logout } = useAuth();
+  usePontoOffline(user?.role === 'MEDICO' ? user.id : undefined);
   const location = useLocation();
   const isMaster = user?.role === 'MASTER';
   const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
@@ -206,6 +208,7 @@ const AppShell = () => {
             { to: '/valores-plantao', label: 'Valores Hora/Plantão' },
             { to: '/valores-ponto', label: 'Horas/Valor Ponto Eletrônico' },
             { to: '/justificativas-ponto', label: 'Justificativas de ponto' },
+            { to: '/reconhecimento-facial', label: 'Reconhecimento facial' },
             { to: '/modulo-escala-master', label: 'Somente escala' },
             { to: '/envio-documentos', label: 'Envio de Documentos' },
             { to: '/email', label: 'Painel de E-mail' },
@@ -250,6 +253,7 @@ const AppShell = () => {
     '/valores-plantao': 'VALORES_PLANTAO',
     '/valores-ponto': 'PONTO_ELETRONICO',
     '/justificativas-ponto': 'PONTO_ELETRONICO',
+    '/reconhecimento-facial': 'PONTO_ELETRONICO',
     '/envio-documentos': 'ENVIO_DOCUMENTOS',
     '/email': 'ENVIO_EMAIL',
     '/enviar-aviso': 'CONFIGURACOES',

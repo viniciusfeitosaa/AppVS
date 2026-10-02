@@ -20,6 +20,8 @@ export function pathForNotificacaoTipo(tipo: string): string {
       return '/historico-pontos';
     case 'DOCUMENTO_VALIDADE':
       return '/perfil';
+    case 'BIOMETRIA_FACIAL_REJEITADA':
+      return '/ponto-eletronico';
     default:
       return '/dashboard';
   }

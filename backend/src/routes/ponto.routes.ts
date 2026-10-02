@@ -1,7 +1,18 @@
 import { Router } from 'express';
 import { ModuloSistema, UserRole } from '@prisma/client';
 import { authenticateToken, requireModuleAccess, requireRole } from '../middleware/auth.middleware';
-import { uploadPontoCheckinMiddleware } from '../middleware/upload.middleware';
+import {
+  maybeUploadPontoCheckoutMiddleware,
+  uploadBiometriaMiddleware,
+  uploadConferirRostoMiddleware,
+  uploadPontoCheckinMiddleware,
+} from '../middleware/upload.middleware';
+import {
+  cadastrarMinhaBiometriaController,
+  conferirMeuRostoController,
+  fotoMinhaBiometriaController,
+  getMinhaBiometriaController,
+} from '../controllers/biometria-facial.controller';
 import {
   validateCheckinMultipart,
   requireCheckinFoto,
@@ -20,6 +31,7 @@ import {
   checkInController,
   checkInSemFotoController,
   checkOutController,
+  pontoOfflineController,
   getMeuDiaPontoController,
   getPainelPontoInicialController,
   downloadFotoCheckinMedicoController,
@@ -58,7 +70,13 @@ router.post(
 );
 /** Check-in quando a câmera não pode ser usada (motivo obrigatório, auditado). */
 router.post('/checkin-sem-foto', validateCheckinSemFoto, checkInSemFotoController);
-router.post('/checkout', validateCheckout, checkOutController);
+router.post('/checkout', maybeUploadPontoCheckoutMiddleware, validateCheckout, checkOutController);
+router.post('/checkin-offline', maybeUploadPontoCheckoutMiddleware, pontoOfflineController('checkin'));
+router.post('/checkout-offline', maybeUploadPontoCheckoutMiddleware, pontoOfflineController('checkout'));
+router.get('/biometria', getMinhaBiometriaController);
+router.post('/biometria', uploadBiometriaMiddleware, cadastrarMinhaBiometriaController);
+router.post('/biometria/conferir', uploadConferirRostoMiddleware, conferirMeuRostoController);
+router.get('/biometria/:id/foto', validateUUIDParam('id'), fotoMinhaBiometriaController);
 router.get('/meu-dia', getMeuDiaPontoController);
 router.get('/painel-inicial', getPainelPontoInicialController);
 router.get('/minhas-escalas', listMinhasEscalasController);

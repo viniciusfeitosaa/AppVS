@@ -37,6 +37,7 @@ import JustificarAusenciaPonto from './pages/JustificarAusenciaPonto';
 import MeuCalendarioPlantoes from './pages/MeuCalendarioPlantoes';
 import Relatorios from './pages/Relatorios';
 import RelatoriosPontoEletronico from './pages/RelatoriosPontoEletronico';
+import ReconhecimentoFacial from './pages/ReconhecimentoFacial';
 import RelatoriosProcedimentos from './pages/RelatoriosProcedimentos';
 import Perfil from './pages/Perfil';
 import EnvioDocumentos from './pages/EnvioDocumentos';
@@ -165,6 +166,14 @@ function AppRoutes() {
           element={
             <MasterOnly>
               <Avaliacao />
+            </MasterOnly>
+          }
+        />
+        <Route
+          path="/reconhecimento-facial"
+          element={
+            <MasterOnly>
+              <ReconhecimentoFacial />
             </MasterOnly>
           }
         />
